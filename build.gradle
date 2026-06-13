@@ -1,0 +1,94 @@
+plugins {
+    id 'java'
+    id 'application'
+}
+
+group = 'com.veylon'
+version = '0.1.0'
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(25)
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+ext {
+    lwjglVersion = '3.3.6'
+    lwjglNatives = 'natives-windows'
+    jomlVersion = '1.10.8'
+}
+
+dependencies {
+    implementation platform("org.lwjgl:lwjgl-bom:${lwjglVersion}")
+    implementation 'org.lwjgl:lwjgl'
+    implementation 'org.lwjgl:lwjgl-glfw'
+    implementation 'org.lwjgl:lwjgl-opengl'
+    implementation 'org.lwjgl:lwjgl-openal'
+    implementation 'org.lwjgl:lwjgl-stb'
+    runtimeOnly "org.lwjgl:lwjgl::${lwjglNatives}"
+    runtimeOnly "org.lwjgl:lwjgl-glfw::${lwjglNatives}"
+    runtimeOnly "org.lwjgl:lwjgl-opengl::${lwjglNatives}"
+    runtimeOnly "org.lwjgl:lwjgl-openal::${lwjglNatives}"
+    runtimeOnly "org.lwjgl:lwjgl-stb::${lwjglNatives}"
+    implementation "org.joml:joml:${jomlVersion}"
+}
+
+application {
+    mainClass = 'com.veylon.Main'
+    applicationDefaultJvmArgs = ['-Xmx2G', '--enable-native-access=ALL-UNNAMED']
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+}
+
+jar {
+    archiveBaseName = 'veylon'
+    manifest {
+        attributes 'Main-Class': 'com.veylon.Main'
+    }
+}
+
+// Single runnable fat jar with all dependencies and natives included.
+tasks.register('fatJar', Jar) {
+    group = 'distribution'
+    description = 'Builds a single runnable jar containing all dependencies.'
+    archiveBaseName = 'veylon'
+    archiveClassifier = 'all'
+    manifest {
+        attributes 'Main-Class': 'com.veylon.Main'
+    }
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    from sourceSets.main.output
+    from {
+        configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) }
+    }
+    exclude 'META-INF/*.SF', 'META-INF/*.DSA', 'META-INF/*.RSA'
+}
+
+// Platform-specific executable bundle via jpackage (requires a JDK with jpackage on PATH).
+tasks.register('jpackage', Exec) {
+    dependsOn 'installDist'
+    group = 'distribution'
+    description = 'Creates a Windows app-image with jpackage.'
+    def libDir = layout.buildDirectory.dir("install/veylon/lib").get().asFile
+    def outDir = layout.buildDirectory.dir("jpackage").get().asFile
+    doFirst {
+        project.delete(new File(outDir, 'Veylon'))
+        outDir.mkdirs()
+    }
+    commandLine 'jpackage',
+            '--type', 'app-image',
+            '--name', 'Veylon',
+            '--app-version', project.version.toString(),
+            '--input', libDir.absolutePath,
+            '--main-jar', "veylon-${project.version}.jar",
+            '--main-class', 'com.veylon.Main',
+            '--dest', outDir.absolutePath,
+            '--java-options', '-Xmx2G',
+            '--java-options', '--enable-native-access=ALL-UNNAMED'
+}
