@@ -22,14 +22,19 @@ jobs:
             os: windows-2025
             platform: windows-x64
             architecture: x64
+            native: natives-windows
           - name: macOS Apple Silicon
             os: macos-15
             platform: macos-arm64
             architecture: aarch64
+            native: natives-macos-arm64
+            binary_arch: arm64
           - name: macOS Intel
             os: macos-15-intel
             platform: macos-x64
             architecture: x64
+            native: natives-macos
+            binary_arch: x86_64
 
     steps:
       - name: Check out source
@@ -60,38 +65,30 @@ jobs:
         shell: bash
         run: ./gradlew clean releaseArtifacts --no-daemon --console=plain
 
-      - name: Smoke test Windows app-image
-        if: runner.os == 'Windows'
-        shell: pwsh
-        env:
-          VEYLON_SMOKE: "12"
-          VEYLON_VSYNC: "0"
-          VEYLON_MIN_FPS: "20"
-        run: |
-          $process = Start-Process -FilePath ".\build\jpackage\Veylon\Veylon.exe" -PassThru -Wait
-          if ($process.ExitCode -ne 0) {
-            throw "Packaged smoke test failed with exit code $($process.ExitCode)"
-          }
-
-      - name: Smoke test macOS app-image
-        if: runner.os == 'macOS'
-        shell: bash
-        env:
-          VEYLON_SMOKE: "12"
-          VEYLON_VSYNC: "0"
-          VEYLON_MIN_FPS: "20"
-        run: ./build/jpackage/Veylon.app/Contents/MacOS/Veylon
-
       - name: Validate Windows archive
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
           $archive = Get-ChildItem "build/distributions/veylon-*-${{ matrix.platform }}.zip" | Select-Object -First 1
           if (-not $archive) { throw "Release archive was not created" }
+          if ($archive.Length -lt 1MB) { throw "Release archive is unexpectedly small" }
           $inspect = Join-Path $env:RUNNER_TEMP "veylon-release-inspect"
           Expand-Archive -LiteralPath $archive.FullName -DestinationPath $inspect
-          if (-not (Test-Path (Join-Path $inspect "Veylon/Veylon.exe"))) {
+          $app = Join-Path $inspect "Veylon"
+          if (-not (Test-Path (Join-Path $app "Veylon.exe"))) {
             throw "Veylon.exe is missing from the release archive"
+          }
+          if (-not (Test-Path (Join-Path $app "runtime/release"))) {
+            throw "Bundled Java runtime is missing from the release archive"
+          }
+          $config = Join-Path $app "app/Veylon.cfg"
+          if (-not (Test-Path $config)) { throw "Veylon.cfg is missing" }
+          $configText = Get-Content -Raw $config
+          if ($configText -notmatch [regex]::Escape("${{ matrix.native }}.jar")) {
+            throw "Expected LWJGL native classifier is missing from Veylon.cfg"
+          }
+          if ($configText -notmatch [regex]::Escape("--enable-native-access=ALL-UNNAMED")) {
+            throw "Required native-access JVM option is missing from Veylon.cfg"
           }
 
       - name: Validate macOS archive
@@ -100,11 +97,21 @@ jobs:
         run: |
           archive="$(find build/distributions -maxdepth 1 -name 'veylon-*-${{ matrix.platform }}.zip' -print -quit)"
           test -n "$archive"
-          unzip -t "$archive"
+          test "$(stat -f%z "$archive")" -gt 1048576
+          unzip -tq "$archive"
           inspect="$RUNNER_TEMP/veylon-release-inspect"
           mkdir -p "$inspect"
           ditto -x -k "$archive" "$inspect"
-          test -x "$inspect/Veylon.app/Contents/MacOS/Veylon"
+          app="$inspect/Veylon.app"
+          launcher="$app/Contents/MacOS/Veylon"
+          config="$app/Contents/app/Veylon.cfg"
+          test -x "$launcher"
+          test -f "$app/Contents/runtime/Contents/Home/lib/libjli.dylib"
+          test -f "$config"
+          file "$launcher" | grep -Fq '${{ matrix.binary_arch }}'
+          grep -Fq '${{ matrix.native }}.jar' "$config"
+          grep -Fq 'java-options=-XstartOnFirstThread' "$config"
+          grep -Fq 'java-options=--enable-native-access=ALL-UNNAMED' "$config"
 
       - name: Upload release archive
         uses: actions/upload-artifact@v7

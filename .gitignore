@@ -1,6 +1,7 @@
 .gradle/
 bin/
 build/
+release-assets-*/
 saves/
 screenshots/
 veylon_graphics.properties
