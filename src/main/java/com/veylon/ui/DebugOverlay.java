@@ -13,9 +13,20 @@ public class DebugOverlay {
         int cz = Math.floorDiv((int) Math.floor(p.pos.z), 16);
         long heapUsed = (Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory()) / (1024 * 1024);
         long heapMax = Runtime.getRuntime().maxMemory() / (1024 * 1024);
+        var timing = g.frameProfiler.snapshot();
+        int totalDraws = g.renderer.drawCalls + ui.drawCallsLastFrame();
 
         String[] lines = {
-                String.format("FPS: %d  (%.2f ms)  particles: %d", g.fps, g.frameMs, g.particles.count),
+                String.format("FPS: %d (%.2f ms)  avg %.1f  p95 %.2f ms  p99 %.2f ms",
+                        g.fps, g.frameMs, timing.averageFps(), timing.p95Ms(), timing.p99Ms()),
+                String.format("Render: %d draws  %,d triangles  %d chunks  %d/%d particles",
+                        totalDraws, g.renderer.trianglesRendered, g.renderer.chunksRendered,
+                        g.renderer.particlesDrawn, g.particles.count),
+                String.format("Output: %dx%d framebuffer  UI %.0f%%  FOV %.0f  distance %d",
+                        g.window.framebufferWidth(), g.window.framebufferHeight(), ui.uiScale() * 100f,
+                        g.renderer.settings.fov, g.renderer.settings.renderDistance),
+                String.format("OpenGL diagnostics: %d errors  %d KHR errors  debug=%s",
+                        g.window.glErrorCount(), g.window.glDebugErrorCount(), g.window.khrDebugActive()),
                 String.format("Pos: %.2f / %.2f / %.2f", p.pos.x, p.pos.y, p.pos.z),
                 String.format("Chunk: %d, %d   Loaded: %d   Rendered: %d",
                         cx, cz, g.world.loadedCount(), g.renderer.chunksRendered),

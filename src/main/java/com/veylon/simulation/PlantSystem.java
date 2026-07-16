@@ -22,6 +22,11 @@ public class PlantSystem {
     public long growthEvents = 0;
     public float lastAvgMoisture = 0.5f;
 
+    public void reset() {
+        growthEvents = 0;
+        lastAvgMoisture = 0.5f;
+    }
+
     public void slowTick(Game g, float dt) {
         World world = g.world;
         int pcx = Math.floorDiv((int) g.player.pos.x, 16);

@@ -29,6 +29,11 @@ public class FireSystem {
         return burning.size();
     }
 
+    public void reset() {
+        burning.clear();
+        totalIgnitions = 0;
+    }
+
     public boolean ignite(Game g, int x, int y, int z) {
         BlockType t = g.world.getBlock(x, y, z);
         if (!t.flammable) {

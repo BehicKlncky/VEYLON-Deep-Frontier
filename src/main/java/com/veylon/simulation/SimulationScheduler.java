@@ -20,6 +20,10 @@ public class SimulationScheduler {
 
     private double fastAcc, mediumAcc, slowAcc;
 
+    public void reset() {
+        fastAcc = mediumAcc = slowAcc = 0;
+    }
+
     public void update(double frameDt, Ticks ticks) {
         // Clamp to avoid a spiral of death after stalls (window drag, GC, etc.).
         frameDt = Math.min(frameDt, 0.25);

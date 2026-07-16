@@ -19,6 +19,10 @@ public class ItemConditionSystem {
 
     public int itemsSpoiled;
 
+    public void reset() {
+        itemsSpoiled = 0;
+    }
+
     public void slowTick(Game g, float dt) {
         // Cold air preserves food; heat spoils it faster.
         float envRate = spoilRate(g.player.envTemp);

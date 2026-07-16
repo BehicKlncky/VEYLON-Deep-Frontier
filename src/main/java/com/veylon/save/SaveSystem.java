@@ -12,6 +12,7 @@ import com.veylon.item.ItemStack;
 import com.veylon.item.ItemType;
 import com.veylon.simulation.EventSystem;
 import com.veylon.simulation.WeatherSystem;
+import com.veylon.util.AppPaths;
 import com.veylon.util.Vec3i;
 import com.veylon.world.BlockType;
 import com.veylon.world.Poi;
@@ -28,6 +29,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 /**
  * Binary save format v2. Stores the seed plus every delta from the generated
@@ -44,16 +46,24 @@ public final class SaveSystem {
     private static final int MAGIC = 0x5645594C; // "VEYL"
     private static final int VERSION = 2;
 
-    public static final Path SAVE_PATH = Path.of("saves", "veylon.sav");
+    public static final Path SAVE_PATH = AppPaths.dataDirectory().resolve("saves/veylon.sav");
 
     private SaveSystem() {
     }
 
     public static boolean save(Game g) {
+        return save(g, SAVE_PATH);
+    }
+
+    public static boolean save(Game g, Path savePath) {
+        Objects.requireNonNull(savePath, "savePath");
         try {
-            Files.createDirectories(SAVE_PATH.getParent());
+            Path parent = savePath.getParent();
+            if (parent != null) {
+                Files.createDirectories(parent);
+            }
             try (DataOutputStream out = new DataOutputStream(
-                    new BufferedOutputStream(Files.newOutputStream(SAVE_PATH)))) {
+                    new BufferedOutputStream(Files.newOutputStream(savePath)))) {
                 out.writeInt(MAGIC);
                 out.writeInt(VERSION);
                 out.writeLong(g.world.seed);
@@ -246,11 +256,16 @@ public final class SaveSystem {
     }
 
     public static boolean load(Game g) {
-        if (!Files.exists(SAVE_PATH)) {
+        return load(g, SAVE_PATH);
+    }
+
+    public static boolean load(Game g, Path savePath) {
+        Objects.requireNonNull(savePath, "savePath");
+        if (!Files.exists(savePath)) {
             return false;
         }
         try (DataInputStream in = new DataInputStream(
-                new BufferedInputStream(Files.newInputStream(SAVE_PATH)))) {
+                new BufferedInputStream(Files.newInputStream(savePath)))) {
             if (in.readInt() != MAGIC) {
                 System.err.println("Save file has wrong magic");
                 return false;

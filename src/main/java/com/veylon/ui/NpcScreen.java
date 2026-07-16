@@ -38,8 +38,7 @@ public class NpcScreen {
 
         float pw = 600, ph = 430;
         float x0 = w / 2f - pw / 2f, y0 = h / 2f - ph / 2f;
-        ui.rect(x0, y0, pw, ph, 0.07f, 0.07f, 0.1f, 0.94f);
-        ui.rectOutline(x0, y0, pw, ph, 2, 0.6f, 0.6f, 0.7f, 0.9f);
+        ui.panel(x0, y0, pw, ph);
         ui.textCentered(w / 2f, y0 + 12, 2f, n.name, 1f, 1f, 0.9f, 1f);
 
         String sub = n.isTrader
@@ -55,18 +54,21 @@ public class NpcScreen {
         option(ui, x0 + 30, oy, "[1] Talk");
         oy += 26;
         if (n.isTrader) {
-            option(ui, x0 + 30, oy, "[2] Trade: 1 Iron Ore -> 2 Cooked Meat");
+            tradeOption(ui, x0 + 30, oy, "[2]", ItemType.IRON_ORE, 1,
+                    ItemType.COOKED_MEAT, 2, "");
             oy += 26;
-            option(ui, x0 + 30, oy, "[3] Trade: 5 Berries -> 2 Coal");
+            tradeOption(ui, x0 + 30, oy, "[3]", ItemType.BERRY, 5,
+                    ItemType.COAL, 2, "");
             oy += 26;
-            option(ui, x0 + 30, oy, "[4] Trade: 2 Hide -> 1 Blueprint Fragment");
+            tradeOption(ui, x0 + 30, oy, "[4]", ItemType.HIDE, 2,
+                    ItemType.BLUEPRINT_FRAGMENT, 1, "");
             oy += 26;
         } else {
-            option(ui, x0 + 30, oy, "[2] Trade: " + berryCost + " Berries -> 1 Plank"
-                    + (friendly ? " (friend price)" : ""));
+            tradeOption(ui, x0 + 30, oy, "[2]", ItemType.BERRY, berryCost,
+                    ItemType.PLANK, 1, friendly ? "friend price" : "");
             oy += 26;
-            option(ui, x0 + 30, oy, "[3] Trade: " + meatCost + " Raw Meat -> 3 Berries"
-                    + (friendly ? " (friend price)" : ""));
+            tradeOption(ui, x0 + 30, oy, "[3]", ItemType.RAW_MEAT, meatCost,
+                    ItemType.BERRY, 3, friendly ? "friend price" : "");
             oy += 26;
             Quest quest = g.faction.quest;
             if (quest == null) {
@@ -118,6 +120,22 @@ public class NpcScreen {
 
     private void option(UiRenderer ui, float x, float y, String s) {
         ui.textShadow(x, y, 1.5f, s, 0.9f, 0.95f, 1f, 1f);
+    }
+
+    private void tradeOption(UiRenderer ui, float x, float y, String key,
+                             ItemType give, int giveCount, ItemType receive, int receiveCount,
+                             String suffix) {
+        ui.textShadow(x, y + 2, 1.35f, key, 0.9f, 0.95f, 1f, 1f);
+        ui.itemIcon(give, x + 38, y - 2, 22);
+        ui.textShadow(x + 64, y + 2, 1.2f, giveCount + " " + give.displayName,
+                0.88f, 0.9f, 0.92f, 1f);
+        ui.textShadow(x + 236, y + 2, 1.25f, "->", 0.55f, 0.9f, 0.92f, 1f);
+        ui.itemIcon(receive, x + 263, y - 2, 22);
+        ui.textShadow(x + 289, y + 2, 1.2f, receiveCount + " " + receive.displayName,
+                0.95f, 0.9f, 0.68f, 1f);
+        if (!suffix.isEmpty()) {
+            ui.textShadow(x + 445, y + 2, 1.05f, suffix, 0.55f, 0.95f, 0.62f, 1f);
+        }
     }
 
     private void questAction(Game g, Npc n) {

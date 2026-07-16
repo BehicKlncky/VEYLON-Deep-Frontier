@@ -72,7 +72,7 @@ public class SimulationPanel {
         float pw = 400;
         float x0 = w - pw - 10;
         float y = 60;
-        ui.rect(x0 - 10, y - 10, pw + 10, lines.length * 17 + 20, 0.04f, 0.04f, 0.07f, 0.85f);
+        ui.panel(x0 - 10, y - 10, pw + 10, lines.length * 17 + 20);
         for (String line : lines) {
             ui.textShadow(x0, y, 1.3f, line, 0.8f, 1f, 0.9f, 1f);
             y += 17;

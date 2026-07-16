@@ -47,6 +47,12 @@ public class WaterSystem {
         return queue.size();
     }
 
+    public void reset() {
+        queue.clear();
+        scheduled.clear();
+        cellsProcessed = 0;
+    }
+
     public void mediumTick(Game g, float dt) {
         World world = g.world;
         int processed = 0;

@@ -196,15 +196,10 @@ public class Hud {
         for (int i = 0; i < slots; i++) {
             float x = x0 + i * slot;
             boolean sel = i == g.player.hotbarSel;
-            ui.rect(x + 1, y0 + 1, slot - 2, slot - 2, 0.08f, 0.08f, 0.1f, sel ? 0.85f : 0.6f);
-            if (sel) {
-                ui.rectOutline(x, y0, slot, slot, 2, 1f, 1f, 1f, 0.95f);
-            } else {
-                ui.rectOutline(x + 1, y0 + 1, slot - 2, slot - 2, 1, 0.5f, 0.5f, 0.5f, 0.6f);
-            }
+            ui.slot(x, y0, slot, false, sel);
             ItemStack s = g.player.inventory.get(i);
             if (s != null) {
-                ui.rect(x + 9, y0 + 7, slot - 18, slot - 22, s.type.r, s.type.g, s.type.b, 1f);
+                ui.itemIcon(s.type, x + 8, y0 + 5, slot - 16);
                 if (s.count > 1) {
                     ui.textShadow(x + 6, y0 + slot - 13, 1.2f, String.valueOf(s.count), 1f, 1f, 1f, 1f);
                 }

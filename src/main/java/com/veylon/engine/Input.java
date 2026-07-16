@@ -10,6 +10,7 @@ public class Input {
     private final boolean[] mousePressed = new boolean[8];
 
     private double cursorX, cursorY;
+    private double cursorScaleX = 1.0, cursorScaleY = 1.0;
     private double lastX, lastY;
     private double deltaX, deltaY;
     private double scrollY;
@@ -82,11 +83,20 @@ public class Input {
     }
 
     public double cursorX() {
-        return cursorX;
+        return cursorX * cursorScaleX;
     }
 
     public double cursorY() {
-        return cursorY;
+        return cursorY * cursorScaleY;
+    }
+
+    /**
+     * Scales GLFW logical-window pointer coordinates into the active UI canvas.
+     * Mouse-look deltas intentionally remain in raw logical pixels.
+     */
+    public void setCursorScale(double x, double y) {
+        cursorScaleX = Double.isFinite(x) && x > 0 ? x : 1.0;
+        cursorScaleY = Double.isFinite(y) && y > 0 ? y : 1.0;
     }
 
     public double scrollDelta() {

@@ -5,7 +5,21 @@ import com.veylon.entity.Carcass;
 import com.veylon.entity.Creature;
 import com.veylon.entity.Npc;
 import com.veylon.entity.Track;
+import com.veylon.gfx.Environment;
+import com.veylon.gfx.GraphicsSettings;
+import com.veylon.gfx.MaterialRegistry;
+import com.veylon.gfx.ParticleRenderer;
+import com.veylon.gfx.PostProcessor;
+import com.veylon.gfx.ShadowMap;
+import com.veylon.gfx.SkyRenderer;
+import com.veylon.gfx.model.Animator;
+import com.veylon.gfx.model.CreatureModels;
+import com.veylon.gfx.model.EntityModel;
+import com.veylon.gfx.model.HeldItemModels;
+import com.veylon.gfx.model.NpcModels;
 import com.veylon.item.ItemStack;
+import com.veylon.item.ItemType;
+import com.veylon.item.ToolKind;
 import com.veylon.util.Vec3i;
 import com.veylon.world.Chunk;
 import com.veylon.world.ChunkMesher;
@@ -21,142 +35,148 @@ import java.util.List;
 import static org.lwjgl.opengl.GL33C.*;
 
 /**
- * Renders the voxel world, entities (with walk-bob and posture animation),
- * carcasses, animal tracks, particles, the first-person held item, fire and
- * the target outline.
+ * Forward PBR-lite pipeline: sun shadow pass -> HDR scene (sky, terrain,
+ * entities, water, particles, held item) -> bloom/tonemap/FXAA composite.
  */
 public class Renderer {
 
+    /** Default chunk radius; live value comes from settings. */
     public static final int RENDER_RADIUS = 6;
 
-    private static final String CHUNK_VS = """
-            #version 330 core
-            layout(location=0) in vec3 aPos;
-            layout(location=1) in vec3 aColor;
-            layout(location=2) in float aSky;
-            layout(location=3) in float aBlock;
-            uniform mat4 uProj;
-            uniform mat4 uView;
-            out vec3 vColor;
-            out float vSky;
-            out float vBlock;
-            out float vDist;
-            void main() {
-                vec4 viewPos = uView * vec4(aPos, 1.0);
-                gl_Position = uProj * viewPos;
-                vColor = aColor;
-                vSky = aSky;
-                vBlock = aBlock;
-                vDist = length(viewPos.xyz);
-            }
-            """;
+    public final GraphicsSettings settings = GraphicsSettings.loadOrDefaults();
+    public final Environment env = new Environment();
 
-    private static final String CHUNK_FS = """
-            #version 330 core
-            in vec3 vColor;
-            in float vSky;
-            in float vBlock;
-            in float vDist;
-            uniform float uDayLight;
-            uniform vec3 uFogColor;
-            uniform float uFogStart;
-            uniform float uFogEnd;
-            uniform float uAlpha;
-            out vec4 FragColor;
-            void main() {
-                float light = max(vSky * uDayLight, vBlock);
-                light = max(light, 0.035);
-                vec3 col = vColor * light;
-                float fog = clamp((vDist - uFogStart) / (uFogEnd - uFogStart), 0.0, 1.0);
-                col = mix(col, uFogColor, fog);
-                FragColor = vec4(col, uAlpha);
-            }
-            """;
-
-    private static final String ENTITY_VS = """
-            #version 330 core
-            layout(location=0) in vec3 aPos;
-            layout(location=1) in vec3 aNormal;
-            uniform mat4 uProj;
-            uniform mat4 uView;
-            uniform mat4 uModel;
-            out vec3 vNormal;
-            out float vDist;
-            void main() {
-                vec4 world = uModel * vec4(aPos, 1.0);
-                vec4 viewPos = uView * world;
-                gl_Position = uProj * viewPos;
-                vNormal = aNormal;
-                vDist = length(viewPos.xyz);
-            }
-            """;
-
-    private static final String ENTITY_FS = """
-            #version 330 core
-            in vec3 vNormal;
-            in float vDist;
-            uniform vec3 uColor;
-            uniform float uLight;
-            uniform vec3 uFogColor;
-            uniform float uFogStart;
-            uniform float uFogEnd;
-            out vec4 FragColor;
-            void main() {
-                float shade = 1.0;
-                if (length(vNormal) > 0.5) {
-                    shade = 0.55 + 0.45 * clamp(dot(normalize(vNormal), normalize(vec3(0.35, 0.8, 0.45))), 0.0, 1.0);
-                }
-                vec3 col = uColor * shade * uLight;
-                float fog = clamp((vDist - uFogStart) / (uFogEnd - uFogStart), 0.0, 1.0);
-                col = mix(col, uFogColor, fog);
-                FragColor = vec4(col, 1.0);
-            }
-            """;
+    /** QA-only vertex-AO kill switch (VEYLON_AO=0) for controlled comparisons. */
+    private final boolean qaAoOff = "0".equals(System.getenv("VEYLON_AO"));
 
     private ShaderProgram chunkShader;
     private ShaderProgram entityShader;
+    private ShaderProgram shadowShader;
+    private ShaderProgram waterShader;
+    private final SkyRenderer sky = new SkyRenderer();
+    private final PostProcessor post = new PostProcessor();
+    private final ParticleRenderer particles = new ParticleRenderer();
+    private ShadowMap shadowMap;
+
     private Mesh cubeMesh;
+    private Mesh centeredCubeMesh;
     private Mesh lineCube;
+    private Mesh crackMesh;
     private final ChunkMesher mesher = new ChunkMesher();
     private final Matrix4f model = new Matrix4f();
+    private final Matrix4f identity = new Matrix4f();
     private final Matrix4f projView = new Matrix4f();
     private final FrustumIntersection frustum = new FrustumIntersection();
+    private final Vector3f camRight = new Vector3f();
+    private final Vector3f camUp = new Vector3f();
+    private final Vector3f shadowFocus = new Vector3f();
+    private final List<Chunk> visible = new ArrayList<>();
 
     private float fogStart = 60, fogEnd = 110;
-    private float skyR, skyG, skyB;
-    public int chunksRendered;
 
-    public void init() {
-        chunkShader = new ShaderProgram(CHUNK_VS, CHUNK_FS);
-        entityShader = new ShaderProgram(ENTITY_VS, ENTITY_FS);
-        cubeMesh = buildCube();
-        lineCube = buildLineCube();
-        glEnable(GL_DEPTH_TEST);
-        glDisable(GL_CULL_FACE);
+    // Render stats (read by the debug overlay / smoke test).
+    public int chunksRendered;
+    public int drawCalls;
+    public long trianglesRendered;
+    public int particlesDrawn;
+    /** Actual particle instanced submissions made this frame (0..2). */
+    public int particleDrawCalls;
+    public int chunkMeshRebuildsLastFrame;
+    public long chunkMeshRebuildsTotal;
+
+    public int renderRadius() {
+        return settings.renderDistance;
     }
 
+    public void init() {
+        if (qaAoOff) {
+            System.out.println("[settings] QA vertex AO disabled (VEYLON_AO=0)");
+        }
+        MaterialRegistry.init(settings.crispTextures);
+        chunkShader = ShaderProgram.load("chunk");
+        entityShader = ShaderProgram.load("entity");
+        shadowShader = ShaderProgram.load("shadow");
+        waterShader = ShaderProgram.load("water");
+        sky.init();
+        post.init();
+        particles.init();
+        shadowMap = new ShadowMap(settings.shadowMapSize());
+
+        // Initialize shadow samplers while both candidate units hold a valid
+        // comparison texture. NVIDIA validates sampler state at glUseProgram,
+        // before the following uniform write, so this also avoids a one-time
+        // undefined-state warning from the default sampler value (unit zero).
+        shadowMap.bindTexture(0);
+        shadowMap.bindTexture(1);
+        chunkShader.bind();
+        chunkShader.set("uShadow", 1);
+        chunkShader.setVec2Array("uLayerProps", MaterialRegistry.layerProps());
+        entityShader.bind();
+        entityShader.set("uShadow", 1);
+        glActiveTexture(GL_TEXTURE0);
+
+        cubeMesh = buildCube();
+        centeredCubeMesh = buildCenteredCube();
+        lineCube = buildLineCube();
+        crackMesh = buildCrackMesh();
+        glEnable(GL_DEPTH_TEST);
+        glEnable(GL_CULL_FACE);
+        glCullFace(GL_BACK);
+    }
+
+    /** Bottom-anchored unit cube used by block-like effects and world marks. */
     private Mesh buildCube() {
-        // Unit cube: x,z in [-0.5, 0.5], y in [0, 1]. Position + normal.
-        float[][] faces = {
-                // nx, ny, nz, then 4 corners
-                {0, 1, 0, -0.5f, 1, -0.5f, 0.5f, 1, -0.5f, 0.5f, 1, 0.5f, -0.5f, 1, 0.5f},
-                {0, -1, 0, -0.5f, 0, -0.5f, -0.5f, 0, 0.5f, 0.5f, 0, 0.5f, 0.5f, 0, -0.5f},
-                {0, 0, -1, -0.5f, 0, -0.5f, 0.5f, 0, -0.5f, 0.5f, 1, -0.5f, -0.5f, 1, -0.5f},
-                {0, 0, 1, -0.5f, 0, 0.5f, -0.5f, 1, 0.5f, 0.5f, 1, 0.5f, 0.5f, 0, 0.5f},
-                {-1, 0, 0, -0.5f, 0, -0.5f, -0.5f, 1, -0.5f, -0.5f, 1, 0.5f, -0.5f, 0, 0.5f},
-                {1, 0, 0, 0.5f, 0, -0.5f, 0.5f, 0, 0.5f, 0.5f, 1, 0.5f, 0.5f, 1, -0.5f},
+        return buildCuboidMesh(0f, 1f);
+    }
+
+    /** Centered unit cube used by ModelPart, whose box coordinates are centers. */
+    private Mesh buildCenteredCube() {
+        return buildCuboidMesh(-0.5f, 0.5f);
+    }
+
+    private Mesh buildCuboidMesh(float y0, float y1) {
+        float x0 = -0.5f, x1 = 0.5f, z0 = -0.5f, z1 = 0.5f;
+        float[][][] faces = {
+                {{0, 1, 0}, {x0, y1, z1}, {x1, y1, z1}, {x1, y1, z0}, {x0, y1, z0}},
+                {{0, -1, 0}, {x0, y0, z0}, {x1, y0, z0}, {x1, y0, z1}, {x0, y0, z1}},
+                {{0, 0, -1}, {x1, y0, z0}, {x0, y0, z0}, {x0, y1, z0}, {x1, y1, z0}},
+                {{0, 0, 1}, {x0, y0, z1}, {x1, y0, z1}, {x1, y1, z1}, {x0, y1, z1}},
+                {{-1, 0, 0}, {x0, y0, z0}, {x0, y0, z1}, {x0, y1, z1}, {x0, y1, z0}},
+                {{1, 0, 0}, {x1, y0, z1}, {x1, y0, z0}, {x1, y1, z0}, {x1, y1, z1}},
         };
         com.veylon.util.FloatList list = new com.veylon.util.FloatList(36 * 6);
-        for (float[] f : faces) {
-            float nx = f[0], ny = f[1], nz = f[2];
-            int[][] order = {{0, 1, 2}, {0, 2, 3}};
-            for (int[] tri : order) {
-                for (int v : tri) {
-                    int base = 3 + v * 3;
-                    list.add(f[base], f[base + 1], f[base + 2]);
-                    list.add(nx, ny, nz);
-                }
+        for (float[][] f : faces) {
+            float[] n = f[0];
+            for (int idx : new int[]{1, 2, 3, 1, 3, 4}) {
+                list.add(f[idx][0], f[idx][1], f[idx][2]);
+                list.add(n[0], n[1], n[2]);
             }
+        }
+        Mesh m = new Mesh(new int[]{3, 3});
+        m.upload(list.array(), list.size());
+        return m;
+    }
+
+    /** Small branching line network rendered once over the face currently being mined. */
+    private Mesh buildCrackMesh() {
+        float[][] segments = {
+                {0.00f, 0.02f, -0.12f, 0.18f},
+                {-0.12f, 0.18f, -0.30f, 0.28f},
+                {-0.12f, 0.18f, -0.20f, 0.38f},
+                {0.00f, 0.02f, 0.15f, 0.13f},
+                {0.15f, 0.13f, 0.34f, 0.08f},
+                {0.15f, 0.13f, 0.25f, 0.32f},
+                {0.00f, 0.02f, -0.05f, -0.18f},
+                {-0.05f, -0.18f, -0.22f, -0.34f},
+                {-0.05f, -0.18f, 0.10f, -0.38f},
+                {0.10f, -0.38f, 0.28f, -0.31f}
+        };
+        com.veylon.util.FloatList list = new com.veylon.util.FloatList(segments.length * 12);
+        for (float[] s : segments) {
+            list.add(s[0], s[1], 0);
+            list.add(0, 0, 1);
+            list.add(s[2], s[3], 0);
+            list.add(0, 0, 1);
         }
         Mesh m = new Mesh(new int[]{3, 3});
         m.upload(list.array(), list.size());
@@ -172,9 +192,9 @@ public class Renderer {
         com.veylon.util.FloatList list = new com.veylon.util.FloatList(24 * 6);
         for (float[] edge : e) {
             list.add(edge[0], edge[1], edge[2]);
-            list.add(0, 0, 0);
+            list.add(0, 1, 0);
             list.add(edge[3], edge[4], edge[5]);
-            list.add(0, 0, 0);
+            list.add(0, 1, 0);
         }
         Mesh m = new Mesh(new int[]{3, 3});
         m.upload(list.array(), list.size());
@@ -183,10 +203,11 @@ public class Renderer {
 
     /** Rebuilds up to budget dirty chunk meshes near the player. */
     public void buildDirtyMeshes(World world, int pcx, int pcz, int budget) {
+        chunkMeshRebuildsLastFrame = 0;
         List<Chunk> dirty = new ArrayList<>();
         for (Chunk c : world.loadedChunks()) {
             if (c.dirty && c.generated
-                    && Math.max(Math.abs(c.cx - pcx), Math.abs(c.cz - pcz)) <= RENDER_RADIUS) {
+                    && Math.max(Math.abs(c.cx - pcx), Math.abs(c.cz - pcz)) <= renderRadius()) {
                 dirty.add(c);
             }
         }
@@ -195,76 +216,45 @@ public class Renderer {
                 Math.abs(b2.cx - pcx) + Math.abs(b2.cz - pcz)));
         for (int i = 0; i < Math.min(budget, dirty.size()); i++) {
             mesher.buildChunk(world, dirty.get(i));
+            chunkMeshRebuildsLastFrame++;
+            chunkMeshRebuildsTotal++;
         }
     }
 
-    public void render(Game game) {
+    public void render(Game game, float dt) {
         Camera cam = game.camera;
+        cam.fovDeg = settings.fov;
         int w = game.window.width(), h = game.window.height();
-        glViewport(0, 0, w, h);
+        drawCalls = 0;
+        trianglesRendered = 0;
 
-        float dayLight = (float) game.time.dayLight() * game.weather.lightMul()
-                * game.events.skyLightMul();
-        float flash = game.weather.flashLight();
+        env.update(game, dt);
+        game.particles.density = settings.particleDensity;
+        glEnable(GL_CULL_FACE); // UI pass disables it each frame
 
-        // Sky/fog color.
-        float dl = Math.max(dayLight, 0.05f);
-        skyR = lerp(0.025f, 0.47f, dl) + flash * 0.45f;
-        skyG = lerp(0.03f, 0.65f, dl) + flash * 0.45f;
-        skyB = lerp(0.07f, 0.88f, dl) + flash * 0.45f;
-        float grayness = game.weather.grayness();
-        float lum = (skyR + skyG + skyB) / 3f;
-        skyR = lerp(skyR, lum, grayness);
-        skyG = lerp(skyG, lum, grayness);
-        skyB = lerp(skyB, lum, grayness);
-        if (game.events.toxicFog()) {
-            // Sickly green cast.
-            skyR *= 0.6f;
-            skyG = Math.min(1f, skyG * 1.1f + 0.06f);
-            skyB *= 0.55f;
-        } else if (game.events.ashfall()) {
-            float ash = (skyR + skyG + skyB) / 3f * 0.8f;
-            skyR = lerp(skyR, ash, 0.7f);
-            skyG = lerp(skyG, ash, 0.7f);
-            skyB = lerp(skyB, ash, 0.7f);
-        }
-
-        fogStart = game.weather.fogStart();
-        fogEnd = game.weather.fogEnd();
-        if (game.events.toxicFog()) {
-            fogStart = Math.min(fogStart, 16f);
-            fogEnd = Math.min(fogEnd, 46f);
-        }
-
-        glClearColor(skyR, skyG, skyB, 1f);
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        glEnable(GL_DEPTH_TEST);
-        glDisable(GL_BLEND);
+        // Fog capped so the chunk-load horizon is never visible.
+        float maxFog = renderRadius() * 16f - 6f;
+        fogEnd = Math.min(env.fogEnd, maxFog);
+        fogStart = Math.min(env.fogStart, fogEnd * 0.62f);
 
         Matrix4f proj = cam.projectionMatrix((float) w / h);
         Matrix4f view = cam.viewMatrix();
         projView.set(proj).mul(view);
         frustum.set(projView);
+        // Billboard axes from the view matrix rows.
+        camRight.set(view.m00(), view.m10(), view.m20());
+        camUp.set(view.m01(), view.m11(), view.m21());
 
         int pcx = Math.floorDiv((int) Math.floor(cam.position.x), 16);
         int pcz = Math.floorDiv((int) Math.floor(cam.position.z), 16);
 
-        chunkShader.bind();
-        chunkShader.set("uProj", proj);
-        chunkShader.set("uView", view);
-        chunkShader.set("uDayLight", Math.min(1f, dayLight + flash));
-        chunkShader.set("uFogColor", skyR, skyG, skyB);
-        chunkShader.set("uFogStart", fogStart);
-        chunkShader.set("uFogEnd", fogEnd);
-        chunkShader.set("uAlpha", 1f);
-
+        visible.clear();
         chunksRendered = 0;
-        List<Chunk> visible = new ArrayList<>();
         for (Chunk c : game.world.loadedChunks()) {
             if (!c.generated || c.meshOpaque == null) {
                 continue;
             }
-            if (Math.max(Math.abs(c.cx - pcx), Math.abs(c.cz - pcz)) > RENDER_RADIUS) {
+            if (Math.max(Math.abs(c.cx - pcx), Math.abs(c.cz - pcz)) > renderRadius()) {
                 continue;
             }
             float minX = c.cx * 16, minZ = c.cz * 16;
@@ -272,215 +262,299 @@ public class Renderer {
                 continue;
             }
             visible.add(c);
+        }
+
+        // ---- Shadow pass ----
+        boolean shadowsOn = settings.shadowQuality > 0;
+        if (shadowsOn) {
+            if (shadowMap.size != settings.shadowMapSize()) {
+                shadowMap.delete();
+                shadowMap = new ShadowMap(settings.shadowMapSize());
+            }
+            shadowFocus.set(cam.position).add(cam.front().mul(14f, new Vector3f()));
+            shadowMap.updateMatrix(shadowFocus, env.lightDir);
+            shadowMap.begin();
+            shadowShader.bind();
+            shadowShader.set("uSunMatrix", shadowMap.lightMatrix);
+            shadowShader.set("uModel", identity);
+            glDisable(GL_CULL_FACE); // include thin geometry both ways
+            for (Chunk c : visible) {
+                c.meshOpaque.draw();
+                drawCalls++;
+            }
+            glEnable(GL_CULL_FACE);
+            shadowMap.end();
+        }
+
+        // ---- HDR scene ----
+        post.resize(w, h);
+        post.beginScene();
+        glClearColor(0, 0, 0, 1);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        glDisable(GL_BLEND);
+
+        sky.render(proj, view, cam.position, env, (float) game.totalTime);
+        drawCalls++;
+
+        // Terrain.
+        chunkShader.bind();
+        chunkShader.set("uProj", proj);
+        chunkShader.set("uView", view);
+        chunkShader.set("uSunMatrix", shadowsOn ? shadowMap.lightMatrix : identity);
+        chunkShader.set("uTime", (float) game.totalTime);
+        chunkShader.set("uTiles", 0);
+        chunkShader.set("uShadow", 1);
+        chunkShader.set("uShadowsOn", shadowsOn ? 1f : 0f);
+        chunkShader.set("uAoOn", qaAoOff ? 0f : 1f);
+        chunkShader.set("uLightDir", env.lightDir);
+        chunkShader.set("uLightColor", env.lightColor);
+        chunkShader.set("uAmbientSky", env.ambientSky);
+        chunkShader.set("uAmbientGround", env.ambientGround);
+        chunkShader.set("uBlockLightColor", env.blockLightColor);
+        chunkShader.set("uCamPos", cam.position);
+        chunkShader.set("uFoliageTint", env.foliageTint);
+        chunkShader.set("uWetness", env.wetness);
+        chunkShader.set("uFrost", env.frost);
+        chunkShader.set("uFogColor", env.fogColor);
+        chunkShader.set("uFogStart", fogStart);
+        chunkShader.set("uFogEnd", fogEnd);
+        MaterialRegistry.textureArray().bind(0);
+        // Keep the samplerShadow backed by a comparison-enabled depth texture
+        // even when shadow contribution is disabled; some 3.3 drivers validate
+        // sampler bindings before uniform flow control.
+        shadowMap.bindTexture(1);
+        for (Chunk c : visible) {
             c.meshOpaque.draw();
+            drawCalls++;
+            trianglesRendered += c.meshOpaque.vertexCount() / 3;
             chunksRendered++;
         }
 
-        renderEntities(game, proj, view, dayLight, flash);
-        renderParticles(game, dayLight + flash);
+        renderEntities(game, proj, view);
 
-        // Transparent water pass.
+        // Water (transparent, both faces visible, no depth writes).
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
         glDepthMask(false);
-        chunkShader.bind();
-        chunkShader.set("uAlpha", 0.55f);
+        glDisable(GL_CULL_FACE);
+        waterShader.bind();
+        waterShader.set("uProj", proj);
+        waterShader.set("uView", view);
+        waterShader.set("uTime", (float) game.totalTime);
+        waterShader.set("uCamPos", cam.position);
+        waterShader.set("uLightDir", env.lightDir);
+        waterShader.set("uLightColor", env.lightColor);
+        waterShader.set("uAmbientSky", env.ambientSky);
+        waterShader.set("uDeepColor", env.waterDeep);
+        waterShader.set("uShallowColor", env.waterShallow);
+        waterShader.set("uFogColor", env.fogColor);
+        waterShader.set("uFogStart", fogStart);
+        waterShader.set("uFogEnd", fogEnd);
         for (Chunk c : visible) {
-            if (c.meshWater != null) {
+            if (c.meshWater != null && c.meshWater.vertexCount() > 0) {
                 c.meshWater.draw();
+                drawCalls++;
+                trianglesRendered += c.meshWater.vertexCount() / 3;
             }
         }
+        glEnable(GL_CULL_FACE);
         glDepthMask(true);
         glDisable(GL_BLEND);
 
-        renderHeldItem(game, proj, dayLight + flash);
+        // Particles (instanced, zero to two actual draw submissions).
+        float pAmbient = Math.max(0.25f,
+                (env.ambientSky.x + env.ambientSky.y + env.ambientSky.z) / 3f + env.flash);
+        particles.render(game.particles, proj, view, camRight, camUp, pAmbient);
+        particlesDrawn = particles.drawnLastFrame;
+        particleDrawCalls = particles.drawCallsLastFrame;
+        drawCalls += particles.drawCallsLastFrame;
+
+        renderHeldItem(game, proj);
+
+        // ---- Composite to backbuffer ----
+        post.composite(env, settings.bloom, settings.fxaa);
+        drawCalls += settings.bloom ? 4 : 1;
     }
 
-    private void renderEntities(Game game, Matrix4f proj, Matrix4f view, float dayLight, float flash) {
+    // ------------------------------------------------------------------
+    // Entities (hierarchical cuboid models posed immediately before each draw)
+    // ------------------------------------------------------------------
+
+    private void bindEntityCommon(Matrix4f proj, Matrix4f view, boolean shadowsOn) {
         entityShader.bind();
         entityShader.set("uProj", proj);
         entityShader.set("uView", view);
-        entityShader.set("uFogColor", skyR, skyG, skyB);
+        entityShader.set("uSunMatrix", shadowsOn ? shadowMap.lightMatrix : identity);
+        entityShader.set("uShadow", 1);
+        entityShader.set("uShadowsOn", shadowsOn ? 1f : 0f);
+        entityShader.set("uLightDir", env.lightDir);
+        entityShader.set("uLightColor", env.lightColor);
+        entityShader.set("uAmbientSky", env.ambientSky);
+        entityShader.set("uAmbientGround", env.ambientGround);
+        entityShader.set("uBlockLightColor", env.blockLightColor);
+        entityShader.set("uFogColor", env.fogColor);
         entityShader.set("uFogStart", fogStart);
         entityShader.set("uFogEnd", fogEnd);
+        entityShader.set("uTintMul", 1f, 1f, 1f);
+        entityShader.set("uEmissive", 0f);
+    }
 
-        renderTracks(game, dayLight + flash);
-        renderCarcasses(game, dayLight + flash);
+    private void renderEntities(Game game, Matrix4f proj, Matrix4f view) {
+        bindEntityCommon(proj, view, settings.shadowQuality > 0);
 
+        renderTracks(game);
+        renderCarcasses(game);
+
+        Vector3f camPos = game.camera.position;
+        float entityRange = fogEnd + 12f;
         for (Creature c : game.entities.creatures) {
-            if (c.dead) {
+            float boundsHalf = Math.max(0.45f, c.width * 0.75f);
+            float boundsHeight = c.height + (c.type == Creature.CreatureType.DEER ? 0.55f : 0.35f);
+            if (c.dead || !entityVisible(camPos, c.pos.x, c.pos.y, c.pos.z,
+                    boundsHalf, boundsHeight, entityRange)) {
                 continue;
             }
-            float light = entityLight(game, c.pos.x, c.pos.y + c.height * 0.5f, c.pos.z, dayLight + flash);
-            boolean moving = Math.abs(c.vel.x) > 0.2f || Math.abs(c.vel.z) > 0.2f;
-            float bob = moving ? (float) Math.abs(Math.sin(c.bobPhase * 3.2f)) * 0.07f : 0f;
-            // Stalking/charging predators drop low; resting deer sit down.
-            float posture = switch (c.state) {
-                case STALK, TRACK -> 0.78f;
-                case CHARGE -> 0.85f;
-                case REST -> 0.6f;
-                default -> 1f;
-            };
-            // Body.
-            model.identity().translate(c.pos.x, c.pos.y + bob, c.pos.z)
-                    .rotateY((float) Math.toRadians(-c.yaw))
-                    .scale(c.width, c.height * 0.62f * posture, c.width * 1.35f);
-            drawCube(c.type.r, c.type.g, c.type.b, light);
-            // Head.
-            model.identity().translate(c.pos.x, c.pos.y + bob + c.height * 0.5f * posture, c.pos.z)
-                    .rotateY((float) Math.toRadians(-c.yaw))
-                    .translate(0, 0, -c.width * 0.62f)
-                    .scale(c.width * 0.55f, c.height * 0.34f, c.width * 0.55f);
-            drawCube(c.type.r * 0.8f, c.type.g * 0.8f, c.type.b * 0.8f, light);
-            // Bird wings flap.
-            if (c.type.flying) {
-                float wing = (float) Math.sin(game.totalTime * 18 + c.bobPhase) * 0.6f;
-                for (int side = -1; side <= 1; side += 2) {
-                    model.identity().translate(c.pos.x, c.pos.y + c.height * 0.55f, c.pos.z)
-                            .rotateY((float) Math.toRadians(-c.yaw))
-                            .rotateZ(side * (0.5f + wing))
-                            .translate(side * c.width * 0.75f, 0, 0)
-                            .scale(c.width * 1.3f, 0.04f, c.width * 0.55f);
-                    drawCube(c.type.r * 0.9f, c.type.g * 0.9f, c.type.b * 0.9f, light);
-                }
-            }
-            // Thornhorn horns.
-            if (c.type == Creature.CreatureType.THORNHORN) {
-                for (int side = -1; side <= 1; side += 2) {
-                    model.identity().translate(c.pos.x, c.pos.y + bob + c.height * 0.72f, c.pos.z)
-                            .rotateY((float) Math.toRadians(-c.yaw))
-                            .translate(side * 0.22f, 0, -c.width * 0.7f)
-                            .scale(0.08f, 0.4f, 0.08f);
-                    drawCube(0.85f, 0.82f, 0.7f, light);
-                }
-            }
+            EntityModel creatureModel = CreatureModels.of(c.type);
+            Animator.poseCreature(creatureModel, c, game.totalTime);
+            setEntityLight(game, c.pos.x, c.pos.y + c.height * 0.5f, c.pos.z);
+            entityShader.set("uTintMul", 1f, 1f, 1f);
+            model.identity().translate(c.pos.x, c.pos.y, c.pos.z)
+                    .rotateY((float) Math.toRadians(-c.yaw));
+            drawModel(creatureModel, model);
         }
 
         for (Npc n : game.entities.npcs) {
-            if (n.dead) {
+            if (n.dead || !entityVisible(camPos, n.pos.x, n.pos.y, n.pos.z,
+                    0.55f, n.height + 0.25f, entityRange)) {
                 continue;
             }
-            float light = entityLight(game, n.pos.x, n.pos.y + 1f, n.pos.z, dayLight + flash);
-            boolean moving = Math.abs(n.vel.x) > 0.2f || Math.abs(n.vel.z) > 0.2f;
-            float bob = moving ? (float) Math.abs(Math.sin(n.bobPhase * 3.2f)) * 0.05f : 0f;
-            float r, g, b;
-            if (n.raider) {
-                r = 0.45f;
-                g = 0.18f;
-                b = 0.14f;
-            } else if (n.isTrader) {
-                r = 0.75f;
-                g = 0.6f;
-                b = 0.2f;
-            } else if (n.hostileToPlayer()) {
-                r = 0.7f;
-                g = 0.2f;
-                b = 0.15f;
-            } else if (n.sick) {
-                r = 0.35f;
-                g = 0.5f;
-                b = 0.45f;
-            } else {
-                r = 0.25f;
-                g = 0.45f;
-                b = 0.65f;
-            }
-            model.identity().translate(n.pos.x, n.pos.y + bob, n.pos.z)
-                    .rotateY((float) Math.toRadians(-n.yaw))
-                    .scale(n.width, n.height * 0.72f, n.width * 0.7f);
-            drawCube(r, g, b, light);
-            model.identity().translate(n.pos.x, n.pos.y + bob + n.height * 0.72f, n.pos.z)
-                    .rotateY((float) Math.toRadians(-n.yaw))
-                    .scale(0.32f, 0.30f, 0.32f);
-            drawCube(0.85f, 0.68f, 0.55f, light);
+            EntityModel npcModel = NpcModels.get();
+            Animator.poseNpc(npcModel, n, game.totalTime);
+            setEntityLight(game, n.pos.x, n.pos.y + 1f, n.pos.z);
+            entityShader.set("uTintMul", 1f, 1f, 1f);
+            model.identity().translate(n.pos.x, n.pos.y, n.pos.z)
+                    .rotateY((float) Math.toRadians(-n.yaw));
+            drawModel(npcModel, model);
         }
 
-        // Burning blocks: pulsing orange cubes.
+        // Burning blocks: emissive flames handled by particles; keep a core glow cube.
         float pulse = 0.78f + 0.22f * (float) Math.sin(game.totalTime * 9.0);
+        entityShader.set("uEmissive", 0.9f);
         for (Vec3i p : game.fire.burningCells()) {
             model.identity().translate(p.x() + 0.5f, p.y(), p.z() + 0.5f)
                     .scale(0.95f * pulse, 1.05f * pulse, 0.95f * pulse);
-            drawCube(1.0f, 0.45f + 0.15f * pulse, 0.08f, 1.0f);
+            drawCube(1.0f, 0.45f + 0.15f * pulse, 0.08f);
         }
 
-        // Active beacon: a pulsing light column reaching the sky.
+        // Active beacon: pulsing cyan light column.
         if (game.world.beaconStage >= 3 && game.world.beaconPos != null) {
             Vec3i bp = game.world.beaconPos;
             float beam = 0.65f + 0.35f * (float) Math.sin(game.totalTime * 2.4);
+            entityShader.set("uEmissive", 1.2f);
             model.identity().translate(bp.x() + 0.5f, bp.y() + 1, bp.z() + 0.5f)
                     .scale(0.22f * beam, Chunk.SY, 0.22f * beam);
-            drawCube(0.55f, 0.9f, 1.0f, 1.2f);
+            drawCube(0.35f, 0.85f, 0.95f);
         }
+        entityShader.set("uEmissive", 0f);
 
         // Target block outline.
         Raycaster.Hit hit = game.targetHit;
         if (hit != null) {
+            setEntityLight(game, hit.x() + 0.5f, hit.y() + 0.5f, hit.z() + 0.5f);
+            entityShader.set("uTintMul", 1f, 1f, 1f);
             model.identity().translate(hit.x() - 0.002f, hit.y() - 0.002f, hit.z() - 0.002f)
                     .scale(1.004f);
             entityShader.set("uModel", model);
             entityShader.set("uColor", 0.05f, 0.05f, 0.05f);
-            entityShader.set("uLight", 1f);
+            entityShader.set("uEmissive", 0.35f);
             lineCube.draw(GL_LINES);
+            entityShader.set("uEmissive", 0f);
+            drawCalls++;
+            if (game.miningProgress > 0f) {
+                renderMiningCracks(hit, game.miningProgress);
+            }
         }
     }
 
-    private void renderTracks(Game game, float dayLight) {
+    /** One line draw over the struck face; scale/intensity communicate mining progress. */
+    private void renderMiningCracks(Raycaster.Hit hit, float progress) {
+        float p = Math.min(1f, Math.max(0f, progress));
+        model.identity().translate(
+                hit.x() + 0.5f + hit.nx() * 0.505f,
+                hit.y() + 0.5f + hit.ny() * 0.505f,
+                hit.z() + 0.5f + hit.nz() * 0.505f);
+        if (hit.nx() > 0) {
+            model.rotateY((float) Math.PI * 0.5f);
+        } else if (hit.nx() < 0) {
+            model.rotateY((float) -Math.PI * 0.5f);
+        } else if (hit.ny() > 0) {
+            model.rotateX((float) -Math.PI * 0.5f);
+        } else if (hit.ny() < 0) {
+            model.rotateX((float) Math.PI * 0.5f);
+        } else if (hit.nz() < 0) {
+            model.rotateY((float) Math.PI);
+        }
+        model.scale(0.62f + p * 0.38f);
+        entityShader.set("uModel", model);
+        entityShader.set("uColor", 0.045f, 0.035f, 0.03f);
+        entityShader.set("uEmissive", 0.18f + p * 0.18f);
+        crackMesh.draw(GL_LINES);
+        entityShader.set("uEmissive", 0f);
+        drawCalls++;
+    }
+
+    private void renderTracks(Game game) {
         Vector3f camPos = game.camera.position;
         for (Track t : game.entities.tracks) {
             float dx = t.x - camPos.x, dz = t.z - camPos.z;
-            if (dx * dx + dz * dz > 42 * 42) {
+            if (dx * dx + dz * dz > 42 * 42
+                    || !frustum.testAab(t.x - 0.3f, t.y - 0.05f, t.z - 0.3f,
+                    t.x + 0.3f, t.y + 0.15f, t.z + 0.3f)) {
                 continue;
             }
             float fade = 1f - t.age / Track.MAX_AGE;
             if (fade <= 0) {
                 continue;
             }
-            float light = entityLight(game, t.x, t.y + 0.5f, t.z, dayLight);
+            setEntityLight(game, t.x, t.y + 0.5f, t.z);
+            entityShader.set("uTintMul", 1f, 1f, 1f);
             model.identity().translate(t.x, t.y + 0.01f, t.z)
                     .rotateY((float) Math.toRadians(-t.yaw))
                     .scale(0.12f + fade * 0.06f, 0.012f, 0.2f + fade * 0.05f);
             if (t.blood) {
-                drawCube(0.55f * fade + 0.1f, 0.06f, 0.06f, light);
+                drawCube(0.45f * fade + 0.1f, 0.05f, 0.05f);
             } else {
-                drawCube(0.16f, 0.12f, 0.09f, light * (0.4f + 0.6f * fade));
+                float d = 0.4f + 0.6f * fade;
+                drawCube(0.16f * d, 0.12f * d, 0.09f * d);
             }
         }
     }
 
-    private void renderCarcasses(Game game, float dayLight) {
+    private void renderCarcasses(Game game) {
+        Vector3f camPos = game.camera.position;
+        float range = fogEnd + 8f;
         for (Carcass c : game.entities.carcasses) {
-            float light = entityLight(game, c.pos.x, c.pos.y + 0.3f, c.pos.z, dayLight);
             var t = c.type;
-            float rot = c.rotten() ? 0.6f : 1f;
-            // Body lying on its side.
-            model.identity().translate(c.pos.x, c.pos.y + 0.05f, c.pos.z)
-                    .scale(t.width * 1.3f, t.width * 0.55f, t.height * 1.1f);
-            drawCube(t.r * rot, t.g * rot * 0.9f, t.b * rot * 0.85f, light);
-            model.identity().translate(c.pos.x, c.pos.y + 0.04f, c.pos.z + t.height * 0.6f)
-                    .scale(t.width * 0.5f, t.width * 0.4f, t.width * 0.5f);
-            drawCube(t.r * 0.75f * rot, t.g * 0.7f * rot, t.b * 0.7f * rot, light);
-        }
-    }
-
-    private void renderParticles(Game game, float dayLight) {
-        ParticleSystem ps = game.particles;
-        if (ps.count == 0) {
-            return;
-        }
-        entityShader.bind();
-        float ambient = Math.max(0.25f, dayLight);
-        for (int i = 0; i < ps.count; i++) {
-            float s = ps.size[i] * ps.fade(i);
-            if (s < 0.005f) {
+            if (!entityVisible(camPos, c.pos.x, c.pos.y, c.pos.z,
+                    Math.max(0.5f, t.width), t.height + 0.5f, range)) {
                 continue;
             }
-            model.identity().translate(ps.px[i], ps.py[i], ps.pz[i]).scale(s);
-            drawCube(ps.cr[i], ps.cg[i], ps.cb[i], ambient);
+            setEntityLight(game, c.pos.x, c.pos.y + 0.3f, c.pos.z);
+            float rot = c.rotten() ? 0.6f : 1f;
+            entityShader.set("uTintMul", rot, rot * 0.9f, rot * 0.85f);
+            EntityModel carcassModel = CreatureModels.of(t);
+            Animator.poseCarcass(carcassModel);
+            // Carcass currently stores no death yaw; derive a stable orientation from position.
+            float yaw = (c.pos.x * 0.37f + c.pos.z * 0.73f) % ((float) Math.PI * 2f);
+            model.identity().translate(c.pos.x, c.pos.y + 0.05f, c.pos.z)
+                    .rotateY(yaw);
+            drawModel(carcassModel, model);
         }
+        entityShader.set("uTintMul", 1f, 1f, 1f);
     }
 
-    /** First-person held item with swing/bob animation, drawn over the world. */
-    private void renderHeldItem(Game game, Matrix4f proj, float dayLight) {
+    /** First-person held item, drawn in camera space over the scene. */
+    private void renderHeldItem(Game game, Matrix4f proj) {
         ItemStack held = game.player.selected();
         if (held == null || game.player.dead) {
             return;
@@ -488,69 +562,107 @@ public class Renderer {
         glClear(GL_DEPTH_BUFFER_BIT);
         entityShader.bind();
         entityShader.set("uProj", proj);
-        // Identity view: position the item in camera space directly.
-        model.identity();
-        entityShader.set("uView", model);
+        entityShader.set("uView", identity);
+        entityShader.set("uShadowsOn", 0f);
         entityShader.set("uFogStart", 1000f);
         entityShader.set("uFogEnd", 2000f);
+        entityShader.set("uTintMul", 1f, 1f, 1f);
+        // Camera-space: fake a from-above light.
+        entityShader.set("uLightDir", 0.3f, 0.8f, 0.5f);
+        setEntityLight(game, game.player.pos.x, game.player.pos.y + 1.2f, game.player.pos.z);
 
+        float motion = settings.motion;
         float swing = game.swingTimer > 0 ? (0.35f - game.swingTimer) / 0.35f : 0;
-        float swingArc = (float) Math.sin(swing * Math.PI) * 0.9f;
-        float bob = (float) Math.sin(game.walkBob * 6) * 0.015f
+        float swingArc = (float) Math.sin(swing * Math.PI) * 0.9f
+                * (0.45f + settings.motion * 0.55f);
+        float bob = (float) Math.sin(game.walkBob * 6) * 0.015f * motion
                 * (Math.abs(game.player.vel.x) + Math.abs(game.player.vel.z) > 0.5f ? 1 : 0);
+        float sideBob = (float) Math.cos(game.walkBob * 3) * 0.012f * motion;
+        float viewScale = heldViewScale(held.type);
 
-        boolean isTool = held.type.tool != com.veylon.item.ToolKind.NONE;
+        EntityModel heldModel = HeldItemModels.of(held.type);
+        heldModel.resetPose();
         model.identity()
-                .translate(0.42f - swingArc * 0.18f, -0.38f + bob - swingArc * 0.10f, -0.62f)
-                .rotateY(-0.5f - swingArc * 0.9f)
-                .rotateX(-swingArc * 0.8f);
-        if (isTool) {
-            // Handle.
-            model.scale(0.05f, 0.34f, 0.05f);
-            entityShader.set("uModel", model);
-            entityShader.set("uColor", 0.45f, 0.33f, 0.2f);
-            entityShader.set("uLight", Math.max(0.4f, dayLight));
-            cubeMesh.draw();
-            // Head.
-            model.identity()
-                    .translate(0.42f - swingArc * 0.18f, -0.07f + bob - swingArc * 0.10f, -0.62f)
-                    .rotateY(-0.5f - swingArc * 0.9f)
-                    .rotateX(-swingArc * 0.8f)
-                    .scale(0.14f, 0.09f, 0.07f);
-            entityShader.set("uModel", model);
-            entityShader.set("uColor", held.type.r, held.type.g, held.type.b);
-            cubeMesh.draw();
-        } else {
-            model.scale(0.16f, 0.16f, 0.16f);
-            entityShader.set("uModel", model);
-            entityShader.set("uColor", held.type.r, held.type.g, held.type.b);
-            entityShader.set("uLight", Math.max(0.4f, dayLight));
-            cubeMesh.draw();
-        }
+                .translate(0.26f + sideBob - swingArc * 0.16f,
+                        -0.50f + bob - swingArc * 0.09f, -0.96f)
+                .rotateZ(-0.18f + sideBob * 1.8f + swingArc * 0.24f)
+                .rotateY(-0.38f - swingArc * 0.85f)
+                .rotateX(0.10f - swingArc * 0.72f)
+                .scale(viewScale);
+        drawModel(heldModel, model);
+        entityShader.set("uEmissive", 0f);
     }
 
-    private void drawCube(float r, float g, float b, float light) {
+    private float heldViewScale(ItemType type) {
+        if (type.tool == ToolKind.WEAPON) {
+            return 0.68f; // long spear stays inside the viewmodel frame
+        }
+        if (type.tool == ToolKind.PICKAXE || type.tool == ToolKind.AXE) {
+            return 0.85f;
+        }
+        if (type.tool == ToolKind.KNIFE) {
+            return 1.2f;
+        }
+        if (type == ItemType.TORCH) {
+            return 1.0f;
+        }
+        if (type.places() != null) {
+            return 0.82f;
+        }
+        if (type.isEdible() || type.isMedical()) {
+            return 1.05f;
+        }
+        if (type.isEquippable()) {
+            return 0.95f;
+        }
+        return 0.9f;
+    }
+
+    private boolean entityVisible(Vector3f camPos, float x, float y, float z,
+                                  float halfWidth, float height, float maxDistance) {
+        float dx = x - camPos.x;
+        float dy = y + height * 0.5f - camPos.y;
+        float dz = z - camPos.z;
+        if (dx * dx + dy * dy + dz * dz > maxDistance * maxDistance) {
+            return false;
+        }
+        return frustum.testAab(x - halfWidth, y - 0.15f, z - halfWidth,
+                x + halfWidth, y + height, z + halfWidth);
+    }
+
+    private void drawModel(EntityModel entityModel, Matrix4f base) {
+        int submitted = entityModel.render(base, entityShader, centeredCubeMesh, true);
+        drawCalls += submitted;
+        trianglesRendered += (long) submitted * 12L;
+    }
+
+    private void drawCube(float r, float g, float b) {
         entityShader.set("uModel", model);
         entityShader.set("uColor", r, g, b);
-        entityShader.set("uLight", Math.min(1.2f, light));
         cubeMesh.draw();
+        drawCalls++;
+        trianglesRendered += 12;
     }
 
-    private float entityLight(Game game, float x, float y, float z, float dayLight) {
+    private void setEntityLight(Game game, float x, float y, float z) {
         int bx = (int) Math.floor(x), by = (int) Math.floor(y), bz = (int) Math.floor(z);
-        float sky = game.world.skyLight(bx, by, bz) * dayLight;
-        float blk = game.world.blockLight(bx, by, bz);
-        return Math.max(0.08f, Math.max(sky, blk));
-    }
-
-    private static float lerp(float a, float b, float t) {
-        return a + (b - a) * t;
+        entityShader.set("uSkyLight", game.world.skyLight(bx, by, bz));
+        entityShader.set("uBlockLight", game.world.blockLight(bx, by, bz));
     }
 
     public void delete() {
         chunkShader.delete();
         entityShader.delete();
+        shadowShader.delete();
+        waterShader.delete();
+        sky.delete();
+        post.delete();
+        particles.delete();
+        shadowMap.delete();
         cubeMesh.delete();
+        centeredCubeMesh.delete();
         lineCube.delete();
+        crackMesh.delete();
+        MaterialRegistry.delete();
     }
 }

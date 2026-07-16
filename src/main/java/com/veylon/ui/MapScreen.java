@@ -22,8 +22,7 @@ public class MapScreen {
         float cell = size / CELLS;
         float x0 = w / 2f - size / 2f, y0 = h / 2f - size / 2f;
 
-        ui.rect(x0 - 14, y0 - 44, size + 28, size + 96, 0.06f, 0.06f, 0.09f, 0.95f);
-        ui.rectOutline(x0 - 14, y0 - 44, size + 28, size + 96, 2, 0.6f, 0.6f, 0.7f, 0.9f);
+        ui.panel(x0 - 14, y0 - 44, size + 28, size + 96);
         ui.textCentered(w / 2f, y0 - 34, 1.8f, "MAP  (" + (CELLS * STEP) + "m across)", 1f, 1f, 1f, 1f);
 
         World world = g.world;

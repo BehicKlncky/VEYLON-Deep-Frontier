@@ -59,6 +59,13 @@ public class EventSystem {
     private float meteorTimer;
     public int totalEventsTriggered = 0;
 
+    public void reset() {
+        active.clear();
+        cooldown = 60f;
+        meteorTimer = 0f;
+        totalEventsTriggered = 0;
+    }
+
     public boolean isActive(EventType type) {
         for (ActiveEvent e : active) {
             if (e.type == type) {
@@ -226,6 +233,7 @@ public class EventSystem {
         g.world.setBlock(x - 1, y - 1, z, BlockType.COAL_ORE, true);
         g.world.setBlock(x, y - 2, z, BlockType.STONE, true);
         g.fire.ignite(g, x + 1, y, z + 1);
+        g.particles.meteorImpact(x + 0.5f, y + 0.2f, z + 0.5f);
         g.audio.playThunder();
         if (announce) {
             active.add(new ActiveEvent(EventType.METEOR_SHARD, 30, 1f));

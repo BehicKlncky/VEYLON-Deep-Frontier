@@ -1,6 +1,9 @@
 .gradle/
+bin/
 build/
 saves/
+screenshots/
+veylon_graphics.properties
 *.log
 .idea/
 *.iml

@@ -53,8 +53,7 @@ public class CraftingScreen {
 
         float pw = 700, ph = 500;
         float x0 = w / 2f - pw / 2f, y0 = h / 2f - ph / 2f;
-        ui.rect(x0, y0, pw, ph, 0.07f, 0.07f, 0.1f, 0.94f);
-        ui.rectOutline(x0, y0, pw, ph, 2, 0.6f, 0.6f, 0.7f, 0.9f);
+        ui.panel(x0, y0, pw, ph);
         ui.textCentered(w / 2f, y0 + 12, 2f, "CRAFTING", 1f, 1f, 1f, 1f);
 
         // Tab row.
@@ -110,14 +109,17 @@ public class CraftingScreen {
             boolean known = CraftingSystem.knowsBlueprint(r, g.player.blueprints);
             boolean craftable = CraftingSystem.canCraft(g.player.inventory, r, nearby,
                     g.player.blueprints);
-            if (i == selected) {
-                ui.rect(listX - 4, y - 2, 338, rowH - 2, 0.25f, 0.25f, 0.35f, 0.9f);
-            }
+            ui.button(listX - 4, y - 2, 338, rowH - 2, inside, i == selected, known);
             String name = known ? r.name : "??? (blueprint needed)";
             float cr = !known ? 0.55f : (craftable ? 0.55f : 0.55f);
             float cg = !known ? 0.5f : (craftable ? 1f : 0.45f);
             float cb = !known ? 0.65f : (craftable ? 0.55f : 0.45f);
-            ui.textShadow(listX, y + 4, 1.5f, name, cr, cg, cb, 1f);
+            float nameX = listX;
+            if (r.result != null) {
+                ui.itemIcon(r.result, listX, y + 1, 20, known ? 1f : 0.35f);
+                nameX += 24;
+            }
+            ui.textShadow(nameX, y + 4, 1.5f, name, cr, cg, cb, 1f);
             if (r.station != Station.HAND) {
                 boolean inRange = nearby.contains(r.station);
                 ui.text(listX + 240, y + 6, 1.1f, "[" + r.station.displayName + "]",
@@ -137,7 +139,8 @@ public class CraftingScreen {
         ui.textShadow(dx, dy, 1.7f, known ? r.name : "Locked Blueprint", 1f, 1f, 0.9f, 1f);
         dy += 26;
         if (r.result != null) {
-            ui.textShadow(dx, dy, 1.3f, "Makes: " + r.resultCount + " x " + r.result.displayName,
+            ui.itemIcon(r.result, dx, dy - 3, 24, known ? 1f : 0.4f);
+            ui.textShadow(dx + 30, dy, 1.3f, "Makes: " + r.resultCount + " x " + r.result.displayName,
                     0.85f, 0.85f, 0.85f, 1f);
         } else {
             String next = CraftingSystem.nextBlueprint(g.player.blueprints);
@@ -164,8 +167,8 @@ public class CraftingScreen {
         for (var e : r.ingredients.entrySet()) {
             int have = g.player.inventory.count(e.getKey());
             boolean ok = have >= e.getValue();
-            ui.rect(dx, dy + 1, 12, 12, e.getKey().r, e.getKey().g, e.getKey().b, 1f);
-            ui.textShadow(dx + 18, dy, 1.3f,
+            ui.itemIcon(e.getKey(), dx, dy - 1, 16);
+            ui.textShadow(dx + 21, dy, 1.3f,
                     e.getKey().displayName + "  " + have + "/" + e.getValue() + (ok ? "" : "  MISSING"),
                     ok ? 0.6f : 1f, ok ? 1f : 0.4f, ok ? 0.6f : 0.4f, 1f);
             dy += 19;
@@ -175,11 +178,7 @@ public class CraftingScreen {
         boolean canCraft = CraftingSystem.canCraft(g.player.inventory, r, nearby, g.player.blueprints);
         float btnX = dx, btnY = y0 + ph - 70, btnW = 220, btnH = 36;
         boolean btnHover = mx >= btnX && mx < btnX + btnW && my >= btnY && my < btnY + btnH;
-        ui.rect(btnX, btnY, btnW, btnH,
-                canCraft ? (btnHover ? 0.3f : 0.2f) : 0.15f,
-                canCraft ? (btnHover ? 0.6f : 0.45f) : 0.15f,
-                canCraft ? 0.25f : 0.15f, 0.95f);
-        ui.rectOutline(btnX, btnY, btnW, btnH, 2, 0.7f, 0.7f, 0.7f, 0.9f);
+        ui.button(btnX, btnY, btnW, btnH, btnHover, false, canCraft);
         String btnLabel = canCraft ? "CRAFT [Enter]"
                 : (!known ? "BLUEPRINT LOCKED"
                 : (r.station != Station.HAND && !nearby.contains(r.station)

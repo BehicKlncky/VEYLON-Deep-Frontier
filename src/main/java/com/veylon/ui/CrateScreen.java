@@ -22,8 +22,7 @@ public class CrateScreen {
 
         float pw = 620, ph = 470;
         float x0 = w / 2f - pw / 2f, y0 = h / 2f - ph / 2f;
-        ui.rect(x0, y0, pw, ph, 0.07f, 0.07f, 0.1f, 0.94f);
-        ui.rectOutline(x0, y0, pw, ph, 2, 0.6f, 0.6f, 0.7f, 0.9f);
+        ui.panel(x0, y0, pw, ph);
         ui.textCentered(w / 2f, y0 + 10, 2f, "STORAGE CRATE", 1f, 1f, 1f, 1f);
         ui.textCentered(w / 2f, y0 + ph - 22, 1.2f, "Click an item to transfer it. [F or Esc] close",
                 0.7f, 0.7f, 0.7f, 1f);
@@ -94,11 +93,9 @@ public class CrateScreen {
     }
 
     private void drawSlot(UiRenderer ui, ItemStack s, float x, float y, float size, boolean hover) {
-        ui.rect(x + 2, y + 2, size - 4, size - 4, 0.11f, 0.11f, 0.14f, 0.95f);
-        ui.rectOutline(x + 2, y + 2, size - 4, size - 4, 1,
-                hover ? 0.95f : 0.45f, hover ? 0.95f : 0.45f, hover ? 0.95f : 0.5f, 0.85f);
+        ui.slot(x + 2, y + 2, size - 4, hover, false);
         if (s != null) {
-            ui.rect(x + 9, y + 7, size - 18, size - 22, s.type.r, s.type.g, s.type.b, 1f);
+            ui.itemIcon(s.type, x + 7, y + 5, size - 14);
             ui.textShadow(x + 6, y + size - 15, 1.1f, String.valueOf(s.count), 1f, 1f, 1f, 1f);
         }
     }

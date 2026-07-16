@@ -3,7 +3,10 @@ package com.veylon;
 public final class Main {
 
     public static void main(String[] args) {
-        System.out.println("VEYLON: Deep Frontier - starting...");
+        String version = Main.class.getPackage().getImplementationVersion();
+        System.out.println("VEYLON: Deep Frontier "
+                + (version == null ? "(development)" : "v" + version)
+                + " - starting...");
         try {
             new Game().run();
         } catch (Throwable t) {

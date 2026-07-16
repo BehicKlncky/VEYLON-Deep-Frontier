@@ -30,8 +30,7 @@ public class InventoryScreen {
         float x0 = w / 2f - (gw - eqW) / 2f, y0 = h / 2f - gh / 2f - 10;
         float ex = x0 - eqW - 22;
 
-        ui.rect(ex - 16, y0 - 52, gw + eqW + 56, gh + 130, 0.07f, 0.07f, 0.1f, 0.93f);
-        ui.rectOutline(ex - 16, y0 - 52, gw + eqW + 56, gh + 130, 2, 0.6f, 0.6f, 0.7f, 0.9f);
+        ui.panel(ex - 16, y0 - 52, gw + eqW + 56, gh + 130);
         ui.textCentered(w / 2f, y0 - 40, 2f, "INVENTORY", 1f, 1f, 1f, 1f);
         ui.textCentered(w / 2f, y0 + gh + 12, 1.25f,
                 "Click to select, click again to move/swap. Click a gear slot to equip. Row 1 = hotbar. [E] close",
@@ -57,12 +56,10 @@ public class InventoryScreen {
             if (inside) {
                 hoverEquip = i;
             }
-            ui.rect(ex + 2, y + 2, SLOT - 4, SLOT - 12, 0.12f, 0.14f, 0.10f, 0.95f);
-            ui.rectOutline(ex + 2, y + 2, SLOT - 4, SLOT - 12, 1,
-                    inside ? 0.95f : 0.55f, inside ? 0.95f : 0.55f, inside ? 0.95f : 0.45f, 0.85f);
+            ui.slot(ex + 4, y, SLOT - 8, inside, false);
             ItemStack s = g.player.equipment[i];
             if (s != null) {
-                ui.rect(ex + 11, y + 8, SLOT - 22, SLOT - 28, s.type.r, s.type.g, s.type.b, 1f);
+                ui.itemIcon(s.type, ex + 10, y + 5, SLOT - 20);
                 if (s.type.hasDurability()) {
                     float frac = s.durabilityFrac();
                     ui.rect(ex + 6, y + SLOT - 16, SLOT - 12, 3, 0.1f, 0.1f, 0.1f, 0.9f);
@@ -83,18 +80,13 @@ public class InventoryScreen {
             if (inside) {
                 hover = i;
             }
-            ui.rect(x + 2, y + 2, SLOT - 4, SLOT - 4,
-                    isHotbar ? 0.13f : 0.10f, isHotbar ? 0.13f : 0.10f, isHotbar ? 0.18f : 0.13f, 0.95f);
-            if (i == selectedSlot) {
-                ui.rectOutline(x + 1, y + 1, SLOT - 2, SLOT - 2, 2, 1f, 0.9f, 0.3f, 1f);
-            } else if (inside) {
-                ui.rectOutline(x + 2, y + 2, SLOT - 4, SLOT - 4, 1, 0.9f, 0.9f, 0.9f, 0.9f);
-            } else {
-                ui.rectOutline(x + 2, y + 2, SLOT - 4, SLOT - 4, 1, 0.45f, 0.45f, 0.5f, 0.7f);
+            ui.slot(x + 2, y + 2, SLOT - 4, inside, i == selectedSlot);
+            if (isHotbar) {
+                ui.rect(x + 7, y + 4, SLOT - 14, 2, 0.35f, 0.7f, 0.9f, 0.55f);
             }
             ItemStack s = g.player.inventory.get(i);
             if (s != null) {
-                ui.rect(x + 11, y + 9, SLOT - 22, SLOT - 26, s.type.r, s.type.g, s.type.b, 1f);
+                ui.itemIcon(s.type, x + 10, y + 7, SLOT - 20);
                 if (s.count > 1) {
                     ui.textShadow(x + 7, y + SLOT - 16, 1.2f, String.valueOf(s.count), 1f, 1f, 1f, 1f);
                 }

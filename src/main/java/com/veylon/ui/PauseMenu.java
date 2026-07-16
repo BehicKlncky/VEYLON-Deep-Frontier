@@ -13,14 +13,14 @@ public class PauseMenu {
 
         float pw = 600, ph = 520;
         float x0 = w / 2f - pw / 2f, y0 = h / 2f - ph / 2f;
-        ui.rect(x0, y0, pw, ph, 0.08f, 0.08f, 0.12f, 0.95f);
-        ui.rectOutline(x0, y0, pw, ph, 2, 0.6f, 0.6f, 0.7f, 0.9f);
+        ui.panel(x0, y0, pw, ph);
 
         ui.textCentered(w / 2f, y0 + 16, 2.6f, "VEYLON: DEEP FRONTIER", 1f, 0.95f, 0.8f, 1f);
         ui.textCentered(w / 2f, y0 + 48, 1.4f, "- PAUSED -", 0.8f, 0.8f, 0.8f, 1f);
 
         float oy = y0 + 78;
-        ui.textCentered(w / 2f, oy, 1.6f, "[Esc] Resume      [F5] Save      [F9] Load      [Q] Quit",
+        ui.textCentered(w / 2f, oy, 1.35f,
+                "[Esc] Resume   [O] Graphics   [F5] Save   [F9] Load   [Q] Quit",
                 1f, 1f, 1f, 1f);
         oy += 36;
 
