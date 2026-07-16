@@ -4,7 +4,30 @@ plugins {
 }
 
 group = 'com.veylon'
-version = '0.1.0'
+version = '0.2.0'
+
+def osName = System.getProperty('os.name').toLowerCase(java.util.Locale.ROOT)
+def osArch = System.getProperty('os.arch').toLowerCase(java.util.Locale.ROOT)
+def isWindows = osName.contains('windows')
+def isMacOs = osName.contains('mac')
+def isArm64 = osArch == 'aarch64' || osArch == 'arm64'
+def isX64 = osArch == 'amd64' || osArch == 'x86_64' || osArch == 'x64'
+
+if ((!isWindows && !isMacOs) || (!isArm64 && !isX64)) {
+    throw new GradleException("Unsupported release platform: ${osName} / ${osArch}")
+}
+
+def platformClassifier = isWindows
+        ? (isArm64 ? 'windows-arm64' : 'windows-x64')
+        : (isArm64 ? 'macos-arm64' : 'macos-x64')
+def nativeClassifier = isWindows
+        ? (isArm64 ? 'natives-windows-arm64' : 'natives-windows')
+        : (isArm64 ? 'natives-macos-arm64' : 'natives-macos')
+def appImageDirectoryName = isMacOs ? 'Veylon.app' : 'Veylon'
+def launcherJvmArgs = ['-Xmx2G', '--enable-native-access=ALL-UNNAMED']
+if (isMacOs) {
+    launcherJvmArgs.add('-XstartOnFirstThread')
+}
 
 java {
     toolchain {
@@ -18,7 +41,7 @@ repositories {
 
 ext {
     lwjglVersion = '3.3.6'
-    lwjglNatives = 'natives-windows'
+    lwjglNatives = nativeClassifier
     jomlVersion = '1.10.8'
 }
 
@@ -35,21 +58,29 @@ dependencies {
     runtimeOnly "org.lwjgl:lwjgl-openal::${lwjglNatives}"
     runtimeOnly "org.lwjgl:lwjgl-stb::${lwjglNatives}"
     implementation "org.joml:joml:${jomlVersion}"
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.11.4'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher:1.11.4'
 }
 
 application {
     mainClass = 'com.veylon.Main'
-    applicationDefaultJvmArgs = ['-Xmx2G', '--enable-native-access=ALL-UNNAMED']
+    applicationDefaultJvmArgs = launcherJvmArgs
 }
 
 tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8'
 }
 
+tasks.withType(Test).configureEach {
+    useJUnitPlatform()
+}
+
 jar {
     archiveBaseName = 'veylon'
     manifest {
-        attributes 'Main-Class': 'com.veylon.Main'
+        attributes 'Main-Class': 'com.veylon.Main',
+                'Implementation-Title': 'VEYLON: Deep Frontier',
+                'Implementation-Version': project.version
     }
 }
 
@@ -60,7 +91,9 @@ tasks.register('fatJar', Jar) {
     archiveBaseName = 'veylon'
     archiveClassifier = 'all'
     manifest {
-        attributes 'Main-Class': 'com.veylon.Main'
+        attributes 'Main-Class': 'com.veylon.Main',
+                'Implementation-Title': 'VEYLON: Deep Frontier',
+                'Implementation-Version': project.version
     }
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
     from sourceSets.main.output
@@ -71,24 +104,78 @@ tasks.register('fatJar', Jar) {
 }
 
 // Platform-specific executable bundle via jpackage (requires a JDK with jpackage on PATH).
+tasks.register('cleanJpackage', Delete) {
+    delete layout.buildDirectory.dir("jpackage/${appImageDirectoryName}")
+}
+
 tasks.register('jpackage', Exec) {
-    dependsOn 'installDist'
+    dependsOn 'installDist', 'cleanJpackage'
     group = 'distribution'
-    description = 'Creates a Windows app-image with jpackage.'
+    description = "Creates a ${platformClassifier} app-image with jpackage."
     def libDir = layout.buildDirectory.dir("install/veylon/lib").get().asFile
     def outDir = layout.buildDirectory.dir("jpackage").get().asFile
-    doFirst {
-        project.delete(new File(outDir, 'Veylon'))
-        outDir.mkdirs()
-    }
-    commandLine 'jpackage',
+    def arguments = [
             '--type', 'app-image',
             '--name', 'Veylon',
             '--app-version', project.version.toString(),
             '--input', libDir.absolutePath,
             '--main-jar', "veylon-${project.version}.jar",
             '--main-class', 'com.veylon.Main',
-            '--dest', outDir.absolutePath,
-            '--java-options', '-Xmx2G',
-            '--java-options', '--enable-native-access=ALL-UNNAMED'
+            '--dest', outDir.absolutePath
+    ]
+    launcherJvmArgs.each { option ->
+        arguments.addAll(['--java-options', option])
+    }
+    doFirst {
+        outDir.mkdirs()
+    }
+    commandLine(['jpackage'] + arguments)
+}
+
+// GitHub Releases cannot attach a directory, so archive the complete app-image.
+if (isMacOs) {
+    tasks.register('appImageZip', Exec) {
+        dependsOn 'jpackage'
+        group = 'distribution'
+        description = "Archives the self-contained ${platformClassifier} app-image."
+        def appImage = layout.buildDirectory.dir("jpackage/${appImageDirectoryName}").get().asFile
+        def archive = layout.buildDirectory.file(
+                "distributions/veylon-${project.version}-${platformClassifier}.zip").get().asFile
+        inputs.dir(appImage)
+        outputs.file(archive)
+        doFirst {
+            archive.parentFile.mkdirs()
+            project.delete(archive)
+        }
+        // ditto preserves the executable bits and macOS bundle metadata.
+        commandLine 'ditto', '-c', '-k', '--sequesterRsrc', '--keepParent',
+                appImage.absolutePath, archive.absolutePath
+    }
+} else {
+    tasks.register('appImageZip', Zip) {
+        dependsOn 'jpackage'
+        group = 'distribution'
+        description = "Archives the self-contained ${platformClassifier} app-image."
+        archiveBaseName = 'veylon'
+        archiveClassifier = platformClassifier
+        destinationDirectory = layout.buildDirectory.dir('distributions')
+        from(layout.buildDirectory.dir("jpackage/${appImageDirectoryName}")) {
+            into 'Veylon'
+        }
+        from('README.md') {
+            into 'Veylon'
+        }
+        from('CHANGELOG.md') {
+            into 'Veylon'
+        }
+        from('src/main/resources/assets/fonts/LICENSE-SourceSans3.md') {
+            into 'Veylon/licenses'
+        }
+    }
+}
+
+tasks.register('releaseArtifacts') {
+    dependsOn 'build', 'fatJar', 'appImageZip'
+    group = 'distribution'
+    description = 'Builds and tests every artifact intended for a release.'
 }
