@@ -105,13 +105,22 @@ jobs:
           app="$inspect/Veylon.app"
           launcher="$app/Contents/MacOS/Veylon"
           config="$app/Contents/app/Veylon.cfg"
+          info_plist="$app/Contents/Info.plist"
           test -x "$launcher"
           test -f "$app/Contents/runtime/Contents/Home/lib/libjli.dylib"
           test -f "$config"
+          test -f "$info_plist"
           file "$launcher" | grep -Fq '${{ matrix.binary_arch }}'
           grep -Fq '${{ matrix.native }}.jar' "$config"
           grep -Fq 'java-options=-XstartOnFirstThread' "$config"
           grep -Fq 'java-options=--enable-native-access=ALL-UNNAMED' "$config"
+          project_version="$(sed -n "s/^version = '\([^']*\)'/\1/p" build.gradle)"
+          IFS='.' read -r major minor patch <<< "$project_version"
+          bundle_version="$((major + 1))"
+          test -z "${minor:-}" || bundle_version="$bundle_version.$minor"
+          test -z "${patch:-}" || bundle_version="$bundle_version.$patch"
+          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$info_plist")" = "$project_version"
+          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$info_plist")" = "$bundle_version"
 
       - name: Upload release archive
         uses: actions/upload-artifact@v7

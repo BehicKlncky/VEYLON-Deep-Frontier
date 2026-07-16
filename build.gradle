@@ -13,6 +13,19 @@ def isMacOs = osName.contains('mac')
 def isArm64 = osArch == 'aarch64' || osArch == 'arm64'
 def isX64 = osArch == 'amd64' || osArch == 'x86_64' || osArch == 'x64'
 
+def releaseVersionParts = project.version.toString().split(/\./).toList()
+if (releaseVersionParts.size() < 1 || releaseVersionParts.size() > 3 ||
+        !releaseVersionParts.every { it ==~ /\d+/ }) {
+    throw new GradleException("Release version must contain one to three numeric components: ${project.version}")
+}
+// jpackage requires the first macOS bundle-version component to be positive.
+// Offset the SemVer major for the internal CFBundleVersion, then restore the
+// public project version in CFBundleShortVersionString after packaging.
+def macBundleVersion = releaseVersionParts.withIndex().collect { part, index ->
+    Integer.parseInt(part) + (index == 0 ? 1 : 0)
+}.join('.')
+def jpackageAppVersion = isMacOs ? macBundleVersion : project.version.toString()
+
 if ((!isWindows && !isMacOs) || (!isArm64 && !isX64)) {
     throw new GradleException("Unsupported release platform: ${osName} / ${osArch}")
 }
@@ -117,7 +130,7 @@ tasks.register('jpackage', Exec) {
     def arguments = [
             '--type', 'app-image',
             '--name', 'Veylon',
-            '--app-version', project.version.toString(),
+            '--app-version', jpackageAppVersion,
             '--input', libDir.absolutePath,
             '--main-jar', "veylon-${project.version}.jar",
             '--main-class', 'com.veylon.Main',
@@ -134,8 +147,18 @@ tasks.register('jpackage', Exec) {
 
 // GitHub Releases cannot attach a directory, so archive the complete app-image.
 if (isMacOs) {
-    tasks.register('appImageZip', Exec) {
+    def setMacMarketingVersion = tasks.register('setMacMarketingVersion', Exec) {
         dependsOn 'jpackage'
+        group = 'distribution'
+        description = 'Restores the public project version in the macOS bundle metadata.'
+        def infoPlist = layout.buildDirectory.file(
+                "jpackage/${appImageDirectoryName}/Contents/Info.plist").get().asFile
+        commandLine '/usr/libexec/PlistBuddy', '-c',
+                "Set :CFBundleShortVersionString ${project.version}", infoPlist.absolutePath
+    }
+
+    tasks.register('appImageZip', Exec) {
+        dependsOn setMacMarketingVersion
         group = 'distribution'
         description = "Archives the self-contained ${platformClassifier} app-image."
         def appImage = layout.buildDirectory.dir("jpackage/${appImageDirectoryName}").get().asFile
