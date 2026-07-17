@@ -2,6 +2,124 @@
 
 All notable user-facing changes to VEYLON: Deep Frontier are recorded here.
 
+## [0.3.0] - 2026-07-17
+
+### Added
+
+- **Procedural settlements**: deterministic regional planning places at most one
+  settlement per 384-block region — camps and homesteads (25%), common villages
+  (45%), uncommon forts (18%), rare castles (9%) and very rare fortresses (3%) —
+  with minimum-separation rules for castles/fortresses, a guaranteed friendly
+  starter area and no hostiles beside spawn. Modular biome-adapted construction:
+  timber palisades in pine forest, stone in the highlands, stilted platforms in
+  the marsh, clay in scrubland; houses, storage, workshops, medic huts, trader
+  stalls, wells, farms, watchtowers, walls, gates, barracks, prisons, powder
+  magazines, two-story keeps, campfire squares and connecting paths.
+- **Living residents**: every settled human has a home settlement, an archetype,
+  a bed and a duty point. Residents sleep at night, work, patrol, guard gates,
+  heal the wounded, investigate sounds, raise alarms, defend their walls, flee
+  when morale breaks, eat from real stocks and produce role-specific supplies —
+  and are simulated abstractly (stocks, hunger, illness, mortality, replenishment,
+  morale) while the player is away. Population never insta-respawns.
+- **Headhunter faction** with distinct silhouettes and roles: trackers that read
+  your footprints and share your position, bow scouts that sprint for the alarm
+  bell, spear hunters, armored brutes on the gates, musket powdermen guarding
+  the magazine, and leaders whose death breaks garrison morale.
+- **Capture and siege**: forts and larger holds require command neutralization,
+  alarm suppression and central-objective control in addition to defeating or
+  routing the garrison. Supply the cleared campfire with food and logs to claim a
+  **friendly outpost** with safe beds, storage and limited trade. Expect
+  counterattacks; distant raids resolve abstractly against your garrison.
+  Fortresses offer staged assaults: outer walls, gatehouse, courtyard, inner
+  wall, keep, powder magazine, prison with rescuable captives and a concealed
+  rear breach for infiltration. A regional **bounty** system sends Headhunter
+  hunting parties out from real settlements when you make enemies. Parties travel
+  outbound, search, retreat/return and let surviving scouts report contact.
+- **Deep caves 2.0** (new worlds): three depth identities measured below the
+  local surface — root caves (roots, dirt intrusions, animal dens), basalt
+  depths (sulfur, saltpeter, extra iron, glow fungus, larger chambers, smoking
+  **fumarole** vents that build up the smoke affliction until mined out) and
+  rare resonant depths with crystal formations — carved from density noise plus
+  domain-warped worm tunnels; guaranteed reserved ladder-shaft **cave mouth** and
+  bounded deterministic POI connectors per region; new
+  underground POIs (abandoned mine, smuggler cache, Headhunter hideout, resonant
+  shrine, gloomstalker nest, lost expedition camp). Lakes remain sealed.
+- **Gloomstalker ecology**: nests claim dark territory with visible bone
+  evidence, stalkers ambush laterally from darkness, refuse to chase brightly
+  lit prey, retreat from fire and strong light, and the population stays capped;
+  root-cave dens spawn their wolves underground.
+- **Ranged combat**: shared data-driven weapon stats for player and NPCs.
+  Primitive bow with draw-and-release, arrow drop, arrow recovery from carcasses
+  and surfaces, and iron arrows. **Black powder** (sulfur + saltpeter + charcoal)
+  unlocks the muzzle-loading **Veylan musket**, **scrap flintlock** and
+  **scrap blunderbuss** — high damage, long reloads, and gunshots are huge noise
+  events that alert settlements and wildlife. HUD shows ammo, loaded rounds,
+  reload progress, bow draw and crosshair spread; `R` reloads.
+- **Explosives**: placeable **powder kegs** with visible sputtering fuses (lit by
+  interaction, adjacent fire, or other blasts; bounded chain reactions), thrown
+  **scrap bombs** and **fire bombs**. A reusable explosion system applies
+  distance falloff, line-of-sight cover, per-block blast resistance (ancient and
+  progression-critical blocks are immune; reinforced stone resists), bounded
+  fire ignition, reputation consequences and a single batched world edit per
+  blast (one heightmap/light/mesh pass).
+- **Relic weapons** (loot-only, never craftable): the accurate semi-auto
+  **Frontier Carbine** and the loud full-auto **Scavenged Auto-Rifle**, found
+  extremely rarely in research pods and castle/fortress armories, dependent on
+  scarce relic cartridges and restorable at an anvil with relic components.
+- **Cave gear**: climbable **rope ladders**, long-lived placeable **lanterns**
+  and cheap emissive **trail markers**.
+- **Perception**: positional world-noise events (gunshots, explosions, alarms,
+  fuses, shouts) with radius and intensity; humans hear them, wildlife flees or
+  investigates; human sight is block-occluded, cone-limited and darkness- and
+  crouch-aware, with last-known-position searching and return-to-duty.
+- **Factions & reputation**: per-faction reputation and bounty plus per-settlement
+  local standing. Trade, gifts, healing, defense and rescues improve relations;
+  theft, property damage and violence sour them. Neutral Free Settler communities
+  flip friendly or hostile at thresholds, while hostile Free Settlers require an
+  explicit restitution offer to de-escalate. Regional traders/leaders offer delivery,
+  village defense, trader escort, fort scouting, rescue, patrol clearance, alarm
+  sabotage, stolen-supply recovery, fort capture, outpost defense and cave quests.
+- **Navigation**: bounded voxel A* for settlement NPCs (1-block step-up, limited
+  drops, water costs, gate and rope-ladder awareness, strict per-query budget,
+  cached paths, repath cooldowns) with steering fallback. Gates open for NPCs
+  and the player and close on their own — never on someone standing in them.
+- 13 new blocks and 21 new items, every one with procedural textures, icons and
+  held models; new synthesized audio for bow draw/release, arrow and bullet
+  impacts, musket/pistol reports (long-carry), dry fire, reload, fuses,
+  explosions, alarm bells and gate creaks. Explosion VFX reuse the instanced
+  particle pipeline (flash, sparks, debris, dust, embers) under the existing
+  4000-particle cap, with restrained motion-setting-aware camera shake.
+- Map screen: settlement markers with alignment colors, tier letters (C/V/F/K/X),
+  cleared/occupied states and a wrapping POI legend; debug overlay reports
+  settlements, projectiles, noise events and lit fuses.
+- The deterministic test suite grew to **160 tests across 39 suites**
+  (settlement planning determinism/order-independence/rarity/spacing, deep-cave
+  identity/connectivity/lake protection, v2→v3 migration incl. an authentic
+  0.2.0 fixture, v3 round-trips, pathfinding, perception, combat and bow/firearm
+  workflows, explosions and keg breaches, faction reputation, captive rescue,
+  counterattack lifecycle, NPC budgets, lantern fuel, quest targeting and
+  long-run boundedness). AI decision jitter is reseeded from the world seed on
+  world creation/load, so a fixed seed replays identically.
+
+### Compatibility
+
+- Save format is now **binary v3**; v2 saves load through an explicit migration
+  path and keep their exact legacy terrain (the generator version is persisted).
+  Settlements, deep caves, sulfur/saltpeter and cave POIs appear only in worlds
+  created on 0.3.0+. `BlockType`/`ItemType` and all other serialized enums are
+  append-only; ordinals from v0.1.0 are unchanged.
+- OpenGL 3.3 Core remains the platform baseline; all new art and audio is
+  procedural/synthesized in code.
+
+### Known limitations
+
+- v2 worlds never gain the new world content (documented in the README).
+- Human pathfinding is bounded local A*, not a navmesh; very rough terrain can
+  still stall an NPC, which then falls back to direct steering.
+- Gates are block swaps rather than animated doors; no aim-down-sights.
+- Switching slots or loading a save cancels an in-progress reload; loaded rounds
+  persist. Open-gate close timers persist and resume.
+
 ## [0.2.0] - 2026-07-16
 
 ### Added
