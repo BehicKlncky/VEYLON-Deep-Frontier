@@ -4,7 +4,7 @@ plugins {
 }
 
 group = 'com.veylon'
-version = '0.2.0'
+version = '0.3.0'
 
 def osName = System.getProperty('os.name').toLowerCase(java.util.Locale.ROOT)
 def osArch = System.getProperty('os.arch').toLowerCase(java.util.Locale.ROOT)
@@ -86,6 +86,7 @@ tasks.withType(JavaCompile).configureEach {
 
 tasks.withType(Test).configureEach {
     useJUnitPlatform()
+    systemProperty 'veylon.version', project.version.toString()
 }
 
 jar {
