@@ -62,6 +62,9 @@ public class Creature extends Entity {
     public float bleedTimer = 0;
     /** Animation phase advanced by movement speed (render-side bob). */
     public float bobPhase;
+    /** Arrows lodged in the animal; recovered when the carcass is harvested. */
+    public int stuckArrows;
+    public com.veylon.item.ItemType stuckArrowType;
 
     public Creature(World world, CreatureType type) {
         super(world);

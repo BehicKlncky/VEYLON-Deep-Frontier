@@ -7,6 +7,7 @@ import com.veylon.item.ItemType;
 import com.veylon.world.Biome;
 import com.veylon.world.Poi;
 import com.veylon.world.World;
+import com.veylon.world.WorldGenerator;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -40,12 +41,17 @@ public class EntityManager {
         for (Iterator<Npc> it = npcs.iterator(); it.hasNext(); ) {
             Npc n = it.next();
             NpcAI.update(g, n, dt);
-            n.applyPhysics(dt, true);
+            if (!n.abstractTravel) {
+                n.applyPhysics(dt, true);
+            }
             if (n.dead) {
+                if (n.isTrader && n.partyMissionId != null && !n.partyMissionId.isBlank()) {
+                    g.faction.failMission(n.partyMissionId, "the escorted trader was lost");
+                }
                 if (n.lastHitByPlayer && n.faction != null) {
                     g.faction.addTrust(g, -40, "You killed " + n.name + "!");
                 }
-                if (n.health <= 0 && !n.raider) {
+                if (n.health <= 0 && !n.raider && !n.hostileToPlayer()) {
                     g.log(n.name + " has died.");
                 }
                 if (n.raider && n.lastHitByPlayer) {
@@ -56,7 +62,71 @@ public class EntityManager {
                     g.log("You looted the fallen scavenger.");
                     g.onRaiderKilled();
                 }
+                if (n.settled() || n.warParty) {
+                    onSettledNpcDied(g, n);
+                }
                 it.remove();
+            }
+        }
+    }
+
+    /** Settlement/war-party NPC died: resident bookkeeping + archetype loot. */
+    private void onSettledNpcDied(Game g, Npc n) {
+        // Mission survivor state changes for every real combat death, regardless
+        // of whether the player or an outpost defender landed the final blow.
+        if (n.warParty && n.partyKind == Npc.PartyKind.COUNTERATTACK) {
+            g.settlementManager.counterattacks.onMemberDied(n);
+        }
+        if (n.warParty && !n.lastHitByPlayer
+                && n.partyMission == Npc.PartyMission.RETURNING
+                && g.entities.npcs.stream().noneMatch(other -> other != n && !other.dead
+                && n.partyMissionId.equals(other.partyMissionId))) {
+            g.faction.failMission(n.partyMissionId, "the hostile party escaped");
+        }
+        if (n.lastHitByPlayer) {
+            if (n.settled()) {
+                g.settlementManager.onNpcKilledByPlayer(g, n);
+            }
+            // Cutting down raiders near a community earns its gratitude.
+            if (n.warParty) {
+                g.faction.onWarPartyKill(g, n.partyMissionId, n.originSettlementId,
+                        n.partyTargetSettlementId, n.partyFactionId,
+                        n.partyMemberId == null || n.partyMemberId.isBlank()
+                                ? n.partyMissionId + ":" + n.name + ":" + n.hashCode()
+                                : n.partyMemberId);
+                g.settlementManager.onSettlementDefended(g, n.partyTargetSettlementId,
+                        n.pos.x, n.pos.z);
+            }
+            if (n.hostileToPlayer() && n.archetype != null) {
+                switch (n.archetype) {
+                    case SCOUT -> g.player.inventory.add(ItemType.ARROW, 2 + rng.nextInt(4));
+                    case POWDERMAN -> {
+                        g.player.inventory.add(ItemType.BLACK_POWDER, 1 + rng.nextInt(2));
+                        if (rng.nextFloat() < 0.5f) {
+                            g.player.inventory.add(ItemType.MUSKET_BALL, 1 + rng.nextInt(3));
+                        }
+                    }
+                    case LEADER -> {
+                        g.player.inventory.add(ItemType.IRON_INGOT, 1 + rng.nextInt(2));
+                        g.player.inventory.add(ItemType.SCRAP, 2 + rng.nextInt(3));
+                    }
+                    default -> {
+                        if (rng.nextFloat() < 0.6f) {
+                            g.player.inventory.add(ItemType.SCRAP, 1 + rng.nextInt(2));
+                        }
+                    }
+                }
+                g.log("You search the fallen " + n.jobName().toLowerCase() + ".");
+            }
+        } else if (n.settled()) {
+            // Died to other causes: keep the resident record consistent.
+            var s = g.world.settlements.get(n.settlementId);
+            if (s != null && n.residentIndex >= 0 && n.residentIndex < s.residents.size()) {
+                var resident = s.residents.get(n.residentIndex);
+                if (!resident.routed && !resident.surrendered) {
+                    resident.alive = false;
+                }
+                resident.live = null;
             }
         }
     }
@@ -73,7 +143,10 @@ public class EntityManager {
             }
             return;
         }
-        carcasses.add(new Carcass(c.type, c.pos.x, c.pos.y, c.pos.z));
+        Carcass carcass = new Carcass(c.type, c.pos.x, c.pos.y, c.pos.z);
+        carcass.stuckArrows = c.stuckArrows;
+        carcass.stuckArrowType = c.stuckArrowType;
+        carcasses.add(carcass);
         if (c.lastHitByPlayer) {
             g.log("The " + c.type.displayName + " is down. Harvest the carcass with [F]"
                     + (g.playerHasKnife() ? "." : " (a knife would yield far more)."));
@@ -186,10 +259,16 @@ public class EntityManager {
         if (birds < 6 && rng.nextFloat() < 0.4f) {
             trySpawn(g, Creature.CreatureType.BIRD, px, pz);
         }
-        // Gloomstalkers only prowl deep darkness below the surface.
-        boolean playerDeep = g.player.pos.y < g.world.surfaceHeight(
-                (int) px, (int) pz) - 6;
-        if (playerDeep && stalkers < 2 && rng.nextFloat() < 0.4f) {
+        // Gloomstalkers are the stronger Basalt-depth predator. Root Caves
+        // retain ordinary wildlife and do not inherit this spawn pressure.
+        int playerSurface = g.world.surfaceHeight((int) px, (int) pz);
+        WorldGenerator.CaveZone playerZone = g.world.generator.caveZoneAt(
+                (int) px, (int) g.player.pos.y, (int) pz);
+        boolean playerInBasalt = g.world.generatorVersion >= World.GEN_CAVE_IDENTITIES
+                ? (playerZone == WorldGenerator.CaveZone.BASALT
+                || playerZone == WorldGenerator.CaveZone.RESONANT)
+                : g.player.pos.y < playerSurface - 6;
+        if (playerInBasalt && stalkers < 2 && rng.nextFloat() < 0.4f) {
             trySpawnStalker(g, px, pz);
         }
     }
@@ -200,6 +279,15 @@ public class EntityManager {
             if (poi.type == Poi.PoiType.PREDATOR_DEN
                     && poi.pos.distSq(px, poi.pos.y(), pz) < 90 * 90
                     && rng.nextFloat() < 0.6f) {
+                int denSurface = g.world.generator.heightAt(poi.pos.x(), poi.pos.z());
+                boolean underground = poi.pos.y() <= denSurface - 5;
+                if (underground) {
+                    if (Math.abs(g.player.pos.y - poi.pos.y()) <= 10
+                            && trySpawnUndergroundWolf(g, px, pz, poi)) {
+                        return;
+                    }
+                    continue;
+                }
                 int x = poi.pos.x() + rng.nextInt(9) - 4;
                 int z = poi.pos.z() + rng.nextInt(9) - 4;
                 if (g.world.getChunk(Math.floorDiv(x, 16), Math.floorDiv(z, 16)) != null) {
@@ -216,24 +304,74 @@ public class EntityManager {
         trySpawn(g, Creature.CreatureType.WOLF, px, pz);
     }
 
-    private void trySpawnStalker(Game g, float px, float pz) {
+    boolean trySpawnUndergroundWolf(Game g, float px, float pz, Poi den) {
+        for (int attempt = 0; attempt < 16; attempt++) {
+            int x = den.pos.x() + rng.nextInt(9) - 4;
+            int y = den.pos.y();
+            int z = den.pos.z() + rng.nextInt(9) - 4;
+            double dx = x + 0.5 - px, dz = z + 0.5 - pz;
+            if (dx * dx + dz * dz <= 10 * 10
+                    || g.world.getChunk(Math.floorDiv(x, 16), Math.floorDiv(z, 16)) == null
+                    || !g.world.getBlock(x, y, z).isAir()
+                    || !g.world.getBlock(x, y + 1, z).isAir()
+                    || !g.world.getBlock(x, y - 1, z).solid) {
+                continue;
+            }
+            Creature wolf = spawnCreature(g.world, Creature.CreatureType.WOLF,
+                    x + 0.5f, y + 0.1f, z + 0.5f);
+            wolf.yaw = rng.nextFloat() * 360;
+            return true;
+        }
+        return false;
+    }
+
+    /** Gloomstalkers prefer an established nest, then any nearby dark pocket. */
+    public boolean trySpawnStalker(Game g, float px, float pz) {
+        for (Poi poi : g.world.pois) {
+            if (poi.type != Poi.PoiType.STALKER_NEST
+                    || poi.pos.distSq(px, poi.pos.y(), pz) > 90 * 90) {
+                continue;
+            }
+            for (int attempt = 0; attempt < 16; attempt++) {
+                int x = poi.pos.x() + rng.nextInt(15) - 7;
+                int y = poi.pos.y();
+                int z = poi.pos.z() + rng.nextInt(15) - 7;
+                if (spawnStalkerIfValid(g, px, pz, x, y, z)) {
+                    return true;
+                }
+            }
+        }
         // Find a dark air pocket underground near the player.
         for (int attempt = 0; attempt < 10; attempt++) {
             int x = (int) (px + rng.nextInt(41) - 20);
             int z = (int) (pz + rng.nextInt(41) - 20);
             int y = (int) (g.player.pos.y + rng.nextInt(9) - 4);
-            if (y < 3 || g.world.getChunk(Math.floorDiv(x, 16), Math.floorDiv(z, 16)) == null) {
-                continue;
-            }
-            if (g.world.getBlock(x, y, z).isAir() && g.world.getBlock(x, y + 1, z).isAir()
-                    && g.world.getBlock(x, y - 1, z).solid
-                    && g.world.skyLight(x, y, z) < 0.3f
-                    && g.world.blockLight(x, y, z) < 0.2f
-                    && g.player.distSqTo(x, y, z) > 12 * 12) {
-                spawnCreature(g.world, Creature.CreatureType.STALKER, x + 0.5f, y + 0.1f, z + 0.5f);
-                return;
+            if (spawnStalkerIfValid(g, px, pz, x, y, z)) {
+                return true;
             }
         }
+        return false;
+    }
+
+    private boolean spawnStalkerIfValid(Game g, float px, float pz, int x, int y, int z) {
+        if (y < 3 || g.world.getChunk(Math.floorDiv(x, 16), Math.floorDiv(z, 16)) == null) {
+            return false;
+        }
+        double dx = x - px, dz = z - pz;
+        if (dx * dx + dz * dz <= 12 * 12
+                || !g.world.getBlock(x, y, z).isAir()
+                || !g.world.getBlock(x, y + 1, z).isAir()
+                || !g.world.getBlock(x, y - 1, z).solid
+                || g.world.skyLight(x, y, z) >= 0.3f
+                || g.world.blockLight(x, y, z) >= 0.2f) {
+            return false;
+        }
+        spawnCreature(g.world, Creature.CreatureType.STALKER, x + 0.5f, y + 0.1f, z + 0.5f);
+        return true;
+    }
+
+    public void setRandomSeed(long seed) {
+        rng.setSeed(seed);
     }
 
     private void trySpawn(Game g, Creature.CreatureType type, float px, float pz) {

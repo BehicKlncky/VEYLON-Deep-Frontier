@@ -228,6 +228,15 @@ public class Renderer {
         drawCalls = 0;
         trianglesRendered = 0;
 
+        // Restrained explosion shake: brief pitch/yaw wobble scaled by the
+        // motion-intensity setting; decays quickly and never moves the camera.
+        if (shake > 0.001f) {
+            float amp = shake * 0.9f * settings.motion;
+            cam.yaw += (float) Math.sin(game.totalTime * 47.0) * amp;
+            cam.pitch += (float) Math.cos(game.totalTime * 53.0) * amp * 0.7f;
+            shake = Math.max(0f, shake - dt * 2.2f);
+        }
+
         env.update(game, dt);
         game.particles.density = settings.particleDensity;
         glEnable(GL_CULL_FACE); // UI pass disables it each frame
@@ -437,6 +446,8 @@ public class Renderer {
             drawModel(npcModel, model);
         }
 
+        renderProjectiles(game);
+
         // Burning blocks: emissive flames handled by particles; keep a core glow cube.
         float pulse = 0.78f + 0.22f * (float) Math.sin(game.totalTime * 9.0);
         entityShader.set("uEmissive", 0.9f);
@@ -473,6 +484,57 @@ public class Renderer {
             if (game.miningProgress > 0f) {
                 renderMiningCracks(hit, game.miningProgress);
             }
+        }
+    }
+
+    /** Arrows, bombs and stuck arrows as oriented slim cuboids; bullets as tracers. */
+    private void renderProjectiles(Game game) {
+        Vector3f camPos = game.camera.position;
+        for (var p : game.projectiles.live) {
+            float dx = p.x - camPos.x, dz = p.z - camPos.z;
+            if (dx * dx + dz * dz > 90 * 90) {
+                continue;
+            }
+            setEntityLight(game, p.x, p.y, p.z);
+            entityShader.set("uTintMul", 1f, 1f, 1f);
+            switch (p.kind) {
+                case ARROW -> {
+                    model.identity().translate(p.x, p.y, p.z)
+                            .rotateY((float) Math.toRadians(-p.yaw))
+                            .rotateX((float) Math.toRadians(-p.pitch))
+                            .scale(0.035f, 0.035f, 0.55f);
+                    drawCube(0.62f, 0.50f, 0.32f);
+                }
+                case BULLET -> {
+                    model.identity().translate(p.x, p.y, p.z)
+                            .rotateY((float) Math.toRadians(-p.yaw))
+                            .rotateX((float) Math.toRadians(-p.pitch))
+                            .scale(0.03f, 0.03f, 0.24f);
+                    entityShader.set("uEmissive", 0.5f);
+                    drawCube(0.9f, 0.78f, 0.5f);
+                    entityShader.set("uEmissive", 0f);
+                }
+                case BOMB, FIRE_BOMB -> {
+                    model.identity().translate(p.x, p.y, p.z)
+                            .rotateY((float) (game.totalTime * 4.0 % (Math.PI * 2)))
+                            .scale(0.16f);
+                    drawCube(p.kind == com.veylon.combat.ProjectileSystem.Kind.FIRE_BOMB
+                            ? 0.55f : 0.24f, 0.22f, 0.18f);
+                }
+            }
+        }
+        for (var p : game.projectiles.stuck) {
+            float dx = p.x - camPos.x, dz = p.z - camPos.z;
+            if (dx * dx + dz * dz > 48 * 48) {
+                continue;
+            }
+            setEntityLight(game, p.x, p.y, p.z);
+            entityShader.set("uTintMul", 1f, 1f, 1f);
+            model.identity().translate(p.x, p.y, p.z)
+                    .rotateY((float) Math.toRadians(-p.yaw))
+                    .rotateX((float) Math.toRadians(-p.pitch))
+                    .scale(0.035f, 0.035f, 0.5f);
+            drawCube(0.66f, 0.54f, 0.36f);
         }
     }
 
@@ -597,6 +659,15 @@ public class Renderer {
         if (type.tool == ToolKind.WEAPON) {
             return 0.68f; // long spear stays inside the viewmodel frame
         }
+        if (type.tool == ToolKind.BOW) {
+            return 0.9f;
+        }
+        if (type.tool == ToolKind.FIREARM) {
+            return type == ItemType.FLINTLOCK_PISTOL ? 1.0f : 0.72f;
+        }
+        if (type.tool == ToolKind.THROWN) {
+            return 1.0f;
+        }
         if (type.tool == ToolKind.PICKAXE || type.tool == ToolKind.AXE) {
             return 0.85f;
         }
@@ -628,6 +699,13 @@ public class Renderer {
         }
         return frustum.testAab(x - halfWidth, y - 0.15f, z - halfWidth,
                 x + halfWidth, y + height, z + halfWidth);
+    }
+
+    private float shake;
+
+    /** Queues restrained camera shake (0..1); decays over ~half a second. */
+    public void addShake(float intensity) {
+        shake = Math.min(1f, shake + Math.max(0f, intensity));
     }
 
     private void drawModel(EntityModel entityModel, Matrix4f base) {

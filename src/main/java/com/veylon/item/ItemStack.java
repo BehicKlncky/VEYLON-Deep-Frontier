@@ -8,6 +8,8 @@ public final class ItemStack {
     public float durability;
     /** Remaining real seconds of freshness; -1 when the type never spoils. */
     public float freshness;
+    /** Rounds loaded into a firearm (persisted in save v3; 0 for other items). */
+    public int charge;
 
     public ItemStack(ItemType type, int count) {
         this.type = type;
@@ -20,6 +22,7 @@ public final class ItemStack {
         ItemStack s = new ItemStack(type, count);
         s.durability = durability;
         s.freshness = freshness;
+        s.charge = charge;
         return s;
     }
 

@@ -24,6 +24,7 @@ import com.veylon.item.Station;
 import com.veylon.item.ToolKind;
 import com.veylon.gfx.FrameProfiler;
 import com.veylon.gfx.GraphicsSettings;
+import com.veylon.qa.RuntimeBudgetSnapshot;
 import com.veylon.save.SaveSystem;
 import com.veylon.simulation.EventSystem;
 import com.veylon.simulation.FireSystem;
@@ -75,6 +76,22 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
         NONE, INVENTORY, CRAFTING, PAUSE, OPTIONS, MAP, CRATE, NPC
     }
 
+    /** Player-facing NPC action selected by the same path used for prompts and F. */
+    public enum NpcInteraction {
+        NONE, TALK, RESCUE_BLOCKED, RESCUE_READY
+    }
+
+    /** Outcome from the real bow input command, exposed for gameplay integration tests. */
+    public enum BowCommandResult {
+        NONE, DRAWING, CANCELLED, FIRED, NO_AMMO, COOLDOWN, INVALID_WEAPON
+    }
+
+    /** Outcome from the production firearm trigger/reload command. */
+    public enum FirearmCommandResult {
+        NONE, FIRED, DRY_FIRE, RELOAD_STARTED, RELOADING, NO_AMMO, COOLDOWN,
+        INVALID_WEAPON
+    }
+
     private enum AppState {
         TITLE, TITLE_OPTIONS, LOADING, PLAYING, DEATH, VICTORY
     }
@@ -97,6 +114,12 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
     public Player player;
     public final EntityManager entities = new EntityManager();
     public final FactionSystem faction = new FactionSystem();
+    // 0.3.0 world-expansion systems.
+    public final com.veylon.combat.WorldNoise noise = new com.veylon.combat.WorldNoise();
+    public final com.veylon.combat.ProjectileSystem projectiles = new com.veylon.combat.ProjectileSystem();
+    public final com.veylon.combat.ExplosionSystem explosions = new com.veylon.combat.ExplosionSystem();
+    public final com.veylon.settlement.SettlementManager settlementManager =
+            new com.veylon.settlement.SettlementManager();
     public final TimeSystem time = new TimeSystem();
     public final WeatherSystem weather = new WeatherSystem();
     public final TemperatureSystem temperature = new TemperatureSystem();
@@ -159,6 +182,16 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
     private int peakParticleDrawCalls;
     private int peakResidentChunkMeshes;
     private long chunkMeshDeletes;
+    /** Dedicated release-smoke sample while streaming toward a generated fortress. */
+    private final FrameProfiler fortressApproachProfiler = new FrameProfiler();
+    private final Vector3f fortressApproachStart = new Vector3f();
+    private final Vector3f fortressApproachEnd = new Vector3f();
+    private com.veylon.settlement.Settlement smokeFortress;
+    private double fortressApproachStarted;
+    private boolean fortressApproaching;
+    private boolean fortressApproachComplete;
+    private long fortressApproachMeshStart;
+    private int fortressApproachChunkStart;
     private boolean heldCycleShowcase;
     private boolean uiCycleShowcase;
     private boolean staticLoadingQa;
@@ -172,6 +205,22 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
     private String qaOptionsSet = System.getenv("VEYLON_QA_SET_OPTIONS");
     private float qaOptionsTimer;
     private final Vector3f benchmarkMovementStart = new Vector3f();
+
+    // Ranged-weapon state (player).
+    /** 0..1 bow draw progress while holding LMB with a bow. */
+    public float bowDraw;
+    public boolean drawingBow;
+    /** Preferred arrow type; native bow input cycles it with R. */
+    private ItemType selectedBowAmmo = ItemType.ARROW;
+    /** Seconds remaining of an active reload (0 = not reloading). */
+    public float reloadTimer;
+    /** Total duration of the active reload, for the HUD bar. */
+    public float reloadTotal;
+    /** Reloads bind to one inventory slot and the exact stack instance. */
+    private int reloadSlot = -1;
+    private ItemStack reloadStack;
+    private String reloadWeaponId;
+    private float rangedCooldown;
 
     // Animation / feedback timers.
     public float swingTimer;
@@ -282,6 +331,10 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
         double start = glfwGetTime();
         double last = start;
         frameProfiler.reset();
+        fortressApproachProfiler.reset();
+        smokeFortress = null;
+        fortressApproaching = false;
+        fortressApproachComplete = false;
         while (!window.shouldClose()) {
             double now = glfwGetTime();
             double rawDt = now - last;
@@ -289,6 +342,10 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
             last = now;
             totalTime = now;
             frameProfiler.record(rawDt);
+            if (smoke && fortressApproaching) {
+                fortressApproachProfiler.record(rawDt);
+                updateSmokeFortressApproach(now);
+            }
 
             window.poll();
             if (heldCycleShowcase && player != null) {
@@ -367,6 +424,10 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
                     System.out.println("[smoke] ignited log stack at " + fx + "," + fy + "," + fz);
                     weather.next = WeatherSystem.Weather.STORM;
                     weather.blend = 0.6f;
+                }
+                if (smokePhase == 3 && now - start > 7.0) {
+                    smokePhase = 4;
+                    beginSmokeFortressApproach(now);
                 }
                 if (now - start > smokeSeconds) {
                     window.pollGlErrors("smoke-gate");
@@ -483,6 +544,7 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
 
     private String emitSmokeReport(double duration, boolean saveOk, boolean loadOk) {
         FrameProfiler.Snapshot timing = frameProfiler.snapshot();
+        FrameProfiler.Snapshot fortressTiming = fortressApproachProfiler.snapshot();
         double avgDraws = profiledRenderFrames == 0 ? 0 : drawCallSum / (double) profiledRenderFrames;
         double avgTriangles = profiledRenderFrames == 0 ? 0 : triangleSum / profiledRenderFrames;
         double avgParticleDraws = profiledRenderFrames == 0 ? 0
@@ -491,9 +553,14 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
                 && ui.iconAtlas().validationErrors().isEmpty();
         boolean glOk = window.glErrorCount() == 0 && window.glDebugErrorCount() == 0;
         boolean target60 = timing.averageFps() >= 60.0;
-        double minimumFps = configuredMinimumSmokeFps();
-        boolean performanceOk = minimumFps <= 0 || timing.averageFps() >= minimumFps;
+        double minimumFps = Math.max(60.0, configuredMinimumSmokeFps());
+        boolean performanceOk = timing.averageFps() >= minimumFps;
         boolean materialsOk = com.veylon.gfx.MaterialRegistry.errors().isEmpty();
+        RuntimeBudgetSnapshot runtime = RuntimeBudgetSnapshot.capture(this);
+        boolean runtimeBoundsOk = runtime.withinHardLimits();
+        boolean fortressApproachOk = world.generatorVersion < World.GEN_DEEP
+                || fortressApproachComplete && smokeFortress != null
+                && fortressTiming.frames() > 0 && fortressTiming.averageFps() >= 60.0;
 
         System.out.printf(Locale.ROOT,
                 "[benchmark] resolution=%dx%d duration=%.1fs seed=%d avgFps=%.1f avgMs=%.2f "
@@ -526,6 +593,20 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
                 + " glErrors=" + window.glErrorCount() + " khrErrors=" + window.glDebugErrorCount()
                 + " creatures=" + entities.creatureCount() + " npcs=" + entities.npcCount()
                 + " tracks=" + entities.tracks.size() + " fires=" + fire.count());
+        System.out.println("[smoke] runtime=" + runtime.occupancySummary()
+                + " withinHardLimits=" + runtimeBoundsOk);
+        System.out.println("[smoke] hardLimits={" + RuntimeBudgetSnapshot.hardLimitSummary() + "}");
+        System.out.println("[smoke] fortressPlan=" + deterministicFortressSnapshot());
+        System.out.printf(Locale.ROOT,
+                "[smoke] fortressApproach={complete=%s,id=%s,frames=%d,avgFps=%.1f,"
+                        + "p95Ms=%.2f,p99Ms=%.2f,maxMs=%.2f,meshRebuilds=%d,"
+                        + "loadedChunkDelta=%d} target60=%s%n",
+                fortressApproachComplete,
+                smokeFortress == null ? "none" : Long.toUnsignedString(smokeFortress.id),
+                fortressTiming.frames(), fortressTiming.averageFps(), fortressTiming.p95Ms(),
+                fortressTiming.p99Ms(), fortressTiming.maxMs(),
+                Math.max(0, renderer.chunkMeshRebuildsTotal - fortressApproachMeshStart),
+                world.loadedCount() - fortressApproachChunkStart, fortressApproachOk);
 
         StringBuilder failure = new StringBuilder();
         if (!saveOk) failure.append("isolated save failed; ");
@@ -535,10 +616,134 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
         if (!performanceOk) failure.append(String.format(Locale.ROOT,
                 "average FPS %.1f below required %.1f; ", timing.averageFps(), minimumFps));
         if (!glOk) failure.append("OpenGL errors observed; ");
+        if (!runtimeBoundsOk) failure.append("runtime collection limit exceeded; ");
+        if (!fortressApproachOk) {
+            failure.append("generated-fortress approach did not sustain 60 FPS; ");
+        }
         return failure.isEmpty() ? null : failure.toString();
     }
 
-    /** Optional release gate; unset/zero records timing without enforcing a hardware target. */
+    /**
+     * Starts the deterministic smoke route outside the nearest planned fortress.
+     * The route remains outside the wall so it measures normal chunk streaming,
+     * settlement activation, structure meshing and rendering without fabricating
+     * a cleared/disabled combat state.
+     */
+    private void beginSmokeFortressApproach(double now) {
+        com.veylon.settlement.Settlement planned = nearestPlannedFortress();
+        if (planned == null) {
+            System.out.println("[smoke] no fortress found for approach inside 24 regions");
+            return;
+        }
+        smokeFortress = world.settlementForRegion(planned.regionX, planned.regionZ);
+        if (smokeFortress == null
+                || smokeFortress.type != com.veylon.settlement.SettlementType.FORTRESS) {
+            smokeFortress = null;
+            System.out.println("[smoke] planned fortress failed deterministic registration");
+            return;
+        }
+        world.layoutFor(smokeFortress);
+
+        float dx = spawnPos.x - (smokeFortress.center.x() + 0.5f);
+        float dz = spawnPos.z - (smokeFortress.center.z() + 0.5f);
+        float length = (float) Math.sqrt(dx * dx + dz * dz);
+        if (length < 0.001f) {
+            dx = 0;
+            dz = 1;
+            length = 1;
+        }
+        dx /= length;
+        dz /= length;
+        float centerX = smokeFortress.center.x() + 0.5f;
+        float centerZ = smokeFortress.center.z() + 0.5f;
+        fortressApproachStart.set(centerX + dx * 180f, 0, centerZ + dz * 180f);
+        fortressApproachEnd.set(centerX + dx * 65f, 0, centerZ + dz * 65f);
+        fortressApproachStarted = now;
+        fortressApproachMeshStart = renderer.chunkMeshRebuildsTotal;
+        fortressApproachChunkStart = world.loadedCount();
+        fortressApproachProfiler.reset();
+        fortressApproaching = true;
+        placeSmokePlayerAt(fortressApproachStart.x, fortressApproachStart.z);
+        System.out.println("[smoke] fortress approach started id="
+                + Long.toUnsignedString(smokeFortress.id) + " center="
+                + smokeFortress.center.x() + "," + smokeFortress.center.z());
+    }
+
+    private void updateSmokeFortressApproach(double now) {
+        float progress = (float) Math.min(1.0,
+                Math.max(0.0, (now - fortressApproachStarted) / 12.0));
+        float x = fortressApproachStart.x
+                + (fortressApproachEnd.x - fortressApproachStart.x) * progress;
+        float z = fortressApproachStart.z
+                + (fortressApproachEnd.z - fortressApproachStart.z) * progress;
+        placeSmokePlayerAt(x, z);
+        if (progress >= 1f) {
+            fortressApproaching = false;
+            fortressApproachComplete = true;
+            System.out.println("[smoke] fortress approach completed at distance="
+                    + Math.round(Math.sqrt(smokeFortress.distSqTo(player.pos.x, player.pos.z))));
+        }
+    }
+
+    private void placeSmokePlayerAt(float x, float z) {
+        int blockX = (int) Math.floor(x);
+        int blockZ = (int) Math.floor(z);
+        float y = world.generator.heightAt(blockX, blockZ) + 1.4f;
+        player.pos.set(x, y, z);
+        player.vel.zero();
+    }
+
+    /**
+     * Stable planner-level fortress marker for comparing smoke runs without
+     * mutating the loaded-chunk frontier merely to collect the metric.
+     */
+    private String deterministicFortressSnapshot() {
+        com.veylon.settlement.Settlement settlement = nearestPlannedFortress();
+        if (world.generatorVersion < World.GEN_DEEP) {
+            return "{available=false,generator=legacy}";
+        }
+        if (settlement == null) {
+            return "{available=false,searchRadiusRegions=24}";
+        }
+        double distance = Math.sqrt(settlement.distSqTo(spawnPos.x, spawnPos.z));
+        boolean registered = world.settlements.containsKey(settlement.id);
+        return String.format(Locale.ROOT,
+                "{available=true,id=%d,region=%d,%d,center=%d,%d,distance=%.0f,registered=%s}",
+                settlement.id, settlement.regionX, settlement.regionZ,
+                settlement.center.x(), settlement.center.z(), distance, registered);
+    }
+
+    private com.veylon.settlement.Settlement nearestPlannedFortress() {
+        if (world == null || world.generatorVersion < World.GEN_DEEP) {
+            return null;
+        }
+        int originRx = com.veylon.settlement.SettlementPlanner.regionOfBlock(
+                (int) Math.floor(spawnPos.x));
+        int originRz = com.veylon.settlement.SettlementPlanner.regionOfBlock(
+                (int) Math.floor(spawnPos.z));
+        for (int radius = 0; radius <= 24; radius++) {
+            for (int dx = -radius; dx <= radius; dx++) {
+                for (int dz = -radius; dz <= radius; dz++) {
+                    if (Math.max(Math.abs(dx), Math.abs(dz)) != radius) {
+                        continue;
+                    }
+                    int rx = originRx + dx;
+                    int rz = originRz + dz;
+                    com.veylon.settlement.Settlement settlement =
+                            com.veylon.settlement.SettlementPlanner.plan(
+                                    world.seed, world.generator, rx, rz);
+                    if (settlement == null
+                            || settlement.type != com.veylon.settlement.SettlementType.FORTRESS) {
+                        continue;
+                    }
+                    return settlement;
+                }
+            }
+        }
+        return null;
+    }
+
+    /** Optional stricter release gate layered over the mandatory 60 FPS target. */
     private double configuredMinimumSmokeFps() {
         String configured = System.getenv("VEYLON_MIN_FPS");
         if (configured == null || configured.isBlank()) {
@@ -1416,6 +1621,10 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
     // ------------------------------------------------------------------
 
     public void newWorld(long seed, boolean fresh) {
+        newWorld(seed, fresh, World.CURRENT_GENERATOR);
+    }
+
+    public void newWorld(long seed, boolean fresh, int generatorVersion) {
         // Save-load and front-end transitions can replace a live world. Release
         // its bounded GPU meshes and reset cross-world simulation queues first.
         releaseWorldMeshes();
@@ -1425,10 +1634,19 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
         events.reset();
         plants.reset();
         itemConditions.reset();
+        noise.reset();
+        projectiles.reset();
+        explosions.reset();
+        settlementManager.reset();
         particles.count = 0;
         particles.setRandomSeed(seed ^ 0x5645594c4f4eL);
         emitterRng.setSeed(seed ^ 0x46584c4f4eL);
-        world = new World(seed);
+        // Static AI decision jitter must also replay deterministically per seed;
+        // otherwise QA runs and tests inherit RNG state from earlier worlds.
+        com.veylon.ai.SettledNpcAI.reseed(seed ^ 0x5345544e5043L);
+        com.veylon.ai.CreatureAI.reseed(seed ^ 0x435245415455L);
+        com.veylon.ai.NpcAI.reseed(seed ^ 0x4c454741434eL);
+        world = new World(seed, generatorVersion);
         world.listener = this;
         player = new Player(world);
         entities.creatures.clear();
@@ -1442,7 +1660,7 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
         faction.woodStock = 8;
         faction.hostile = false;
         faction.upgradeStage = 0;
-        faction.quest = null;
+        faction.resetQuestRuntime();
         faction.alliedGiftGiven = false;
         time.totalMinutes = 8 * 60;
         weather.current = WeatherSystem.Weather.CLEAR;
@@ -1459,6 +1677,11 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
         miningProgress = 0;
         swingTimer = 0;
         walkBob = 0;
+        drawingBow = false;
+        bowDraw = 0;
+        rangedCooldown = 0;
+        selectedBowAmmo = ItemType.ARROW;
+        cancelReload();
 
         // Synchronous initial generation around spawn.
         world.ensureChunks(8, 8, 5, 10_000);
@@ -1645,6 +1868,9 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
             time.advance(dtD);
             scheduler.update(dtD, this);
             particles.update(dt);
+            projectiles.update(this, dt);
+            explosions.tickFuses(this, dt);
+            noise.update(dt);
             updateEmitters(dt);
         }
         audio.update(dt);
@@ -2192,11 +2418,14 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
         if (input.isKeyDown(GLFW_KEY_SPACE)) {
             if (p.inWater) {
                 p.vel.y = Math.max(p.vel.y, 3.0f);
-            } else if (p.onGround && p.stamina >= 3 && input.wasKeyPressed(GLFW_KEY_SPACE)) {
+            } else if (!applyPlayerClimbCommand(true, fwd)
+                    && p.onGround && p.stamina >= 3 && input.wasKeyPressed(GLFW_KEY_SPACE)) {
                 p.vel.y = p.has(Affliction.SPRAIN) ? 6.2f : 8.2f;
                 p.stamina -= 3;
                 p.onGround = false;
             }
+        } else {
+            applyPlayerClimbCommand(false, fwd);
         }
 
         boolean wasInWater = p.inWater;
@@ -2216,11 +2445,46 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
                 BlockType under = world.getBlock((int) Math.floor(p.pos.x),
                         (int) Math.floor(p.pos.y - 0.1f), (int) Math.floor(p.pos.z));
                 audio.playFootstep(under, p.inWater);
-                if (!p.crouching) {
-                    p.noise = Math.min(1f, p.noise + (p.sprinting ? 0.12f : 0.05f));
-                }
+                emitPlayerFootstepNoise(p.sprinting, p.crouching);
             }
         }
+    }
+
+    /**
+     * Applies the same rope-ladder intent used by the native movement path.
+     * Exposed as a gameplay command so deterministic integration coverage does
+     * not need to manufacture GLFW key state.
+     */
+    public boolean applyPlayerClimbCommand(boolean ascendHeld, boolean forwardHeld) {
+        if (player == null || !player.onLadder) {
+            return false;
+        }
+        if (ascendHeld) {
+            player.vel.y = 2.6f;
+            return true;
+        }
+        if (forwardHeld && player.horizontalCollision) {
+            // Walking into a ladder mounted against a wall climbs it.
+            player.vel.y = 2.2f;
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * Emits the same positioned footstep perception event used by native
+     * movement. Exposed as a small command seam so input-independent gameplay
+     * tests can verify sprint/crouch audibility without a GLFW window.
+     */
+    public boolean emitPlayerFootstepNoise(boolean sprinting, boolean crouching) {
+        if (player == null || crouching) {
+            return false;
+        }
+        player.noise = Math.min(1f, player.noise + (sprinting ? 0.12f : 0.05f));
+        noise.emit(this, player.pos.x, player.pos.y, player.pos.z,
+                sprinting ? 22f : 10f, sprinting ? 0.38f : 0.15f,
+                sprinting ? "sprint" : "footstep", true, player);
+        return true;
     }
 
     // ------------------------------------------------------------------
@@ -2228,12 +2492,31 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
     // ------------------------------------------------------------------
 
     private void updateActions(float dt) {
-        attackCooldown -= dt;
+        advancePlayerAttackCooldown(dt);
+        tickReload(dt);
         Vector3f origin = camera.position;
         Vector3f dir = camera.front();
         targetHit = Raycaster.cast(world, origin, dir, 5.2, false);
 
         updatePrompt();
+
+        // Ranged and thrown weapons take over the primary attack.
+        ItemStack heldItem = player.selected();
+        com.veylon.combat.WeaponDefinition weapon =
+                com.veylon.combat.WeaponRegistry.of(heldItem == null ? null : heldItem.type);
+        if (weapon != null) {
+            updateRangedWeapon(dt, heldItem, weapon, dir);
+            // Right mouse still handles use/place/eat below.
+            if (input.wasMousePressed(GLFW_MOUSE_BUTTON_RIGHT)) {
+                rightClick();
+            }
+            if (input.wasKeyPressed(GLFW_KEY_F)) {
+                interact();
+            }
+            return;
+        }
+        advanceRangedCooldown(dt);
+        cancelRangedState();
 
         // Left mouse: attack entity in reach, otherwise mine.
         if (input.isMouseDown(GLFW_MOUSE_BUTTON_LEFT)) {
@@ -2241,11 +2524,7 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
             if (victim != null) {
                 miningProgress = 0;
                 miningTarget = null;
-                if (attackCooldown <= 0) {
-                    attackCooldown = 0.45f;
-                    swingTimer = 0.35f;
-                    attack(victim);
-                }
+                performPlayerAttack(victim);
             } else if (targetHit != null) {
                 mine(dt);
             } else {
@@ -2272,6 +2551,366 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
         }
     }
 
+    // ------------------------------------------------------------------
+    // Ranged weapons (bow / firearms / thrown)
+    // ------------------------------------------------------------------
+
+    private void updateRangedWeapon(float dt, ItemStack held,
+                                    com.veylon.combat.WeaponDefinition weapon, Vector3f dir) {
+        miningProgress = 0;
+        miningTarget = null;
+
+        switch (weapon.category) {
+            case BOW -> {
+                if (input.wasKeyPressed(GLFW_KEY_R)) {
+                    cycleBowAmmo();
+                }
+                updateBowCommand(dt, input.isMouseDown(GLFW_MOUSE_BUTTON_LEFT),
+                        input.wasMousePressed(GLFW_MOUSE_BUTTON_LEFT), dir);
+            }
+            case FIREARM -> {
+                updateFirearmCommand(dt,
+                        input.isMouseDown(GLFW_MOUSE_BUTTON_LEFT),
+                        input.wasMousePressed(GLFW_MOUSE_BUTTON_LEFT),
+                        input.wasKeyPressed(GLFW_KEY_R), dir);
+            }
+            case THROWN -> {
+                updateThrownWeaponCommand(dt,
+                        input.wasMousePressed(GLFW_MOUSE_BUTTON_LEFT), dir);
+            }
+        }
+    }
+
+    private void cancelRangedState() {
+        drawingBow = false;
+        bowDraw = 0;
+        cancelReload();
+    }
+
+    private void advanceRangedCooldown(float dt) {
+        rangedCooldown = Math.max(0, rangedCooldown - Math.max(0, dt));
+    }
+
+    /**
+     * Production firearm command shared by native GLFW input and gameplay
+     * integration tests. Semi-automatic weapons require the trigger-press edge;
+     * automatic weapons deliberately keep firing while the trigger is held.
+     * Reload completion remains in {@link #tickReload(float)}, the same method
+     * advanced once per native action frame.
+     */
+    public FirearmCommandResult updateFirearmCommand(float dt, boolean triggerHeld,
+                                                      boolean triggerPressed,
+                                                      boolean reloadPressed,
+                                                      Vector3f dir) {
+        advanceRangedCooldown(dt);
+        ItemStack held = player == null ? null : player.selected();
+        var weapon = com.veylon.combat.WeaponRegistry.of(held == null ? null : held.type);
+        if (player == null || player.dead || weapon == null
+                || weapon.category != com.veylon.combat.WeaponDefinition.Category.FIREARM
+                || dir == null) {
+            return FirearmCommandResult.INVALID_WEAPON;
+        }
+
+        if (reloadTimer > 0) {
+            return FirearmCommandResult.RELOADING;
+        }
+
+        boolean wantsFire = weapon.automatic ? triggerHeld : triggerPressed;
+        FirearmCommandResult result = FirearmCommandResult.NONE;
+        if (wantsFire) {
+            if (rangedCooldown > 0) {
+                return FirearmCommandResult.COOLDOWN;
+            }
+            if (held.charge > 0) {
+                fireFirearm(held, weapon, dir);
+                result = FirearmCommandResult.FIRED;
+            } else {
+                audio.playDryFire();
+                rangedCooldown = 0.4f;
+                if (player.inventory.count(weapon.ammo) >= weapon.ammoPerShot) {
+                    log("Not loaded — press [R] to reload.");
+                } else {
+                    log("Out of " + weapon.ammo.displayName + ".");
+                }
+                result = FirearmCommandResult.DRY_FIRE;
+            }
+        }
+
+        if (reloadPressed && held.charge < weapon.magazine) {
+            boolean started = startReload(held, weapon);
+            if (result == FirearmCommandResult.NONE) {
+                result = started ? FirearmCommandResult.RELOAD_STARTED
+                        : FirearmCommandResult.NO_AMMO;
+            }
+        }
+        return result;
+    }
+
+    /**
+     * Selected ammunition displayed by the HUD. If only one kind remains, the
+     * selection follows that available kind without overriding a deliberate
+     * choice while both basic and iron arrows are present.
+     */
+    public ItemType selectedBowAmmo() {
+        if (player != null && player.inventory.count(selectedBowAmmo) <= 0) {
+            ItemType fallback = selectedBowAmmo == ItemType.ARROW
+                    ? ItemType.IRON_ARROW : ItemType.ARROW;
+            if (player.inventory.count(fallback) > 0) {
+                selectedBowAmmo = fallback;
+            }
+        }
+        return selectedBowAmmo;
+    }
+
+    /** Native [R] bow command: deliberately choose basic versus iron arrows. */
+    public ItemType cycleBowAmmo() {
+        if (player == null) {
+            return selectedBowAmmo;
+        }
+        boolean basic = player.inventory.count(ItemType.ARROW) > 0;
+        boolean iron = player.inventory.count(ItemType.IRON_ARROW) > 0;
+        if (basic && iron) {
+            selectedBowAmmo = selectedBowAmmo == ItemType.ARROW
+                    ? ItemType.IRON_ARROW : ItemType.ARROW;
+        } else if (iron) {
+            selectedBowAmmo = ItemType.IRON_ARROW;
+        } else if (basic) {
+            selectedBowAmmo = ItemType.ARROW;
+        } else {
+            // Still let the player choose what they intend to craft or recover.
+            selectedBowAmmo = selectedBowAmmo == ItemType.ARROW
+                    ? ItemType.IRON_ARROW : ItemType.ARROW;
+        }
+        drawingBow = false;
+        bowDraw = 0;
+        log("Selected " + selectedBowAmmo.displayName + ".");
+        return selectedBowAmmo;
+    }
+
+    private ItemType bowAmmo() {
+        ItemType selected = selectedBowAmmo();
+        return player.inventory.count(selected) > 0 ? selected : null;
+    }
+
+    /**
+     * Production bow command used directly by the GLFW input path. Holding
+     * advances draw, releasing either fires or cancels a short draw, and every
+     * call advances the same attack cooldown used during normal play.
+     */
+    public BowCommandResult updateBowCommand(float dt, boolean triggerHeld,
+                                             boolean triggerPressed, Vector3f dir) {
+        advanceRangedCooldown(dt);
+        ItemStack held = player == null ? null : player.selected();
+        var weapon = com.veylon.combat.WeaponRegistry.of(held == null ? null : held.type);
+        if (weapon == null
+                || weapon.category != com.veylon.combat.WeaponDefinition.Category.BOW
+                || dir == null) {
+            drawingBow = false;
+            bowDraw = 0;
+            return BowCommandResult.INVALID_WEAPON;
+        }
+
+        ItemType arrow = bowAmmo();
+        if (triggerHeld) {
+            if (arrow == null) {
+                drawingBow = false;
+                bowDraw = 0;
+                if (triggerPressed) {
+                    log("No arrows. Craft them from sticks, stone and fiber.");
+                }
+                return BowCommandResult.NO_AMMO;
+            }
+            if (rangedCooldown > 0) {
+                return BowCommandResult.COOLDOWN;
+            }
+            if (!drawingBow) {
+                drawingBow = true;
+                bowDraw = 0;
+                audio.playBowDraw();
+            }
+            bowDraw = Math.min(1f, bowDraw + Math.max(0, dt) / weapon.drawTime);
+            return BowCommandResult.DRAWING;
+        }
+
+        if (!drawingBow) {
+            return BowCommandResult.NONE;
+        }
+        if (bowDraw >= 0.3f && arrow != null) {
+            fireBow(held, weapon, arrow, dir);
+            drawingBow = false;
+            bowDraw = 0;
+            return BowCommandResult.FIRED;
+        }
+        drawingBow = false;
+        bowDraw = 0;
+        return BowCommandResult.CANCELLED;
+    }
+
+    private void fireBow(ItemStack held, com.veylon.combat.WeaponDefinition weapon,
+                         ItemType arrow, Vector3f dir) {
+        player.inventory.remove(arrow, 1);
+        float power = 0.4f + 0.6f * bowDraw;
+        Vector3f o = camera.position;
+        projectiles.fire(this, player, true, o.x, o.y - 0.08f, o.z,
+                dir.x, dir.y, dir.z, weapon, arrow);
+        // Under-drawn arrows fly slower: retro-scale the newly spawned arrows.
+        for (int i = projectiles.live.size() - 1; i >= 0; i--) {
+            var p = projectiles.live.get(i);
+            if (p.fromPlayer && p.kind == com.veylon.combat.ProjectileSystem.Kind.ARROW
+                    && p.stuckTime == 0 && p.life > 0 && power < 0.999f) {
+                p.vx *= power;
+                p.vy *= power;
+                p.vz *= power;
+                break;
+            }
+        }
+        audio.playBowRelease(o.x, o.y, o.z);
+        noise.emit(this, o.x, o.y, o.z, weapon.noiseRadius, 0.25f, "bow", true, player);
+        consumeDurability(held, weapon.durabilityCost);
+        rangedCooldown = weapon.attackInterval;
+        swingTimer = Math.max(swingTimer, 0.2f);
+    }
+
+    private void fireFirearm(ItemStack held, com.veylon.combat.WeaponDefinition weapon,
+                             Vector3f dir) {
+        held.charge--;
+        Vector3f o = camera.position;
+        projectiles.fire(this, player, true, o.x, o.y - 0.05f, o.z,
+                dir.x, dir.y, dir.z, weapon, weapon.ammo);
+        boolean pistol = held.type == ItemType.FLINTLOCK_PISTOL;
+        audio.playGunshot(pistol, o.x, o.y, o.z);
+        particles.muzzleFlash(o.x + dir.x * 0.8f, o.y + dir.y * 0.8f - 0.15f,
+                o.z + dir.z * 0.8f, dir.x, dir.y, dir.z);
+        // Gunshots are enormous noise events: everything hears them.
+        noise.emit(this, o.x, o.y, o.z, weapon.noiseRadius, 1f, "gunshot", true, player);
+        player.noise = 1f;
+        camera.pitch -= weapon.recoil * 4.5f;
+        renderer.addShake(weapon.recoil * 0.35f);
+        consumeDurability(held, weapon.durabilityCost);
+        rangedCooldown = weapon.attackInterval;
+        swingTimer = Math.max(swingTimer, 0.25f);
+    }
+
+    private boolean startReload(ItemStack held, com.veylon.combat.WeaponDefinition weapon) {
+        if (held == null || weapon == null
+                || weapon.category != com.veylon.combat.WeaponDefinition.Category.FIREARM
+                || held.charge >= weapon.magazine) {
+            return false;
+        }
+        if (player.inventory.count(weapon.ammo) < weapon.ammoPerShot) {
+            log("No " + weapon.ammo.displayName + " to reload with.");
+            audio.playDryFire();
+            return false;
+        }
+        reloadTotal = weapon.reloadTime;
+        reloadTimer = reloadTotal;
+        reloadSlot = player.hotbarSel;
+        reloadStack = held;
+        reloadWeaponId = weapon.id;
+        audio.playReload();
+        return true;
+    }
+
+    private void finishReload(ItemStack held, com.veylon.combat.WeaponDefinition weapon) {
+        ItemStack current = player.selected();
+        if (current == null || current != held
+                || com.veylon.combat.WeaponRegistry.of(current.type) != weapon) {
+            return; // weapon switched away mid-reload
+        }
+        int roomRounds = weapon.magazine - held.charge;
+        int haveRounds = player.inventory.count(weapon.ammo) / weapon.ammoPerShot;
+        int loaded = Math.min(roomRounds, haveRounds);
+        if (loaded > 0) {
+            player.inventory.remove(weapon.ammo, loaded * weapon.ammoPerShot);
+            held.charge += loaded;
+            log(held.type.displayName + " loaded ("
+                    + held.charge + "/" + weapon.magazine + ").");
+        }
+    }
+
+    /** Gameplay/test seam: starts a reload using the currently selected firearm. */
+    public boolean startReloadSelected() {
+        ItemStack held = player == null ? null : player.selected();
+        var weapon = com.veylon.combat.WeaponRegistry.of(held == null ? null : held.type);
+        return startReload(held, weapon);
+    }
+
+    /**
+     * Advances the active reload. Switching slots/stacks cancels it before ammo
+     * is consumed; save/load intentionally cancels because this transient state
+     * is not serialized. Ammo is transferred exactly once at completion.
+     */
+    public void tickReload(float dt) {
+        if (reloadTimer <= 0) {
+            return;
+        }
+        ItemStack current = player == null ? null : player.selected();
+        var currentDef = com.veylon.combat.WeaponRegistry.of(
+                current == null ? null : current.type);
+        if (player.hotbarSel != reloadSlot || current != reloadStack || currentDef == null
+                || !currentDef.id.equals(reloadWeaponId)) {
+            cancelReload();
+            return;
+        }
+        reloadTimer -= Math.max(0, dt);
+        if (reloadTimer > 0) {
+            return;
+        }
+        ItemStack completedStack = reloadStack;
+        var completedWeapon = currentDef;
+        // Clear first so a second tick can never transfer ammunition again.
+        reloadTimer = 0;
+        reloadTotal = 0;
+        reloadSlot = -1;
+        reloadStack = null;
+        reloadWeaponId = null;
+        finishReload(completedStack, completedWeapon);
+    }
+
+    public void cancelReload() {
+        reloadTimer = 0;
+        reloadTotal = 0;
+        reloadSlot = -1;
+        reloadStack = null;
+        reloadWeaponId = null;
+    }
+
+    private void throwBomb(ItemStack held, com.veylon.combat.WeaponDefinition weapon,
+                           Vector3f dir) {
+        Vector3f o = camera.position;
+        projectiles.fire(this, player, true, o.x, o.y, o.z, dir.x, dir.y + 0.18f, dir.z,
+                weapon, null);
+        player.inventory.shrink(player.hotbarSel, 1);
+        audio.playFuse(o.x, o.y, o.z);
+        audio.playSwing();
+        rangedCooldown = weapon.attackInterval;
+        swingTimer = Math.max(swingTimer, 0.3f);
+        log("Fuse lit — get clear!");
+    }
+
+    /**
+     * Advances and, on a press edge, fires the selected thrown weapon. This is
+     * the production command used by the native-input path, so save/load and
+     * integration coverage can exercise an actual inventory-consuming throw
+     * without synthesizing GLFW state.
+     *
+     * @return true only when a bomb was lit and thrown
+     */
+    public boolean updateThrownWeaponCommand(float dt, boolean attackPressed, Vector3f dir) {
+        advanceRangedCooldown(dt);
+        if (!attackPressed || rangedCooldown > 0 || dir == null || player == null) {
+            return false;
+        }
+        ItemStack held = player.selected();
+        var weapon = com.veylon.combat.WeaponRegistry.of(held == null ? null : held.type);
+        if (weapon == null
+                || weapon.category != com.veylon.combat.WeaponDefinition.Category.THROWN) {
+            return false;
+        }
+        throwBomb(held, weapon, dir);
+        return true;
+    }
+
     private void attack(Entity victim) {
         ItemStack held = player.selected();
         float dmg = held != null ? held.type.damage : 1.5f;
@@ -2284,13 +2923,42 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
         particles.blood(victim.pos.x, victim.pos.y + victim.height * 0.6f, victim.pos.z);
         consumeDurability(held, 1f);
         player.noise = Math.min(1f, player.noise + 0.25f);
+        noise.emit(this, victim.pos.x, victim.pos.y + victim.height * 0.5f, victim.pos.z,
+                14f, 0.3f, victim instanceof Creature ? "creature-attack" : "melee",
+                true, player);
         if (victim instanceof Creature c) {
             c.fear = 1f;
             c.bleedTimer = Math.max(c.bleedTimer, 18f);
         }
-        if (victim instanceof Npc n && !n.isTrader && !n.raider) {
-            faction.addTrust(this, -30, "You attacked " + n.name + "!");
+        if (victim instanceof Npc n) {
+            if (n.settled()) {
+                settlementManager.onNpcAttackedByPlayer(this, n);
+            } else if (!n.isTrader && !n.raider && !n.warParty) {
+                faction.addTrust(this, -30, "You attacked " + n.name + "!");
+            }
         }
+    }
+
+    /** Advances the same melee cooldown used by the native LMB path. */
+    public void advancePlayerAttackCooldown(float dt) {
+        attackCooldown = Math.max(0f, attackCooldown - Math.max(0f, dt));
+    }
+
+    /**
+     * Gameplay melee command shared by native input and integration tests.
+     * Selection/aim remain the caller's job; this command enforces the live
+     * reach, cooldown, damage, durability and reputation path.
+     */
+    public boolean performPlayerAttack(Entity victim) {
+        if (player == null || player.dead || victim == null || victim.dead
+                || attackCooldown > 0f
+                || victim.distSqTo(player.pos.x, player.pos.y, player.pos.z) > 3.4 * 3.4) {
+            return false;
+        }
+        attackCooldown = 0.45f;
+        swingTimer = 0.35f;
+        attack(victim);
+        return true;
     }
 
     /** Wears the held item; breaks it when durability runs out. */
@@ -2329,10 +2997,18 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
 
     /** Called by EntityManager when the player's hit killed a creature. */
     public void onCreatureKilled(Creature c) {
-        if (c.type.predator && world.campPos != null
-                && c.distSqTo(world.campPos.x(), world.campPos.y(), world.campPos.z()) < 22 * 22) {
-            faction.addTrust(this, 10, "The camp saw you slay a predator");
-            faction.onPredatorKilledNearCamp(this);
+        if (c.type.predator) {
+            // A regional community gets first claim on a threat killed beside
+            // its walls; the starter camp is credited only when no settlement
+            // is the beneficiary.
+            if (settlementManager.onNearbyThreatCleared(this, c.pos.x, c.pos.z)) {
+                return;
+            }
+            if (world.campPos != null
+                    && c.distSqTo(world.campPos.x(), world.campPos.y(), world.campPos.z()) < 22 * 22) {
+                faction.addTrust(this, 10, "The camp saw you slay a predator");
+                faction.onPredatorKilledNearCamp(this);
+            }
         }
     }
 
@@ -2340,11 +3016,25 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
         faction.addTrust(this, 8, "You drove off a scavenger");
     }
 
-    private void updatePrompt() {
+    public void updatePrompt() {
         interactPrompt = null;
-        Npc npc = entities.nearestNpc(player.pos.x, player.pos.y, player.pos.z, 3.2f);
-        if (npc != null && !npc.raider) {
-            interactPrompt = "[F] Talk to " + npc.name;
+        Npc npc = nearestNpcForInteraction(3.2f);
+        NpcInteraction npcInteraction = npcInteraction(npc);
+        if (npcInteraction != NpcInteraction.NONE) {
+            interactPrompt = switch (npcInteraction) {
+                case TALK -> "[F] Talk to " + npc.name
+                        + (npc.settled() ? " (" + npc.jobName() + ")" : "");
+                case RESCUE_BLOCKED -> "Break the cage bars to rescue " + npc.name;
+                case RESCUE_READY -> "[F] Rescue " + npc.name;
+                case NONE -> null;
+            };
+            return;
+        }
+        // Recoverable arrows stuck in surfaces.
+        var stuckArrow = projectiles.nearestStuckArrow(
+                player.pos.x, player.pos.y + 1f, player.pos.z, 2.6f);
+        if (stuckArrow != null) {
+            interactPrompt = "[F] Recover arrow";
             return;
         }
         Carcass carcass = entities.nearestCarcass(player.pos.x, player.pos.y, player.pos.z, 2.6f);
@@ -2361,7 +3051,13 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
                 case HERB_PLANT -> interactPrompt = "[F] Gather herbs";
                 case CAMPFIRE -> interactPrompt = "[F] Cook meat / boil water / add fuel ("
                         + (int) (float) world.campfireFuel.getOrDefault(pos, 0f) + "s fuel)";
-                case CRATE -> interactPrompt = "[F] Open crate";
+                case CRATE -> {
+                    var stores = world.settlementAt(pos.x(), pos.z());
+                    interactPrompt = stores != null && !stores.cleared && !stores.occupied
+                            ? "[F] Open " + (stores.hostile() ? "enemy" : "restricted")
+                            + " stores (taking supplies has consequences)"
+                            : "[F] Open crate";
+                }
                 case WORKBENCH -> interactPrompt = "[F] Use workbench";
                 case FURNACE -> interactPrompt = "[F] Use furnace (crafting)";
                 case ANVIL -> interactPrompt = "[F] Use anvil (crafting)";
@@ -2374,12 +3070,59 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
                     interactPrompt = "[F] Rain collector: " + String.format("%.1f", liters)
                             + "/3.0 L" + (liters >= 1f ? " (fill waterskin)" : "");
                 }
+                case LANTERN -> interactPrompt = lanternPrompt(pos);
                 case BEDROLL -> interactPrompt = "[F] Sleep (bedroll)";
-                case CAMP_BED -> interactPrompt = "[F] Sleep (camp bed"
-                        + (faction.campPrivileges() ? ")" : " - needs Friendly trust)");
+                case CAMP_BED -> {
+                    var beds = world.settlementAt(pos.x(), pos.z());
+                    if (beds != null) {
+                        interactPrompt = beds.friendly() || beds.cleared
+                                ? "[F] Sleep safely (settlement bed)"
+                                : beds.hostile()
+                                ? "Hostile bed — clear the area before sleeping"
+                                : "Residents' bed — earn local friendship first";
+                    } else {
+                        interactPrompt = "[F] Sleep (camp bed"
+                                + (faction.campPrivileges() ? ")" : " - needs Friendly trust)");
+                    }
+                }
                 case BEACON -> interactPrompt = beaconPrompt();
                 case BEACON_LIT -> interactPrompt = "[F] Beacon transmitting... rescue inbound";
+                case POWDER_KEG -> {
+                    Float fuse = world.kegFuses.get(pos);
+                    interactPrompt = fuse != null
+                            ? "FUSE BURNING — " + String.format("%.1f", fuse) + "s. RUN!"
+                            : "[F] Light the fuse (5s) — stand well clear";
+                }
+                case GATE -> {
+                    var gs = world.settlementAt(pos.x(), pos.z());
+                    boolean barred = gs != null && gs.hostile();
+                    interactPrompt = barred
+                            ? "Barred from the inside. A powder keg could breach it."
+                            : "[F] Open gate";
+                }
+                case GATE_OPEN -> interactPrompt = "Gate (closes on its own)";
+                case ALARM_BELL -> {
+                    var bs = world.settlementAt(pos.x(), pos.z());
+                    interactPrompt = bs != null && bs.hostile()
+                            ? "Alarm bell — destroy it to silence the garrison"
+                            : "[F] Ring the alarm";
+                }
+                case CAGE_BARS -> interactPrompt = "Cage bars (mine through to free captives)";
                 default -> {
+                }
+            }
+            // Outpost claim prompt overrides the campfire line.
+            if (targetHit.type() == BlockType.CAMPFIRE) {
+                var cs = world.settlementAt(pos.x(), pos.z());
+                if (cs != null && cs.hostile()
+                        && com.veylon.settlement.HumanFaction.FREE_SETTLERS.equals(cs.founderFaction)) {
+                    interactPrompt = "[F] Offer restitution (6 food, 2 medicine)";
+                } else if (cs != null && cs.hostile() && !cs.centralObjectiveControlled) {
+                    interactPrompt = "[F] Secure central capture objective";
+                } else if (cs != null && cs.cleared && !cs.occupied) {
+                    interactPrompt = "[F] Supply and claim outpost ("
+                            + com.veylon.settlement.SettlementManager.OCCUPY_FOOD + " food, "
+                            + com.veylon.settlement.SettlementManager.OCCUPY_WOOD + " logs)";
                 }
             }
             if (interactPrompt != null) {
@@ -2416,6 +3159,27 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
         }
         int pct = (int) (batch.progress / batch.required() * 100);
         return "Drying " + batch.count + "x " + batch.input.displayName + " (" + pct + "%)";
+    }
+
+    /** HUD text for the same lantern state consumed by the F-key command. */
+    public String lanternPrompt(Vec3i pos) {
+        World.LanternState state = world.lanternState(pos);
+        if (state == null) {
+            return "Lantern unavailable";
+        }
+        int fuel = (int) Math.ceil(state.fuelSeconds());
+        ItemStack held = player.selected();
+        if (held != null && held.type == ItemType.CHARCOAL
+                && state.fuelSeconds() < World.LANTERN_MAX_FUEL) {
+            return "[F] Refuel lantern with charcoal (" + fuel + "/"
+                    + (int) World.LANTERN_MAX_FUEL + "s)";
+        }
+        if (fuel <= 0) {
+            return "[F] Lantern UNLIT — hold charcoal to refuel";
+        }
+        return state.lit()
+                ? "[F] Extinguish lantern — LIT, " + fuel + "s fuel"
+                : "[F] Light lantern — UNLIT, " + fuel + "s fuel";
     }
 
     private String beaconPrompt() {
@@ -2459,23 +3223,46 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
             hitSoundTimer = 0.32f;
             audio.playBlockHit(t, pos.x() + 0.5f, pos.y() + 0.5f, pos.z() + 0.5f);
             particles.blockDust(t, pos.x() + 0.5f, pos.y() + 0.5f, pos.z() + 0.5f, 3);
+            noise.emit(this, pos.x() + 0.5f, pos.y() + 0.5f, pos.z() + 0.5f,
+                    24f, 0.35f, "mining", true, player);
         }
         miningProgress += dt * mult / Math.max(0.05f, t.hardness);
         if (miningProgress >= 1f) {
-            breakBlock(pos, t, held);
+            completePlayerBlockBreak(pos);
             miningProgress = 0;
             miningTarget = null;
         }
     }
 
+    /**
+     * Completes a player mining action after the hold-to-mine timer succeeds.
+     * Keeping the block outcome in this command lets gameplay integration tests
+     * exercise real drops, durability, changed-block persistence and hooks.
+     */
+    public boolean completePlayerBlockBreak(Vec3i pos) {
+        if (pos == null) {
+            return false;
+        }
+        BlockType type = world.getBlock(pos.x(), pos.y(), pos.z());
+        ItemStack held = player.selected();
+        if (type.hardness < 0
+                || (type.requiresTool && (held == null || held.type.tool != type.preferredTool))) {
+            return false;
+        }
+        breakBlock(pos, type, held);
+        return true;
+    }
+
     private void breakBlock(Vec3i pos, BlockType t, ItemStack held) {
         // Crates dump their contents to the player.
+        int brokenCrateContents = 0;
         if (t == BlockType.CRATE) {
             Inventory crate = world.crateContents.remove(pos);
             if (crate != null) {
                 for (int i = 0; i < crate.size(); i++) {
                     ItemStack s = crate.get(i);
                     if (s != null) {
+                        brokenCrateContents += s.count;
                         player.inventory.addStack(s);
                     }
                 }
@@ -2519,6 +3306,14 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
         consumeDurability(held, 1f);
         player.noise = Math.min(1f, player.noise + 0.3f);
 
+        boolean structure = t == BlockType.WALL || t == BlockType.STONE_BRICK
+                || t == BlockType.GATE || t == BlockType.CRATE || t == BlockType.CAMPFIRE
+                || t == BlockType.CAMP_BED || t == BlockType.PLANK || t == BlockType.LOG
+                || t == BlockType.WORKBENCH || t == BlockType.FURNACE || t == BlockType.ANVIL;
+        noise.emit(this, pos.x() + 0.5f, pos.y() + 0.5f, pos.z() + 0.5f,
+                structure ? 32f : 22f, structure ? 0.55f : 0.35f,
+                structure ? "structure-break" : "mining-break", true, player);
+
         // Damaging camp structures angers the camp.
         if (world.campPos != null && !faction.hostile
                 && (t == BlockType.CRATE || t == BlockType.CAMPFIRE || t == BlockType.WALL
@@ -2526,6 +3321,22 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
                 || t == BlockType.HERB_STATION || t == BlockType.DRYING_RACK)
                 && pos.distSq(world.campPos.x(), world.campPos.y(), world.campPos.z()) < 14 * 14) {
             faction.addTrust(this, -15, "The camp saw you wreck their property!");
+        }
+
+        // Settlement structures: reputation and alarm consequences.
+        var bs = world.settlementAt(pos.x(), pos.z());
+        if (bs != null) {
+            if (t == BlockType.ALARM_BELL && bs.hostile()) {
+                log("The alarm bell clatters down — the garrison can't ring it now.");
+                settlementManager.onAlarmSabotaged(this, bs);
+            } else if (t == BlockType.CRATE) {
+                settlementManager.onContainerBroken(this, bs, brokenCrateContents);
+            } else {
+                settlementManager.onStructureDestroyed(this, bs, t);
+            }
+        }
+        if (t == BlockType.POWDER_KEG) {
+            world.kegFuses.remove(pos);
         }
     }
 
@@ -2582,31 +3393,62 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
             int px = targetHit.x() + targetHit.nx();
             int py = targetHit.y() + targetHit.ny();
             int pz = targetHit.z() + targetHit.nz();
-            if (!world.getBlock(px, py, pz).isReplaceable()) {
-                return;
-            }
-            // Don't place inside the player or an entity.
-            if (place.solid && wouldCollide(px, py, pz)) {
-                return;
-            }
-            world.setBlock(px, py, pz, place, true);
-            Vec3i pos = new Vec3i(px, py, pz);
-            switch (place) {
-                case CAMPFIRE -> world.campfireFuel.put(pos, 300f);
-                case CRATE -> world.crateContents.put(pos, new Inventory(12));
-                case RAIN_COLLECTOR -> world.collectorWater.put(pos, 0f);
-                case BEACON -> {
-                    world.beaconPos = pos;
-                    world.beaconStage = 0;
-                    log("Beacon frame placed. It needs a signal crystal, copper wiring and calibration.");
-                }
-                default -> {
-                }
-            }
-            player.inventory.shrink(player.hotbarSel, 1);
-            audio.playBlockPlace(px + 0.5f, py + 0.5f, pz + 0.5f);
-            particles.blockDust(place, px + 0.5f, py + 0.8f, pz + 0.5f, 5);
+            placeSelectedBlockAt(px, py, pz);
         }
+    }
+
+    /** Gameplay placement command shared by RMB and integration tests. */
+    public boolean placeSelectedBlockAt(int px, int py, int pz) {
+        ItemStack held = player.selected();
+        BlockType place = held == null ? null : held.type.places();
+        if (place == null || !world.getBlock(px, py, pz).isReplaceable()) {
+            return false;
+        }
+        // Don't place inside the player or an entity.
+        if (place.solid && wouldCollide(px, py, pz)) {
+            return false;
+        }
+        world.setBlock(px, py, pz, place, true);
+        if (world.getBlock(px, py, pz) != place) {
+            return false;
+        }
+        Vec3i pos = new Vec3i(px, py, pz);
+        switch (place) {
+            case CAMPFIRE -> world.campfireFuel.put(pos, 300f);
+            case CRATE -> world.crateContents.put(pos, new Inventory(12));
+            case RAIN_COLLECTOR -> world.collectorWater.put(pos, 0f);
+            case LANTERN -> log("Lantern placed empty. Hold charcoal and press [F] to refuel it.");
+            case BEACON -> {
+                world.beaconPos = pos;
+                world.beaconStage = 0;
+                log("Beacon frame placed. It needs a signal crystal, copper wiring and calibration.");
+            }
+            default -> {
+            }
+        }
+        player.inventory.shrink(player.hotbarSel, 1);
+        audio.playBlockPlace(px + 0.5f, py + 0.5f, pz + 0.5f);
+        particles.blockDust(place, px + 0.5f, py + 0.8f, pz + 0.5f, 5);
+        return true;
+    }
+
+    /** True when no cage bars or walls block the line to an NPC (rescues). */
+    private boolean clearPathToNpc(Npc npc) {
+        // Player position is authoritative.  The camera is synchronized later in
+        // the frame and may legitimately lag during save/load or command tests.
+        float ox = player.pos.x, oy = player.pos.y + player.eyeHeight(), oz = player.pos.z;
+        float tx = npc.pos.x, ty = npc.pos.y + 1.2f, tz = npc.pos.z;
+        float dx = tx - ox, dy = ty - oy, dz = tz - oz;
+        float dist = (float) Math.sqrt(dx * dx + dy * dy + dz * dz);
+        int steps = Math.max(1, (int) (dist * 2));
+        for (int i = 1; i < steps; i++) {
+            float f = i / (float) steps;
+            if (world.getBlock((int) Math.floor(ox + dx * f), (int) Math.floor(oy + dy * f),
+                    (int) Math.floor(oz + dz * f)).solid) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private boolean wouldCollide(int bx, int by, int bz) {
@@ -2776,19 +3618,133 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
     // Interactions (F)
     // ------------------------------------------------------------------
 
+    /** Normal talk/trade gate. Captives use the rescue action and never this UI. */
+    public boolean canOpenNpcInteraction(Npc npc) {
+        return npc != null && !npc.dead && !npc.raider
+                && npc.archetype != com.veylon.settlement.NpcArchetype.CAPTIVE
+                && !npc.hostileToPlayer();
+    }
+
+    /** Shared decision used by the HUD prompt and the real interaction command. */
+    public NpcInteraction npcInteraction(Npc npc) {
+        if (npc == null || npc.dead || npc.raider) {
+            return NpcInteraction.NONE;
+        }
+        if (npc.archetype == com.veylon.settlement.NpcArchetype.CAPTIVE) {
+            if (!settlementManager.canRescueCaptive(this, npc)) {
+                return NpcInteraction.NONE;
+            }
+            return clearPathToNpc(npc)
+                    ? NpcInteraction.RESCUE_READY : NpcInteraction.RESCUE_BLOCKED;
+        }
+        return canOpenNpcInteraction(npc) ? NpcInteraction.TALK : NpcInteraction.NONE;
+    }
+
+    /** Ignores closer hostile guards so a reachable prisoner remains selectable. */
+    private Npc nearestNpcForInteraction(float range) {
+        Npc best = null;
+        double bestD = range * range;
+        for (Npc candidate : entities.npcs) {
+            if (npcInteraction(candidate) == NpcInteraction.NONE) {
+                continue;
+            }
+            double d = candidate.distSqTo(player.pos.x, player.pos.y, player.pos.z);
+            if (d < bestD) {
+                bestD = d;
+                best = candidate;
+            }
+        }
+        return best;
+    }
+
+    /**
+     * Gameplay command used by the F-key path and integration tests. Returns
+     * true when an NPC action consumed the interaction.
+     */
+    public boolean interactWithNearbyNpc() {
+        Npc npc = nearestNpcForInteraction(3.2f);
+        return switch (npcInteraction(npc)) {
+            case TALK -> {
+                activeNpc = npc;
+                npcScreen.open();
+                uiMode = UiMode.NPC;
+                yield true;
+            }
+            case RESCUE_BLOCKED -> {
+                log("The cage bars are in the way — break them first.");
+                yield true;
+            }
+            case RESCUE_READY -> {
+                settlementManager.rescueCaptive(this, npc);
+                yield true;
+            }
+            case NONE -> false;
+        };
+    }
+
+    /**
+     * Gameplay block-interaction command shared by the real F-key path and
+     * integration tests. It deliberately covers world-state interactions;
+     * UI-only containers and stations remain on their existing screen path.
+     */
+    public boolean interactWithBlockAt(Vec3i pos) {
+        if (pos == null) {
+            return false;
+        }
+        return switch (world.getBlock(pos.x(), pos.y(), pos.z())) {
+            case CAMPFIRE -> {
+                campfireInteract(pos);
+                yield true;
+            }
+            case LANTERN -> interactLantern(pos);
+            case POWDER_KEG -> {
+                if (explosions.tryArmKeg(this, pos, 5f, true)) {
+                    audio.playFuse(pos.x() + 0.5f, pos.y() + 0.5f, pos.z() + 0.5f);
+                    log("Fuse lit! Five seconds — RUN.");
+                    noise.emit(this, pos.x(), pos.y(), pos.z(), 12f, 0.4f,
+                            "fuse", true, player);
+                } else if (!world.kegFuses.containsKey(pos)) {
+                    log("Too many powder-keg fuses are already burning.");
+                }
+                yield true;
+            }
+            case GATE -> {
+                var settlement = world.settlementAt(pos.x(), pos.z());
+                if (settlement != null && settlement.hostile()) {
+                    log("The gate is barred from the inside.");
+                } else {
+                    // Open the complete two-wide/two-high doorway around the hit block.
+                    settlementManager.openGate(this, pos);
+                    settlementManager.openGate(this, pos.offset(0, 1, 0));
+                    settlementManager.openGate(this, pos.offset(0, -1, 0));
+                    settlementManager.openGate(this, pos.offset(1, 0, 0));
+                    settlementManager.openGate(this, pos.offset(-1, 0, 0));
+                }
+                yield true;
+            }
+            case ALARM_BELL -> {
+                var settlement = world.settlementAt(pos.x(), pos.z());
+                if (settlement != null) {
+                    settlementManager.triggerAlarm(this, settlement);
+                    log("The bell tolls across the settlement.");
+                }
+                yield true;
+            }
+            default -> false;
+        };
+    }
+
     private void interact() {
-        // NPCs first.
-        Npc npc = entities.nearestNpc(player.pos.x, player.pos.y, player.pos.z, 3.2f);
-        if (npc != null && !npc.raider) {
-            activeNpc = npc;
-            npcScreen.open();
-            uiMode = UiMode.NPC;
+        // NPCs first, through the same command seam used by tests.
+        if (interactWithNearbyNpc()) {
+            return;
+        }
+        // Recover stuck arrows through the shared gameplay command.
+        if (recoverNearbyArrow()) {
             return;
         }
         // Carcasses.
-        Carcass carcass = entities.nearestCarcass(player.pos.x, player.pos.y, player.pos.z, 2.6f);
-        if (carcass != null) {
-            harvestCarcass(carcass);
+        if (interactWithNearbyCarcass()) {
             return;
         }
         if (targetHit != null) {
@@ -2809,7 +3765,7 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
                     return;
                 }
                 case CAMPFIRE -> {
-                    campfireInteract(pos);
+                    interactWithBlockAt(pos);
                     return;
                 }
                 case CRATE -> {
@@ -2828,6 +3784,10 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
                     collectorInteract(pos);
                     return;
                 }
+                case LANTERN -> {
+                    interactWithBlockAt(pos);
+                    return;
+                }
                 case BEDROLL -> {
                     startSleep(false);
                     return;
@@ -2839,6 +3799,14 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
                         log("The camp won't let you use their beds yet (needs Friendly trust).");
                         return;
                     }
+                    var bedSettlement = world.settlementAt(pos.x(), pos.z());
+                    if (bedSettlement != null && !bedSettlement.friendly()
+                            && !bedSettlement.cleared) {
+                        log(bedSettlement.hostile()
+                                ? "Sleeping in a hostile camp? Not a chance."
+                                : "These beds belong to the residents. Earn their friendship first.");
+                        return;
+                    }
                     startSleep(true);
                     return;
                 }
@@ -2848,6 +3816,18 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
                 }
                 case BEACON_LIT -> {
                     log("The beacon thrums steadily, its signal cutting through the sky.");
+                    return;
+                }
+                case POWDER_KEG -> {
+                    interactWithBlockAt(pos);
+                    return;
+                }
+                case GATE -> {
+                    interactWithBlockAt(pos);
+                    return;
+                }
+                case ALARM_BELL -> {
+                    interactWithBlockAt(pos);
                     return;
                 }
                 default -> {
@@ -2875,6 +3855,34 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
         }
     }
 
+    /** Gameplay command shared by the real F-key path and integration tests. */
+    public boolean recoverNearbyArrow() {
+        if (player == null) {
+            return false;
+        }
+        var stuckArrow = projectiles.nearestStuckArrow(
+                player.pos.x, player.pos.y + 1f, player.pos.z, 2.6f);
+        if (stuckArrow == null) {
+            return false;
+        }
+        projectiles.pickUp(this, stuckArrow);
+        return true;
+    }
+
+    /** Gameplay command shared by the real F-key path for harvesting carcasses. */
+    public boolean interactWithNearbyCarcass() {
+        if (player == null) {
+            return false;
+        }
+        Carcass carcass = entities.nearestCarcass(
+                player.pos.x, player.pos.y, player.pos.z, 2.6f);
+        if (carcass == null) {
+            return false;
+        }
+        harvestCarcass(carcass);
+        return true;
+    }
+
     private void harvestCarcass(Carcass carcass) {
         boolean knife = playerHasKnife();
         ItemType meatType = carcass.rotten() ? ItemType.SPOILED_MEAT : ItemType.RAW_MEAT;
@@ -2897,6 +3905,14 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
             particles.blood(carcass.pos.x, carcass.pos.y + 0.3f, carcass.pos.z);
             log("Skinned the " + carcass.type.displayName + ": " + meat + " meat, " + hide
                     + " hide" + (carcass.rotten() ? " (the meat is spoiled)" : "") + ".");
+            // Lodged arrows come back with the hide.
+            if (carcass.stuckArrows > 0) {
+                ItemType arrowType = carcass.stuckArrowType != null
+                        ? carcass.stuckArrowType : ItemType.ARROW;
+                player.inventory.add(arrowType, carcass.stuckArrows);
+                log("Recovered " + carcass.stuckArrows + "x " + arrowType.displayName + ".");
+                carcass.stuckArrows = 0;
+            }
         } else if (carcass.meatLeft > 0) {
             carcass.meatLeft--;
             player.inventory.add(meatType, 1);
@@ -2910,6 +3926,21 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
     }
 
     private void campfireInteract(Vec3i pos) {
+        // A cleared settlement's fire is where the player claims the outpost.
+        var cs = world.settlementAt(pos.x(), pos.z());
+        if (cs != null && cs.hostile()
+                && com.veylon.settlement.HumanFaction.FREE_SETTLERS.equals(cs.founderFaction)) {
+            settlementManager.offerRestitution(this, cs);
+            return;
+        }
+        if (cs != null && cs.hostile()) {
+            settlementManager.controlCentralObjective(this, cs);
+            return;
+        }
+        if (cs != null && cs.cleared && !cs.occupied) {
+            settlementManager.occupy(this, cs);
+            return;
+        }
         boolean lit = world.campfireFuel.getOrDefault(pos, 0f) > 0;
         if (lit && player.inventory.has(ItemType.RAW_MEAT, 1)) {
             player.inventory.remove(ItemType.RAW_MEAT, 1);
@@ -2931,6 +3962,35 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
             log(lit ? "Bring raw meat to cook, dirty water to boil, or a log for fuel."
                     : "The fire is out. Add a log to relight it.");
         }
+    }
+
+    /** Gameplay command shared by the real F-key interaction and integration tests. */
+    public boolean interactLantern(Vec3i pos) {
+        World.LanternState state = world.lanternState(pos);
+        if (state == null) {
+            return false;
+        }
+        ItemStack held = player.selected();
+        if (held != null && held.type == ItemType.CHARCOAL
+                && state.fuelSeconds() < World.LANTERN_MAX_FUEL) {
+            player.inventory.shrink(player.hotbarSel, 1);
+            float fuel = world.addLanternFuel(pos, World.LANTERN_FUEL_PER_CHARCOAL);
+            audio.playClick();
+            log(state.lit()
+                    ? "Added charcoal to the lit lantern (" + (int) fuel + "s fuel)."
+                    : "Added charcoal to the lantern (" + (int) fuel
+                    + "s fuel). Press [F] again to light it.");
+            return true;
+        }
+        if (state.fuelSeconds() <= 0) {
+            log("The lantern is empty. Hold charcoal and press [F] to refuel it.");
+            return true;
+        }
+        boolean light = !state.lit();
+        world.setLanternLit(pos, light);
+        audio.playClick();
+        log(light ? "Lantern lit." : "Lantern extinguished; its remaining fuel is preserved.");
+        return true;
     }
 
     private void rackInteract(Vec3i pos) {
@@ -3024,10 +4084,16 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
         }
     }
 
-    private void openCrateAt(Vec3i pos) {
+    /** Opens a real world crate; both RMB/F interaction paths use this command. */
+    public boolean openCrateAt(Vec3i pos) {
+        if (pos == null || world.getBlock(pos.x(), pos.y(), pos.z()) != BlockType.CRATE) {
+            return false;
+        }
+        settlementManager.onRestrictedStorageOpened(this, pos);
         openCrate = world.crateContents.computeIfAbsent(pos, k -> new Inventory(12));
         openCratePos = pos;
         uiMode = UiMode.CRATE;
+        return true;
     }
 
     /** Called by the crate UI; taking from camp crates is stealing unless trusted. */
@@ -3036,6 +4102,61 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
                 && openCratePos.distSq(world.campPos.x(), world.campPos.y(), world.campPos.z()) < 9 * 9) {
             faction.addTrust(this, -Math.min(12, 3 + count), "The camp caught you stealing!");
         }
+        // Settlement crates: theft angers the locals.
+        if (openCratePos != null) {
+            settlementManager.onCrateTheft(this, openCratePos, type, count);
+            var settlement = world.settlementAt(openCratePos.x(), openCratePos.z());
+            if (settlement != null && settlement.hostile()) {
+                faction.onStolenSuppliesRecovered(this, settlement,
+                        com.veylon.ai.FactionSystem.settlementStorageId(
+                                settlement.id, openCratePos),
+                        type, count);
+            }
+        }
+    }
+
+    /** Real crate-UI transfer command used by mouse input and integration tests. */
+    public int transferCrateItemToPlayer(int slot) {
+        if (openCrate == null || slot < 0 || slot >= openCrate.size()) {
+            return 0;
+        }
+        ItemStack stack = openCrate.get(slot);
+        if (stack == null) {
+            return 0;
+        }
+        ItemType type = stack.type;
+        int before = stack.count;
+        int leftover = player.inventory.addStack(stack);
+        int taken = before - leftover;
+        openCrate.set(slot, leftover > 0 ? stack : null);
+        if (taken > 0) {
+            audio.playClick();
+            onCrateItemTaken(type, taken);
+        }
+        return taken;
+    }
+
+    /** Real crate-UI deposit command; returned supplies are attributed by crate position. */
+    public int transferPlayerItemToCrate(int slot) {
+        if (openCrate == null || slot < 0 || slot >= player.inventory.size()) {
+            return 0;
+        }
+        ItemStack stack = player.inventory.get(slot);
+        if (stack == null) {
+            return 0;
+        }
+        ItemType type = stack.type;
+        int before = stack.count;
+        int leftover = openCrate.addStack(stack);
+        int deposited = before - leftover;
+        player.inventory.set(slot, leftover > 0 ? stack : null);
+        if (deposited > 0) {
+            audio.playClick();
+            if (openCratePos != null) {
+                settlementManager.onSuppliesReturned(this, openCratePos, type, deposited);
+            }
+        }
+        return deposited;
     }
 
     private Entity findAttackTarget(Vector3f dir) {
@@ -3095,6 +4216,7 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
     public void fastTick(float dt) {
         player.tickNeeds(this, dt);
         entities.fastTick(this, dt);
+        settlementManager.fastTick(this, dt);
     }
 
     @Override
@@ -3112,10 +4234,28 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
                 particles.smoke(player.pos.x, player.pos.y + 1.9f, player.pos.z, 0.4f);
             }
         }
+        Vec3i fumarole = world.nearestBasaltFumarole(
+                player.pos.x, player.pos.y + 0.5f, player.pos.z, 5);
+        if (fumarole != null) {
+            player.smokeExposure += 14f * dt;
+            particles.smoke(fumarole.x() + 0.5f, fumarole.y() + 0.35f,
+                    fumarole.z() + 0.5f, 0.75f);
+        }
         if (events.toxicFog() && player.exposedToSky && !player.shelter.roofed()) {
             if (Math.random() < 0.04 && !player.has(Affliction.SICKNESS)) {
                 player.addAffliction(Affliction.SICKNESS, 120);
                 log("The toxic fog claws at your lungs... SICKNESS takes hold.");
+            }
+        }
+
+        // Open flame cooks off adjacent powder kegs.
+        for (Vec3i f : fire.burningCells()) {
+            for (int[] off : new int[][]{{1, 0, 0}, {-1, 0, 0}, {0, 1, 0},
+                    {0, -1, 0}, {0, 0, 1}, {0, 0, -1}}) {
+                Vec3i k = new Vec3i(f.x() + off[0], f.y() + off[1], f.z() + off[2]);
+                if (explosions.tryArmKeg(this, k, 1.5f, false)) {
+                    audio.playFuse(k.x() + 0.5f, k.y() + 0.5f, k.z() + 0.5f);
+                }
             }
         }
 
@@ -3130,7 +4270,15 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
                 if (poi.type == Poi.PoiType.PREDATOR_DEN) {
                     log("Bones and claw marks everywhere... wolves den here.");
                 }
-                faction.onPoiDiscovered(this);
+                faction.onPoiDiscovered(this, poi);
+                if (poi.type == Poi.PoiType.ABANDONED_MINE
+                        || poi.type == Poi.PoiType.SMUGGLER_CACHE
+                        || poi.type == Poi.PoiType.HIDEOUT_CAVE
+                        || poi.type == Poi.PoiType.RESONANT_SHRINE
+                        || poi.type == Poi.PoiType.STALKER_NEST
+                        || poi.type == Poi.PoiType.EXPEDITION_CAMP) {
+                    faction.onCaveExplored(this, poi);
+                }
             }
         }
 
@@ -3176,6 +4324,7 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
         entities.slowTick(this);
         entities.tickWorldDetritus(this, dt);
         itemConditions.slowTick(this, dt);
+        settlementManager.slowTick(this, dt);
 
         // Clear the camp illness event once everyone has recovered.
         boolean anySick = false;

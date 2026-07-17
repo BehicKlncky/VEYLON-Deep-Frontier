@@ -15,6 +15,60 @@ import com.veylon.util.Noise;
  */
 public class Hud {
 
+    /** Exact player-facing bow ammo readout used by rendering and workflow tests. */
+    public static String bowAmmoLabel(Game g) {
+        int basic = g.player.inventory.count(com.veylon.item.ItemType.ARROW);
+        int iron = g.player.inventory.count(com.veylon.item.ItemType.IRON_ARROW);
+        return "Selected " + g.selectedBowAmmo().displayName + " [R]"
+                + "   Basic " + basic + "   Iron " + iron;
+    }
+
+    /** Ammo counter, reload bar and bow-draw meter above the hotbar. */
+    private void renderWeaponStatus(Game g, UiRenderer ui, int w, int h,
+                                    com.veylon.combat.WeaponDefinition weapon,
+                                    ItemStack held) {
+        if (weapon == null || held == null) {
+            return;
+        }
+        float cx = w / 2f;
+        float y = h - 96;
+        switch (weapon.category) {
+            case BOW -> {
+                int basic = g.player.inventory.count(com.veylon.item.ItemType.ARROW);
+                int iron = g.player.inventory.count(com.veylon.item.ItemType.IRON_ARROW);
+                String label = bowAmmoLabel(g);
+                ui.textCentered(cx, y, 1.4f, label,
+                        basic + iron > 0 ? 0.9f : 1f, basic + iron > 0 ? 0.9f : 0.4f, 0.7f, 1f);
+                if (g.drawingBow) {
+                    float bw = 120;
+                    ui.rect(cx - bw / 2, y + 18, bw, 7, 0.08f, 0.08f, 0.08f, 0.8f);
+                    boolean full = g.bowDraw >= 0.999f;
+                    ui.rect(cx - bw / 2 + 1, y + 19, (bw - 2) * g.bowDraw, 5,
+                            full ? 0.4f : 0.85f, full ? 0.9f : 0.7f, 0.35f, 0.95f);
+                }
+            }
+            case FIREARM -> {
+                int reserve = g.player.inventory.count(weapon.ammo);
+                String label = held.charge + "/" + weapon.magazine + "   " + reserve
+                        + " " + weapon.ammo.displayName;
+                ui.textCentered(cx, y, 1.4f, label,
+                        held.charge > 0 ? 0.9f : 1f, held.charge > 0 ? 0.9f : 0.45f, 0.7f, 1f);
+                if (g.reloadTimer > 0 && g.reloadTotal > 0) {
+                    float bw = 120;
+                    float frac = 1f - g.reloadTimer / g.reloadTotal;
+                    ui.rect(cx - bw / 2, y + 18, bw, 7, 0.08f, 0.08f, 0.08f, 0.8f);
+                    ui.rect(cx - bw / 2 + 1, y + 19, (bw - 2) * frac, 5, 0.85f, 0.65f, 0.3f, 0.95f);
+                    ui.textCentered(cx, y + 30, 1.15f, "Reloading...", 0.85f, 0.8f, 0.7f, 1f);
+                } else if (held.charge <= 0 && reserve > 0) {
+                    ui.textCentered(cx, y + 18, 1.15f, "[R] Reload", 0.9f, 0.8f, 0.5f, 1f);
+                }
+            }
+            case THROWN -> ui.textCentered(cx, y, 1.4f,
+                    held.count + "x " + held.type.displayName + " — LMB to throw",
+                    0.9f, 0.85f, 0.7f, 1f);
+        }
+    }
+
     public void render(Game g) {
         UiRenderer ui = g.ui;
         int w = ui.screenW(), h = ui.screenH();
@@ -23,9 +77,21 @@ public class Hud {
         renderWeatherOverlay(g, ui, w, h);
         renderVignettes(g, ui, w, h);
 
-        // Crosshair.
-        ui.rect(w / 2f - 8, h / 2f - 1, 16, 2, 1, 1, 1, 0.8f);
-        ui.rect(w / 2f - 1, h / 2f - 8, 2, 16, 1, 1, 1, 0.8f);
+        // Crosshair: spreads apart while a ranged weapon is inaccurate.
+        var heldStack = p.selected();
+        var weapon = com.veylon.combat.WeaponRegistry.of(heldStack == null ? null : heldStack.type);
+        float spread = 0f;
+        if (weapon != null && weapon.category == com.veylon.combat.WeaponDefinition.Category.BOW) {
+            spread = (1f - g.bowDraw) * 7f;
+        } else if (weapon != null) {
+            spread = weapon.spread * 0.8f;
+        }
+        ui.rect(w / 2f - 8 - spread, h / 2f - 1, 6, 2, 1, 1, 1, 0.8f);
+        ui.rect(w / 2f + 2 + spread, h / 2f - 1, 6, 2, 1, 1, 1, 0.8f);
+        ui.rect(w / 2f - 1, h / 2f - 8 - spread, 2, 6, 1, 1, 1, 0.8f);
+        ui.rect(w / 2f - 1, h / 2f + 2 + spread, 2, 6, 1, 1, 1, 0.8f);
+
+        renderWeaponStatus(g, ui, w, h, weapon, heldStack);
 
         // Survival bars (bottom-left).
         float bx = 16, bw = 190, bh = 13;
@@ -118,6 +184,14 @@ public class Hud {
         if (g.faction.quest != null) {
             String q = "Request: " + g.faction.quest.describe();
             ui.textShadow(w - ui.textWidth(q, 1.25f) - 12, 48, 1.25f, q, 0.7f, 0.85f, 1f, 1f);
+            String navigation = QuestObjectiveView.navigationLabel(g);
+            if (!navigation.isEmpty()) {
+                boolean returning = g.faction.quest.status
+                        == com.veylon.ai.Quest.Status.READY_TO_TURN_IN;
+                ui.textShadow(w - ui.textWidth(navigation, 1.2f) - 12, 66, 1.2f,
+                        navigation, returning ? 0.45f : 1f,
+                        returning ? 0.9f : 0.78f, returning ? 1f : 0.25f, 1f);
+            }
         }
 
         // Targeted block label + mining progress.

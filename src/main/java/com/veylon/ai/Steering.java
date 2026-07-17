@@ -21,7 +21,9 @@ public final class Steering {
         e.vel.x = dx / len * speed;
         e.vel.z = dz / len * speed;
         e.yaw = (float) Math.toDegrees(Math.atan2(dx, -dz));
-        if (e.horizontalCollision && e.onGround) {
+        if (e.onLadder && e.horizontalCollision) {
+            e.vel.y = 2.4f;
+        } else if (e.horizontalCollision && e.onGround) {
             e.vel.y = 7.4f;
         }
         if (e.inWater) {

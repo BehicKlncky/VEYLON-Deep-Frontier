@@ -119,7 +119,42 @@ public enum ItemType {
     FUR_HOOD("Fur Hood", p().gear(EquipSlot.HEAD, 3, 0.25f, 1).durability(120)
             .weight(0.8f).color(0.56f, 0.44f, 0.30f)),
     BACKPACK("Backpack", p().gear(EquipSlot.BACK, 0, 0, 0).carry(14)
-            .weight(1.2f).color(0.46f, 0.38f, 0.26f));
+            .weight(1.2f).color(0.46f, 0.38f, 0.26f)),
+
+    // ---- Deep Frontier world expansion (append-only; ordinals are save IDs) ----
+    SULFUR("Sulfur", p().weight(0.4f).color(0.82f, 0.76f, 0.24f)),
+    SALTPETER("Saltpeter", p().weight(0.4f).color(0.84f, 0.82f, 0.70f)),
+    BLACK_POWDER("Black Powder", p().weight(0.3f).color(0.16f, 0.15f, 0.15f)),
+    MUSKET_BALL("Iron Ball", p().stack(32).weight(0.12f).color(0.55f, 0.56f, 0.60f)),
+    SCRAP_SHOT("Scrap Shot", p().stack(32).weight(0.15f).color(0.48f, 0.44f, 0.40f)),
+    PRIMITIVE_BOW("Primitive Bow", p().tool(ToolKind.BOW, 1f).damage(2).durability(140)
+            .weight(0.9f).color(0.58f, 0.44f, 0.26f)),
+    ARROW("Arrow", p().stack(32).weight(0.08f).color(0.66f, 0.56f, 0.38f)),
+    IRON_ARROW("Iron Arrow", p().stack(32).weight(0.11f).color(0.70f, 0.72f, 0.76f)),
+    MUSKET("Veylan Musket", p().tool(ToolKind.FIREARM, 1f).damage(4).durability(220)
+            .weight(4.2f).color(0.42f, 0.32f, 0.22f)),
+    FLINTLOCK_PISTOL("Scrap Flintlock", p().tool(ToolKind.FIREARM, 1f).damage(3).durability(180)
+            .weight(1.6f).color(0.38f, 0.34f, 0.30f)),
+    BLUNDERBUSS("Scrap Blunderbuss", p().tool(ToolKind.FIREARM, 1f).damage(3).durability(160)
+            .weight(3.4f).color(0.46f, 0.38f, 0.26f)),
+    POWDER_KEG("Powder Keg", p().stack(4).places("POWDER_KEG").weight(9f)
+            .color(0.50f, 0.36f, 0.22f)),
+    SCRAP_BOMB("Scrap Bomb", p().tool(ToolKind.THROWN, 1f).stack(8).damage(2)
+            .weight(1.4f).color(0.30f, 0.30f, 0.34f)),
+    FIRE_BOMB("Fire Bomb", p().tool(ToolKind.THROWN, 1f).stack(8).damage(1)
+            .weight(1.2f).color(0.85f, 0.45f, 0.18f)),
+    ROPE_LADDER("Rope Ladder", p().stack(16).places("LADDER").weight(0.8f)
+            .color(0.62f, 0.50f, 0.30f)),
+    LANTERN("Lantern", p().stack(8).places("LANTERN").weight(1.4f)
+            .color(0.92f, 0.78f, 0.40f)),
+    TRAIL_MARKER("Trail Marker", p().stack(32).places("TRAIL_MARKER").weight(0.1f)
+            .color(0.92f, 0.58f, 0.28f)),
+    RELIC_CARBINE("Frontier Carbine", p().tool(ToolKind.FIREARM, 1f).damage(4).durability(160)
+            .weight(3.2f).color(0.52f, 0.56f, 0.60f)),
+    RELIC_RIFLE("Scavenged Auto-Rifle", p().tool(ToolKind.FIREARM, 1f).damage(4).durability(140)
+            .weight(4.6f).color(0.34f, 0.36f, 0.32f)),
+    RIFLE_CARTRIDGE("Relic Cartridge", p().stack(48).weight(0.03f).color(0.78f, 0.62f, 0.30f)),
+    RELIC_PARTS("Relic Components", p().stack(8).weight(0.6f).color(0.60f, 0.66f, 0.72f));
 
     public final String displayName;
     public final int maxStack;

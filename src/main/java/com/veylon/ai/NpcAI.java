@@ -18,10 +18,18 @@ public final class NpcAI {
 
     private static final Random RNG = new Random();
 
+    /** Re-seeds decision jitter so a fixed world seed replays identically. */
+    public static void reseed(long seed) {
+        RNG.setSeed(seed);
+    }
+
     private NpcAI() {
     }
 
     public static void update(Game g, Npc n, float dt) {
+        if (n.dead) {
+            return;
+        }
         n.decideTimer -= dt;
         n.attackCooldown -= dt;
         n.hunger = Math.min(100, n.hunger + 0.03f * dt);
@@ -31,6 +39,12 @@ public final class NpcAI {
             n.interactFreeze -= dt;
             Steering.stop(n);
             faceEntity(n, g.player.pos.x, g.player.pos.z);
+            return;
+        }
+
+        // Settlement residents and traveling war parties use the 0.3.0 brain.
+        if (n.settled() || n.warParty) {
+            SettledNpcAI.update(g, n, dt);
             return;
         }
 
@@ -408,12 +422,25 @@ public final class NpcAI {
     private static void updateTrader(Game g, Npc n, float dt) {
         n.leaveTimer -= dt;
         if (n.leaveTimer <= 0) {
+            if (n.partyMissionId != null && !n.partyMissionId.isBlank()) {
+                g.faction.failMission(n.partyMissionId, "the escorted trader left the route");
+            }
             n.dead = true;
             n.lastHitByPlayer = false;
             g.log("The wandering trader has moved on.");
             return;
         }
         double pd = Math.sqrt(n.distSqTo(g.player));
+        var destination = n.partyTargetSettlementId != 0
+                ? g.world.settlements.get(n.partyTargetSettlementId)
+                : g.settlementManager.nearest(g, n.pos.x, n.pos.z, 20);
+        if (destination != null && destination.friendly() && pd < 12) {
+            double arrival = destination.distSqTo(n.pos.x, n.pos.z);
+            if (arrival <= (destination.radius + 4.0) * (destination.radius + 4.0)
+                    && n.partyMissionId != null && !n.partyMissionId.isBlank()) {
+                g.faction.onTraderEscorted(g, n.partyMissionId, destination.id);
+            }
+        }
         if (pd > 10) {
             Steering.moveToward(n, g.player.pos.x, g.player.pos.z, 2.8f);
         } else if (n.decideTimer <= 0) {

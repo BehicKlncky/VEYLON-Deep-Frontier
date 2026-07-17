@@ -17,6 +17,9 @@ import java.util.Set;
  */
 public class FireSystem {
 
+    /** Hard ceiling for simultaneously burning world cells. */
+    public static final int MAX_ACTIVE_FIRES = 220;
+
     private final Map<Vec3i, Float> burning = new HashMap<>();
     private final Random rng = new Random();
     public int totalIgnitions = 0;
@@ -43,7 +46,7 @@ public class FireSystem {
         if (burning.containsKey(p)) {
             return false;
         }
-        if (burning.size() > 220) {
+        if (burning.size() >= MAX_ACTIVE_FIRES) {
             return false;
         }
         burning.put(p, 4f + rng.nextFloat() * 6f);
@@ -67,6 +70,7 @@ public class FireSystem {
     public void mediumTick(Game g, float dt) {
         if (burning.isEmpty()) {
             tickCampfires(g, dt);
+            tickLanterns(g, dt);
             return;
         }
         float rainFactor = g.weather.isPrecip() ? 0.12f : 1f;
@@ -100,6 +104,7 @@ public class FireSystem {
 
             // Damage entities standing in/next to fire.
             damageNear(g, p, dt);
+            armAdjacentKegs(g, p);
 
             if (e.getValue() <= 0) {
                 BlockType result = switch (t) {
@@ -114,6 +119,7 @@ public class FireSystem {
             ignite(g, t.x(), t.y(), t.z());
         }
         tickCampfires(g, dt);
+        tickLanterns(g, dt);
     }
 
     private void damageNear(Game g, Vec3i p, float dt) {
@@ -156,6 +162,36 @@ public class FireSystem {
                 g.log("A campfire burned out.");
             } else {
                 e.setValue(fuel);
+                armAdjacentKegs(g, p);
+            }
+        }
+    }
+
+    /** Lit lanterns consume their own finite reservoirs; extinguished ones do not. */
+    private void tickLanterns(Game g, float dt) {
+        for (Vec3i pos : g.world.tickLanterns(dt)) {
+            if (pos.distSq(g.player.pos.x, g.player.pos.y, g.player.pos.z) < 32 * 32) {
+                g.log("A lantern sputtered out of fuel.");
+            }
+        }
+    }
+
+    /** Adjacent open flame gives powder kegs a short, visible fuse. */
+    private void armAdjacentKegs(Game g, Vec3i flame) {
+        for (int dx = -1; dx <= 1; dx++) {
+            for (int dy = -1; dy <= 1; dy++) {
+                for (int dz = -1; dz <= 1; dz++) {
+                    if (dx == 0 && dy == 0 && dz == 0) {
+                        continue;
+                    }
+                    Vec3i keg = flame.offset(dx, dy, dz);
+                    if (g.explosions.tryArmKeg(g, keg, 1.5f, false)) {
+                        g.audio.playFuse(keg.x() + 0.5f, keg.y() + 0.5f, keg.z() + 0.5f);
+                        g.noise.emit(g, keg.x(), keg.y(), keg.z(), 12f, 0.4f,
+                                "fuse", false, null);
+                        g.log("Flame catches a powder-keg fuse!");
+                    }
+                }
             }
         }
     }

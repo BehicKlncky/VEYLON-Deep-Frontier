@@ -137,8 +137,27 @@ public final class Animator {
         float t = (float) time;
 
         // Role/faction colors.
+        var a = n.archetype;
         int vest;
-        if (n.raider) {
+        if (a != null) {
+            vest = switch (a) {
+                case GUARD -> 0x5e4a30;
+                case ARCHER -> 0x4a5a38;
+                case MEDIC -> 0x707a80;
+                case TRADER -> 0xa8842e;
+                case FARMER -> 0x5c6a3a;
+                case SMITH -> 0x54483c;
+                case SCAVENGER -> 0x5a2a20;
+                case TRACKER -> 0x4a382c;
+                case SCOUT -> 0x3e4a42;
+                case HUNTER -> 0x513f2c;
+                case BRUTE -> 0x3a2f28;
+                case POWDERMAN -> 0x40342a;
+                case LEADER -> 0x5a2430;
+                case CAPTIVE -> 0x565250;
+                default -> 0x6a5a44;
+            };
+        } else if (n.raider) {
             vest = 0x5a2a20;
         } else if (n.isTrader) {
             vest = 0xa8842e;
@@ -153,20 +172,46 @@ public final class Animator {
             };
         }
         m.part("vest").color(vest);
-        m.part("pack").visible = n.isTrader;
-        m.part("traderRoll").visible = n.isTrader;
-        m.part("traderAntenna").visible = n.isTrader;
-        m.part("traderLamp").visible = n.isTrader;
-        m.part("traderSatchelL").visible = n.isTrader;
-        m.part("traderSatchelR").visible = n.isTrader;
-        m.part("hood").visible = n.raider;
-        m.part("visor").visible = n.raider;
-        m.part("raiderPadL").visible = n.raider;
-        m.part("raiderPadR").visible = n.raider;
+
+        boolean scavengerLook = n.raider
+                || a == com.veylon.settlement.NpcArchetype.SCAVENGER;
+        boolean headhunter = a != null && a.hostileArchetype()
+                && a != com.veylon.settlement.NpcArchetype.SCAVENGER;
+        boolean trader = n.isTrader || a == com.veylon.settlement.NpcArchetype.TRADER;
+        m.part("pack").visible = trader;
+        m.part("traderRoll").visible = trader;
+        m.part("traderAntenna").visible = trader;
+        m.part("traderLamp").visible = trader;
+        m.part("traderSatchelL").visible = trader;
+        m.part("traderSatchelR").visible = trader;
+        m.part("hood").visible = scavengerLook;
+        m.part("visor").visible = scavengerLook;
+        m.part("raiderPadL").visible = scavengerLook;
+        m.part("raiderPadR").visible = scavengerLook;
         ModelPart raiderSpear = m.part("raiderSpear");
-        raiderSpear.visible = n.raider;
+        raiderSpear.visible = scavengerLook;
         raiderSpear.rotZ = 0.62f; // slung diagonally across the back
-        m.part("friendlyBadge").visible = !n.raider && !n.isTrader;
+        m.part("friendlyBadge").visible = !scavengerLook && !headhunter && !trader
+                && a != com.veylon.settlement.NpcArchetype.CAPTIVE;
+
+        // 0.3.0 archetype accessories.
+        boolean archer = a == com.veylon.settlement.NpcArchetype.ARCHER
+                || a == com.veylon.settlement.NpcArchetype.SCOUT;
+        m.part("quiver").visible = archer;
+        m.part("slungBow").visible = archer;
+        m.part("kegPack").visible = a == com.veylon.settlement.NpcArchetype.POWDERMAN;
+        m.part("slungGun").visible = a == com.veylon.settlement.NpcArchetype.POWDERMAN;
+        boolean brute = a == com.veylon.settlement.NpcArchetype.BRUTE;
+        m.part("brutePadL").visible = brute;
+        m.part("brutePadR").visible = brute;
+        m.part("bruteChest").visible = brute;
+        boolean leader = a == com.veylon.settlement.NpcArchetype.LEADER;
+        m.part("leaderCrest").visible = leader;
+        m.part("leaderMantle").visible = leader;
+        m.part("trophies").visible = headhunter;
+        m.part("warPaint").visible = headhunter;
+        m.part("medicSash").visible = a == com.veylon.settlement.NpcArchetype.MEDIC;
+        m.part("guardPlate").visible = a == com.veylon.settlement.NpcArchetype.GUARD;
 
         m.part("arm_l").rotX = swing * 0.7f;
         m.part("arm_r").rotX = -swing * 0.7f;

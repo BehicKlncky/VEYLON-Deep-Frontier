@@ -55,7 +55,22 @@ public enum BlockType {
     BEDROLL("Bedroll", Shape.PANEL, false, false, true, 0.4f, ToolKind.NONE, false, ItemType.BEDROLL, 1, 0, 0f, 0.60f, 0.50f, 0.34f),
     CAMP_BED("Camp Bed", Shape.PANEL, false, false, true, 0.8f, ToolKind.AXE, false, ItemType.BEDROLL, 1, 0, 0f, 0.55f, 0.42f, 0.40f),
     BEACON("Distress Beacon", Shape.CUBE, true, true, false, 6.0f, ToolKind.PICKAXE, false, ItemType.BEACON_FRAME, 1, 4, 0f, 0.55f, 0.70f, 0.80f),
-    BEACON_LIT("Distress Beacon (active)", Shape.CUBE, true, true, false, -1f, ToolKind.NONE, false, null, 0, 15, 0f, 0.55f, 0.90f, 1.0f);
+    BEACON_LIT("Distress Beacon (active)", Shape.CUBE, true, true, false, -1f, ToolKind.NONE, false, null, 0, 15, 0f, 0.55f, 0.90f, 1.0f),
+
+    // ---- Deep Frontier world expansion (append-only; ordinals are chunk/save IDs) ----
+    BASALT("Basalt", Shape.CUBE, true, true, false, 6.5f, ToolKind.PICKAXE, false, ItemType.STONE, 1, 0, 0f, 0.24f, 0.24f, 0.28f),
+    SULFUR_ORE("Sulfur Vein", Shape.CUBE, true, true, false, 6.0f, ToolKind.PICKAXE, true, ItemType.SULFUR, 2, 0, 0f, 0.72f, 0.68f, 0.22f),
+    SALTPETER_ORE("Saltpeter Crust", Shape.CUBE, true, true, false, 5.5f, ToolKind.PICKAXE, true, ItemType.SALTPETER, 2, 0, 0f, 0.78f, 0.76f, 0.66f),
+    GLOW_FUNGUS("Glow Fungus", Shape.CROSS, false, false, false, 0.2f, ToolKind.NONE, false, ItemType.HERB, 1, 7, 0f, 0.42f, 0.78f, 0.62f),
+    LADDER("Rope Ladder", Shape.CROSS, false, false, true, 0.5f, ToolKind.NONE, false, ItemType.ROPE_LADDER, 1, 0, 0f, 0.60f, 0.48f, 0.28f),
+    LANTERN("Lantern", Shape.TORCH, false, false, false, 0.6f, ToolKind.NONE, false, ItemType.LANTERN, 1, 15, 2f, 0.88f, 0.74f, 0.38f),
+    TRAIL_MARKER("Trail Marker", Shape.TORCH, false, false, false, 0.1f, ToolKind.NONE, false, ItemType.TRAIL_MARKER, 1, 3, 0f, 0.90f, 0.55f, 0.25f),
+    POWDER_KEG("Powder Keg", Shape.CUBE, true, true, true, 1.2f, ToolKind.AXE, false, ItemType.POWDER_KEG, 1, 0, 0f, 0.45f, 0.33f, 0.20f),
+    GATE("Gate", Shape.CUBE, true, true, true, 2.6f, ToolKind.AXE, false, null, 0, 0, 0f, 0.44f, 0.34f, 0.22f),
+    GATE_OPEN("Gate (open)", Shape.RACK, false, false, true, 2.6f, ToolKind.AXE, false, null, 0, 0, 0f, 0.44f, 0.34f, 0.22f),
+    STONE_BRICK("Stone Brick", Shape.CUBE, true, true, false, 7.5f, ToolKind.PICKAXE, false, ItemType.STONE, 1, 0, 0f, 0.44f, 0.44f, 0.48f),
+    ALARM_BELL("Alarm Bell", Shape.TORCH, false, false, false, 1.4f, ToolKind.NONE, false, ItemType.SCRAP, 1, 0, 0f, 0.75f, 0.60f, 0.25f),
+    CAGE_BARS("Cage Bars", Shape.CUBE, true, true, false, 5.0f, ToolKind.PICKAXE, false, ItemType.SCRAP, 1, 0, 0f, 0.36f, 0.38f, 0.42f);
 
     public enum Shape {
         NONE, CUBE, CROSS, LIQUID, TORCH, CAMPFIRE, PANEL, RACK, BASIN
@@ -128,5 +143,10 @@ public enum BlockType {
     public boolean isStation() {
         return this == WORKBENCH || this == CAMPFIRE || this == FURNACE || this == ANVIL
                 || this == TANNERY || this == HERB_STATION || this == MAP_TABLE;
+    }
+
+    /** Blocks entities can climb while inside them (vertical shafts). */
+    public boolean isClimbable() {
+        return this == LADDER;
     }
 }

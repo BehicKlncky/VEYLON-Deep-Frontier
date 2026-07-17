@@ -3,6 +3,7 @@ package com.veylon.simulation;
 import com.veylon.Game;
 import com.veylon.entity.Creature;
 import com.veylon.entity.Npc;
+import com.veylon.settlement.SettlementManager;
 import com.veylon.world.BlockType;
 
 import java.util.ArrayList;
@@ -273,6 +274,9 @@ public class EventSystem {
     }
 
     private void spawnRaider(Game g, int idx) {
+        if (!g.settlementManager.canSpawnNpc(g, SettlementManager.NpcCategory.LEGACY)) {
+            return;
+        }
         var camp = g.world.campPos;
         double ang = rng.nextDouble() * Math.PI * 2;
         int x = (int) (camp.x() + Math.cos(ang) * 24);
@@ -292,6 +296,9 @@ public class EventSystem {
     }
 
     private void spawnTrader(Game g) {
+        if (!g.settlementManager.canSpawnNpc(g, SettlementManager.NpcCategory.LEGACY)) {
+            return;
+        }
         double ang = rng.nextDouble() * Math.PI * 2;
         int x = (int) (g.player.pos.x + Math.cos(ang) * 35);
         int z = (int) (g.player.pos.z + Math.sin(ang) * 35);

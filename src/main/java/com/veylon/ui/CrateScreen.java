@@ -39,24 +39,9 @@ public class CrateScreen {
 
         if (click) {
             if (moveFromCrate >= 0) {
-                ItemStack s = crate.get(moveFromCrate);
-                if (s != null) {
-                    int before = s.count;
-                    int leftover = g.player.inventory.addStack(s);
-                    int taken = before - leftover;
-                    crate.set(moveFromCrate, leftover > 0 ? s : null);
-                    if (taken > 0) {
-                        g.audio.playClick();
-                        g.onCrateItemTaken(s.type, taken);
-                    }
-                }
+                g.transferCrateItemToPlayer(moveFromCrate);
             } else if (moveFromPlayer >= 0) {
-                ItemStack s = g.player.inventory.get(moveFromPlayer);
-                if (s != null) {
-                    int leftover = crate.addStack(s);
-                    g.player.inventory.set(moveFromPlayer, leftover > 0 ? s : null);
-                    g.audio.playClick();
-                }
+                g.transferPlayerItemToCrate(moveFromPlayer);
             }
         }
     }

@@ -15,6 +15,9 @@ public class Carcass {
     public int hideLeft;
     /** Real seconds until the carcass rots away entirely. */
     public float decay;
+    /** Arrows recoverable when skinning (transferred from the live animal). */
+    public int stuckArrows;
+    public com.veylon.item.ItemType stuckArrowType;
 
     public Carcass(Creature.CreatureType type, float x, float y, float z) {
         this.type = type;

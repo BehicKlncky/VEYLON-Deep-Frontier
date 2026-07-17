@@ -17,6 +17,8 @@ public abstract class Entity {
     public float maxHealth = 20;
     public boolean onGround;
     public boolean inWater;
+    /** Overlapping a climbable block (rope ladder). */
+    public boolean onLadder;
     public boolean dead;
     public boolean horizontalCollision;
     /** True if the most recent damage came from the player (controls drops). */
@@ -85,10 +87,20 @@ public abstract class Entity {
         int ez = (int) Math.floor(pos.z);
         inWater = world.getBlock(ex, ey, ez) == BlockType.WATER
                 || world.getBlock(ex, (int) Math.floor(pos.y + 0.1f), ez) == BlockType.WATER;
+        onLadder = world.getBlock(ex, ey, ez).isClimbable()
+                || world.getBlock(ex, (int) Math.floor(pos.y + 0.1f), ez).isClimbable();
 
         if (gravity) {
-            float g = inWater ? 7f : 26f;
-            vel.y -= g * dt;
+            if (onLadder) {
+                // Rope ladders arrest falls; entities slide down slowly unless climbing.
+                if (vel.y < -1.6f) {
+                    vel.y = -1.6f;
+                }
+                fallDist = 0;
+            } else {
+                float g = inWater ? 7f : 26f;
+                vel.y -= g * dt;
+            }
             if (inWater && vel.y < -2.2f) {
                 vel.y = -2.2f;
             }

@@ -73,12 +73,19 @@ public class Chunk {
 
     /** Rescans the chunk for light-emitting blocks. */
     public void rebuildLights() {
+        rebuildLights(null);
+    }
+
+    /** Rescans lights, consulting runtime state for controllable emitters. */
+    public void rebuildLights(World world) {
         lights.clear();
         for (int y = 0; y < SY; y++) {
             for (int z = 0; z < SZ; z++) {
                 for (int x = 0; x < SX; x++) {
                     BlockType t = BlockType.byId(blocks[idx(x, y, z)]);
-                    if (t.light > 0) {
+                    boolean enabled = t != BlockType.LANTERN || world != null
+                            && world.isLanternLit(cx * SX + x, y, cz * SZ + z);
+                    if (t.light > 0 && enabled) {
                         lights.add(new int[]{cx * SX + x, y, cz * SZ + z, t.light});
                     }
                 }

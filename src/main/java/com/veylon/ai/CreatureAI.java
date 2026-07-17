@@ -21,6 +21,15 @@ public final class CreatureAI {
 
     private static final Random RNG = new Random();
 
+    /** Re-seeds decision jitter so a fixed world seed replays identically. */
+    public static void reseed(long seed) {
+        RNG.setSeed(seed);
+    }
+
+    private static final float STALKER_STRONG_LIGHT = 0.42f;
+    private static final float STALKER_DARK_PREY_LIGHT = 0.32f;
+    private static final float STALKER_AMBUSH_RANGE = 5.25f;
+
     private CreatureAI() {
     }
 
@@ -208,6 +217,8 @@ public final class CreatureAI {
                     p.hurtPhysical(g, 9, false);
                     p.knockback(c.pos.x, c.pos.z, 6.5f);
                     g.audio.playHit();
+                    g.noise.emit(g, c.pos.x, c.pos.y, c.pos.z,
+                            24f, 0.7f, "creature-attack", false, c);
                     g.log("The Thornhorn gores you! (-9 HP)");
                 }
             } else if (playerDist > 20 || p.dead) {
@@ -310,6 +321,8 @@ public final class CreatureAI {
                     p.knockback(c.pos.x, c.pos.z, 3.5f);
                     g.audio.playHit();
                     g.audio.playHurt();
+                    g.noise.emit(g, c.pos.x, c.pos.y, c.pos.z,
+                            20f, 0.65f, "creature-attack", false, c);
                     g.log("An Ashwolf bit you! Check for bleeding.");
                 }
             } else {
@@ -328,6 +341,8 @@ public final class CreatureAI {
                     prey.hurt(7, false);
                     prey.fear = 1f;
                     prey.bleedTimer = 20f;
+                    g.noise.emit(g, c.pos.x, c.pos.y, c.pos.z,
+                            18f, 0.65f, "creature-attack", false, c);
                     if (prey.dead) {
                         c.hunger = 0;
                     }
@@ -390,13 +405,25 @@ public final class CreatureAI {
         Player p = g.player;
         double playerDist = Math.sqrt(c.distSqTo(p));
 
-        // Gloomstalkers shun bright light: torchlight forces them back.
-        float lightHere = g.world.blockLight((int) c.pos.x, (int) c.pos.y, (int) c.pos.z);
-        float skyHere = g.world.skyLight((int) c.pos.x, (int) c.pos.y, (int) c.pos.z)
-                * (float) g.time.dayLight();
-        if (lightHere > 0.45f || skyHere > 0.5f) {
+        // Burning cells are not voxel light emitters. Check the actual fire
+        // simulation first so a burning log or spreading fire is still a hard
+        // deterrent in an otherwise dark cave.
+        Vec3i fire = g.fire.nearestBurning(c.pos.x, c.pos.y, c.pos.z, 10);
+        if (fire != null) {
             c.state = CreatureState.FLEE;
-            fleeFrom(c, p.pos.x, p.pos.z);
+            fleeFrom(c, fire.x() + 0.5f, fire.z() + 0.5f);
+            Steering.moveToward(c, c.target.x, c.target.z, c.type.speed * 1.6f);
+            return;
+        }
+
+        // Strong torch, lantern, fungus, or daylight exposure makes a stalker
+        // retreat down the local light gradient. This avoids the old behavior
+        // where it could run toward a torch merely because the player happened
+        // to stand on the opposite side.
+        float lightHere = lightExposure(g, c.pos.x, c.pos.y, c.pos.z);
+        if (lightHere > STALKER_STRONG_LIGHT) {
+            c.state = CreatureState.FLEE;
+            retreatDownLightGradient(g, c, p);
             Steering.moveToward(c, c.target.x, c.target.z, c.type.speed * 1.4f);
             return;
         }
@@ -410,6 +437,17 @@ public final class CreatureAI {
 
         float range = detectionRange(g, 18);
         if (playerDist < range && !p.dead) {
+            // Gloomstalkers do not convert every detection into a straight-line
+            // chase. Illumination around the prey makes them give ground and
+            // wait for darkness instead.
+            float preyLight = lightExposure(g, p.pos.x, p.pos.y, p.pos.z);
+            if (preyLight > STALKER_DARK_PREY_LIGHT) {
+                c.state = CreatureState.FLEE;
+                fleeFrom(c, p.pos.x, p.pos.z);
+                Steering.moveToward(c, c.target.x, c.target.z, c.type.speed * 0.8f);
+                return;
+            }
+
             if (playerDist < 2.0) {
                 c.state = CreatureState.ATTACK;
                 Steering.stop(c);
@@ -419,14 +457,34 @@ public final class CreatureAI {
                     p.knockback(c.pos.x, c.pos.z, 3f);
                     g.audio.playHit();
                     g.audio.playHurt();
+                    g.noise.emit(g, c.pos.x, c.pos.y, c.pos.z,
+                            22f, 0.7f, "creature-attack", false, c);
                     g.log("A Gloomstalker rakes you from the dark!");
                 }
-            } else {
-                if (c.state != CreatureState.HUNT) {
+            } else if (playerDist <= STALKER_AMBUSH_RANGE) {
+                // Once a successful stalk reaches striking distance, commit to
+                // a short, fast ambush burst.
+                if (c.state != CreatureState.HUNT && c.state != CreatureState.STALK) {
                     g.audio.playGrowl(c.pos.x, c.pos.y, c.pos.z);
                 }
                 c.state = CreatureState.HUNT;
-                Steering.moveToward(c, p.pos.x, p.pos.z, c.type.speed * 1.2f);
+                c.hasTarget = false;
+                Steering.moveToward(c, p.pos.x, p.pos.z, c.type.speed * 1.5f);
+            } else {
+                // At range, advance obliquely through the darker flank instead
+                // of homing directly onto the player. A persistent target keeps
+                // the choice stable for a short interval and prevents jitter.
+                boolean enteringStalk = c.state != CreatureState.STALK;
+                c.state = CreatureState.STALK;
+                if (enteringStalk || !c.hasTarget || c.decideTimer <= 0
+                        || c.distSqTo(c.target.x, c.pos.y, c.target.z) < 1.5) {
+                    pickDarkFlank(g, c, p, playerDist);
+                    c.decideTimer = 1.25f;
+                }
+                if (enteringStalk) {
+                    g.audio.playGrowl(c.pos.x, c.pos.y, c.pos.z);
+                }
+                Steering.moveToward(c, c.target.x, c.target.z, c.type.speed * 0.68f);
             }
             return;
         }
@@ -441,6 +499,66 @@ public final class CreatureAI {
         } else {
             Steering.stop(c);
         }
+    }
+
+    /** Combined dynamic/sky exposure used by the cave predator's decisions. */
+    private static float lightExposure(Game g, float x, float y, float z) {
+        int bx = (int) Math.floor(x);
+        int by = (int) Math.floor(y);
+        int bz = (int) Math.floor(z);
+        float block = g.world.blockLight(bx, by, bz);
+        float sky = g.world.skyLight(bx, by, bz) * (float) g.time.dayLight();
+        return Math.max(block, sky);
+    }
+
+    /** Finds the uphill light direction with four cheap samples and flees it. */
+    private static void retreatDownLightGradient(Game g, Creature c, Player p) {
+        float step = 1.5f;
+        float gx = lightExposure(g, c.pos.x + step, c.pos.y, c.pos.z)
+                - lightExposure(g, c.pos.x - step, c.pos.y, c.pos.z);
+        float gz = lightExposure(g, c.pos.x, c.pos.y, c.pos.z + step)
+                - lightExposure(g, c.pos.x, c.pos.y, c.pos.z - step);
+        float lengthSq = gx * gx + gz * gz;
+        if (lengthSq > 0.0001f) {
+            fleeFrom(c, c.pos.x + gx, c.pos.z + gz);
+        } else {
+            // A perfectly even source (or broad daylight) has no useful local
+            // gradient; the player is the safest deterministic fallback.
+            fleeFrom(c, p.pos.x, p.pos.z);
+        }
+    }
+
+    /**
+     * Chooses between two lateral approaches, preferring the darker sample.
+     * The deterministic tie-break prevents every stalker from circling in the
+     * same direction without adding save state or changing serialized enums.
+     */
+    private static void pickDarkFlank(Game g, Creature c, Player p, double playerDist) {
+        float dx = p.pos.x - c.pos.x;
+        float dz = p.pos.z - c.pos.z;
+        float len = (float) Math.max(0.001, Math.sqrt(dx * dx + dz * dz));
+        float nx = dx / len;
+        float nz = dz / len;
+        float advance = Math.min(3.5f, Math.max(1.5f, (float) playerDist - STALKER_AMBUSH_RANGE));
+        float lateral = Math.min(4.5f, 1.5f + (float) playerDist * 0.22f);
+
+        float leftX = c.pos.x + nx * advance - nz * lateral;
+        float leftZ = c.pos.z + nz * advance + nx * lateral;
+        float rightX = c.pos.x + nx * advance + nz * lateral;
+        float rightZ = c.pos.z + nz * advance - nx * lateral;
+        float leftLight = lightExposure(g, leftX, c.pos.y, leftZ);
+        float rightLight = lightExposure(g, rightX, c.pos.y, rightZ);
+
+        boolean left;
+        if (Math.abs(leftLight - rightLight) > 0.01f) {
+            left = leftLight < rightLight;
+        } else {
+            int cellHash = (int) Math.floor(c.pos.x) * 73428767
+                    ^ (int) Math.floor(c.pos.z) * 912931;
+            left = (cellHash & 1) == 0;
+        }
+        c.target.set(left ? leftX : rightX, c.pos.y, left ? leftZ : rightZ);
+        c.hasTarget = true;
     }
 
     private static void updateBird(Game g, Creature c, float dt) {

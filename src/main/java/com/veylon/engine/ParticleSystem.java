@@ -120,15 +120,25 @@ public class ParticleSystem {
     // ------------------------------------------------------------------
 
     public void blockDust(BlockType t, float x, float y, float z, int n) {
+        // The material registry only exists with a live GL context; fall back
+        // to the block's flat color in headless runs (unit tests, tools).
         var m = com.veylon.gfx.MaterialRegistry.of(t);
-        int[] tile = com.veylon.gfx.MaterialRegistry.layerPixels(m.sideLayer[0]);
+        int[] tile = m != null
+                ? com.veylon.gfx.MaterialRegistry.layerPixels(m.sideLayer[0]) : null;
         for (int i = 0; i < scaled(n); i++) {
-            // Sample a random texel so debris matches the block's actual texture.
-            int p = tile[rng.nextInt(tile.length)];
             float shade = 0.75f + rng.nextFloat() * 0.4f;
-            float r = ((p >> 16) & 0xFF) / 255f * shade;
-            float g = ((p >> 8) & 0xFF) / 255f * shade;
-            float b = (p & 0xFF) / 255f * shade;
+            float r, g, b;
+            if (tile != null) {
+                // Sample a random texel so debris matches the block's actual texture.
+                int p = tile[rng.nextInt(tile.length)];
+                r = ((p >> 16) & 0xFF) / 255f * shade;
+                g = ((p >> 8) & 0xFF) / 255f * shade;
+                b = (p & 0xFF) / 255f * shade;
+            } else {
+                r = t.r * shade;
+                g = t.g * shade;
+                b = t.b * shade;
+            }
             spawn(KIND_DOT, x + rnd(0.4f), y + rnd(0.4f), z + rnd(0.4f),
                     rnd(2.2f), 1.5f + rng.nextFloat() * 2f, rnd(2.2f),
                     r, g, b, 0.07f + rng.nextFloat() * 0.06f, 0.5f + rng.nextFloat() * 0.5f, 14f);
@@ -244,6 +254,69 @@ public class ParticleSystem {
                 rnd(0.15f), 1.4f + rng.nextFloat() * 1.2f, rnd(0.15f),
                 0.35f, 0.9f, 0.95f, 0.10f + rng.nextFloat() * 0.06f,
                 1.2f + rng.nextFloat() * 0.8f, -0.2f);
+    }
+
+    /**
+     * Black-powder explosion: a very short emissive flash, radial sparks and
+     * hot fragments, texture-neutral debris, expanding dust/smoke and embers.
+     * Counts scale with blast power but respect the density setting and cap.
+     */
+    public void explosion(float x, float y, float z, float power) {
+        float mul = Math.min(1.6f, 0.6f + power * 0.25f);
+        // Core flash: a handful of large, very short-lived additive sparks.
+        for (int i = 0; i < scaled(6); i++) {
+            spawn(KIND_SPARK, x + rnd(0.3f), y + rnd(0.3f), z + rnd(0.3f),
+                    rnd(0.6f), rnd(0.6f), rnd(0.6f),
+                    1f, 0.85f, 0.55f, 0.9f + rng.nextFloat() * 0.6f, 0.12f, 0f);
+        }
+        // Radial sparks / hot fragments.
+        int sparks = scaled((int) (26 * mul));
+        for (int i = 0; i < sparks; i++) {
+            float ang = rng.nextFloat() * (float) (Math.PI * 2.0);
+            float el = (rng.nextFloat() - 0.35f) * 1.6f;
+            float speed = 4f + rng.nextFloat() * 8f * mul;
+            spawn(KIND_SPARK, x, y + 0.2f, z,
+                    (float) (Math.cos(ang) * Math.cos(el)) * speed,
+                    (float) Math.sin(el) * speed + 2.5f,
+                    (float) (Math.sin(ang) * Math.cos(el)) * speed,
+                    1f, 0.42f + rng.nextFloat() * 0.35f, 0.10f,
+                    0.07f + rng.nextFloat() * 0.08f, 0.5f + rng.nextFloat() * 0.9f, 11f);
+        }
+        // Dark debris chunks.
+        for (int i = 0; i < scaled((int) (10 * mul)); i++) {
+            float shade = 0.16f + rng.nextFloat() * 0.14f;
+            spawn(KIND_DOT, x + rnd(0.5f), y + 0.3f, z + rnd(0.5f),
+                    rnd(5f), 2.5f + rng.nextFloat() * 5f, rnd(5f),
+                    shade, shade * 0.9f, shade * 0.8f,
+                    0.08f + rng.nextFloat() * 0.09f, 0.8f + rng.nextFloat() * 0.8f, 15f);
+        }
+        // Expanding dust and smoke column.
+        for (int i = 0; i < scaled((int) (14 * mul)); i++) {
+            float shade = 0.26f + rng.nextFloat() * 0.16f;
+            spawn(KIND_PUFF, x + rnd(0.9f), y + 0.2f + rnd(0.3f), z + rnd(0.9f),
+                    rnd(2.2f), 0.9f + rng.nextFloat() * 2.4f, rnd(2.2f),
+                    shade, shade * 0.94f, shade * 0.86f,
+                    0.4f + rng.nextFloat() * 0.55f, 1.6f + rng.nextFloat() * 1.6f, -0.3f);
+        }
+        // Lingering embers.
+        for (int i = 0; i < scaled(5); i++) {
+            ember(x + rnd(1.2f), y + 0.4f, z + rnd(1.2f));
+        }
+    }
+
+    /** Brief muzzle flash + powder smoke at a firing position. */
+    public void muzzleFlash(float x, float y, float z, float dirX, float dirY, float dirZ) {
+        for (int i = 0; i < scaled(3); i++) {
+            spawn(KIND_SPARK, x + dirX * 0.5f, y + dirY * 0.5f, z + dirZ * 0.5f,
+                    dirX * 3f + rnd(0.8f), dirY * 3f + rnd(0.8f), dirZ * 3f + rnd(0.8f),
+                    1f, 0.8f, 0.45f, 0.22f, 0.10f, 0f);
+        }
+        for (int i = 0; i < scaled(4); i++) {
+            float s = 0.55f + rng.nextFloat() * 0.2f;
+            spawn(KIND_PUFF, x + dirX * 0.6f, y + dirY * 0.6f, z + dirZ * 0.6f,
+                    dirX * 1.2f + rnd(0.4f), 0.5f + rnd(0.3f), dirZ * 1.2f + rnd(0.4f),
+                    s, s, s, 0.16f + rng.nextFloat() * 0.12f, 0.7f + rng.nextFloat() * 0.5f, -0.3f);
+        }
     }
 
     /** Short, bounded impact burst for meteor events: hot fragments plus crater dust. */

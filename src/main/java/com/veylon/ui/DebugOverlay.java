@@ -15,6 +15,7 @@ public class DebugOverlay {
         long heapMax = Runtime.getRuntime().maxMemory() / (1024 * 1024);
         var timing = g.frameProfiler.snapshot();
         int totalDraws = g.renderer.drawCalls + ui.drawCallsLastFrame();
+        var budgets = com.veylon.qa.RuntimeBudgetSnapshot.capture(g);
 
         String[] lines = {
                 String.format("FPS: %d (%.2f ms)  avg %.1f  p95 %.2f ms  p99 %.2f ms",
@@ -44,6 +45,18 @@ public class DebugOverlay {
                         + "   Tracks: " + g.entities.tracks.size(),
                 "Water queue: " + g.water.activeCount() + "   Fires: " + g.fire.count()
                         + "   POIs: " + g.world.pois.size(),
+                "Settlements: " + g.world.settlements.size()
+                        + "   Projectiles: " + g.projectiles.liveCount()
+                        + "/" + g.projectiles.stuck.size() + " stuck"
+                        + "   Noise events: " + g.noise.count()
+                        + "   Keg fuses: " + g.world.kegFuses.size(),
+                "Budgets: NPC " + budgets.npcs().total() + "/"
+                        + com.veylon.settlement.SettlementManager.MAX_ACTIVE_NPCS
+                        + "   Missions " + budgets.counterattackMissions() + "/"
+                        + com.veylon.settlement.CounterattackDirector.MAX_MISSIONS
+                        + "   Paths " + budgets.cachedPathNodes()
+                        + "   Pending-gen " + budgets.pendingGenerationChunks()
+                        + "/" + budgets.pendingGenerationEdits(),
                 "OnGround: " + p.onGround + "  InWater: " + p.inWater + "  Exposed: " + p.exposedToSky,
                 String.format("Heap: %d / %d MB", heapUsed, heapMax),
         };

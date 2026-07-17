@@ -411,6 +411,22 @@ public final class IconAtlas {
     }
 
     private static void drawTool(Canvas c, ItemType item, int base) {
+        switch (item.tool) {
+            case BOW -> {
+                drawBow(c, base);
+                return;
+            }
+            case FIREARM -> {
+                drawFirearm(c, item, base);
+                return;
+            }
+            case THROWN -> {
+                drawBomb(c, item, base);
+                return;
+            }
+            default -> {
+            }
+        }
         int dark = shade(base, 0.38f);
         int light = shade(base, 1.35f);
         int handle = item.name().startsWith("IRON_") ? 0xFF77583A : 0xFF8B6237;
@@ -646,7 +662,108 @@ public final class IconAtlas {
                 c.circle(13, 17, 4, 0xFF242B31);
                 c.line(20, 7, 24, 26, 2, shade(base, 1.35f));
             }
+            case SULFUR, SALTPETER, BLACK_POWDER -> {
+                // Poured powder pile with scattered grains.
+                c.polygon(new int[]{4, 16, 28, 24, 8}, new int[]{26, 12, 26, 29, 29},
+                        shade(base, 0.6f));
+                c.polygon(new int[]{6, 16, 26, 22, 10}, new int[]{26, 14, 26, 28, 28}, base);
+                c.circle(16, 15, 2, shade(base, 1.4f));
+                for (int i = 0; i < 8; i++) {
+                    int h = item.name().hashCode() * (i + 3);
+                    c.rect(8 + Math.floorMod(h, 17), 22 + Math.floorMod(h >> 4, 6), 8 + Math.floorMod(h, 17), 22 + Math.floorMod(h >> 4, 6),
+                            shade(base, 0.8f + (i % 3) * 0.25f));
+                }
+            }
+            case MUSKET_BALL, SCRAP_SHOT -> {
+                for (int i = 0; i < 5; i++) {
+                    int x = 9 + (i % 3) * 7, y = 14 + (i / 3) * 7;
+                    c.circle(x, y, 4, shade(base, 0.55f));
+                    c.circle(x - 1, y - 1, 3, base);
+                    c.rect(x - 2, y - 2, x - 2, y - 2, shade(base, 1.5f));
+                }
+            }
+            case ARROW, IRON_ARROW -> {
+                int shaft = 0xFF8B6B3A;
+                c.line(6, 27, 24, 8, 3, shade(shaft, 0.6f));
+                c.line(7, 26, 24, 8, 2, shaft);
+                c.polygon(new int[]{22, 28, 25, 20}, new int[]{9, 3, 11, 12}, base);
+                // Fletching.
+                c.line(6, 27, 10, 27, 2, 0xFFDFE5D2);
+                c.line(6, 27, 6, 23, 2, 0xFFC8CDB8);
+            }
+            case RIFLE_CARTRIDGE -> {
+                for (int i = 0; i < 3; i++) {
+                    int x = 9 + i * 6;
+                    c.rect(x, 12, x + 3, 24, base);
+                    c.polygon(new int[]{x, x + 3, x + 1}, new int[]{12, 12, 6},
+                            shade(base, 1.25f));
+                    c.rect(x, 22, x + 3, 24, shade(base, 0.6f));
+                }
+            }
+            case RELIC_PARTS -> {
+                c.circle(12, 14, 6, shade(base, 0.55f));
+                c.circle(12, 14, 4, base);
+                c.circle(12, 14, 2, 0xFF1E2226);
+                c.rect(17, 18, 27, 22, shade(base, 0.8f));
+                c.rect(19, 15, 21, 25, shade(base, 1.2f));
+                c.line(7, 24, 15, 28, 2, shade(base, 0.7f));
+            }
             default -> drawRock(c, base, item.name().hashCode());
+        }
+    }
+
+    private static void drawBow(Canvas c, int base) {
+        int dark = shade(base, 0.5f);
+        // Curved stave: three joined segments read as a bow at 32px.
+        c.line(9, 4, 22, 10, 3, dark);
+        c.line(22, 10, 24, 20, 3, dark);
+        c.line(24, 20, 13, 28, 3, dark);
+        c.line(10, 5, 22, 11, 1, shade(base, 1.3f));
+        // String and nocked arrow.
+        c.line(9, 4, 13, 28, 1, 0xFFD8D2C0);
+        c.line(5, 17, 20, 15, 2, 0xFF8B6B3A);
+        c.polygon(new int[]{19, 25, 20}, new int[]{12, 15, 18}, 0xFFB9BEC4);
+        c.polygon(new int[]{5, 9, 8}, new int[]{15, 16, 19}, 0xFFDFE5D2);
+    }
+
+    private static void drawFirearm(Canvas c, ItemType item, int base) {
+        boolean shortArm = item == ItemType.FLINTLOCK_PISTOL;
+        boolean relic = item == ItemType.RELIC_CARBINE || item == ItemType.RELIC_RIFLE;
+        int wood = shade(base, 0.9f);
+        int steel = relic ? shade(base, 1.25f) : 0xFF6E747C;
+        // Stock and grip.
+        c.polygon(new int[]{5, 12, 14, 9}, new int[]{27, 18, 21, 30}, shade(wood, 0.7f));
+        c.polygon(new int[]{6, 12, 13, 9}, new int[]{26, 19, 21, 28}, wood);
+        // Barrel: long for muskets/rifles, stubby for the pistol.
+        int tipX = shortArm ? 22 : 28;
+        int tipY = shortArm ? 10 : 4;
+        c.line(11, 20, tipX, tipY, 4, shade(steel, 0.55f));
+        c.line(11, 19, tipX, tipY, 2, steel);
+        // Lock and trigger guard.
+        c.circle(13, 20, 2, 0xFF3A3E44);
+        c.line(14, 23, 17, 24, 2, 0xFF3A3E44);
+        if (item == ItemType.BLUNDERBUSS) {
+            c.circle(tipX, tipY, 4, shade(steel, 0.8f));
+            c.circle(tipX, tipY, 2, 0xFF15171A);
+        }
+        if (relic) {
+            // Boxy receiver + magazine mark the relic tier silhouette.
+            c.rect(12, 15, 19, 19, shade(steel, 0.7f));
+            c.rect(15, 19, 18, 24, 0xFF2E3237);
+        }
+    }
+
+    private static void drawBomb(Canvas c, ItemType item, int base) {
+        boolean fire = item == ItemType.FIRE_BOMB;
+        c.circle(15, 20, 9, shade(base, 0.55f));
+        c.circle(14, 19, 8, base);
+        c.circle(12, 17, 3, shade(base, 1.4f));
+        // Fuse.
+        c.line(19, 12, 24, 6, 2, 0xFF8B6B3A);
+        c.circle(25, 5, 2, fire ? 0xFFFFD75A : 0xFFFF8A24);
+        if (fire) {
+            // Rag-wick bottle glint.
+            c.rect(13, 9, 17, 13, 0xFFB8B5AC);
         }
     }
 

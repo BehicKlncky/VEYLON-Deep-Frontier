@@ -15,7 +15,8 @@ public final class HeldItemModels {
 
     private enum Shape {
         PICKAXE, AXE, SPEAR, KNIFE, TORCH, BERRY, MEAT, FOOD, DRINK, MEDICAL,
-        BANDAGE, SPLINT, BOTTLE, POULTICE, WORKBENCH, BLOCK, MATERIAL, GEAR, GENERIC
+        BANDAGE, SPLINT, BOTTLE, POULTICE, WORKBENCH, BLOCK, MATERIAL, GEAR, GENERIC,
+        BOW, LONG_GUN, PISTOL, BOMB
     }
 
     private static final Map<Shape, EntityModel> CACHE = new EnumMap<>(Shape.class);
@@ -31,6 +32,15 @@ public final class HeldItemModels {
     }
 
     private static Shape shapeOf(ItemType t) {
+        if (t.tool == ToolKind.BOW) {
+            return Shape.BOW;
+        }
+        if (t.tool == ToolKind.FIREARM) {
+            return t == ItemType.FLINTLOCK_PISTOL ? Shape.PISTOL : Shape.LONG_GUN;
+        }
+        if (t.tool == ToolKind.THROWN) {
+            return Shape.BOMB;
+        }
         if (t.tool == ToolKind.PICKAXE) {
             return Shape.PICKAXE;
         }
@@ -283,6 +293,72 @@ public final class HeldItemModels {
                         .box(0, 0.03f, 0, 0.18f, 0.16f, 0.06f).color(0x7a5a34));
                 root.child(new ModelPart("strap").pivot(0, 0.16f, 0)
                         .box(0, 0, 0, 0.20f, 0.03f, 0.05f).color(0x4a3a24));
+            }
+            case BOW -> {
+                // Vertical stave with angled tips; the string closes the arc.
+                root.child(new ModelPart("tint").pivot(0, 0.28f, 0)
+                        .box(0, -0.24f, 0, 0.045f, 0.48f, 0.06f).color(0x7a5a34));
+                ModelPart tipTop = new ModelPart("tipTop").pivot(0, 0.52f, 0);
+                tipTop.rotX = 0.5f;
+                tipTop.child(new ModelPart("tipTopArm").pivot(0, 0.07f, 0.02f)
+                        .box(0, 0, 0, 0.04f, 0.16f, 0.05f).color(0x6a4c2c));
+                root.child(tipTop);
+                ModelPart tipBot = new ModelPart("tipBot").pivot(0, 0.04f, 0);
+                tipBot.rotX = -0.5f;
+                tipBot.child(new ModelPart("tipBotArm").pivot(0, -0.07f, 0.02f)
+                        .box(0, 0, 0, 0.04f, 0.16f, 0.05f).color(0x6a4c2c));
+                root.child(tipBot);
+                root.child(new ModelPart("string").pivot(0, 0.28f, 0.085f)
+                        .box(0, -0.31f, 0, 0.012f, 0.62f, 0.012f).color(0xd8d2c0));
+                root.child(new ModelPart("gripWrap").pivot(0, 0.28f, 0)
+                        .box(0, -0.05f, 0, 0.06f, 0.10f, 0.075f).color(0x4a3a24));
+            }
+            case LONG_GUN -> {
+                // Full-length musket lying along -Z: stock, barrel, lock, ramrod.
+                root.child(new ModelPart("tint").pivot(0, 0.06f, 0.22f)
+                        .box(0, 0, 0.02f, 0.06f, 0.11f, 0.30f).color(0x5a4028));
+                root.child(new ModelPart("tint2").pivot(0, 0.115f, -0.02f)
+                        .box(0, 0, -0.24f, 0.055f, 0.055f, 0.62f).color(0x6a4e30));
+                root.child(new ModelPart("barrel").pivot(0, 0.15f, -0.24f)
+                        .box(0, 0, -0.34f, 0.042f, 0.042f, 0.92f).color(0x565c64));
+                root.child(new ModelPart("muzzle").pivot(0, 0.15f, -0.60f)
+                        .box(0, 0, -0.02f, 0.055f, 0.055f, 0.05f).color(0x3c4046));
+                root.child(new ModelPart("lock").pivot(0.038f, 0.11f, 0.06f)
+                        .box(0, 0, 0, 0.03f, 0.06f, 0.09f).color(0x3c4046));
+                root.child(new ModelPart("hammer").pivot(0.045f, 0.16f, 0.075f)
+                        .box(0, 0, 0, 0.02f, 0.05f, 0.03f).color(0x2c3036));
+                root.child(new ModelPart("ramrod").pivot(0, 0.085f, -0.30f)
+                        .box(0, 0, -0.20f, 0.016f, 0.016f, 0.55f).color(0x8a8e94));
+                root.child(new ModelPart("trigger").pivot(0, 0.055f, 0.08f)
+                        .box(0, -0.03f, 0, 0.016f, 0.045f, 0.03f).color(0x2c3036));
+            }
+            case PISTOL -> {
+                root.child(new ModelPart("tint").pivot(0, 0.03f, 0.10f)
+                        .box(0, -0.05f, 0.01f, 0.05f, 0.13f, 0.09f).color(0x5a4028));
+                root.child(new ModelPart("tint2").pivot(0, 0.10f, 0)
+                        .box(0, 0, -0.26f, 0.05f, 0.05f, 0.36f).color(0x6a4e30));
+                root.child(new ModelPart("barrel").pivot(0, 0.125f, -0.10f)
+                        .box(0, 0, -0.22f, 0.038f, 0.038f, 0.34f).color(0x565c64));
+                root.child(new ModelPart("hammer").pivot(0.03f, 0.14f, 0.06f)
+                        .box(0, 0, 0, 0.02f, 0.05f, 0.028f).color(0x2c3036));
+                root.child(new ModelPart("guard").pivot(0, 0.035f, 0.02f)
+                        .box(0, -0.02f, 0, 0.014f, 0.03f, 0.06f).color(0x8a8e94));
+            }
+            case BOMB -> {
+                root.child(new ModelPart("tint").pivot(0, 0.10f, 0)
+                        .box(0, 0, 0, 0.15f, 0.15f, 0.15f).color(0x3a3d42));
+                root.child(new ModelPart("band").pivot(0, 0.10f, 0)
+                        .box(0, 0.055f, 0, 0.16f, 0.03f, 0.16f).color(0x63676d));
+                root.child(new ModelPart("fusePost").pivot(0, 0.185f, 0)
+                        .box(0, 0, 0, 0.035f, 0.045f, 0.035f).color(0x2c2c30));
+                ModelPart fuse = new ModelPart("fuse").pivot(0.01f, 0.22f, 0);
+                fuse.rotZ = 0.5f;
+                fuse.child(new ModelPart("fuseCord").pivot(0, 0.03f, 0)
+                        .box(0, 0, 0, 0.016f, 0.08f, 0.016f).color(0x9a8258));
+                root.child(fuse);
+                root.child(new ModelPart("spark").pivot(0.045f, 0.29f, 0)
+                        .box(0, 0, 0, 0.03f, 0.03f, 0.03f)
+                        .color(0xffb24a).emissive(0.9f));
             }
             default -> root.child(new ModelPart("tint").pivot(0, 0.07f, 0)
                     .box(0, 0, 0, 0.12f, 0.12f, 0.12f).color(0x888888));

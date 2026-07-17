@@ -64,6 +64,20 @@ public final class ProceduralTextures {
             case "herb_station" -> herbStation(p);
             case "map_table" -> mapTable(p);
             case "water_still" -> water(p);
+            case "basalt" -> basalt(p);
+            case "sulfur_ore" -> sulfurOre(p);
+            case "saltpeter_ore" -> saltpeterOre(p);
+            case "glow_fungus" -> glowFungus(p);
+            case "ladder" -> ladder(p);
+            case "lantern_glass" -> lanternGlass(p);
+            case "lantern_glass_unlit" -> lanternGlassUnlit(p);
+            case "marker_paint" -> markerPaint(p);
+            case "keg_side" -> keg(p, false);
+            case "keg_top" -> keg(p, true);
+            case "gate" -> gate(p);
+            case "stone_brick" -> stoneBrick(p);
+            case "bell_bronze" -> bellBronze(p);
+            case "cage_bars" -> cageBars(p);
             default -> {
                 return null;
             }
@@ -496,6 +510,217 @@ public final class ProceduralTextures {
             p.line(x, y, x + 3 + (int) (p.rf(i) * 4), y + 1, p.shade(0x5a4430, 0.8f));
         }
         p.box(0, 0, p.size - 1, p.size - 1, 2, 0x6e5638);
+    }
+
+    // ------------------------------------------------------------------
+    // Deep Frontier expansion tiles
+    // ------------------------------------------------------------------
+
+    private static void basalt(Painter p) {
+        p.fillFbm(0x3a3c44, 0.10f, 4, 611);
+        // Columnar cooling bands: vertical low-frequency shading.
+        for (int y = 0; y < p.size; y++) {
+            for (int x = 0; x < p.size; x++) {
+                float col = p.noise(x * 3, y / 3, 12, 612);
+                if (col > 0.72f) {
+                    p.mulAt(x, y, 0.82f);
+                }
+            }
+        }
+        p.cracks(0x17181c, 0.4f, 613, 9);
+        p.grain(0.045f);
+    }
+
+    private static void sulfurOre(Painter p) {
+        basalt(p);
+        // Crusted yellow deposits growing along fissures.
+        for (int i = 0; i < 8; i++) {
+            int x = 6 + p.ri(i * 41 + 620) % (p.size - 12);
+            int y = 6 + p.ri(i * 41 + 621) % (p.size - 12);
+            int r = 2 + (int) (p.rf(i * 41 + 622) * 3f);
+            p.pebble(x, y, r + 1, p.shade(0x8a7a14, 0.7f));
+            p.pebble(x, y, r, p.shade(0xd8c62e, 0.9f + p.rf(i) * 0.3f));
+            p.dot(x + 1, y - 1, 0xf0e468);
+        }
+    }
+
+    private static void saltpeterOre(Painter p) {
+        stone(p, 0x8a8c92, 1f);
+        // Pale crystalline crusts in patchy seams.
+        p.fillFbmMasked(0xd8d4c2, 9, 631, 0.66f, 0.8f);
+        for (int i = 0; i < 10; i++) {
+            int x = 4 + p.ri(i * 43 + 632) % (p.size - 8);
+            int y = 4 + p.ri(i * 43 + 633) % (p.size - 8);
+            p.dot(x, y, 0xf2efdf);
+            p.dot(x + 1, y, 0xcac4a8);
+        }
+    }
+
+    private static void glowFungus(Painter p) {
+        p.clearAlpha();
+        // Cluster of stalked caps with soft-glow rims.
+        for (int i = 0; i < 5; i++) {
+            int bx = 8 + (int) (p.rf(i * 51 + 641) * (p.size - 16));
+            int h = (int) (p.size * (0.25f + p.rf(i * 51 + 642) * 0.35f));
+            for (int t = 0; t < h; t++) {
+                p.set(bx, p.size - 1 - t, 0x3a5648);
+                p.set(bx + 1, p.size - 1 - t, 0x2e463c);
+            }
+            int cy = p.size - 1 - h;
+            int r = 3 + (int) (p.rf(i * 51 + 643) * 3f);
+            p.pebble(bx, cy, r + 1, 0x2f6a55);
+            p.pebble(bx, cy, r, 0x59c79b);
+            p.dot(bx, cy - r + 1, 0xa8f2d4);
+            p.dot(bx - 1, cy, 0x8ee8c4);
+        }
+    }
+
+    private static void ladder(Painter p) {
+        p.clearAlpha();
+        int left = p.size / 5, right = p.size - p.size / 5;
+        for (int y = 0; y < p.size; y++) {
+            // Twisted fiber side ropes.
+            int wob = (int) (p.noise(0, y, 10, 651) * 2);
+            p.set(left + wob, y, 0x7a6236);
+            p.set(left + 1 + wob, y, 0x93794a);
+            p.set(right + wob, y, 0x7a6236);
+            p.set(right - 1 + wob, y, 0x93794a);
+        }
+        for (int r = 0; r < 4; r++) {
+            int y = 6 + r * (p.size / 4);
+            for (int x = left; x <= right; x++) {
+                p.set(x, y, p.shade(0x8a6a42, 0.85f + p.noise(x, y, 8, 652) * 0.3f));
+                p.set(x, y + 1, p.shade(0x6e5432, 0.9f));
+            }
+        }
+    }
+
+    private static void lanternGlass(Painter p) {
+        // Warm glass panes behind a dark iron frame.
+        for (int y = 0; y < p.size; y++) {
+            for (int x = 0; x < p.size; x++) {
+                float n = p.noise(x, y, 7, 661);
+                p.set(x, y, p.lerpColor(0xffd985, 0xdf8f2a, Math.min(1f, n * 1.3f)));
+            }
+        }
+        p.box(0, 0, p.size - 1, p.size - 1, 3, 0x33322f);
+        p.line(p.size / 2, 0, p.size / 2, p.size - 1, 0x33322f);
+        p.line(0, p.size / 2, p.size - 1, p.size / 2, 0x33322f);
+    }
+
+    private static void lanternGlassUnlit(Painter p) {
+        // The same physical panes without the flame's emissive amber core.
+        for (int y = 0; y < p.size; y++) {
+            for (int x = 0; x < p.size; x++) {
+                float n = p.noise(x, y, 7, 662);
+                p.set(x, y, p.lerpColor(0x5f625e, 0x353936, Math.min(1f, n * 1.3f)));
+            }
+        }
+        p.box(0, 0, p.size - 1, p.size - 1, 3, 0x292b2a);
+        p.line(p.size / 2, 0, p.size / 2, p.size - 1, 0x292b2a);
+        p.line(0, p.size / 2, p.size - 1, p.size / 2, 0x292b2a);
+    }
+
+    private static void markerPaint(Painter p) {
+        // Bright chalk-orange strips over weathered cloth: readable in the dark.
+        fabric(p, 0x8a7c60);
+        for (int y = p.size / 5; y < p.size - p.size / 5; y++) {
+            for (int x = 0; x < p.size; x++) {
+                if ((y / (p.size / 5)) % 2 == 1) {
+                    p.set(x, y, p.shade(0xf07a28, 0.9f + p.noise(x, y, 8, 671) * 0.25f));
+                }
+            }
+        }
+    }
+
+    private static void keg(Painter p, boolean top) {
+        if (top) {
+            planks(p, 0x7a5a34, false);
+            // Powder emblem: black circle with a cross of grains.
+            float c = p.size / 2f;
+            for (int y = 0; y < p.size; y++) {
+                for (int x = 0; x < p.size; x++) {
+                    float d = (float) Math.hypot(x - c, y - c);
+                    if (d < p.size * 0.22f) {
+                        p.set(x, y, p.shade(0x1d1a18, 0.9f + p.noise(x, y, 6, 681) * 0.3f));
+                    }
+                }
+            }
+            for (int i = 0; i < 10; i++) {
+                p.dot((int) (c + (p.rf(i * 3 + 682) - 0.5f) * p.size * 0.3f),
+                        (int) (c + (p.rf(i * 3 + 683) - 0.5f) * p.size * 0.3f), 0x4a4440);
+            }
+        } else {
+            // Vertical staves with two iron hoops.
+            planks(p, 0x7a5634, true);
+            for (int band : new int[]{p.size / 5, p.size - p.size / 5 - 4}) {
+                for (int y = band; y < band + 4; y++) {
+                    for (int x = 0; x < p.size; x++) {
+                        p.set(x, y, p.shade(0x4a4c52, 0.85f + p.noise(x, y, 12, 684) * 0.3f));
+                    }
+                }
+            }
+        }
+    }
+
+    private static void gate(Painter p) {
+        planks(p, 0x6a5030, true);
+        // Heavy horizontal crossbars and iron studs.
+        for (int band : new int[]{p.size / 6, p.size / 2, p.size - p.size / 6 - 5}) {
+            for (int y = band; y < band + 5; y++) {
+                for (int x = 0; x < p.size; x++) {
+                    p.set(x, y, p.shade(0x51391f, 0.85f + p.noise(x, y, 10, 691) * 0.3f));
+                }
+            }
+            for (int i = 0; i < 6; i++) {
+                p.dot(5 + i * 10, band + 2, 0x8a8e94);
+            }
+        }
+    }
+
+    private static void stoneBrick(Painter p) {
+        p.fillFbm(0x74767e, 0.08f, 4, 701);
+        int bh = p.size / 4;
+        int bw = p.size / 2;
+        for (int y = 0; y < p.size; y++) {
+            for (int x = 0; x < p.size; x++) {
+                int row = y / bh;
+                int off = (row % 2) * (bw / 2);
+                if (y % bh == 0 || (x + off) % bw == 0) {
+                    p.set(x, y, p.shade(0x4a4c54, 0.9f + p.noise(x, y, 8, 702) * 0.2f));
+                } else {
+                    float wear = p.noise(x, y, 9, 703);
+                    if (wear > 0.8f) {
+                        p.mulAt(x, y, 0.88f);
+                    }
+                }
+            }
+        }
+        p.grain(0.04f);
+    }
+
+    private static void bellBronze(Painter p) {
+        metal(p, 0x9a7a30);
+        // Verdigris streaks on old bronze.
+        p.fillFbmMasked(0x4f8a6e, 8, 711, 0.7f, 0.5f);
+        p.grain(0.03f);
+    }
+
+    private static void cageBars(Painter p) {
+        // Dark cell interior behind a riveted bar grid.
+        p.fillFbm(0x1c1d22, 0.10f, 4, 721);
+        for (int x = 4; x < p.size; x += p.size / 5) {
+            for (int y = 0; y < p.size; y++) {
+                float brush = p.noise(x, y * 2, 14, 722);
+                p.set(x, y, p.shade(0x585c64, 0.85f + brush * 0.3f));
+                p.set(x + 1, y, p.shade(0x43464e, 0.85f + brush * 0.3f));
+            }
+        }
+        for (int y = 4; y < p.size; y += p.size / 3) {
+            for (int x = 0; x < p.size; x++) {
+                p.set(x, y, p.shade(0x505460, 0.9f));
+            }
+        }
     }
 
     private static void beacon(Painter p, boolean lit) {

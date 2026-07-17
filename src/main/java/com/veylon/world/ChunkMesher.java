@@ -72,10 +72,32 @@ public class ChunkMesher {
                         case CUBE -> emitCube(t, wx, y, wz);
                         case CROSS -> emitCross(t, wx, y, wz);
                         case TORCH -> {
-                            box(wx + 0.44f, y, wz + 0.44f, wx + 0.56f, y + 0.68f, wz + 0.56f,
-                                    layer("log_side"), wx, y, wz, 1f, 1f, 1f);
-                            box(wx + 0.40f, y + 0.68f, wz + 0.40f, wx + 0.60f, y + 0.86f, wz + 0.60f,
-                                    layer("torch_head"), wx, y, wz, 1f, 1f, 1f);
+                            if (t == BlockType.LANTERN) {
+                                boolean lit = world.isLanternLit(wx, y, wz);
+                                box(wx + 0.38f, y, wz + 0.38f, wx + 0.62f, y + 0.10f, wz + 0.62f,
+                                        layer("anvil_metal"), wx, y, wz, 1f, 1f, 1f);
+                                box(wx + 0.34f, y + 0.10f, wz + 0.34f, wx + 0.66f, y + 0.52f, wz + 0.66f,
+                                        layer(lit ? "lantern_glass" : "lantern_glass_unlit"),
+                                        wx, y, wz, lit ? 1f : 0.55f,
+                                        lit ? 1f : 0.58f, lit ? 1f : 0.62f);
+                                box(wx + 0.40f, y + 0.52f, wz + 0.40f, wx + 0.60f, y + 0.62f, wz + 0.60f,
+                                        layer("anvil_metal"), wx, y, wz, 1f, 1f, 1f);
+                            } else if (t == BlockType.TRAIL_MARKER) {
+                                box(wx + 0.46f, y, wz + 0.46f, wx + 0.54f, y + 0.55f, wz + 0.54f,
+                                        layer("log_side"), wx, y, wz, 1f, 1f, 1f);
+                                box(wx + 0.42f, y + 0.42f, wz + 0.42f, wx + 0.58f, y + 0.58f, wz + 0.58f,
+                                        layer("marker_paint"), wx, y, wz, 1f, 1f, 1f);
+                            } else if (t == BlockType.ALARM_BELL) {
+                                box(wx + 0.44f, y, wz + 0.44f, wx + 0.56f, y + 0.92f, wz + 0.56f,
+                                        layer("log_side"), wx, y, wz, 1f, 1f, 1f);
+                                box(wx + 0.32f, y + 0.52f, wz + 0.32f, wx + 0.68f, y + 0.84f, wz + 0.68f,
+                                        layer("bell_bronze"), wx, y, wz, 1f, 1f, 1f);
+                            } else {
+                                box(wx + 0.44f, y, wz + 0.44f, wx + 0.56f, y + 0.68f, wz + 0.56f,
+                                        layer("log_side"), wx, y, wz, 1f, 1f, 1f);
+                                box(wx + 0.40f, y + 0.68f, wz + 0.40f, wx + 0.60f, y + 0.86f, wz + 0.60f,
+                                        layer("torch_head"), wx, y, wz, 1f, 1f, 1f);
+                            }
                         }
                         case CAMPFIRE -> {
                             box(wx + 0.12f, y, wz + 0.12f, wx + 0.88f, y + 0.20f, wz + 0.88f,

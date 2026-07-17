@@ -72,6 +72,51 @@ public final class NpcModels {
         torso.child(raiderSpear);
         torso.child(new ModelPart("friendlyBadge").pivot(-0.15f, 0.40f, -0.158f)
                 .box(0, 0, 0, 0.08f, 0.12f, 0.018f).color(0x3c9aa2).emissive(0.18f));
+
+        // ---- 0.3.0 archetype accessories (toggled per pose) ----
+        // Archer/scout quiver: angled tube with pale fletching tips.
+        ModelPart quiver = new ModelPart("quiver").pivot(0.16f, 0.26f, 0.19f)
+                .box(0, 0, 0, 0.12f, 0.42f, 0.12f).color(0x5c4426);
+        quiver.rotZ = -0.35f;
+        quiver.child(new ModelPart("quiverFletch").pivot(0, 0.24f, 0)
+                .box(0, 0, 0, 0.14f, 0.08f, 0.14f).color(0xd9d2bd));
+        torso.child(quiver);
+        // Slung bow arc across the back.
+        ModelPart slungBow = new ModelPart("slungBow").pivot(-0.06f, 0.28f, 0.235f)
+                .box(0, 0, 0, 0.045f, 1.0f, 0.05f).color(0x6a4c2c);
+        slungBow.rotZ = -0.55f;
+        torso.child(slungBow);
+        // Powderman: powder keg back-pack and slung long gun.
+        torso.child(new ModelPart("kegPack").pivot(0, 0.26f, 0.24f)
+                .box(0, 0, 0.02f, 0.30f, 0.34f, 0.26f).color(0x6b4a28));
+        ModelPart slungGun = new ModelPart("slungGun").pivot(0.05f, 0.28f, 0.25f)
+                .box(0, 0, 0, 0.05f, 1.1f, 0.05f).color(0x565c64);
+        slungGun.rotZ = 0.5f;
+        torso.child(slungGun);
+        // Brute bulk: heavy pauldrons and a chest slab.
+        torso.child(new ModelPart("brutePadL").pivot(-0.33f, 0.55f, 0)
+                .box(0, 0, 0, 0.24f, 0.20f, 0.38f).color(0x2e2724));
+        torso.child(new ModelPart("brutePadR").pivot(0.33f, 0.55f, 0)
+                .box(0, 0, 0, 0.24f, 0.20f, 0.38f).color(0x2e2724));
+        torso.child(new ModelPart("bruteChest").pivot(0, 0.30f, -0.16f)
+                .box(0, 0, 0, 0.46f, 0.34f, 0.06f).color(0x3a3430));
+        // Leader crest: tall silhouette-breaking headdress + shoulder cape hint.
+        head.child(new ModelPart("leaderCrest").pivot(0, 0.30f, 0.02f)
+                .box(0, 0, 0, 0.06f, 0.26f, 0.24f).color(0x7a1f2b));
+        torso.child(new ModelPart("leaderMantle").pivot(0, 0.52f, 0.10f)
+                .box(0, 0, 0, 0.56f, 0.14f, 0.20f).color(0x4a1a22));
+        // Headhunter identity: pale bone trophies strung across the chest.
+        torso.child(new ModelPart("trophies").pivot(0, 0.42f, -0.16f)
+                .box(0, 0, 0, 0.40f, 0.06f, 0.03f).color(0xd9d2bd));
+        // Head wrap for all headhunters (distinct from the scavenger hood).
+        head.child(new ModelPart("warPaint").pivot(0, 0.20f, -0.135f)
+                .box(0, 0, 0, 0.27f, 0.035f, 0.02f).color(0xe8e2cc));
+        // Medic sash.
+        torso.child(new ModelPart("medicSash").pivot(0, 0.32f, -0.155f)
+                .box(0, 0, 0, 0.10f, 0.46f, 0.02f).color(0xc8d6ce));
+        // Guard shoulder plate.
+        torso.child(new ModelPart("guardPlate").pivot(-0.30f, 0.56f, 0)
+                .box(0, 0, 0, 0.17f, 0.10f, 0.30f).color(0x6e747c));
         return new EntityModel(root);
     }
 }

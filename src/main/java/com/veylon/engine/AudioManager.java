@@ -38,6 +38,9 @@ public class AudioManager {
     private int bBreak, bPlace, bClick, bEat, bDrink, bHit, bHurt, bSwing, bCraft, bEquip;
     private int bToolBreak, bHowl, bGrowl, bChirp, bFlap, bDeer, bCough, bSleep;
     private int bDiscover, bQuest, bThunder, bBoil;
+    // 0.3.0 combat & settlement sounds (all synthesized, like everything else).
+    private int bBowDraw, bBowRelease, bArrowImpact, bBulletImpact, bMusket, bPistol;
+    private int bDryFire, bReload, bFuse, bExplosion, bAlarmBell, bGate;
 
     // Ambience loops.
     private int bRain, bWind, bFire, bCave, bCrickets, bBeacon;
@@ -255,6 +258,53 @@ public class AudioManager {
         playAt(bDeer, x, y, z, 0.6f, pitchVar(0.1f));
     }
 
+    // ---- 0.3.0 combat & settlement one-shots ----
+
+    public void playBowDraw() {
+        play2d(bBowDraw, 0.45f, pitchVar(0.1f));
+    }
+
+    public void playBowRelease(float x, float y, float z) {
+        playAt(bBowRelease, x, y, z, 0.55f, pitchVar(0.12f));
+    }
+
+    public void playArrowImpact(float x, float y, float z) {
+        playAt(bArrowImpact, x, y, z, 0.5f, pitchVar(0.2f));
+    }
+
+    public void playBulletImpact(float x, float y, float z) {
+        playAt(bBulletImpact, x, y, z, 0.5f, pitchVar(0.2f));
+    }
+
+    /** Gunshots carry much farther than ordinary sounds. */
+    public void playGunshot(boolean pistol, float x, float y, float z) {
+        playAtFar(pistol ? bPistol : bMusket, x, y, z, 0.95f, pitchVar(0.08f));
+    }
+
+    public void playDryFire() {
+        play2d(bDryFire, 0.5f, pitchVar(0.1f));
+    }
+
+    public void playReload() {
+        play2d(bReload, 0.55f, pitchVar(0.08f));
+    }
+
+    public void playFuse(float x, float y, float z) {
+        playAt(bFuse, x, y, z, 0.6f, pitchVar(0.1f));
+    }
+
+    public void playExplosion(float x, float y, float z) {
+        playAtFar(bExplosion, x, y, z, 1.0f, pitchVar(0.1f));
+    }
+
+    public void playAlarmBell(float x, float y, float z) {
+        playAtFar(bAlarmBell, x, y, z, 0.85f, pitchVar(0.05f));
+    }
+
+    public void playGate(float x, float y, float z) {
+        playAt(bGate, x, y, z, 0.6f, pitchVar(0.12f));
+    }
+
     public void shutdown() {
         if (!enabled) {
             return;
@@ -285,6 +335,16 @@ public class AudioManager {
     }
 
     private void playAt(int buffer, float x, float y, float z, float gain, float pitch) {
+        playAt(buffer, x, y, z, gain, pitch, 3f, 44f);
+    }
+
+    /** Long-carry variant for gunshots, explosions and alarm bells. */
+    private void playAtFar(int buffer, float x, float y, float z, float gain, float pitch) {
+        playAt(buffer, x, y, z, gain, pitch, 14f, 220f);
+    }
+
+    private void playAt(int buffer, float x, float y, float z, float gain, float pitch,
+                        float refDist, float maxDist) {
         if (!enabled) {
             return;
         }
@@ -298,6 +358,8 @@ public class AudioManager {
         alSource3f(src, AL_POSITION, x, y, z);
         alSourcef(src, AL_GAIN, gain);
         alSourcef(src, AL_PITCH, pitch);
+        alSourcef(src, AL_REFERENCE_DISTANCE, refDist);
+        alSourcef(src, AL_MAX_DISTANCE, maxDist);
         alSourcePlay(src);
     }
 
@@ -356,12 +418,176 @@ public class AudioManager {
         bFlap = upload(flap());
         bDeer = upload(deerCall());
 
+        bBowDraw = upload(bowDraw());
+        bBowRelease = upload(bowRelease());
+        bArrowImpact = upload(mix(noiseBurst(0.05f, 0.4f, 16f, 0.6f), tone(300, 0.05f, 30f, 0.35f)));
+        bBulletImpact = upload(mix(noiseBurst(0.04f, 0.75f, 22f, 0.7f), tone(1200, 0.03f, 40f, 0.3f)));
+        bMusket = upload(gunshot(false));
+        bPistol = upload(gunshot(true));
+        bDryFire = upload(dryFireClick());
+        bReload = upload(reloadRustle());
+        bFuse = upload(fuseHiss());
+        bExplosion = upload(explosionBoom());
+        bAlarmBell = upload(alarmBell());
+        bGate = upload(gateCreak());
+
         bRain = upload(rainLoop());
         bWind = upload(windLoop());
         bFire = upload(fireLoop());
         bCave = upload(caveLoop());
         bCrickets = upload(cricketsLoop());
         bBeacon = upload(beaconLoop());
+    }
+
+    // ---- 0.3.0 combat & settlement synthesis ----
+
+    /** Rising creak of a bow stave under tension. */
+    private float[] bowDraw() {
+        int n = len(0.45f);
+        float[] out = new float[n];
+        float y = 0;
+        for (int i = 0; i < n; i++) {
+            float t = (float) i / n;
+            float x = rng.nextFloat() * 2f - 1f;
+            y += (0.04f + t * 0.10f) * (x - y);
+            float creak = (float) Math.sin(2 * Math.PI * (90 + t * 160) * i / RATE) * 0.14f;
+            out[i] = (y * 0.8f + creak) * (0.3f + t * 0.7f) * 0.5f;
+        }
+        return out;
+    }
+
+    /** String twang plus a short air swish. */
+    private float[] bowRelease() {
+        float[] twang = new float[len(0.28f)];
+        double phase = 0;
+        for (int i = 0; i < twang.length; i++) {
+            float t = (float) i / RATE;
+            float f = 210 - t * 90;
+            phase += 2 * Math.PI * f / RATE;
+            twang[i] = (float) (Math.sin(phase) * 0.5 + Math.sin(phase * 2.7) * 0.2)
+                    * (float) Math.exp(-16 * t);
+        }
+        return mix(twang, swish());
+    }
+
+    /** Black-powder report: sharp crack into a low rolling boom. */
+    private float[] gunshot(boolean pistol) {
+        float dur = pistol ? 0.7f : 1.15f;
+        int n = len(dur);
+        float[] out = new float[n];
+        float y = 0, y2 = 0;
+        for (int i = 0; i < n; i++) {
+            float t = (float) i / RATE;
+            float x = rng.nextFloat() * 2f - 1f;
+            // Crack: bright noise with a very fast decay.
+            y += (pistol ? 0.85f : 0.7f) * (x - y);
+            float crack = y * (float) Math.exp(-60 * t) * 1.4f;
+            // Boom: heavily low-passed noise, slower decay for muskets.
+            y2 += 0.05f * (x - y2);
+            float boom = y2 * (float) Math.exp(-(pistol ? 9f : 5.5f) * t) * 2.4f;
+            out[i] = crack + boom;
+        }
+        return out;
+    }
+
+    private float[] dryFireClick() {
+        float[] a = tone(1600, 0.03f, 60f, 0.4f);
+        float[] out = new float[len(0.16f)];
+        System.arraycopy(a, 0, out, 0, a.length);
+        float[] b = tone(900, 0.04f, 45f, 0.35f);
+        int off = len(0.07f);
+        for (int i = 0; i < b.length && off + i < out.length; i++) {
+            out[off + i] += b[i];
+        }
+        return out;
+    }
+
+    /** Powder pour, ball tap, ramrod slide. */
+    private float[] reloadRustle() {
+        float[] out = new float[len(0.9f)];
+        float[] pour = noiseBurst(0.3f, 0.18f, 6f, 0.4f);
+        System.arraycopy(pour, 0, out, 0, pour.length);
+        float[] tap = mix(tone(700, 0.05f, 30f, 0.4f), noiseBurst(0.04f, 0.5f, 20f, 0.4f));
+        int off = len(0.42f);
+        for (int i = 0; i < tap.length && off + i < out.length; i++) {
+            out[off + i] += tap[i];
+        }
+        float[] slide = noiseBurst(0.22f, 0.30f, 8f, 0.35f);
+        off = len(0.6f);
+        for (int i = 0; i < slide.length && off + i < out.length; i++) {
+            out[off + i] += slide[i];
+        }
+        return out;
+    }
+
+    /** Sputtering fuse hiss. */
+    private float[] fuseHiss() {
+        int n = len(1.2f);
+        float[] out = new float[n];
+        float y = 0;
+        for (int i = 0; i < n; i++) {
+            float x = rng.nextFloat() * 2f - 1f;
+            y += 0.55f * (x - y);
+            float sputter = rng.nextFloat() < 0.002f ? 0.5f : 0f;
+            out[i] = y * 0.35f + sputter;
+        }
+        return fadeEnds(out);
+    }
+
+    /** Deep detonation: sub thump, mid boom, long rumble tail. */
+    private float[] explosionBoom() {
+        int n = len(2.2f);
+        float[] out = new float[n];
+        float y = 0;
+        double phase = 0;
+        for (int i = 0; i < n; i++) {
+            float t = (float) i / RATE;
+            float x = rng.nextFloat() * 2f - 1f;
+            y += 0.035f * (x - y);
+            float rumble = y * (float) Math.exp(-2.2 * t) * 2.6f;
+            float f = 52 - t * 18;
+            phase += 2 * Math.PI * Math.max(20, f) / RATE;
+            float thump = (float) Math.sin(phase) * (float) Math.exp(-7 * t) * 0.9f;
+            float crack = (rng.nextFloat() * 2f - 1f) * (float) Math.exp(-45 * t) * 0.8f;
+            out[i] = rumble + thump + crack;
+        }
+        return out;
+    }
+
+    /** Three urgent bronze bell strikes. */
+    private float[] alarmBell() {
+        int n = len(1.6f);
+        float[] out = new float[n];
+        for (int strike = 0; strike < 3; strike++) {
+            int off = len(0.5f * strike);
+            for (float[] partial : new float[][]{{520, 0.5f}, {780, 0.3f}, {1240, 0.18f}}) {
+                float[] ring = tone(partial[0], 0.55f, 5.5f, partial[1]);
+                for (int i = 0; i < ring.length && off + i < n; i++) {
+                    out[off + i] += ring[i];
+                }
+            }
+            float[] clank = noiseBurst(0.03f, 0.6f, 30f, 0.4f);
+            for (int i = 0; i < clank.length && off + i < n; i++) {
+                out[off + i] += clank[i];
+            }
+        }
+        return out;
+    }
+
+    /** Heavy timber gate swinging on rope hinges. */
+    private float[] gateCreak() {
+        int n = len(0.7f);
+        float[] out = new float[n];
+        float y = 0;
+        for (int i = 0; i < n; i++) {
+            float t = (float) i / n;
+            float x = rng.nextFloat() * 2f - 1f;
+            y += 0.06f * (x - y);
+            float squeal = (float) Math.sin(2 * Math.PI * (140 + Math.sin(t * 9) * 60) * i / RATE)
+                    * 0.16f * (float) Math.sin(Math.PI * t);
+            out[i] = y * 1.2f * (float) Math.sin(Math.PI * t) + squeal;
+        }
+        return out;
     }
 
     private int upload(float[] samples) {

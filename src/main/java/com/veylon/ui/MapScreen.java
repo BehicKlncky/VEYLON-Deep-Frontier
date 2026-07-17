@@ -2,6 +2,8 @@ package com.veylon.ui;
 
 import com.veylon.Game;
 import com.veylon.engine.UiRenderer;
+import com.veylon.settlement.NpcArchetype;
+import com.veylon.settlement.Settlement;
 import com.veylon.world.BlockType;
 import com.veylon.world.Poi;
 import com.veylon.world.World;
@@ -22,7 +24,7 @@ public class MapScreen {
         float cell = size / CELLS;
         float x0 = w / 2f - size / 2f, y0 = h / 2f - size / 2f;
 
-        ui.panel(x0 - 14, y0 - 44, size + 28, size + 96);
+        ui.panel(x0 - 14, y0 - 44, size + 28, size + 132);
         ui.textCentered(w / 2f, y0 - 34, 1.8f, "MAP  (" + (CELLS * STEP) + "m across)", 1f, 1f, 1f, 1f);
 
         World world = g.world;
@@ -92,21 +94,134 @@ public class MapScreen {
                 ui.rect(x0 + dx * cell - 3, y0 + dz * cell - 3, 7, 7, 1f, 0.6f, 0.1f, 1f);
             }
         }
+
+        // Settlement markers. Rumors deliberately disclose neither exact tier,
+        // owner nor alignment until the player performs normal discovery.
+        for (var s : world.settlements.values()) {
+            if (!s.discovered && !s.rumored) {
+                continue;
+            }
+            int dx = (s.center.x() - px) / STEP + half;
+            int dz = (s.center.z() - pz) / STEP + half;
+            if (dx < 1 || dx >= CELLS - 1 || dz < 1 || dz >= CELLS - 1) {
+                continue;
+            }
+            float r, gg, b;
+            if (!s.discovered) {
+                r = 0.48f;
+                gg = 0.40f;
+                b = 0.60f;
+            } else if (s.occupied) {
+                r = 0.35f;
+                gg = 0.85f;
+                b = 0.95f;
+            } else if (s.cleared) {
+                r = 0.55f;
+                gg = 0.55f;
+                b = 0.55f;
+            } else {
+                switch (s.alignment) {
+                    case FRIENDLY -> {
+                        r = 0.35f;
+                        gg = 0.85f;
+                        b = 0.40f;
+                    }
+                    case HOSTILE -> {
+                        r = 0.90f;
+                        gg = 0.25f;
+                        b = 0.20f;
+                    }
+                    default -> {
+                        r = 0.85f;
+                        gg = 0.80f;
+                        b = 0.40f;
+                    }
+                }
+            }
+            int mark = s.discovered ? 5 + s.type.ordinal() * 2 : 7;
+            ui.rect(x0 + dx * cell - mark / 2f, y0 + dz * cell - mark / 2f, mark, mark, r, gg, b, 1f);
+            ui.rectOutline(x0 + dx * cell - mark / 2f - 1, y0 + dz * cell - mark / 2f - 1,
+                    mark + 2, mark + 2, 1, 0, 0, 0, 0.9f);
+            String tag = markerTag(s);
+            ui.textShadow(x0 + dx * cell + mark / 2f + 2, y0 + dz * cell - 6, 1.1f,
+                    tag, r, gg, b, 1f);
+        }
+        // Exact quest target (or turn-in provider once the task is complete).
+        // The generic gold/cyan overlay discloses coordinates, not hidden tier,
+        // faction, alignment or services. Off-map objectives clamp to the edge.
+        QuestObjectiveView.Objective objective = QuestObjectiveView.resolve(g);
+        if (objective != null) {
+            float targetX = (objective.position().x() - px) / (float) STEP + half;
+            float targetZ = (objective.position().z() - pz) / (float) STEP + half;
+            boolean offMap = targetX < 2 || targetX > CELLS - 3
+                    || targetZ < 2 || targetZ > CELLS - 3;
+            targetX = Math.max(2, Math.min(CELLS - 3, targetX));
+            targetZ = Math.max(2, Math.min(CELLS - 3, targetZ));
+            float mx = x0 + targetX * cell;
+            float mz = y0 + targetZ * cell;
+            boolean returning = objective.phase()
+                    == QuestObjectiveView.Phase.RETURN_TO_PROVIDER;
+            float r = returning ? 0.35f : 1f;
+            float gg = returning ? 0.90f : 0.78f;
+            float b = returning ? 1f : 0.20f;
+            ui.rectOutline(mx - 7, mz - 7, 15, 15, 2, r, gg, b, 1f);
+            ui.rect(mx - 2, mz - 2, 5, 5, r, gg, b, 1f);
+            ui.textShadow(mx + 9, mz - 7, 1.15f,
+                    returning ? "RETURN" : offMap ? "! EDGE" : "!", r, gg, b, 1f);
+        }
+
         // Player marker (center).
         ui.rect(x0 + half * cell - 3, y0 + half * cell - 3, 7, 7, 1f, 1f, 1f, 1f);
         ui.rectOutline(x0 + half * cell - 4, y0 + half * cell - 4, 9, 9, 1, 0f, 0f, 0f, 1f);
 
         ui.textCentered(w / 2f, y0 + size + 8, 1.2f,
-                "White = you   Orange = camp   Cyan = beacon   POIs discovered: " + discovered
-                        + " / " + world.pois.size() + " known area", 0.75f, 0.75f, 0.75f, 1f);
-        // POI legend.
+                "White = you   Orange = camp   Cyan = beacon   ? = settlement rumor   Gold ! = objective   "
+                        + "Green/yellow/red = discovered settlement (C/V/F/K/X; $/+/Z services)   POIs: " + discovered
+                        + "/" + world.pois.size(), 0.75f, 0.75f, 0.75f, 1f);
+        // POI legend (wraps into rows now that cave POIs exist).
         float lx = x0;
         float lyy = y0 + size + 26;
         for (Poi.PoiType t : Poi.PoiType.values()) {
+            float entryWidth = ui.textWidth(t.displayName, 1.1f) + 34;
+            if (lx + entryWidth > x0 + size) {
+                lx = x0;
+                lyy += 15;
+            }
             ui.rect(lx, lyy + 2, 8, 8, t.r, t.g, t.b, 1f);
             ui.textShadow(lx + 12, lyy, 1.1f, t.displayName, 0.8f, 0.8f, 0.8f, 1f);
-            lx += ui.textWidth(t.displayName, 1.1f) + 34;
+            lx += entryWidth;
         }
-        ui.textCentered(w / 2f, y0 + size + 44, 1.15f, "[M or Esc] close", 0.7f, 0.7f, 0.7f, 1f);
+        ui.textCentered(w / 2f, lyy + 20, 1.15f, "[M or Esc] close", 0.7f, 0.7f, 0.7f, 1f);
+    }
+
+    static String markerTag(Settlement s) {
+        if (!s.discovered) {
+            return "?";
+        }
+        String tier = switch (s.type) {
+            case CAMP -> "C";
+            case VILLAGE -> "V";
+            case FORT -> "F";
+            case CASTLE -> "K";
+            case FORTRESS -> "X";
+        };
+        String services = serviceTag(s);
+        return services.isEmpty() ? tier : tier + " " + services;
+    }
+
+    static String serviceTag(Settlement s) {
+        if (!s.discovered || (!s.friendly() && !s.occupied)) {
+            return "";
+        }
+        boolean trader = false, medic = false;
+        for (Settlement.Resident resident : s.residents) {
+            if (!resident.alive || resident.rescued || resident.routed || resident.surrendered) {
+                continue;
+            }
+            trader |= resident.archetype == NpcArchetype.TRADER;
+            medic |= resident.archetype == NpcArchetype.MEDIC && s.medStock > 0;
+        }
+        return (trader ? "$" : "") + (medic ? "+" : "")
+                + ((!s.beds.isEmpty() || s.occupied) ? "Z" : "");
     }
 }

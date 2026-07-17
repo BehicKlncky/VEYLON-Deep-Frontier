@@ -142,6 +142,21 @@ public final class MaterialRegistry {
         register("beacon", BlockType.BEACON, "beacon_side", "beacon_side", "beacon_side", 1, TintMode.NONE, false, 0.15f, 0.3f);
         register("beacon_lit", BlockType.BEACON_LIT, "beacon_lit", "beacon_lit", "beacon_lit", 1, TintMode.NONE, false, 0.9f, 0.3f);
 
+        // ---- Deep Frontier expansion blocks ----
+        register("basalt", BlockType.BASALT, "basalt", "basalt", "basalt", 2, TintMode.NONE, false, 0f, 0.9f);
+        register("sulfur_ore", BlockType.SULFUR_ORE, "sulfur_ore", "sulfur_ore", "sulfur_ore", 1, TintMode.NONE, false, 0.06f, 0.85f);
+        register("saltpeter_ore", BlockType.SALTPETER_ORE, "saltpeter_ore", "saltpeter_ore", "saltpeter_ore", 1, TintMode.NONE, false, 0f, 0.85f);
+        register("glow_fungus", BlockType.GLOW_FUNGUS, "glow_fungus", "glow_fungus", "glow_fungus", 1, TintMode.NONE, true, 0.75f, 0.9f);
+        register("ladder", BlockType.LADDER, "ladder", "ladder", "ladder", 1, TintMode.NONE, true, 0f, 0.95f);
+        register("lantern", BlockType.LANTERN, "lantern_glass", "lantern_glass", "lantern_glass", 1, TintMode.NONE, false, 0.85f, 0.4f);
+        register("trail_marker", BlockType.TRAIL_MARKER, "marker_paint", "marker_paint", "marker_paint", 1, TintMode.NONE, false, 0.7f, 0.9f);
+        register("powder_keg", BlockType.POWDER_KEG, "keg_top", "keg_side", "keg_top", 1, TintMode.NONE, false, 0f, 0.9f);
+        register("gate", BlockType.GATE, "gate", "gate", "gate", 1, TintMode.NONE, false, 0f, 0.9f);
+        register("gate_open", BlockType.GATE_OPEN, "gate", "gate", "gate", 1, TintMode.NONE, false, 0f, 0.9f);
+        register("stone_brick", BlockType.STONE_BRICK, "stone_brick", "stone_brick", "stone_brick", 2, TintMode.NONE, false, 0f, 0.9f);
+        register("alarm_bell", BlockType.ALARM_BELL, "bell_bronze", "bell_bronze", "bell_bronze", 1, TintMode.NONE, false, 0.1f, 0.35f);
+        register("cage_bars", BlockType.CAGE_BARS, "cage_bars", "cage_bars", "cage_bars", 1, TintMode.NONE, false, 0f, 0.4f);
+
         // Standalone prop tiles used by special shapes (torch flame, campfire, basin water...).
         propTile("torch_head", 1.0f, 0.9f);
         propTile("campfire_wood", 0f, 0.95f);
@@ -151,6 +166,11 @@ public final class MaterialRegistry {
         propTile("bone", 0f, 0.8f);
         propTile("log_side", 0f, 0.95f);
         propTile("plank", 0f, 0.9f);
+        propTile("lantern_glass", 0.85f, 0.4f);
+        propTile("lantern_glass_unlit", 0f, 0.55f);
+        propTile("marker_paint", 0.7f, 0.9f);
+        propTile("bell_bronze", 0.1f, 0.35f);
+        propTile("anvil_metal", 0f, 0.25f);
     }
 
     private static void register(String id, BlockType block, String top, String side, String bottom,

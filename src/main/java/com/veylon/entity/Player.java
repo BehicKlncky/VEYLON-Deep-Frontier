@@ -52,7 +52,7 @@ public class Player extends Entity {
     public float scent;
     /** Red-flash feedback for the HUD; decays each frame. */
     public float damageFlash;
-    /** Smoke buildup 0..100 while breathing campfire smoke indoors. */
+    /** Smoke buildup 0..100 from enclosed fires and Basalt-depth fumaroles. */
     public float smokeExposure;
     /** Set by antiseptic: the current wound won't get infected when it closes. */
     public boolean woundClean;
