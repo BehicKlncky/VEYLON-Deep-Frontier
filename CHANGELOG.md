@@ -2,6 +2,45 @@
 
 All notable user-facing changes to VEYLON: Deep Frontier are recorded here.
 
+## [0.3.1] - 2026-07-22
+
+### Fixed
+
+- Settlement crate transfers now separate bounded event and transfer identities, so
+  duplicate callbacks cannot repeat effects, distinct same-type stacks all update stock,
+  and one logical theft applies reputation/alert penalties only once.
+- Bounded A* reconstruction now returns failure when its defensive cache cap is reached
+  instead of returning a reversed path suffix disconnected from the NPC's start.
+- Voxel DDA raycasts correctly hit an adjacent voxel when starting exactly on a boundary.
+- Settled NPC perception no longer decrements its schedule twice per simulation tick.
+- Player collision now supports a tested one-voxel step while rejecting taller ledges.
+
+### Changed
+
+- Extracted headless player movement/voxel physics, medical treatment and high-level
+  gameplay action routing from `Game`; `Game.updateActions()` is now orchestration only.
+- Added caller-owned mutable raycast results to the per-frame target and fluid queries;
+  the immutable compatibility API remains available for occasional callers.
+- Runtime light emitter changes update one chunk-list entry instead of rescanning every
+  cell; bulk generation/load retains the safe full rebuild.
+- Chunk meshing reuses per-face scratch arrays, projectile objects return to a strict
+  bounded pool, and OpenAL listener/ambience update arrays are retained.
+- Human LOS evaluation keeps the documented deterministic 0.3-second cadence.
+
+### Quality
+
+- Expanded the deterministic suite from 160 to 223 tests. New coverage includes player
+  stepping/collision/falling/swimming/ladders/chunk edges, DDA axes/boundaries/fluids/
+  result reuse, theft transactions, reconstruction limits, fire and afflictions, water,
+  temperature, shelter, plant growth, coordinate safety and performance invariants.
+- Added the v0.3.1 engineering validation matrix and release notes.
+
+### Compatibility
+
+- Save format remains binary v3 and historical v2 migration remains supported.
+- World generator version remains 3; existing seeds and generated output are unchanged.
+- Serialized enums remain append-only with no reordered or removed constants.
+
 ## [0.3.0] - 2026-07-17
 
 ### Added

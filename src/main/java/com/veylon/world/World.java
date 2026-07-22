@@ -279,7 +279,7 @@ public class World {
         c.dirty = true;
         boolean lightChanged = old.light > 0 || t.light > 0;
         if (lightChanged) {
-            c.rebuildLights(this);
+            c.updateLightAt(this, x, y, z);
             // Light spills into neighbor meshes; rebuild them too.
             markDirty(cx - 1, cz);
             markDirty(cx + 1, cz);
@@ -418,7 +418,7 @@ public class World {
         if (chunk == null) {
             return;
         }
-        chunk.rebuildLights(this);
+        chunk.updateLightAt(this, pos.x(), pos.y(), pos.z());
         chunk.dirty = true;
         markDirty(cx - 1, cz);
         markDirty(cx + 1, cz);

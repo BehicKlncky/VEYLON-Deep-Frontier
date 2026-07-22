@@ -125,7 +125,7 @@ public final class Pathfinder {
             int cx = kx(cur.key), cy = ky(cur.key), cz = kz(cur.key);
             if (cur.key == goalKey
                     || (Math.abs(cx - tx) + Math.abs(cz - tz) <= 1 && Math.abs(cy - ty) <= 1)) {
-                return reconstruct(parent, cur.key);
+                return reconstruct(parent, cur.key, startKey);
             }
 
             // Ladder cells allow direct vertical movement.
@@ -179,16 +179,23 @@ public final class Pathfinder {
         return Math.abs(tx - x) + Math.abs(tz - z) + Math.abs(ty - y) * 0.6f;
     }
 
-    private static List<Vec3i> reconstruct(Map<Long, Long> parent, long end) {
+    /**
+     * Reconstructs only a complete end-to-start chain. The defensive cap is a
+     * failure boundary: returning a reversed suffix would make an NPC follow a
+     * path disconnected from its current position.
+     */
+    private static List<Vec3i> reconstruct(Map<Long, Long> parent, long end, long start) {
         ArrayList<Vec3i> out = new ArrayList<>();
         Long k = end;
-        int guard = 0;
-        while (k != null && guard++ < MAX_PATH_NODES) {
+        while (k != null && out.size() < MAX_PATH_NODES) {
             out.add(new Vec3i(kx(k), ky(k), kz(k)));
+            if (k == start) {
+                java.util.Collections.reverse(out);
+                return out;
+            }
             k = parent.get(k);
         }
-        java.util.Collections.reverse(out);
-        return out;
+        return null;
     }
 
     /** Snaps a cell downward to footing (max 3); -1 when none. */

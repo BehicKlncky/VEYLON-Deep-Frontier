@@ -8,6 +8,7 @@ import com.veylon.item.ItemType;
 import com.veylon.world.BlockType;
 
 import java.util.ArrayList;
+import java.util.ArrayDeque;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Random;
@@ -54,9 +55,17 @@ public class ProjectileSystem {
 
     public final List<Projectile> live = new ArrayList<>();
     public final List<Projectile> stuck = new ArrayList<>();
+    private static final int MAX_POOL = MAX_LIVE + MAX_STUCK;
+    private final ArrayDeque<Projectile> pool = new ArrayDeque<>(MAX_POOL);
     private final Random rng = new Random();
 
     public void reset() {
+        for (Projectile projectile : live) {
+            release(projectile);
+        }
+        for (Projectile projectile : stuck) {
+            release(projectile);
+        }
         live.clear();
         stuck.clear();
     }
@@ -69,7 +78,7 @@ public class ProjectileSystem {
             if (live.size() >= MAX_LIVE) {
                 return;
             }
-            Projectile p = new Projectile();
+            Projectile p = acquire();
             p.kind = switch (def.category) {
                 case BOW -> Kind.ARROW;
                 case FIREARM -> Kind.BULLET;
@@ -140,6 +149,7 @@ public class ProjectileSystem {
             p.life -= dt;
             if (p.life <= 0) {
                 it.remove();
+                release(p);
                 continue;
             }
             if (p.fuse > 0) {
@@ -147,6 +157,7 @@ public class ProjectileSystem {
                 if (p.fuse <= 0) {
                     detonate(g, p);
                     it.remove();
+                    release(p);
                     continue;
                 }
             }
@@ -158,6 +169,9 @@ public class ProjectileSystem {
             float nz = p.z + p.vz * dt;
             if (step(g, p, nx, ny, nz)) {
                 it.remove();
+                if (!p.stuck) {
+                    release(p);
+                }
             }
         }
 
@@ -166,6 +180,7 @@ public class ProjectileSystem {
             p.stuckTime += dt;
             if (p.stuckTime > STUCK_LIFE) {
                 it.remove();
+                release(p);
             }
         }
     }
@@ -341,14 +356,58 @@ public class ProjectileSystem {
     }
 
     public void pickUp(Game g, Projectile p) {
-        stuck.remove(p);
+        if (!stuck.remove(p)) {
+            return;
+        }
         ItemType item = p.ammoItem == null ? ItemType.ARROW : p.ammoItem;
         g.player.inventory.add(item, 1);
         g.audio.playClick();
         g.log("Recovered 1 " + item.displayName + ".");
+        release(p);
     }
 
     public int liveCount() {
         return live.size();
+    }
+
+    /** Current retained projectile capacity, exposed for deterministic budget QA. */
+    public int pooledCount() {
+        return pool.size();
+    }
+
+    private Projectile acquire() {
+        Projectile projectile = pool.pollFirst();
+        if (projectile == null) {
+            projectile = new Projectile();
+        }
+        resetState(projectile);
+        return projectile;
+    }
+
+    private void release(Projectile projectile) {
+        if (projectile == null || pool.size() >= MAX_POOL) {
+            return;
+        }
+        resetState(projectile);
+        pool.addFirst(projectile);
+    }
+
+    /** Every field is reset so pooled ownership and persisted restoration never leak state. */
+    private static void resetState(Projectile projectile) {
+        projectile.kind = null;
+        projectile.x = projectile.y = projectile.z = 0;
+        projectile.vx = projectile.vy = projectile.vz = 0;
+        projectile.gravity = 0;
+        projectile.damage = 0;
+        projectile.life = 0;
+        projectile.fromPlayer = false;
+        projectile.owner = null;
+        projectile.ammoItem = null;
+        projectile.fuse = 0;
+        projectile.stuck = false;
+        projectile.stuckTime = 0;
+        projectile.impactedEntity = false;
+        projectile.detonated = false;
+        projectile.yaw = projectile.pitch = 0;
     }
 }

@@ -17,6 +17,9 @@ public class Chunk {
     public final int[] heightMap = new int[SX * SZ];
     /** Light-emitting blocks in this chunk: {worldX, worldY, worldZ, level}. */
     public final List<int[]> lights = new ArrayList<>();
+    /** Deterministic diagnostics for full versus point light-list maintenance. */
+    public long fullLightRebuilds;
+    public long incrementalLightUpdates;
 
     public boolean dirty = true;
     public boolean generated = false;
@@ -78,6 +81,7 @@ public class Chunk {
 
     /** Rescans lights, consulting runtime state for controllable emitters. */
     public void rebuildLights(World world) {
+        fullLightRebuilds++;
         lights.clear();
         for (int y = 0; y < SY; y++) {
             for (int z = 0; z < SZ; z++) {
@@ -90,6 +94,36 @@ public class Chunk {
                     }
                 }
             }
+        }
+    }
+
+    /**
+     * Updates the one emitter at a world position without rescanning all 24,576
+     * cells. Bulk generation/load still uses {@link #rebuildLights(World)}.
+     */
+    public void updateLightAt(World world, int worldX, int y, int worldZ) {
+        incrementalLightUpdates++;
+        int found = -1;
+        for (int i = 0; i < lights.size(); i++) {
+            int[] light = lights.get(i);
+            if (light[0] == worldX && light[1] == y && light[2] == worldZ) {
+                found = i;
+                break;
+            }
+        }
+        BlockType type = world.getBlock(worldX, y, worldZ);
+        boolean enabled = type.light > 0 && (type != BlockType.LANTERN
+                || world.isLanternLit(worldX, y, worldZ));
+        if (!enabled) {
+            if (found >= 0) {
+                lights.remove(found);
+            }
+            return;
+        }
+        if (found >= 0) {
+            lights.get(found)[3] = type.light;
+        } else {
+            lights.add(new int[]{worldX, y, worldZ, type.light});
         }
     }
 

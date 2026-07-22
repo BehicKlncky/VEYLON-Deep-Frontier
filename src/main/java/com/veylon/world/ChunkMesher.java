@@ -42,6 +42,20 @@ public class ChunkMesher {
     private final FloatList opaque = new FloatList(1 << 17);
     private final FloatList water = new FloatList(1 << 12);
 
+    // Per-face scratch is retained with the mesher. A typical terrain rebuild
+    // emits thousands of faces, so allocating these arrays per face dominated
+    // otherwise avoidable young-generation churn.
+    private final float[] faceX = new float[4];
+    private final float[] faceY = new float[4];
+    private final float[] faceZ = new float[4];
+    private final float[] faceU = new float[4];
+    private final float[] faceV = new float[4];
+    private final float[] faceAo = new float[4];
+    private final float[] faceSky = new float[4];
+    private final float[] faceBlock = new float[4];
+    private static final int[] QUAD_ORDER = {0, 1, 2, 0, 2, 3};
+    private static final int[] FLIPPED_QUAD_ORDER = {1, 2, 3, 1, 3, 0};
+
     // Per-build caches over the chunk neighborhood: x,z in [-1,17), y in [-1,SY+1).
     private static final int CW = Chunk.SX + 2, CH = Chunk.SY + 2;
     private final byte[] solidCache = new byte[CW * CH * CW];      // 0 unknown, 1 opaque, 2 open
@@ -260,33 +274,24 @@ public class ChunkMesher {
         int fx = x + n[0], fy = y + n[1], fz = z + n[2]; // cell in front of the face
         int a1 = TANGENTS[d][0], a2 = TANGENTS[d][1];
 
-        float[] vx = new float[4];
-        float[] vy = new float[4];
-        float[] vz = new float[4];
-        float[] u = new float[4];
-        float[] v = new float[4];
-        float[] ao = new float[4];
-        float[] sky = new float[4];
-        float[] blk = new float[4];
-
         for (int i = 0; i < 4; i++) {
             int[] csel = CORNERS[d][i];
-            vx[i] = x + csel[0];
-            vy[i] = y + csel[1];
-            vz[i] = z + csel[2];
+            faceX[i] = x + csel[0];
+            faceY[i] = y + csel[1];
+            faceZ[i] = z + csel[2];
             // World-space UVs (repeat wrapping in the array sampler).
             switch (d) {
                 case 0, 1 -> {
-                    u[i] = vx[i];
-                    v[i] = vz[i];
+                    faceU[i] = faceX[i];
+                    faceV[i] = faceZ[i];
                 }
                 case 2, 3 -> {
-                    u[i] = vx[i];
-                    v[i] = -vy[i];
+                    faceU[i] = faceX[i];
+                    faceV[i] = -faceY[i];
                 }
                 default -> {
-                    u[i] = vz[i];
-                    v[i] = -vy[i];
+                    faceU[i] = faceZ[i];
+                    faceV[i] = -faceY[i];
                 }
             }
             // Signed tangent direction for this corner: corner coord 1 => +axis, 0 => -axis.
@@ -302,7 +307,7 @@ public class ChunkMesher {
             boolean o2 = opaqueAt(e2x, e2y, e2z);
             boolean oc = opaqueAt(ecx, ecy, ecz);
             int level = (o1 && o2) ? 0 : 3 - ((o1 ? 1 : 0) + (o2 ? 1 : 0) + (oc ? 1 : 0));
-            ao[i] = AO_LEVELS[level];
+            faceAo[i] = AO_LEVELS[level];
 
             // Smooth light: average the open cells of the same neighborhood.
             float sSum = skyAt(fx, fy, fz);
@@ -323,16 +328,16 @@ public class ChunkMesher {
                 bSum += blockAt(ecx, ecy, ecz);
                 cnt++;
             }
-            sky[i] = sSum / cnt;
-            blk[i] = bSum / cnt;
+            faceSky[i] = sSum / cnt;
+            faceBlock[i] = bSum / cnt;
         }
 
         // Flip the quad diagonal toward the brighter pair to avoid AO artifacts.
-        boolean flip = ao[0] + ao[2] < ao[1] + ao[3];
-        int[] order = flip ? new int[]{1, 2, 3, 1, 3, 0} : new int[]{0, 1, 2, 0, 2, 3};
+        boolean flip = faceAo[0] + faceAo[2] < faceAo[1] + faceAo[3];
+        int[] order = flip ? FLIPPED_QUAD_ORDER : QUAD_ORDER;
         for (int oi : order) {
-            vertex(vx[oi], vy[oi], vz[oi], u[oi], v[oi], layer, d,
-                    sky[oi], blk[oi], ao[oi], tr, tg, tb, flags);
+            vertex(faceX[oi], faceY[oi], faceZ[oi], faceU[oi], faceV[oi], layer, d,
+                    faceSky[oi], faceBlock[oi], faceAo[oi], tr, tg, tb, flags);
         }
     }
 

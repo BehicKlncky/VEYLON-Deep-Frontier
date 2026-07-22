@@ -28,7 +28,7 @@ public final class SettledNpcAI {
     private static final Random RNG = new Random();
 
     /** Seconds between perception (LOS) evaluations per NPC. */
-    private static final float PERCEPTION_INTERVAL = 0.3f;
+    public static final float PERCEPTION_INTERVAL = 0.3f;
 
     /** Re-seeds decision jitter so a fixed world seed replays identically. */
     public static void reseed(long seed) {
@@ -118,11 +118,14 @@ public final class SettledNpcAI {
     // ------------------------------------------------------------------
 
     private static void perceive(Game g, Npc n, Settlement s, boolean hostile, float dt) {
-        n.decideTimer -= dt;
+        // NpcAI owns the once-per-tick timer decrement before dispatching here.
+        // Decrementing again halved the documented perception interval for every
+        // active settled NPC and synchronized unnecessary LOS queries.
         if (n.decideTimer > 0) {
             return;
         }
         n.decideTimer = PERCEPTION_INTERVAL;
+        n.perceptionChecks++;
         var p = g.player;
         if (p == null || p.dead) {
             return;

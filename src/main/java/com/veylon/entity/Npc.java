@@ -90,6 +90,8 @@ public class Npc extends Entity {
     public boolean hasTarget;
     public Vec3i targetBlock;
     public float decideTimer;
+    /** Non-persisted deterministic diagnostic: completed settled-NPC perception queries. */
+    public long perceptionChecks;
     public float workTimer;
     public float attackCooldown;
     /** While > 0 the NPC stands still (talking/trading with the player). */

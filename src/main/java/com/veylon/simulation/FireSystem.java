@@ -37,6 +37,11 @@ public class FireSystem {
         totalIgnitions = 0;
     }
 
+    /** Deterministic QA hook; normal gameplay retains organic fire variation. */
+    public void setRandomSeed(long seed) {
+        rng.setSeed(seed);
+    }
+
     public boolean ignite(Game g, int x, int y, int z) {
         BlockType t = g.world.getBlock(x, y, z);
         if (!t.flammable) {

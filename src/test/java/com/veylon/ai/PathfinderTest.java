@@ -9,6 +9,7 @@ import org.junit.jupiter.api.Test;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -128,5 +129,105 @@ class PathfinderTest {
                         "path entered an unloaded chunk at " + cell);
             }
         }
+    }
+
+    @Test
+    void longestMazeBelowReconstructionCapConnectsStartToGoal() {
+        World world = snakeMaze(15);
+        int goalX = 30;
+        int goalZ = 28;
+
+        List<Vec3i> path = Pathfinder.find(
+                world, 0, 40, 0, goalX, 40, goalZ, 2_000);
+
+        assertNotNull(path);
+        assertEquals(new Vec3i(0, 40, 0), path.getFirst());
+        assertTrue(path.getLast().distSq(goalX + 0.5, 40.5, goalZ + 0.5) < 4);
+        assertTrue(path.size() < Pathfinder.MAX_PATH_NODES);
+        assertTrue(path.size() > 450, "fixture must exercise a near-cap complete chain");
+    }
+
+    @Test
+    void reconstructionCapReturnsFailureInsteadOfDisconnectedSuffix() {
+        World world = snakeMaze(18);
+        int goalX = 0;
+        int goalZ = 34;
+
+        assertNull(Pathfinder.find(world, 0, 40, 0,
+                        goalX, 40, goalZ, 2_000),
+                "a chain beyond the defensive cache cap must fail, never truncate");
+    }
+
+    @Test
+    void waterCostPrefersShortDryDetour() {
+        World world = flatWorld();
+        for (int x = 2; x <= 8; x++) {
+            world.setBlock(x, 40, 0, BlockType.WATER, false);
+        }
+
+        List<Vec3i> path = Pathfinder.find(
+                world, 0, 40, 0, 10, 40, 0, Pathfinder.DEFAULT_BUDGET);
+
+        assertNotNull(path);
+        assertTrue(path.stream().noneMatch(cell ->
+                        world.getBlock(cell.x(), cell.y(), cell.z()) == BlockType.WATER),
+                "water cost should make the one-cell dry detour cheaper");
+    }
+
+    @Test
+    void acceptsMaximumDropAndRejectsOneVoxelMore() {
+        World allowed = flatWorld();
+        for (int y = 40; y <= 42; y++) {
+            allowed.setBlock(0, y, 0, BlockType.STONE, false);
+        }
+        List<Vec3i> path = Pathfinder.find(
+                allowed, 0, 43, 0, 1, 40, 0, Pathfinder.DEFAULT_BUDGET);
+        assertNotNull(path);
+        assertEquals(-Pathfinder.MAX_DROP,
+                path.get(1).y() - path.getFirst().y());
+
+        World rejected = flatWorld();
+        for (int y = 40; y <= 43; y++) {
+            rejected.setBlock(0, y, 0, BlockType.STONE, false);
+        }
+        assertNull(Pathfinder.find(rejected, 0, 44, 0,
+                1, 40, 0, Pathfinder.DEFAULT_BUDGET));
+    }
+
+    private World snakeMaze(int rows) {
+        World world = new World(556L, World.GEN_LEGACY);
+        for (int cx = -1; cx <= 2; cx++) {
+            for (int cz = -1; cz <= 2; cz++) {
+                Chunk chunk = world.getOrCreateChunk(cx, cz);
+                for (int lx = 0; lx < Chunk.SX; lx++) {
+                    for (int lz = 0; lz < Chunk.SZ; lz++) {
+                        for (int y = 0; y < Chunk.SY; y++) {
+                            chunk.set(lx, y, lz, y <= 39 ? BlockType.STONE : BlockType.AIR);
+                        }
+                    }
+                }
+                chunk.recomputeAllHeights();
+            }
+        }
+        int maxZ = (rows - 1) * 2;
+        for (int x = -1; x <= 31; x++) {
+            for (int z = -1; z <= maxZ + 1; z++) {
+                world.setBlock(x, 40, z, BlockType.WALL, false);
+                world.setBlock(x, 41, z, BlockType.WALL, false);
+            }
+        }
+        for (int row = 0; row < rows; row++) {
+            int z = row * 2;
+            for (int x = 0; x <= 30; x++) {
+                world.setBlock(x, 40, z, BlockType.AIR, false);
+                world.setBlock(x, 41, z, BlockType.AIR, false);
+            }
+            if (row + 1 < rows) {
+                int connectorX = row % 2 == 0 ? 30 : 0;
+                world.setBlock(connectorX, 40, z + 1, BlockType.AIR, false);
+                world.setBlock(connectorX, 41, z + 1, BlockType.AIR, false);
+            }
+        }
+        return world;
     }
 }

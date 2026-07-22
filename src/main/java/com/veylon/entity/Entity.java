@@ -1,6 +1,5 @@
 package com.veylon.entity;
 
-import com.veylon.world.BlockType;
 import com.veylon.world.World;
 import org.joml.Vector3f;
 
@@ -54,87 +53,9 @@ public abstract class Entity {
         return false;
     }
 
-    private boolean moveAxis(int axis, float d) {
-        if (d == 0) {
-            return false;
-        }
-        float remaining = d;
-        float sign = Math.signum(d);
-        while (Math.abs(remaining) > 1e-7f) {
-            float step = sign * Math.min(0.2f, Math.abs(remaining));
-            remaining -= step;
-            switch (axis) {
-                case 0 -> pos.x += step;
-                case 1 -> pos.y += step;
-                default -> pos.z += step;
-            }
-            if (collidesAt(pos.x, pos.y, pos.z)) {
-                switch (axis) {
-                    case 0 -> pos.x -= step;
-                    case 1 -> pos.y -= step;
-                    default -> pos.z -= step;
-                }
-                return true;
-            }
-        }
-        return false;
-    }
-
     /** Integrates velocity with gravity and voxel collision. */
     public void applyPhysics(float dt, boolean gravity) {
-        int ex = (int) Math.floor(pos.x);
-        int ey = (int) Math.floor(pos.y + height * 0.5f);
-        int ez = (int) Math.floor(pos.z);
-        inWater = world.getBlock(ex, ey, ez) == BlockType.WATER
-                || world.getBlock(ex, (int) Math.floor(pos.y + 0.1f), ez) == BlockType.WATER;
-        onLadder = world.getBlock(ex, ey, ez).isClimbable()
-                || world.getBlock(ex, (int) Math.floor(pos.y + 0.1f), ez).isClimbable();
-
-        if (gravity) {
-            if (onLadder) {
-                // Rope ladders arrest falls; entities slide down slowly unless climbing.
-                if (vel.y < -1.6f) {
-                    vel.y = -1.6f;
-                }
-                fallDist = 0;
-            } else {
-                float g = inWater ? 7f : 26f;
-                vel.y -= g * dt;
-            }
-            if (inWater && vel.y < -2.2f) {
-                vel.y = -2.2f;
-            }
-            if (vel.y < -52f) {
-                vel.y = -52f;
-            }
-        }
-
-        float drag = inWater ? 0.5f : 1f;
-        boolean hitX = moveAxis(0, vel.x * dt * drag);
-        boolean hitZ = moveAxis(2, vel.z * dt * drag);
-        horizontalCollision = hitX || hitZ;
-        boolean hitY = moveAxis(1, vel.y * dt);
-        if (hitY) {
-            if (vel.y < 0) {
-                onGround = true;
-                if (fallDist > 3.5f && !inWater) {
-                    onLanded(fallDist);
-                }
-                fallDist = 0;
-            }
-            vel.y = 0;
-        } else {
-            if (vel.y < -0.01f) {
-                onGround = false;
-                fallDist += -vel.y * dt;
-            } else if (vel.y > 0.01f) {
-                onGround = false;
-                fallDist = 0;
-            }
-        }
-        if (inWater) {
-            fallDist = 0;
-        }
+        VoxelPhysics.integrate(this, dt, gravity, 0f);
     }
 
     protected void onLanded(float fall) {

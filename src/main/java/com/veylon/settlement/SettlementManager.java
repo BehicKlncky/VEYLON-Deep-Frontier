@@ -63,10 +63,18 @@ public class SettlementManager {
     public static final float TRESPASS_INTERVAL = 60f;
     /** Reopening the same community stores cannot apply a penalty every frame. */
     public static final float RESTRICTED_STORAGE_INTERVAL = 30f;
+    /** Crates have 12 slots; leave bounded headroom for composite UI transfers. */
+    public static final int MAX_THEFT_TRANSFERS_PER_EVENT = 16;
 
     private final Random rng = new Random();
     private float bountyPartyCooldown = 120f;
     private long partySequence;
+    private long generatedTheftEventId;
+    private long activeTheftEventId = Long.MIN_VALUE;
+    private Vec3i activeTheftCrate;
+    private final long[] activeTheftTransferIds = new long[MAX_THEFT_TRANSFERS_PER_EVENT];
+    private int activeTheftTransferCount;
+    private boolean activeTheftPenaltyApplied;
     /** Persistent group-level state for occupied-outpost counterattacks. */
     public final CounterattackDirector counterattacks = new CounterattackDirector();
 
@@ -90,6 +98,11 @@ public class SettlementManager {
     public void reset() {
         bountyPartyCooldown = 120f;
         partySequence = 0;
+        generatedTheftEventId = 0;
+        activeTheftEventId = Long.MIN_VALUE;
+        activeTheftCrate = null;
+        activeTheftTransferCount = 0;
+        activeTheftPenaltyApplied = false;
         counterattacks.reset();
     }
 
@@ -319,17 +332,69 @@ public class SettlementManager {
 
     /** Theft from settlement crates. */
     public void onCrateTheft(Game g, Vec3i cratePos, int count) {
-        onCrateTheft(g, cratePos, null, count);
+        long eventId = --generatedTheftEventId;
+        onCrateTheft(g, cratePos, null, count, eventId, eventId);
     }
 
     public void onCrateTheft(Game g, Vec3i cratePos, ItemType type, int count) {
+        long eventId = --generatedTheftEventId;
+        onCrateTheft(g, cratePos, type, count, eventId, eventId);
+    }
+
+    /**
+     * Compatibility overload for an event with at most one transfer per item type.
+     */
+    public void onCrateTheft(Game g, Vec3i cratePos, ItemType type, int count,
+                             long logicalEventId) {
+        onCrateTheft(g, cratePos, type, count, logicalEventId,
+                type == null ? 0 : type.ordinal() + 1L);
+    }
+
+    /**
+     * Applies one uniquely identified transfer within a logical theft event.
+     * Event state is a single fixed-size window: changing the event or crate
+     * clears it, duplicate transfer callbacks are ignored, distinct same-type
+     * stacks all update stock, and the crime penalty is applied only once.
+     */
+    public void onCrateTheft(Game g, Vec3i cratePos, ItemType type, int count,
+                             long logicalEventId, long transferId) {
+        if (g == null || cratePos == null || count <= 0) {
+            return;
+        }
+        if (activeTheftEventId != logicalEventId || !cratePos.equals(activeTheftCrate)) {
+            activeTheftEventId = logicalEventId;
+            activeTheftCrate = cratePos;
+            activeTheftTransferCount = 0;
+            activeTheftPenaltyApplied = false;
+        }
+        if (!rememberTheftTransfer(transferId)) {
+            return;
+        }
         Settlement s = g.world.settlementAt(cratePos.x(), cratePos.z());
-        if (s != null && !s.hostile() && !s.cleared && !s.occupied) {
+        if (s != null) {
+            // The physical inventory transfer always changes the matching
+            // settlement ledger, even when access makes the transfer lawful.
             removeSupplyStock(s, type, count);
+        }
+        if (s != null && !hasSettlementAccess(s) && !activeTheftPenaltyApplied) {
             addLocalReputation(g, s, -Math.min(15, 4 + count),
                     "They saw you stealing from their stores!");
             s.alertLevel = Math.min(100, s.alertLevel + 15);
+            activeTheftPenaltyApplied = true;
         }
+    }
+
+    private boolean rememberTheftTransfer(long transferId) {
+        for (int i = 0; i < activeTheftTransferCount; i++) {
+            if (activeTheftTransferIds[i] == transferId) {
+                return false;
+            }
+        }
+        if (activeTheftTransferCount >= activeTheftTransferIds.length) {
+            throw new IllegalStateException("logical theft event exceeds transfer limit");
+        }
+        activeTheftTransferIds[activeTheftTransferCount++] = transferId;
+        return true;
     }
 
     /** Opening a restricted store is an explicit crime separate from taking goods. */

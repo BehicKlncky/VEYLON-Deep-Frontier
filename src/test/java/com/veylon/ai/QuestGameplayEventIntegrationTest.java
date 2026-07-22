@@ -152,6 +152,10 @@ class QuestGameplayEventIntegrationTest {
             Set<Npc> reached = Collections.newSetFromMap(new IdentityHashMap<>());
             for (int tick = 0; tick < 5_000 && reached.size() < party.size(); tick++) {
                 context.game.entities.fastTick(context.game, 1f);
+                // Game's production frame loop expires perception noise after
+                // simulation ticks. Mirror that lifecycle here so melee noise
+                // cannot become an immortal distraction in this direct-AI test.
+                context.game.noise.update(1f);
                 for (Npc attacker : party) {
                     if (!attacker.dead && !reached.contains(attacker)
                             && attacker.partyMission == Npc.PartyMission.SEARCHING) {

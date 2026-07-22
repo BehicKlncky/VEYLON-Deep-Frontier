@@ -469,7 +469,7 @@ public class Renderer {
         entityShader.set("uEmissive", 0f);
 
         // Target block outline.
-        Raycaster.Hit hit = game.targetHit;
+        Raycaster.Result hit = game.targetHit;
         if (hit != null) {
             setEntityLight(game, hit.x() + 0.5f, hit.y() + 0.5f, hit.z() + 0.5f);
             entityShader.set("uTintMul", 1f, 1f, 1f);
@@ -539,7 +539,7 @@ public class Renderer {
     }
 
     /** One line draw over the struck face; scale/intensity communicate mining progress. */
-    private void renderMiningCracks(Raycaster.Hit hit, float progress) {
+    private void renderMiningCracks(Raycaster.Result hit, float progress) {
         float p = Math.min(1f, Math.max(0f, progress));
         model.identity().translate(
                 hit.x() + 0.5f + hit.nx() * 0.505f,

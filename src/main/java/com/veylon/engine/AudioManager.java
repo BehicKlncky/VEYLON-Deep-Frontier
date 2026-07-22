@@ -47,6 +47,9 @@ public class AudioManager {
     private int sRain, sWind, sFire, sCave, sCrickets, sBeacon;
     private final float[] ambTarget = new float[6];
     private final float[] ambCurrent = new float[6];
+    private final int[] ambSources = new int[6];
+    private static final float[] AMBIENCE_LEVELS = {0.65f, 0.5f, 0.55f, 0.4f, 0.3f, 0.35f};
+    private final float[] listenerOrientation = new float[6];
 
     private int[] pool;
     private int poolNext;
@@ -80,6 +83,12 @@ public class AudioManager {
             sCave = makeLoop(bCave);
             sCrickets = makeLoop(bCrickets);
             sBeacon = makeLoop(bBeacon);
+            ambSources[0] = sRain;
+            ambSources[1] = sWind;
+            ambSources[2] = sFire;
+            ambSources[3] = sCave;
+            ambSources[4] = sCrickets;
+            ambSources[5] = sBeacon;
             enabled = true;
             System.out.println("[audio] OpenAL initialized (" + pool.length + " voices).");
         } catch (Throwable t) {
@@ -110,8 +119,13 @@ public class AudioManager {
         alListener3f(AL_POSITION, x, y, z);
         float yaw = (float) Math.toRadians(yawDeg);
         float fx = (float) Math.sin(yaw), fz = -(float) Math.cos(yaw);
-        float[] ori = {fx, 0, fz, 0, 1, 0};
-        alListenerfv(AL_ORIENTATION, ori);
+        listenerOrientation[0] = fx;
+        listenerOrientation[1] = 0;
+        listenerOrientation[2] = fz;
+        listenerOrientation[3] = 0;
+        listenerOrientation[4] = 1;
+        listenerOrientation[5] = 0;
+        alListenerfv(AL_ORIENTATION, listenerOrientation);
     }
 
     /**
@@ -133,14 +147,12 @@ public class AudioManager {
         if (!enabled) {
             return;
         }
-        int[] sources = {sRain, sWind, sFire, sCave, sCrickets, sBeacon};
-        float[] level = {0.65f, 0.5f, 0.55f, 0.4f, 0.3f, 0.35f};
         for (int i = 0; i < 6; i++) {
             float cur = ambCurrent[i];
             float tgt = ambTarget[i];
             cur += (tgt - cur) * Math.min(1f, dt * 1.5f);
             if (Math.abs(cur - ambCurrent[i]) > 0.0005f || cur != tgt) {
-                alSourcef(sources[i], AL_GAIN, cur * level[i]);
+                alSourcef(ambSources[i], AL_GAIN, cur * AMBIENCE_LEVELS[i]);
             }
             ambCurrent[i] = cur;
         }

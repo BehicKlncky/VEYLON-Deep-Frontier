@@ -27,6 +27,11 @@ public class PlantSystem {
         lastAvgMoisture = 0.5f;
     }
 
+    /** Deterministic QA hook; normal gameplay retains organic growth sampling. */
+    public void setRandomSeed(long seed) {
+        rng.setSeed(seed);
+    }
+
     public void slowTick(Game g, float dt) {
         World world = g.world;
         int pcx = Math.floorDiv((int) g.player.pos.x, 16);

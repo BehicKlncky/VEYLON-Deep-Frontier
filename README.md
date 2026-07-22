@@ -62,9 +62,9 @@ Windows x64 (PowerShell):
 
 ```powershell
 .\gradlew.bat build             # compile + unit tests + jar
-.\gradlew.bat fatJar            # build\libs\veylon-0.3.0-all.jar
+.\gradlew.bat fatJar            # build\libs\veylon-0.3.1-all.jar
 .\gradlew.bat jpackage          # build\jpackage\Veylon\Veylon.exe
-.\gradlew.bat appImageZip       # build\distributions\veylon-0.3.0-windows-x64.zip
+.\gradlew.bat appImageZip       # build\distributions\veylon-0.3.1-windows-x64.zip
 .\gradlew.bat releaseArtifacts  # tests + all host-specific release artifacts
 ```
 
@@ -74,7 +74,7 @@ macOS Intel or Apple Silicon (Terminal):
 ./gradlew build
 ./gradlew fatJar
 ./gradlew jpackage          # build/jpackage/Veylon.app
-./gradlew appImageZip       # build/distributions/veylon-0.3.0-macos-{x64|arm64}.zip
+./gradlew appImageZip       # build/distributions/veylon-0.3.1-macos-{x64|arm64}.zip
 ./gradlew releaseArtifacts
 ```
 
@@ -109,7 +109,7 @@ See [CHANGELOG.md](CHANGELOG.md) for release notes.
 Run the fat JAR with the same JVM options used by the packaged launchers:
 
 ```powershell
-java --enable-native-access=ALL-UNNAMED -Xmx2G -jar build\libs\veylon-0.3.0-all.jar
+java --enable-native-access=ALL-UNNAMED -Xmx2G -jar build\libs\veylon-0.3.1-all.jar
 ```
 
 ---
@@ -258,7 +258,7 @@ java --enable-native-access=ALL-UNNAMED -Xmx2G -jar build\libs\veylon-0.3.0-all.
 
 ```
 com.veylon
-  Game / Main                 - loop, input, player actions, tick wiring
+  Game / Main                 - loop, high-level orchestration and tick wiring
   engine/                     - Window, Input, Camera, ShaderProgram, Mesh, Renderer,
                                 UiRenderer, AudioManager (OpenAL, synthesized),
                                 ParticleSystem
@@ -278,7 +278,10 @@ com.veylon
   simulation/                 - SimulationScheduler, Time, Weather, Temperature, Water,
                                 Fire, Plant, Event, Season, Shelter, ItemCondition
   entity/                     - Entity, Player, Creature, Npc, EntityManager,
-                                Affliction, Carcass, Track
+                                PlayerMovementSystem, PlayerTreatmentSystem,
+                                VoxelPhysics, Affliction, Carcass, Track
+  input/                      - PlayerInteractionSystem (gameplay command routing;
+                                engine.Input remains the raw GLFW abstraction)
   ai/                         - CreatureAI (perception/tracking), NpcAI (camp jobs +
                                 dispatch), SettledNpcAI (daily life/perception/combat),
                                 Pathfinder (bounded voxel A*), FactionSystem, Quest,
@@ -295,7 +298,9 @@ com.veylon
 Performance design: rendering/input per frame; movement, needs and entity AI at 20 Hz;
 weather/fire/water/temperature/shelter at 2 Hz; plants/events/faction/spawning/spoilage
 every 10 s. Chunk meshes rebuild on a per-frame budget; far meshes are released.
-Particles are CPU-simulated (cap 4000) and drawn as lit cubes.
+Particles are CPU-simulated (cap 4000) and drawn as lit cubes. Hot targeting uses
+caller-owned DDA results; movement/interaction command buffers and projectile storage
+are bounded and reused.
 
 ## Save format
 

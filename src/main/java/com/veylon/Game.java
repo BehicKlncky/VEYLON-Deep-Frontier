@@ -1,6 +1,7 @@
 package com.veylon;
 
 import com.veylon.ai.FactionSystem;
+import com.veylon.combat.WeaponDefinition;
 import com.veylon.engine.AudioManager;
 import com.veylon.engine.Camera;
 import com.veylon.engine.Input;
@@ -15,6 +16,8 @@ import com.veylon.entity.Entity;
 import com.veylon.entity.EntityManager;
 import com.veylon.entity.Npc;
 import com.veylon.entity.Player;
+import com.veylon.entity.PlayerMovementSystem;
+import com.veylon.entity.PlayerTreatmentSystem;
 import com.veylon.entity.Track;
 import com.veylon.item.EquipSlot;
 import com.veylon.item.Inventory;
@@ -22,6 +25,7 @@ import com.veylon.item.ItemStack;
 import com.veylon.item.ItemType;
 import com.veylon.item.Station;
 import com.veylon.item.ToolKind;
+import com.veylon.input.PlayerInteractionSystem;
 import com.veylon.gfx.FrameProfiler;
 import com.veylon.gfx.GraphicsSettings;
 import com.veylon.qa.RuntimeBudgetSnapshot;
@@ -108,6 +112,14 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
     public final UiRenderer ui = new UiRenderer();
     public final AudioManager audio = new AudioManager();
     public final ParticleSystem particles = new ParticleSystem();
+    private final PlayerMovementSystem playerMovement = new PlayerMovementSystem();
+    private final PlayerMovementSystem.Command movementCommand = new PlayerMovementSystem.Command();
+    private final PlayerMovementSystem.FrameResult movementResult =
+            new PlayerMovementSystem.FrameResult();
+    private final PlayerInteractionSystem playerInteractions = new PlayerInteractionSystem();
+    private final PlayerInteractionSystem.FrameInput interactionInput =
+            new PlayerInteractionSystem.FrameInput();
+    private final PlayerTreatmentSystem playerTreatments = new PlayerTreatmentSystem();
 
     // World & simulation.
     public World world;
@@ -153,7 +165,9 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
     public boolean pendingScreenshot;
 
     // Per-frame state.
-    public Raycaster.Hit targetHit;
+    public Raycaster.Result targetHit;
+    private final Raycaster.MutableHit targetHitBuffer = new Raycaster.MutableHit();
+    private final Raycaster.MutableHit fluidHitBuffer = new Raycaster.MutableHit();
     public float miningProgress;
     private Vec3i miningTarget;
     public String interactPrompt;
@@ -240,6 +254,54 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
     public Inventory openCrate;
     public Vec3i openCratePos;
     public Npc activeNpc;
+    private long nextTheftEventId = 1;
+    private long activeTheftEventId = Long.MIN_VALUE;
+    private Vec3i activeTheftEventCrate;
+    private final long[] activeTheftTransferIds = new long[
+            com.veylon.settlement.SettlementManager.MAX_THEFT_TRANSFERS_PER_EVENT];
+    private int activeTheftTransferCount;
+
+    private final PlayerInteractionSystem.Commands interactionCommands =
+            new PlayerInteractionSystem.Commands() {
+                @Override
+                public void updateRanged(float dt, ItemStack held, WeaponDefinition weapon,
+                                         Vector3f direction,
+                                         PlayerInteractionSystem.FrameInput frameInput) {
+                    updateRangedWeapon(dt, held, weapon, direction, frameInput);
+                }
+
+                @Override
+                public void advanceNonRangedCooldown(float dt) {
+                    advanceRangedCooldown(dt);
+                }
+
+                @Override
+                public void cancelRangedState() {
+                    Game.this.cancelRangedState();
+                }
+
+                @Override
+                public void updatePrimary(float dt, Vector3f direction,
+                                          boolean primaryPressed) {
+                    updatePrimaryAction(dt, direction, primaryPressed);
+                }
+
+                @Override
+                public void resetPrimary() {
+                    miningProgress = 0;
+                    miningTarget = null;
+                }
+
+                @Override
+                public void useSecondary() {
+                    rightClick();
+                }
+
+                @Override
+                public void interact() {
+                    Game.this.interact();
+                }
+            };
 
     private final Vector3f spawnPos = new Vector3f();
 
@@ -1681,6 +1743,10 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
         bowDraw = 0;
         rangedCooldown = 0;
         selectedBowAmmo = ItemType.ARROW;
+        nextTheftEventId = 1;
+        activeTheftEventId = Long.MIN_VALUE;
+        activeTheftEventCrate = null;
+        activeTheftTransferCount = 0;
         cancelReload();
 
         // Synchronous initial generation around spawn.
@@ -1884,7 +1950,8 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
             // prove dust + impact feedback + crack progression, not a static prop.
             miningShowcaseElapsed += dt;
             miningShowcaseDustTimer -= dt;
-            targetHit = Raycaster.cast(world, camera.position, camera.front(), 7.0, false);
+            targetHit = Raycaster.castInto(world, camera.position, camera.front(), 7.0,
+                    false, targetHitBuffer) ? targetHitBuffer : null;
             miningProgress = targetHit == null ? 0f
                     : Math.min(0.95f, miningShowcaseElapsed * 0.19f);
             if (targetHit != null && miningShowcaseDustTimer <= 0f) {
@@ -2371,72 +2438,22 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
 
     private void updateMovement(float dt) {
         Player p = player;
-        p.crouching = input.isKeyDown(GLFW_KEY_LEFT_CONTROL);
         boolean fwd = input.isKeyDown(GLFW_KEY_W);
         boolean back = input.isKeyDown(GLFW_KEY_S);
         boolean left = input.isKeyDown(GLFW_KEY_A);
         boolean right = input.isKeyDown(GLFW_KEY_D);
-        boolean wantSprint = input.isKeyDown(GLFW_KEY_LEFT_SHIFT) && fwd && !p.crouching;
-        p.sprinting = wantSprint && p.canSprint();
-
-        float speed = (p.crouching ? 2.1f : (p.sprinting ? 6.7f : 4.3f)) * p.moveSpeedMul();
-        float yawRad = (float) Math.toRadians(camera.yaw);
-        float fx = (float) Math.sin(yawRad), fz = -(float) Math.cos(yawRad);
-        float rx = (float) Math.cos(yawRad), rz = (float) Math.sin(yawRad);
-
-        float mx = 0, mz = 0;
-        if (fwd) {
-            mx += fx;
-            mz += fz;
-        }
-        if (back) {
-            mx -= fx;
-            mz -= fz;
-        }
-        if (right) {
-            mx += rx;
-            mz += rz;
-        }
-        if (left) {
-            mx -= rx;
-            mz -= rz;
-        }
-        float len = (float) Math.sqrt(mx * mx + mz * mz);
-        if (len > 0.01f) {
-            p.vel.x = mx / len * speed;
-            p.vel.z = mz / len * speed;
-        } else {
-            p.vel.x = 0;
-            p.vel.z = 0;
-        }
-
-        if (p.sprinting) {
-            p.stamina = Math.max(0, p.stamina - 9f * dt);
-            p.noise = Math.min(1f, p.noise + 0.8f * dt);
-        }
-
-        if (input.isKeyDown(GLFW_KEY_SPACE)) {
-            if (p.inWater) {
-                p.vel.y = Math.max(p.vel.y, 3.0f);
-            } else if (!applyPlayerClimbCommand(true, fwd)
-                    && p.onGround && p.stamina >= 3 && input.wasKeyPressed(GLFW_KEY_SPACE)) {
-                p.vel.y = p.has(Affliction.SPRAIN) ? 6.2f : 8.2f;
-                p.stamina -= 3;
-                p.onGround = false;
-            }
-        } else {
-            applyPlayerClimbCommand(false, fwd);
-        }
-
-        boolean wasInWater = p.inWater;
-        p.applyPhysics(dt, true);
-        if (!wasInWater && p.inWater) {
+        movementCommand.set(camera.yaw, fwd, back, left, right,
+                input.isKeyDown(GLFW_KEY_LEFT_SHIFT),
+                input.isKeyDown(GLFW_KEY_LEFT_CONTROL),
+                input.isKeyDown(GLFW_KEY_SPACE), input.wasKeyPressed(GLFW_KEY_SPACE));
+        playerMovement.update(p, world, movementCommand, dt, movementResult);
+        if (movementResult.enteredWater) {
             particles.splash(p.pos.x, p.pos.y + 0.4f, p.pos.z);
             audio.playFootstep(BlockType.WATER, true);
         }
 
         // Footsteps with material sounds and view bob.
-        boolean moving = len > 0.01f && p.onGround;
+        boolean moving = movementResult.horizontalIntent && p.onGround;
         if (moving) {
             walkBob += dt * (p.sprinting ? 1.6f : 1f);
             footstepTimer -= dt;
@@ -2456,19 +2473,7 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
      * not need to manufacture GLFW key state.
      */
     public boolean applyPlayerClimbCommand(boolean ascendHeld, boolean forwardHeld) {
-        if (player == null || !player.onLadder) {
-            return false;
-        }
-        if (ascendHeld) {
-            player.vel.y = 2.6f;
-            return true;
-        }
-        if (forwardHeld && player.horizontalCollision) {
-            // Walking into a ladder mounted against a wall climbs it.
-            player.vel.y = 2.2f;
-            return true;
-        }
-        return false;
+        return playerMovement.applyClimbCommand(player, ascendHeld, forwardHeld);
     }
 
     /**
@@ -2496,58 +2501,37 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
         tickReload(dt);
         Vector3f origin = camera.position;
         Vector3f dir = camera.front();
-        targetHit = Raycaster.cast(world, origin, dir, 5.2, false);
+        targetHit = Raycaster.castInto(world, origin, dir, 5.2, false, targetHitBuffer)
+                ? targetHitBuffer : null;
 
         updatePrompt();
-
-        // Ranged and thrown weapons take over the primary attack.
         ItemStack heldItem = player.selected();
-        com.veylon.combat.WeaponDefinition weapon =
+        WeaponDefinition weapon =
                 com.veylon.combat.WeaponRegistry.of(heldItem == null ? null : heldItem.type);
-        if (weapon != null) {
-            updateRangedWeapon(dt, heldItem, weapon, dir);
-            // Right mouse still handles use/place/eat below.
-            if (input.wasMousePressed(GLFW_MOUSE_BUTTON_RIGHT)) {
-                rightClick();
-            }
-            if (input.wasKeyPressed(GLFW_KEY_F)) {
-                interact();
-            }
-            return;
-        }
-        advanceRangedCooldown(dt);
-        cancelRangedState();
+        interactionInput.set(dt,
+                input.isMouseDown(GLFW_MOUSE_BUTTON_LEFT),
+                input.wasMousePressed(GLFW_MOUSE_BUTTON_LEFT),
+                input.wasMousePressed(GLFW_MOUSE_BUTTON_RIGHT),
+                input.wasKeyPressed(GLFW_KEY_F), input.wasKeyPressed(GLFW_KEY_R));
+        playerInteractions.update(interactionInput, heldItem, weapon, dir, interactionCommands);
+    }
 
-        // Left mouse: attack entity in reach, otherwise mine.
-        if (input.isMouseDown(GLFW_MOUSE_BUTTON_LEFT)) {
-            Entity victim = findAttackTarget(dir);
-            if (victim != null) {
-                miningProgress = 0;
-                miningTarget = null;
-                performPlayerAttack(victim);
-            } else if (targetHit != null) {
-                mine(dt);
-            } else {
-                if (input.wasMousePressed(GLFW_MOUSE_BUTTON_LEFT)) {
-                    swingTimer = 0.35f;
-                    audio.playSwing();
-                }
-                miningProgress = 0;
-                miningTarget = null;
-            }
-        } else {
+    /** Non-ranged primary action: entity attack has precedence over block mining. */
+    private void updatePrimaryAction(float dt, Vector3f dir, boolean primaryPressed) {
+        Entity victim = findAttackTarget(dir);
+        if (victim != null) {
             miningProgress = 0;
             miningTarget = null;
-        }
-
-        // Right mouse: use block / eat / place / equip / treat.
-        if (input.wasMousePressed(GLFW_MOUSE_BUTTON_RIGHT)) {
-            rightClick();
-        }
-
-        // F: interact.
-        if (input.wasKeyPressed(GLFW_KEY_F)) {
-            interact();
+            performPlayerAttack(victim);
+        } else if (targetHit != null) {
+            mine(dt);
+        } else {
+            if (primaryPressed) {
+                swingTimer = 0.35f;
+                audio.playSwing();
+            }
+            miningProgress = 0;
+            miningTarget = null;
         }
     }
 
@@ -2555,28 +2539,25 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
     // Ranged weapons (bow / firearms / thrown)
     // ------------------------------------------------------------------
 
-    private void updateRangedWeapon(float dt, ItemStack held,
-                                    com.veylon.combat.WeaponDefinition weapon, Vector3f dir) {
+    private void updateRangedWeapon(float dt, ItemStack held, WeaponDefinition weapon,
+                                    Vector3f dir,
+                                    PlayerInteractionSystem.FrameInput frameInput) {
         miningProgress = 0;
         miningTarget = null;
 
         switch (weapon.category) {
             case BOW -> {
-                if (input.wasKeyPressed(GLFW_KEY_R)) {
+                if (frameInput.reloadPressed) {
                     cycleBowAmmo();
                 }
-                updateBowCommand(dt, input.isMouseDown(GLFW_MOUSE_BUTTON_LEFT),
-                        input.wasMousePressed(GLFW_MOUSE_BUTTON_LEFT), dir);
+                updateBowCommand(dt, frameInput.primaryHeld, frameInput.primaryPressed, dir);
             }
             case FIREARM -> {
-                updateFirearmCommand(dt,
-                        input.isMouseDown(GLFW_MOUSE_BUTTON_LEFT),
-                        input.wasMousePressed(GLFW_MOUSE_BUTTON_LEFT),
-                        input.wasKeyPressed(GLFW_KEY_R), dir);
+                updateFirearmCommand(dt, frameInput.primaryHeld, frameInput.primaryPressed,
+                        frameInput.reloadPressed, dir);
             }
             case THROWN -> {
-                updateThrownWeaponCommand(dt,
-                        input.wasMousePressed(GLFW_MOUSE_BUTTON_LEFT), dir);
+                updateThrownWeaponCommand(dt, frameInput.primaryPressed, dir);
             }
         }
     }
@@ -3045,14 +3026,20 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
             return;
         }
         if (targetHit != null) {
-            Vec3i pos = new Vec3i(targetHit.x(), targetHit.y(), targetHit.z());
+            int targetX = targetHit.x();
+            int targetY = targetHit.y();
+            int targetZ = targetHit.z();
             switch (targetHit.type()) {
                 case BERRY_BUSH -> interactPrompt = "[F] Harvest berries";
                 case HERB_PLANT -> interactPrompt = "[F] Gather herbs";
-                case CAMPFIRE -> interactPrompt = "[F] Cook meat / boil water / add fuel ("
-                        + (int) (float) world.campfireFuel.getOrDefault(pos, 0f) + "s fuel)";
+                case CAMPFIRE -> {
+                    Vec3i position = new Vec3i(targetX, targetY, targetZ);
+                    interactPrompt = "[F] Cook meat / boil water / add fuel ("
+                            + (int) (float) world.campfireFuel.getOrDefault(position, 0f)
+                            + "s fuel)";
+                }
                 case CRATE -> {
-                    var stores = world.settlementAt(pos.x(), pos.z());
+                    var stores = world.settlementAt(targetX, targetZ);
                     interactPrompt = stores != null && !stores.cleared && !stores.occupied
                             ? "[F] Open " + (stores.hostile() ? "enemy" : "restricted")
                             + " stores (taking supplies has consequences)"
@@ -3064,16 +3051,19 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
                 case TANNERY -> interactPrompt = "[F] Use tannery (crafting)";
                 case HERB_STATION -> interactPrompt = "[F] Use herbalist bench (crafting)";
                 case MAP_TABLE -> interactPrompt = "[F] Use map table (decode blueprints)";
-                case DRYING_RACK -> interactPrompt = rackPrompt(pos);
+                case DRYING_RACK -> interactPrompt = rackPrompt(
+                        new Vec3i(targetX, targetY, targetZ));
                 case RAIN_COLLECTOR -> {
-                    float liters = world.collectorWater.getOrDefault(pos, 0f);
+                    float liters = world.collectorWater.getOrDefault(
+                            new Vec3i(targetX, targetY, targetZ), 0f);
                     interactPrompt = "[F] Rain collector: " + String.format("%.1f", liters)
                             + "/3.0 L" + (liters >= 1f ? " (fill waterskin)" : "");
                 }
-                case LANTERN -> interactPrompt = lanternPrompt(pos);
+                case LANTERN -> interactPrompt = lanternPrompt(
+                        new Vec3i(targetX, targetY, targetZ));
                 case BEDROLL -> interactPrompt = "[F] Sleep (bedroll)";
                 case CAMP_BED -> {
-                    var beds = world.settlementAt(pos.x(), pos.z());
+                    var beds = world.settlementAt(targetX, targetZ);
                     if (beds != null) {
                         interactPrompt = beds.friendly() || beds.cleared
                                 ? "[F] Sleep safely (settlement bed)"
@@ -3088,13 +3078,13 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
                 case BEACON -> interactPrompt = beaconPrompt();
                 case BEACON_LIT -> interactPrompt = "[F] Beacon transmitting... rescue inbound";
                 case POWDER_KEG -> {
-                    Float fuse = world.kegFuses.get(pos);
+                    Float fuse = world.kegFuses.get(new Vec3i(targetX, targetY, targetZ));
                     interactPrompt = fuse != null
                             ? "FUSE BURNING — " + String.format("%.1f", fuse) + "s. RUN!"
                             : "[F] Light the fuse (5s) — stand well clear";
                 }
                 case GATE -> {
-                    var gs = world.settlementAt(pos.x(), pos.z());
+                    var gs = world.settlementAt(targetX, targetZ);
                     boolean barred = gs != null && gs.hostile();
                     interactPrompt = barred
                             ? "Barred from the inside. A powder keg could breach it."
@@ -3102,7 +3092,7 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
                 }
                 case GATE_OPEN -> interactPrompt = "Gate (closes on its own)";
                 case ALARM_BELL -> {
-                    var bs = world.settlementAt(pos.x(), pos.z());
+                    var bs = world.settlementAt(targetX, targetZ);
                     interactPrompt = bs != null && bs.hostile()
                             ? "Alarm bell — destroy it to silence the garrison"
                             : "[F] Ring the alarm";
@@ -3113,7 +3103,7 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
             }
             // Outpost claim prompt overrides the campfire line.
             if (targetHit.type() == BlockType.CAMPFIRE) {
-                var cs = world.settlementAt(pos.x(), pos.z());
+                var cs = world.settlementAt(targetX, targetZ);
                 if (cs != null && cs.hostile()
                         && com.veylon.settlement.HumanFaction.FREE_SETTLERS.equals(cs.founderFaction)) {
                     interactPrompt = "[F] Offer restitution (6 food, 2 medicine)";
@@ -3141,7 +3131,8 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
                 return;
             }
         }
-        Raycaster.Hit fluid = Raycaster.cast(world, camera.position, camera.front(), 4.0, true);
+        Raycaster.Result fluid = Raycaster.castInto(world, camera.position, camera.front(),
+                4.0, true, fluidHitBuffer) ? fluidHitBuffer : null;
         if (fluid != null && fluid.type() == BlockType.WATER) {
             interactPrompt = player.inventory.count(ItemType.WATERSKIN_EMPTY) > 0
                     ? "[F] Fill waterskin (untreated water)"
@@ -3531,72 +3522,12 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
     }
 
     private void applyMedical(ItemStack held) {
-        Player p = player;
-        boolean used = false;
-        switch (held.type) {
-            case BANDAGE -> {
-                if (p.has(Affliction.BLEEDING)) {
-                    p.cure(Affliction.BLEEDING);
-                    p.woundClean = true;
-                    p.health = Math.min(p.maxHealth, p.health + 3);
-                    log("You bandage the wound. Bleeding stopped.");
-                    used = true;
-                } else {
-                    log("No bleeding to bandage.");
-                }
-            }
-            case SPLINT -> {
-                if (p.has(Affliction.SPRAIN)) {
-                    p.cure(Affliction.SPRAIN);
-                    log("You splint your leg. You can move normally again.");
-                    used = true;
-                } else {
-                    log("Nothing needs splinting.");
-                }
-            }
-            case ANTISEPTIC -> {
-                if (p.has(Affliction.INFECTION)) {
-                    p.cure(Affliction.INFECTION);
-                    log("The antiseptic burns away the infection.");
-                    used = true;
-                } else if (p.has(Affliction.BLEEDING)) {
-                    p.woundClean = true;
-                    log("You disinfect the wound - it won't fester now. Still needs a bandage.");
-                    used = true;
-                } else {
-                    log("No wound to disinfect.");
-                }
-            }
-            case HERBAL_POULTICE -> {
-                if (p.has(Affliction.BURN)) {
-                    p.cure(Affliction.BURN);
-                    log("The poultice soothes your burns.");
-                    used = true;
-                } else if (p.has(Affliction.INFECTION)) {
-                    p.afflictions.computeIfPresent(Affliction.INFECTION, (a, v) -> v * 0.4f);
-                    log("The poultice draws out some of the infection.");
-                    used = true;
-                } else {
-                    log("No burns or infection to treat.");
-                }
-            }
-            case MEDICINE -> {
-                if (p.has(Affliction.FOOD_POISONING) || p.has(Affliction.SICKNESS)
-                        || p.has(Affliction.INFECTION)) {
-                    p.cure(Affliction.FOOD_POISONING);
-                    p.cure(Affliction.SICKNESS);
-                    p.cure(Affliction.INFECTION);
-                    log("The medicine works fast. You feel much better.");
-                    used = true;
-                } else {
-                    log("You aren't sick enough to need medicine.");
-                }
-            }
-            default -> {
-            }
+        PlayerTreatmentSystem.Result result = playerTreatments.apply(player, held);
+        if (result != PlayerTreatmentSystem.Result.INVALID) {
+            log(result.message());
         }
-        if (used) {
-            p.inventory.shrink(p.hotbarSel, 1);
+        if (result.used()) {
+            player.inventory.shrink(player.hotbarSel, 1);
             audio.playEquip();
         }
     }
@@ -3835,7 +3766,8 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
             }
         }
         // Drink from / fill at water.
-        Raycaster.Hit fluid = Raycaster.cast(world, camera.position, camera.front(), 4.0, true);
+        Raycaster.Result fluid = Raycaster.castInto(world, camera.position, camera.front(),
+                4.0, true, fluidHitBuffer) ? fluidHitBuffer : null;
         if (fluid != null && fluid.type() == BlockType.WATER) {
             if (player.inventory.count(ItemType.WATERSKIN_EMPTY) > 0) {
                 player.inventory.remove(ItemType.WATERSKIN_EMPTY, 1);
@@ -4098,21 +4030,75 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
 
     /** Called by the crate UI; taking from camp crates is stealing unless trusted. */
     public void onCrateItemTaken(ItemType type, int count) {
-        if (openCratePos != null && world.campPos != null && faction.trust < 75
+        long eventId = nextLogicalTheftEventId();
+        onCrateItemTaken(type, count, eventId, eventId);
+    }
+
+    /**
+     * Compatibility overload for a logical event with at most one transfer per
+     * item type. Callers batching multiple same-type stacks must supply distinct
+     * transfer ids through the four-argument overload.
+     */
+    public void onCrateItemTaken(ItemType type, int count, long logicalEventId) {
+        onCrateItemTaken(type, count, logicalEventId, type == null ? 0 : type.ordinal() + 1L);
+    }
+
+    /**
+     * Attributes a callback to one logical crime event and one physical transfer.
+     * Repeated delivery of the same transfer id is idempotent, while different
+     * transfer ids update every stack even when their item types are identical.
+     * The fixed window is cleared by the next event/crate.
+     */
+    public void onCrateItemTaken(ItemType type, int count, long logicalEventId,
+                                 long transferId) {
+        if (openCratePos == null || type == null || count <= 0) {
+            return;
+        }
+        boolean newEvent = activeTheftEventId != logicalEventId
+                || !openCratePos.equals(activeTheftEventCrate);
+        if (newEvent) {
+            activeTheftEventId = logicalEventId;
+            activeTheftEventCrate = openCratePos;
+            activeTheftTransferCount = 0;
+        }
+        if (!rememberTheftTransfer(transferId)) {
+            return;
+        }
+        if (newEvent && world.campPos != null && faction.trust < 75
                 && openCratePos.distSq(world.campPos.x(), world.campPos.y(), world.campPos.z()) < 9 * 9) {
             faction.addTrust(this, -Math.min(12, 3 + count), "The camp caught you stealing!");
         }
         // Settlement crates: theft angers the locals.
-        if (openCratePos != null) {
-            settlementManager.onCrateTheft(this, openCratePos, type, count);
-            var settlement = world.settlementAt(openCratePos.x(), openCratePos.z());
-            if (settlement != null && settlement.hostile()) {
-                faction.onStolenSuppliesRecovered(this, settlement,
-                        com.veylon.ai.FactionSystem.settlementStorageId(
-                                settlement.id, openCratePos),
-                        type, count);
+        settlementManager.onCrateTheft(
+                this, openCratePos, type, count, logicalEventId, transferId);
+        var settlement = world.settlementAt(openCratePos.x(), openCratePos.z());
+        if (settlement != null && settlement.hostile()) {
+            faction.onStolenSuppliesRecovered(this, settlement,
+                    com.veylon.ai.FactionSystem.settlementStorageId(
+                            settlement.id, openCratePos),
+                    type, count);
+        }
+    }
+
+    private boolean rememberTheftTransfer(long transferId) {
+        for (int i = 0; i < activeTheftTransferCount; i++) {
+            if (activeTheftTransferIds[i] == transferId) {
+                return false;
             }
         }
+        if (activeTheftTransferCount >= activeTheftTransferIds.length) {
+            throw new IllegalStateException("logical theft event exceeds transfer limit");
+        }
+        activeTheftTransferIds[activeTheftTransferCount++] = transferId;
+        return true;
+    }
+
+    private long nextLogicalTheftEventId() {
+        long id = nextTheftEventId++;
+        if (nextTheftEventId <= 0) {
+            nextTheftEventId = 1;
+        }
+        return id;
     }
 
     /** Real crate-UI transfer command used by mouse input and integration tests. */
@@ -4131,7 +4117,8 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
         openCrate.set(slot, leftover > 0 ? stack : null);
         if (taken > 0) {
             audio.playClick();
-            onCrateItemTaken(type, taken);
+            long eventId = nextLogicalTheftEventId();
+            onCrateItemTaken(type, taken, eventId, eventId);
         }
         return taken;
     }
