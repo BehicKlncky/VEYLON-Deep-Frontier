@@ -256,6 +256,12 @@ java --enable-native-access=ALL-UNNAMED -Xmx2G -jar build\libs\veylon-0.3.1-all.
 
 ## Architecture
 
+> Contributing? [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) covers the
+> initialization and per-frame flow, tick-bucket invariants, save/load data flow
+> and the thread model. [`docs/DEVELOPING.md`](docs/DEVELOPING.md) covers how to
+> add blocks, items, creatures, biomes and settlements, plus the pitfalls that
+> bite newcomers.
+
 ```
 com.veylon
   Game / Main                 - loop, high-level orchestration and tick wiring
