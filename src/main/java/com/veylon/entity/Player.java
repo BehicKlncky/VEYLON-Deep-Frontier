@@ -4,6 +4,7 @@ import com.veylon.Game;
 import com.veylon.item.EquipSlot;
 import com.veylon.item.Inventory;
 import com.veylon.item.ItemStack;
+import com.veylon.item.ItemType;
 import com.veylon.simulation.ShelterSystem;
 import com.veylon.util.MathUtil;
 import com.veylon.world.Biome;
@@ -14,23 +15,25 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
+import static com.veylon.entity.PlayerConstants.*;
+
 /** The player: physics body plus the full survival-needs simulation. */
 public class Player extends Entity {
 
-    public final Inventory inventory = new Inventory(36);
+    public final Inventory inventory = new Inventory(INVENTORY_SLOTS);
     /** Worn gear, indexed by {@link EquipSlot#ordinal()}. */
     public final ItemStack[] equipment = new ItemStack[EquipSlot.values().length];
     public int hotbarSel;
 
-    public float hunger = 100;
-    public float thirst = 100;
-    public float stamina = 100;
-    public float bodyTemp = 37f;
+    public float hunger = MAX_NEED;
+    public float thirst = MAX_NEED;
+    public float stamina = MAX_NEED;
+    public float bodyTemp = NORMAL_BODY_TEMP;
     public float fatigue = 0;
     public float wetness = 0;
     /** Nutrition balance 0..100: animal protein and plant vitamins. */
-    public float protein = 70;
-    public float vitamins = 70;
+    public float protein = STARTING_NUTRITION;
+    public float vitamins = STARTING_NUTRITION;
 
     /** Active medical conditions -> remaining seconds. */
     public final Map<Affliction, Float> afflictions = new EnumMap<>(Affliction.class);
@@ -40,7 +43,7 @@ public class Player extends Entity {
     public boolean sprinting;
     public boolean crouching;
     /** Cached environment readings, updated each fast tick. */
-    public float envTemp = 15f;
+    public float envTemp = STARTING_ENV_TEMP;
     public Biome biome = Biome.MEADOW;
     public boolean exposedToSky = true;
     /** Cached shelter evaluation (refreshed on the medium tick). */
@@ -61,14 +64,14 @@ public class Player extends Entity {
 
     public Player(World world) {
         super(world);
-        width = 0.6f;
-        height = 1.8f;
-        maxHealth = 100;
-        health = 100;
+        width = BODY_WIDTH;
+        height = BODY_HEIGHT;
+        maxHealth = MAX_HEALTH;
+        health = MAX_HEALTH;
     }
 
     public float eyeHeight() {
-        return crouching ? 1.32f : 1.62f;
+        return crouching ? EYE_HEIGHT_CROUCHED : EYE_HEIGHT_STANDING;
     }
 
     public ItemStack selected() {
@@ -100,7 +103,7 @@ public class Player extends Entity {
                 sum += s.type.wetResist;
             }
         }
-        return Math.min(0.9f, sum);
+        return Math.min(MAX_WET_RESISTANCE, sum);
     }
 
     public float armor() {
@@ -114,7 +117,7 @@ public class Player extends Entity {
     }
 
     public float carryCapacity() {
-        float cap = 28f;
+        float cap = BASE_CARRY_CAPACITY;
         for (ItemStack s : equipment) {
             if (s != null) {
                 cap += s.type.carryBonus;
@@ -127,7 +130,7 @@ public class Player extends Entity {
         float w = inventory.totalWeight();
         for (ItemStack s : equipment) {
             if (s != null) {
-                w += s.type.weight * 0.5f; // worn gear counts half
+                w += s.type.weight * WORN_GEAR_WEIGHT_FRACTION;
             }
         }
         return w;
@@ -143,21 +146,22 @@ public class Player extends Entity {
         float mul = 1f;
         float enc = encumbrance();
         if (enc > 1f) {
-            mul *= 0.62f;
-        } else if (enc > 0.8f) {
-            mul *= 0.85f;
+            mul *= OVERLOADED_SPEED_MULT;
+        } else if (enc > HEAVY_LOAD_ENCUMBRANCE) {
+            mul *= HEAVY_LOAD_SPEED_MULT;
         }
         if (has(Affliction.SPRAIN)) {
-            mul *= 0.6f;
+            mul *= SPRAIN_SPEED_MULT;
         }
-        if (fatigue > 90) {
-            mul *= 0.85f;
+        if (fatigue > EXHAUSTED_FATIGUE) {
+            mul *= EXHAUSTED_SPEED_MULT;
         }
         return mul;
     }
 
     public boolean canSprint() {
-        return stamina > 1 && hunger > 5 && !has(Affliction.SPRAIN) && encumbrance() <= 1f;
+        return stamina > SPRINT_MIN_STAMINA && hunger > SPRINT_MIN_HUNGER
+                && !has(Affliction.SPRAIN) && encumbrance() <= 1f;
     }
 
     // ------------------------------------------------------------------
@@ -178,30 +182,31 @@ public class Player extends Entity {
 
     /** Damage with armor applied; wears down worn gear. */
     public void hurtPhysical(Game g, float dmg, boolean canBleed) {
-        float reduced = Math.max(dmg * 0.25f, dmg - armor());
+        float reduced = Math.max(dmg * MIN_DAMAGE_FRACTION, dmg - armor());
         hurt(reduced, false);
         damageFlash = 1f;
         for (ItemStack s : equipment) {
             if (s != null && s.type.armor > 0 && s.type.hasDurability()) {
-                s.durability -= 1.5f;
+                s.durability -= ARMOR_DURABILITY_PER_HIT;
                 if (s.durability <= 0) {
                     g.log("Your " + s.type.displayName + " is destroyed!");
                     equipment[s.type.equipSlot.ordinal()] = null;
                 }
             }
         }
-        if (canBleed && Math.random() < 0.35) {
+        if (canBleed && Math.random() < BLEED_CHANCE) {
             if (!has(Affliction.BLEEDING)) {
                 g.log("You are BLEEDING! Bandage the wound before it festers.");
             }
-            addAffliction(Affliction.BLEEDING, 45 + (float) Math.random() * 30);
+            addAffliction(Affliction.BLEEDING,
+                    BLEEDING_DURATION_MIN + (float) Math.random() * BLEEDING_DURATION_RANGE);
             woundClean = false;
         }
     }
 
     @Override
     protected void onLanded(float fall) {
-        pendingFallDamage = (fall - 3.5f) * 4.5f;
+        pendingFallDamage = (fall - FALL_SAFE_DISTANCE) * FALL_DAMAGE_PER_BLOCK;
     }
 
     // ------------------------------------------------------------------
@@ -218,123 +223,166 @@ public class Player extends Entity {
         if (chunk != null) {
             surface = chunk.height(Math.floorMod(bx, 16), Math.floorMod(bz, 16));
         }
-        exposedToSky = pos.y + 1.6f >= surface;
+        exposedToSky = pos.y + SKY_EXPOSURE_EYE_OFFSET >= surface;
 
-        damageFlash = Math.max(0, damageFlash - 1.6f * dt);
-        noise = Math.max(0, noise - 0.5f * dt);
+        damageFlash = Math.max(0, damageFlash - DAMAGE_FLASH_DECAY_PER_SECOND * dt);
+        noise = Math.max(0, noise - NOISE_DECAY_PER_SECOND * dt);
 
-        if (pendingFallDamage > 0) {
-            hurtPhysical(g, pendingFallDamage, false);
-            g.log("You hit the ground hard (-" + (int) pendingFallDamage + " HP)");
-            g.audio.playHurt();
-            if (pendingFallDamage > 9 && Math.random() < 0.5 && !has(Affliction.SPRAIN)) {
-                addAffliction(Affliction.SPRAIN, 150 + (float) Math.random() * 90);
-                g.log("You SPRAINED your leg in the fall. Splint it or hobble.");
-            }
-            pendingFallDamage = 0;
-        }
+        applyPendingFallDamage(g);
+        tickHungerAndThirst(g, dt);
+        tickStamina(dt);
+        tickWetness(g, dt);
+        tickBodyTemperature(g, dt);
 
-        // Hunger / thirst drains.
-        float hungerRate = 0.045f + (sprinting ? 0.05f : 0f) + (encumbrance() > 0.8f ? 0.02f : 0f);
-        hunger = Math.max(0, hunger - hungerRate * dt);
-        float thirstRate = 0.075f * (envTemp > 30 ? 1.6f : 1f) * g.events.thirstMul();
-        if (has(Affliction.INFECTION) || has(Affliction.FOOD_POISONING)) {
-            thirstRate *= 1.6f;
-        }
-        thirst = Math.max(0, thirst - thirstRate * dt);
-
-        // Nutrition balance drains slowly; starving drains it faster.
-        float nutriDrain = 0.018f * dt * (hunger <= 0 ? 2.5f : 1f);
-        protein = Math.max(0, protein - nutriDrain);
-        vitamins = Math.max(0, vitamins - nutriDrain * 1.1f);
-
-        // Stamina regeneration (drain happens in movement code).
-        if (!sprinting) {
-            float regen = 7f;
-            if (hunger < 20) regen *= 0.35f;
-            if (thirst < 15) regen *= 0.35f;
-            if (bodyTemp < 34.5f) regen *= 0.5f;
-            if (protein < 25) regen *= 0.6f;
-            if (has(Affliction.FOOD_POISONING) || has(Affliction.SICKNESS)) regen *= 0.5f;
-            if (has(Affliction.BURN)) regen *= 0.65f;
-            if (has(Affliction.SMOKE)) regen *= 0.55f;
-            regen *= 1f - fatigue / 250f;
-            float maxStam = maxStamina();
-            stamina = Math.min(maxStam, stamina + regen * dt);
-        }
-
-        // Wetness: rain blocked partially by gear and shelter.
-        if (inWater) {
-            wetness = 1f;
-        } else if (g.weather.isPrecip() && exposedToSky) {
-            float gain = 0.05f * g.weather.intensity() * (1f - wetResistance())
-                    * (1f - shelter.coverage() * 0.85f);
-            wetness = Math.min(1f, wetness + gain * dt);
-        } else {
-            float dry = 0.025f + (envTemp > 25 ? 0.03f : 0f) + (nearFireHeat(g) > 5 ? 0.10f : 0f);
-            wetness = Math.max(0, wetness - dry * dt);
-        }
-
-        // Body temperature drifts toward an environment-driven target.
-        float insul = insulation();
-        float effectiveEnv = envTemp;
-        if (envTemp < 18) {
-            effectiveEnv += Math.min(insul * 0.8f, 18 - envTemp);
-            // Wind chill in storms when not behind walls.
-            if (g.weather.isStormy() && exposedToSky) {
-                effectiveEnv -= 4f * (1f - shelter.enclosure());
-            }
-        }
-        float target = 37f + (effectiveEnv - 16f) * 0.22f
-                - wetness * 6.5f * (effectiveEnv < 18 ? 1f : 0.3f);
-        if (has(Affliction.INFECTION)) {
-            target += 2.2f; // fever
-        }
-        bodyTemp = MathUtil.approach(bodyTemp, target, (0.075f + wetness * 0.09f) * dt);
-        bodyTemp = MathUtil.clamp(bodyTemp, 25f, 45f);
-
-        if (bodyTemp < 33f) {
-            health -= (33f - bodyTemp) * 0.12f * dt;
-        } else if (bodyTemp > 40.5f) {
-            health -= (bodyTemp - 40.5f) * 0.15f * dt;
-            thirst = Math.max(0, thirst - 0.1f * dt);
-        }
-
-        if (hunger <= 0) health -= 0.5f * dt;
-        if (thirst <= 0) health -= 0.8f * dt;
+        if (hunger <= 0) health -= STARVATION_DAMAGE_PER_SECOND * dt;
+        if (thirst <= 0) health -= DEHYDRATION_DAMAGE_PER_SECOND * dt;
 
         tickAfflictions(g, dt);
-
-        // Scent: raw/spoiled meat carried and open wounds attract predators.
-        int meatCarried = inventory.count(com.veylon.item.ItemType.RAW_MEAT)
-                + inventory.count(com.veylon.item.ItemType.SPOILED_MEAT);
-        scent = Math.min(1f, meatCarried * 0.12f + (has(Affliction.BLEEDING) ? 0.5f : 0f));
-
-        // Slow regeneration when well fed, hydrated and uninjured.
-        boolean healthyEnough = !has(Affliction.BLEEDING) && !has(Affliction.INFECTION)
-                && !has(Affliction.FOOD_POISONING);
-        if (hunger > 70 && thirst > 60 && bodyTemp > 35 && health < maxHealth && healthyEnough) {
-            float regen = 0.6f;
-            if (protein > 60 && vitamins > 60) {
-                regen = 1.0f; // balanced diet heals faster
-            } else if (protein < 25 || vitamins < 25) {
-                regen = 0.25f;
-            }
-            health = Math.min(maxHealth, health + regen * dt);
-        }
-
-        // Fatigue.
-        boolean moving = Math.abs(vel.x) > 0.1f || Math.abs(vel.z) > 0.1f;
-        fatigue += (moving ? 0.04f : 0.012f) * dt * (encumbrance() > 1f ? 1.6f : 1f);
-        if (nearFireHeat(g) > 5 && !moving) {
-            fatigue -= 0.6f * dt;
-        }
-        fatigue = MathUtil.clamp(fatigue, 0, 100);
+        updateScent();
+        tickHealthRegen(dt);
+        tickFatigue(g, dt);
 
         if (health <= 0 && !dead) {
             dead = true;
         }
         health = MathUtil.clamp(health, 0, maxHealth);
+    }
+
+    private void applyPendingFallDamage(Game g) {
+        if (pendingFallDamage <= 0) {
+            return;
+        }
+        hurtPhysical(g, pendingFallDamage, false);
+        g.log("You hit the ground hard (-" + (int) pendingFallDamage + " HP)");
+        g.audio.playHurt();
+        if (pendingFallDamage > SPRAIN_DAMAGE_THRESHOLD && Math.random() < SPRAIN_CHANCE
+                && !has(Affliction.SPRAIN)) {
+            addAffliction(Affliction.SPRAIN,
+                    SPRAIN_DURATION_MIN + (float) Math.random() * SPRAIN_DURATION_RANGE);
+            g.log("You SPRAINED your leg in the fall. Splint it or hobble.");
+        }
+        pendingFallDamage = 0;
+    }
+
+    private void tickHungerAndThirst(Game g, float dt) {
+        float hungerRate = BASE_HUNGER_DRAIN_PER_SECOND
+                + (sprinting ? SPRINT_HUNGER_DRAIN_PER_SECOND : 0f)
+                + (encumbrance() > HEAVY_LOAD_ENCUMBRANCE
+                        ? ENCUMBERED_HUNGER_DRAIN_PER_SECOND : 0f);
+        hunger = Math.max(0, hunger - hungerRate * dt);
+
+        float thirstRate = BASE_THIRST_DRAIN_PER_SECOND
+                * (envTemp > HOT_WEATHER_TEMP ? HOT_WEATHER_THIRST_MULT : 1f)
+                * g.events.thirstMul();
+        if (has(Affliction.INFECTION) || has(Affliction.FOOD_POISONING)) {
+            thirstRate *= ILLNESS_THIRST_MULT;
+        }
+        thirst = Math.max(0, thirst - thirstRate * dt);
+
+        // Nutrition balance drains slowly; starving drains it faster.
+        float nutriDrain = NUTRITION_DRAIN_PER_SECOND * dt
+                * (hunger <= 0 ? STARVING_NUTRITION_MULT : 1f);
+        protein = Math.max(0, protein - nutriDrain);
+        vitamins = Math.max(0, vitamins - nutriDrain * VITAMIN_DRAIN_MULT);
+    }
+
+    /** Stamina regeneration; the drain happens in the movement code. */
+    private void tickStamina(float dt) {
+        if (sprinting) {
+            return;
+        }
+        float regen = BASE_STAMINA_REGEN_PER_SECOND;
+        if (hunger < LOW_HUNGER) regen *= LOW_HUNGER_REGEN_MULT;
+        if (thirst < LOW_THIRST) regen *= LOW_THIRST_REGEN_MULT;
+        if (bodyTemp < COLD_REGEN_BODY_TEMP) regen *= COLD_REGEN_MULT;
+        if (protein < LOW_PROTEIN) regen *= LOW_PROTEIN_REGEN_MULT;
+        if (has(Affliction.FOOD_POISONING) || has(Affliction.SICKNESS)) {
+            regen *= ILLNESS_REGEN_MULT;
+        }
+        if (has(Affliction.BURN)) regen *= BURN_REGEN_MULT;
+        if (has(Affliction.SMOKE)) regen *= SMOKE_REGEN_MULT;
+        regen *= 1f - fatigue / FATIGUE_REGEN_DIVISOR;
+        stamina = Math.min(maxStamina(), stamina + regen * dt);
+    }
+
+    /** Wetness: rain blocked partially by gear and shelter. */
+    private void tickWetness(Game g, float dt) {
+        if (inWater) {
+            wetness = 1f;
+        } else if (g.weather.isPrecip() && exposedToSky) {
+            float gain = RAIN_WETNESS_PER_SECOND * g.weather.intensity()
+                    * (1f - wetResistance())
+                    * (1f - shelter.coverage() * SHELTER_RAIN_BLOCK);
+            wetness = Math.min(1f, wetness + gain * dt);
+        } else {
+            float dry = BASE_DRY_PER_SECOND
+                    + (envTemp > WARM_DRY_TEMP ? WARM_DRY_BONUS_PER_SECOND : 0f)
+                    + (nearFireHeat(g) > FIRE_HEAT_THRESHOLD ? FIRE_DRY_BONUS_PER_SECOND : 0f);
+            wetness = Math.max(0, wetness - dry * dt);
+        }
+    }
+
+    /** Body temperature drifts toward an environment-driven target. */
+    private void tickBodyTemperature(Game g, float dt) {
+        float insul = insulation();
+        float effectiveEnv = envTemp;
+        if (envTemp < COLD_ENV_TEMP) {
+            effectiveEnv += Math.min(insul * INSULATION_EFFECTIVENESS, COLD_ENV_TEMP - envTemp);
+            // Wind chill in storms when not behind walls.
+            if (g.weather.isStormy() && exposedToSky) {
+                effectiveEnv -= STORM_WIND_CHILL * (1f - shelter.enclosure());
+            }
+        }
+        float target = NORMAL_BODY_TEMP + (effectiveEnv - TEMP_NEUTRAL_ENV) * ENV_TEMP_INFLUENCE
+                - wetness * WETNESS_CHILL
+                * (effectiveEnv < COLD_ENV_TEMP ? 1f : WETNESS_CHILL_WARM_MULT);
+        if (has(Affliction.INFECTION)) {
+            target += FEVER_TEMP_RISE; // fever
+        }
+        bodyTemp = MathUtil.approach(bodyTemp, target,
+                (TEMP_APPROACH_RATE + wetness * TEMP_APPROACH_WET_BONUS) * dt);
+        bodyTemp = MathUtil.clamp(bodyTemp, MIN_BODY_TEMP, MAX_BODY_TEMP);
+
+        if (bodyTemp < FREEZING_THRESHOLD) {
+            health -= (FREEZING_THRESHOLD - bodyTemp) * FREEZING_DAMAGE_PER_DEGREE * dt;
+        } else if (bodyTemp > OVERHEAT_THRESHOLD) {
+            health -= (bodyTemp - OVERHEAT_THRESHOLD) * OVERHEAT_DAMAGE_PER_DEGREE * dt;
+            thirst = Math.max(0, thirst - OVERHEAT_THIRST_DRAIN_PER_SECOND * dt);
+        }
+    }
+
+    /** Raw/spoiled meat carried and open wounds attract predators. */
+    private void updateScent() {
+        int meatCarried = inventory.count(ItemType.RAW_MEAT)
+                + inventory.count(ItemType.SPOILED_MEAT);
+        scent = Math.min(1f, meatCarried * SCENT_PER_MEAT
+                + (has(Affliction.BLEEDING) ? BLEEDING_SCENT : 0f));
+    }
+
+    /** Slow regeneration when well fed, hydrated and uninjured. */
+    private void tickHealthRegen(float dt) {
+        boolean healthyEnough = !has(Affliction.BLEEDING) && !has(Affliction.INFECTION)
+                && !has(Affliction.FOOD_POISONING);
+        if (hunger > REGEN_MIN_HUNGER && thirst > REGEN_MIN_THIRST
+                && bodyTemp > REGEN_MIN_BODY_TEMP && health < maxHealth && healthyEnough) {
+            float regen = BASE_HEALTH_REGEN_PER_SECOND;
+            if (protein > BALANCED_DIET_THRESHOLD && vitamins > BALANCED_DIET_THRESHOLD) {
+                regen = BALANCED_DIET_REGEN_PER_SECOND; // balanced diet heals faster
+            } else if (protein < POOR_DIET_THRESHOLD || vitamins < POOR_DIET_THRESHOLD) {
+                regen = POOR_DIET_REGEN_PER_SECOND;
+            }
+            health = Math.min(maxHealth, health + regen * dt);
+        }
+    }
+
+    private void tickFatigue(Game g, float dt) {
+        boolean moving = Math.abs(vel.x) > MOVEMENT_EPSILON || Math.abs(vel.z) > MOVEMENT_EPSILON;
+        fatigue += (moving ? MOVING_FATIGUE_PER_SECOND : IDLE_FATIGUE_PER_SECOND) * dt
+                * (encumbrance() > 1f ? OVERLOADED_FATIGUE_MULT : 1f);
+        if (nearFireHeat(g) > FIRE_HEAT_THRESHOLD && !moving) {
+            fatigue -= FIRE_REST_RECOVERY_PER_SECOND * dt;
+        }
+        fatigue = MathUtil.clamp(fatigue, 0, MAX_FATIGUE);
     }
 
     private void tickAfflictions(Game g, float dt) {
@@ -345,15 +393,15 @@ public class Player extends Entity {
             Affliction a = e.getKey();
             float left = e.getValue() - dt;
             switch (a) {
-                case BLEEDING -> health -= 0.5f * dt;
-                case INFECTION -> health -= 0.35f * dt;
-                case BURN -> health -= 0.18f * dt;
+                case BLEEDING -> health -= BLEEDING_DAMAGE_PER_SECOND * dt;
+                case INFECTION -> health -= INFECTION_DAMAGE_PER_SECOND * dt;
+                case BURN -> health -= BURN_DAMAGE_PER_SECOND * dt;
                 case FOOD_POISONING -> {
-                    health -= 0.22f * dt;
-                    hunger = Math.max(0, hunger - 0.06f * dt);
+                    health -= FOOD_POISONING_DAMAGE_PER_SECOND * dt;
+                    hunger = Math.max(0, hunger - FOOD_POISONING_HUNGER_DRAIN_PER_SECOND * dt);
                 }
-                case SICKNESS -> health -= 0.15f * dt;
-                case SMOKE -> health -= 0.10f * dt;
+                case SICKNESS -> health -= SICKNESS_DAMAGE_PER_SECOND * dt;
+                case SMOKE -> health -= SMOKE_DAMAGE_PER_SECOND * dt;
                 case SPRAIN -> {
                 }
             }
@@ -370,42 +418,47 @@ public class Player extends Entity {
         }
         // A wound that clotted on its own (never bandaged) risks infection.
         if (bleedEnded) {
-            if (!woundClean && Math.random() < 0.55) {
-                addAffliction(Affliction.INFECTION, 240 + (float) Math.random() * 120);
+            if (!woundClean && Math.random() < INFECTION_FROM_UNCLEAN_WOUND_CHANCE) {
+                addAffliction(Affliction.INFECTION,
+                        INFECTION_DURATION_MIN + (float) Math.random() * INFECTION_DURATION_RANGE);
                 g.log("The untreated wound has become INFECTED. Fever sets in...");
             } else {
                 g.log("The bleeding stopped on its own.");
             }
         }
 
-        // Smoke exposure converts to the smoke affliction.
-        smokeExposure = MathUtil.clamp(smokeExposure, 0, 100);
-        if (smokeExposure >= 60 && !has(Affliction.SMOKE)) {
-            addAffliction(Affliction.SMOKE, 30);
+        tickSmokeExposure(g, dt);
+    }
+
+    /** Smoke exposure converts to the smoke affliction. */
+    private void tickSmokeExposure(Game g, float dt) {
+        smokeExposure = MathUtil.clamp(smokeExposure, 0, MAX_SMOKE_EXPOSURE);
+        if (smokeExposure >= SMOKE_AFFLICTION_THRESHOLD && !has(Affliction.SMOKE)) {
+            addAffliction(Affliction.SMOKE, SMOKE_AFFLICTION_SECONDS);
             g.log("Smoke fills your lungs - get to fresh air or ventilate the shelter!");
         }
         if (!has(Affliction.SMOKE)) {
-            smokeExposure = Math.max(0, smokeExposure - 4f * dt);
-        } else if (smokeExposure < 20) {
+            smokeExposure = Math.max(0, smokeExposure - SMOKE_DECAY_CLEAN_AIR_PER_SECOND * dt);
+        } else if (smokeExposure < SMOKE_CLEAR_THRESHOLD) {
             cure(Affliction.SMOKE);
         } else {
-            smokeExposure = Math.max(0, smokeExposure - 2f * dt);
+            smokeExposure = Math.max(0, smokeExposure - SMOKE_DECAY_AFFLICTED_PER_SECOND * dt);
         }
     }
 
     public float maxStamina() {
-        float max = 100;
-        if (fatigue > 70) {
-            max -= (fatigue - 70) * 1.2f;
+        float max = MAX_NEED;
+        if (fatigue > FATIGUE_STAMINA_THRESHOLD) {
+            max -= (fatigue - FATIGUE_STAMINA_THRESHOLD) * FATIGUE_STAMINA_PENALTY;
         }
-        if (vitamins < 25) {
-            max -= 15;
+        if (vitamins < LOW_VITAMINS) {
+            max -= LOW_VITAMIN_STAMINA_PENALTY;
         }
-        return Math.max(30, max);
+        return Math.max(MIN_MAX_STAMINA, max);
     }
 
     /** Heat bonus in degrees from nearby campfires/torches (via temperature system cache). */
     public float nearFireHeat(Game g) {
-        return g.temperature.fireHeatAt(pos.x, pos.y + 0.9f, pos.z);
+        return g.temperature.fireHeatAt(pos.x, pos.y + FIRE_HEAT_SAMPLE_HEIGHT, pos.z);
     }
 }
