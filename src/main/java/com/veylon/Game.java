@@ -171,7 +171,7 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
     final Raycaster.MutableHit targetHitBuffer = new Raycaster.MutableHit();
     private final Raycaster.MutableHit fluidHitBuffer = new Raycaster.MutableHit();
     public float miningProgress;
-    private Vec3i miningTarget;
+    Vec3i miningTarget;
     public String interactPrompt;
     public double totalTime;
     public int fps;
@@ -179,7 +179,6 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
     public final FrameProfiler frameProfiler = new FrameProfiler();
     private int fpsCounter;
     private double fpsTimer;
-    private float attackCooldown;
 
     AppState appState = AppState.TITLE;
     private LoadRequest loadRequest;
@@ -193,21 +192,18 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
     /** Opt-in benchmark, capture and release-smoke scaffolding. Inert without VEYLON_* env. */
     private final QaHarness qa = new QaHarness(this);
 
-    // Ranged-weapon state (player).
+    /** Melee, bow, firearm and thrown-weapon rules; see the delegates below. */
+    private final PlayerCombatSystem combat = new PlayerCombatSystem(this);
+
+    // Ranged-weapon aim state the HUD draws. The rules live in PlayerCombatSystem;
+    // these stay here because Hud reads them straight off the Game instance.
     /** 0..1 bow draw progress while holding LMB with a bow. */
     public float bowDraw;
     public boolean drawingBow;
-    /** Preferred arrow type; native bow input cycles it with R. */
-    private ItemType selectedBowAmmo = ItemType.ARROW;
     /** Seconds remaining of an active reload (0 = not reloading). */
     public float reloadTimer;
     /** Total duration of the active reload, for the HUD bar. */
     public float reloadTotal;
-    /** Reloads bind to one inventory slot and the exact stack instance. */
-    private int reloadSlot = -1;
-    private ItemStack reloadStack;
-    private String reloadWeaponId;
-    private float rangedCooldown;
 
     // Animation / feedback timers.
     public float swingTimer;
@@ -240,23 +236,23 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
                 public void updateRanged(float dt, ItemStack held, WeaponDefinition weapon,
                                          Vector3f direction,
                                          PlayerInteractionSystem.FrameInput frameInput) {
-                    updateRangedWeapon(dt, held, weapon, direction, frameInput);
+                    combat.updateRangedWeapon(dt, held, weapon, direction, frameInput);
                 }
 
                 @Override
                 public void advanceNonRangedCooldown(float dt) {
-                    advanceRangedCooldown(dt);
+                    combat.advanceRangedCooldown(dt);
                 }
 
                 @Override
                 public void cancelRangedState() {
-                    Game.this.cancelRangedState();
+                    combat.cancelRangedState();
                 }
 
                 @Override
                 public void updatePrimary(float dt, Vector3f direction,
                                           boolean primaryPressed) {
-                    updatePrimaryAction(dt, direction, primaryPressed);
+                    combat.updatePrimaryAction(dt, direction, primaryPressed);
                 }
 
                 @Override
@@ -533,13 +529,11 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
         walkBob = 0;
         drawingBow = false;
         bowDraw = 0;
-        rangedCooldown = 0;
-        selectedBowAmmo = ItemType.ARROW;
+        combat.reset();
         nextTheftEventId = 1;
         activeTheftEventId = Long.MIN_VALUE;
         activeTheftEventCrate = null;
         activeTheftTransferCount = 0;
-        cancelReload();
 
         // Synchronous initial generation around spawn.
         world.ensureChunks(8, 8, 5, 10_000);
@@ -1246,485 +1240,80 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
         playerInteractions.update(interactionInput, heldItem, weapon, dir, interactionCommands);
     }
 
-    /** Non-ranged primary action: entity attack has precedence over block mining. */
-    private void updatePrimaryAction(float dt, Vector3f dir, boolean primaryPressed) {
-        Entity victim = findAttackTarget(dir);
-        if (victim != null) {
-            miningProgress = 0;
-            miningTarget = null;
-            performPlayerAttack(victim);
-        } else if (targetHit != null) {
-            mine(dt);
-        } else {
-            if (primaryPressed) {
-                swingTimer = 0.35f;
-                audio.playSwing();
-            }
-            miningProgress = 0;
-            miningTarget = null;
-        }
-    }
-
     // ------------------------------------------------------------------
-    // Ranged weapons (bow / firearms / thrown)
+    // Combat delegates
+    //
+    // The rules live in PlayerCombatSystem. These entry points stay on Game
+    // because the native input path, the HUD, EntityManager and the gameplay
+    // tests all drive combat through the Game instance.
     // ------------------------------------------------------------------
 
-    private void updateRangedWeapon(float dt, ItemStack held, WeaponDefinition weapon,
-                                    Vector3f dir,
-                                    PlayerInteractionSystem.FrameInput frameInput) {
-        miningProgress = 0;
-        miningTarget = null;
-
-        switch (weapon.category) {
-            case BOW -> {
-                if (frameInput.reloadPressed) {
-                    cycleBowAmmo();
-                }
-                updateBowCommand(dt, frameInput.primaryHeld, frameInput.primaryPressed, dir);
-            }
-            case FIREARM -> {
-                updateFirearmCommand(dt, frameInput.primaryHeld, frameInput.primaryPressed,
-                        frameInput.reloadPressed, dir);
-            }
-            case THROWN -> {
-                updateThrownWeaponCommand(dt, frameInput.primaryPressed, dir);
-            }
-        }
+    /** Advances the melee cooldown shared by the native LMB path and tests. */
+    public void advancePlayerAttackCooldown(float dt) {
+        combat.advancePlayerAttackCooldown(dt);
     }
 
-    private void cancelRangedState() {
-        drawingBow = false;
-        bowDraw = 0;
-        cancelReload();
+    /** Gameplay melee command: enforces reach, cooldown, damage and reputation. */
+    public boolean performPlayerAttack(Entity victim) {
+        return combat.performPlayerAttack(victim);
     }
 
-    private void advanceRangedCooldown(float dt) {
-        rangedCooldown = Math.max(0, rangedCooldown - Math.max(0, dt));
-    }
-
-    /**
-     * Production firearm command shared by native GLFW input and gameplay
-     * integration tests. Semi-automatic weapons require the trigger-press edge;
-     * automatic weapons deliberately keep firing while the trigger is held.
-     * Reload completion remains in {@link #tickReload(float)}, the same method
-     * advanced once per native action frame.
-     */
+    /** Production firearm trigger/reload command used by input and tests alike. */
     public FirearmCommandResult updateFirearmCommand(float dt, boolean triggerHeld,
-                                                      boolean triggerPressed,
-                                                      boolean reloadPressed,
-                                                      Vector3f dir) {
-        advanceRangedCooldown(dt);
-        ItemStack held = player == null ? null : player.selected();
-        var weapon = com.veylon.combat.WeaponRegistry.of(held == null ? null : held.type);
-        if (player == null || player.dead || weapon == null
-                || weapon.category != com.veylon.combat.WeaponDefinition.Category.FIREARM
-                || dir == null) {
-            return FirearmCommandResult.INVALID_WEAPON;
-        }
-
-        if (reloadTimer > 0) {
-            return FirearmCommandResult.RELOADING;
-        }
-
-        boolean wantsFire = weapon.automatic ? triggerHeld : triggerPressed;
-        FirearmCommandResult result = FirearmCommandResult.NONE;
-        if (wantsFire) {
-            if (rangedCooldown > 0) {
-                return FirearmCommandResult.COOLDOWN;
-            }
-            if (held.charge > 0) {
-                fireFirearm(held, weapon, dir);
-                result = FirearmCommandResult.FIRED;
-            } else {
-                audio.playDryFire();
-                rangedCooldown = 0.4f;
-                if (player.inventory.count(weapon.ammo) >= weapon.ammoPerShot) {
-                    log("Not loaded — press [R] to reload.");
-                } else {
-                    log("Out of " + weapon.ammo.displayName + ".");
-                }
-                result = FirearmCommandResult.DRY_FIRE;
-            }
-        }
-
-        if (reloadPressed && held.charge < weapon.magazine) {
-            boolean started = startReload(held, weapon);
-            if (result == FirearmCommandResult.NONE) {
-                result = started ? FirearmCommandResult.RELOAD_STARTED
-                        : FirearmCommandResult.NO_AMMO;
-            }
-        }
-        return result;
+                                                     boolean triggerPressed,
+                                                     boolean reloadPressed, Vector3f dir) {
+        return combat.updateFirearmCommand(dt, triggerHeld, triggerPressed, reloadPressed, dir);
     }
 
-    /**
-     * Selected ammunition displayed by the HUD. If only one kind remains, the
-     * selection follows that available kind without overriding a deliberate
-     * choice while both basic and iron arrows are present.
-     */
-    public ItemType selectedBowAmmo() {
-        if (player != null && player.inventory.count(selectedBowAmmo) <= 0) {
-            ItemType fallback = selectedBowAmmo == ItemType.ARROW
-                    ? ItemType.IRON_ARROW : ItemType.ARROW;
-            if (player.inventory.count(fallback) > 0) {
-                selectedBowAmmo = fallback;
-            }
-        }
-        return selectedBowAmmo;
-    }
-
-    /** Native [R] bow command: deliberately choose basic versus iron arrows. */
-    public ItemType cycleBowAmmo() {
-        if (player == null) {
-            return selectedBowAmmo;
-        }
-        boolean basic = player.inventory.count(ItemType.ARROW) > 0;
-        boolean iron = player.inventory.count(ItemType.IRON_ARROW) > 0;
-        if (basic && iron) {
-            selectedBowAmmo = selectedBowAmmo == ItemType.ARROW
-                    ? ItemType.IRON_ARROW : ItemType.ARROW;
-        } else if (iron) {
-            selectedBowAmmo = ItemType.IRON_ARROW;
-        } else if (basic) {
-            selectedBowAmmo = ItemType.ARROW;
-        } else {
-            // Still let the player choose what they intend to craft or recover.
-            selectedBowAmmo = selectedBowAmmo == ItemType.ARROW
-                    ? ItemType.IRON_ARROW : ItemType.ARROW;
-        }
-        drawingBow = false;
-        bowDraw = 0;
-        log("Selected " + selectedBowAmmo.displayName + ".");
-        return selectedBowAmmo;
-    }
-
-    private ItemType bowAmmo() {
-        ItemType selected = selectedBowAmmo();
-        return player.inventory.count(selected) > 0 ? selected : null;
-    }
-
-    /**
-     * Production bow command used directly by the GLFW input path. Holding
-     * advances draw, releasing either fires or cancels a short draw, and every
-     * call advances the same attack cooldown used during normal play.
-     */
+    /** Production bow draw/release command used by input and tests alike. */
     public BowCommandResult updateBowCommand(float dt, boolean triggerHeld,
                                              boolean triggerPressed, Vector3f dir) {
-        advanceRangedCooldown(dt);
-        ItemStack held = player == null ? null : player.selected();
-        var weapon = com.veylon.combat.WeaponRegistry.of(held == null ? null : held.type);
-        if (weapon == null
-                || weapon.category != com.veylon.combat.WeaponDefinition.Category.BOW
-                || dir == null) {
-            drawingBow = false;
-            bowDraw = 0;
-            return BowCommandResult.INVALID_WEAPON;
-        }
-
-        ItemType arrow = bowAmmo();
-        if (triggerHeld) {
-            if (arrow == null) {
-                drawingBow = false;
-                bowDraw = 0;
-                if (triggerPressed) {
-                    log("No arrows. Craft them from sticks, stone and fiber.");
-                }
-                return BowCommandResult.NO_AMMO;
-            }
-            if (rangedCooldown > 0) {
-                return BowCommandResult.COOLDOWN;
-            }
-            if (!drawingBow) {
-                drawingBow = true;
-                bowDraw = 0;
-                audio.playBowDraw();
-            }
-            bowDraw = Math.min(1f, bowDraw + Math.max(0, dt) / weapon.drawTime);
-            return BowCommandResult.DRAWING;
-        }
-
-        if (!drawingBow) {
-            return BowCommandResult.NONE;
-        }
-        if (bowDraw >= 0.3f && arrow != null) {
-            fireBow(held, weapon, arrow, dir);
-            drawingBow = false;
-            bowDraw = 0;
-            return BowCommandResult.FIRED;
-        }
-        drawingBow = false;
-        bowDraw = 0;
-        return BowCommandResult.CANCELLED;
+        return combat.updateBowCommand(dt, triggerHeld, triggerPressed, dir);
     }
 
-    private void fireBow(ItemStack held, com.veylon.combat.WeaponDefinition weapon,
-                         ItemType arrow, Vector3f dir) {
-        player.inventory.remove(arrow, 1);
-        float power = 0.4f + 0.6f * bowDraw;
-        Vector3f o = camera.position;
-        projectiles.fire(this, player, true, o.x, o.y - 0.08f, o.z,
-                dir.x, dir.y, dir.z, weapon, arrow);
-        // Under-drawn arrows fly slower: retro-scale the newly spawned arrows.
-        for (int i = projectiles.live.size() - 1; i >= 0; i--) {
-            var p = projectiles.live.get(i);
-            if (p.fromPlayer && p.kind == com.veylon.combat.ProjectileSystem.Kind.ARROW
-                    && p.stuckTime == 0 && p.life > 0 && power < 0.999f) {
-                p.vx *= power;
-                p.vy *= power;
-                p.vz *= power;
-                break;
-            }
-        }
-        audio.playBowRelease(o.x, o.y, o.z);
-        noise.emit(this, o.x, o.y, o.z, weapon.noiseRadius, 0.25f, "bow", true, player);
-        consumeDurability(held, weapon.durabilityCost);
-        rangedCooldown = weapon.attackInterval;
-        swingTimer = Math.max(swingTimer, 0.2f);
-    }
-
-    private void fireFirearm(ItemStack held, com.veylon.combat.WeaponDefinition weapon,
-                             Vector3f dir) {
-        held.charge--;
-        Vector3f o = camera.position;
-        projectiles.fire(this, player, true, o.x, o.y - 0.05f, o.z,
-                dir.x, dir.y, dir.z, weapon, weapon.ammo);
-        boolean pistol = held.type == ItemType.FLINTLOCK_PISTOL;
-        audio.playGunshot(pistol, o.x, o.y, o.z);
-        particles.muzzleFlash(o.x + dir.x * 0.8f, o.y + dir.y * 0.8f - 0.15f,
-                o.z + dir.z * 0.8f, dir.x, dir.y, dir.z);
-        // Gunshots are enormous noise events: everything hears them.
-        noise.emit(this, o.x, o.y, o.z, weapon.noiseRadius, 1f, "gunshot", true, player);
-        player.noise = 1f;
-        camera.pitch -= weapon.recoil * 4.5f;
-        renderer.addShake(weapon.recoil * 0.35f);
-        consumeDurability(held, weapon.durabilityCost);
-        rangedCooldown = weapon.attackInterval;
-        swingTimer = Math.max(swingTimer, 0.25f);
-    }
-
-    private boolean startReload(ItemStack held, com.veylon.combat.WeaponDefinition weapon) {
-        if (held == null || weapon == null
-                || weapon.category != com.veylon.combat.WeaponDefinition.Category.FIREARM
-                || held.charge >= weapon.magazine) {
-            return false;
-        }
-        if (player.inventory.count(weapon.ammo) < weapon.ammoPerShot) {
-            log("No " + weapon.ammo.displayName + " to reload with.");
-            audio.playDryFire();
-            return false;
-        }
-        reloadTotal = weapon.reloadTime;
-        reloadTimer = reloadTotal;
-        reloadSlot = player.hotbarSel;
-        reloadStack = held;
-        reloadWeaponId = weapon.id;
-        audio.playReload();
-        return true;
-    }
-
-    private void finishReload(ItemStack held, com.veylon.combat.WeaponDefinition weapon) {
-        ItemStack current = player.selected();
-        if (current == null || current != held
-                || com.veylon.combat.WeaponRegistry.of(current.type) != weapon) {
-            return; // weapon switched away mid-reload
-        }
-        int roomRounds = weapon.magazine - held.charge;
-        int haveRounds = player.inventory.count(weapon.ammo) / weapon.ammoPerShot;
-        int loaded = Math.min(roomRounds, haveRounds);
-        if (loaded > 0) {
-            player.inventory.remove(weapon.ammo, loaded * weapon.ammoPerShot);
-            held.charge += loaded;
-            log(held.type.displayName + " loaded ("
-                    + held.charge + "/" + weapon.magazine + ").");
-        }
-    }
-
-    /** Gameplay/test seam: starts a reload using the currently selected firearm. */
-    public boolean startReloadSelected() {
-        ItemStack held = player == null ? null : player.selected();
-        var weapon = com.veylon.combat.WeaponRegistry.of(held == null ? null : held.type);
-        return startReload(held, weapon);
-    }
-
-    /**
-     * Advances the active reload. Switching slots/stacks cancels it before ammo
-     * is consumed; save/load intentionally cancels because this transient state
-     * is not serialized. Ammo is transferred exactly once at completion.
-     */
-    public void tickReload(float dt) {
-        if (reloadTimer <= 0) {
-            return;
-        }
-        ItemStack current = player == null ? null : player.selected();
-        var currentDef = com.veylon.combat.WeaponRegistry.of(
-                current == null ? null : current.type);
-        if (player.hotbarSel != reloadSlot || current != reloadStack || currentDef == null
-                || !currentDef.id.equals(reloadWeaponId)) {
-            cancelReload();
-            return;
-        }
-        reloadTimer -= Math.max(0, dt);
-        if (reloadTimer > 0) {
-            return;
-        }
-        ItemStack completedStack = reloadStack;
-        var completedWeapon = currentDef;
-        // Clear first so a second tick can never transfer ammunition again.
-        reloadTimer = 0;
-        reloadTotal = 0;
-        reloadSlot = -1;
-        reloadStack = null;
-        reloadWeaponId = null;
-        finishReload(completedStack, completedWeapon);
-    }
-
-    public void cancelReload() {
-        reloadTimer = 0;
-        reloadTotal = 0;
-        reloadSlot = -1;
-        reloadStack = null;
-        reloadWeaponId = null;
-    }
-
-    private void throwBomb(ItemStack held, com.veylon.combat.WeaponDefinition weapon,
-                           Vector3f dir) {
-        Vector3f o = camera.position;
-        projectiles.fire(this, player, true, o.x, o.y, o.z, dir.x, dir.y + 0.18f, dir.z,
-                weapon, null);
-        player.inventory.shrink(player.hotbarSel, 1);
-        audio.playFuse(o.x, o.y, o.z);
-        audio.playSwing();
-        rangedCooldown = weapon.attackInterval;
-        swingTimer = Math.max(swingTimer, 0.3f);
-        log("Fuse lit — get clear!");
-    }
-
-    /**
-     * Advances and, on a press edge, fires the selected thrown weapon. This is
-     * the production command used by the native-input path, so save/load and
-     * integration coverage can exercise an actual inventory-consuming throw
-     * without synthesizing GLFW state.
-     *
-     * @return true only when a bomb was lit and thrown
-     */
+    /** Production thrown-explosive command; true only when a bomb was thrown. */
     public boolean updateThrownWeaponCommand(float dt, boolean attackPressed, Vector3f dir) {
-        advanceRangedCooldown(dt);
-        if (!attackPressed || rangedCooldown > 0 || dir == null || player == null) {
-            return false;
-        }
-        ItemStack held = player.selected();
-        var weapon = com.veylon.combat.WeaponRegistry.of(held == null ? null : held.type);
-        if (weapon == null
-                || weapon.category != com.veylon.combat.WeaponDefinition.Category.THROWN) {
-            return false;
-        }
-        throwBomb(held, weapon, dir);
-        return true;
+        return combat.updateThrownWeaponCommand(dt, attackPressed, dir);
     }
 
-    private void attack(Entity victim) {
-        ItemStack held = player.selected();
-        float dmg = held != null ? held.type.damage : 1.5f;
-        if (player.crouching) {
-            dmg *= 1.4f; // ambush bonus
-        }
-        victim.hurt(dmg, true);
-        victim.knockback(player.pos.x, player.pos.z, 3.2f);
-        audio.playHit();
-        particles.blood(victim.pos.x, victim.pos.y + victim.height * 0.6f, victim.pos.z);
-        consumeDurability(held, 1f);
-        player.noise = Math.min(1f, player.noise + 0.25f);
-        noise.emit(this, victim.pos.x, victim.pos.y + victim.height * 0.5f, victim.pos.z,
-                14f, 0.3f, victim instanceof Creature ? "creature-attack" : "melee",
-                true, player);
-        if (victim instanceof Creature c) {
-            c.fear = 1f;
-            c.bleedTimer = Math.max(c.bleedTimer, 18f);
-        }
-        if (victim instanceof Npc n) {
-            if (n.settled()) {
-                settlementManager.onNpcAttackedByPlayer(this, n);
-            } else if (!n.isTrader && !n.raider && !n.warParty) {
-                faction.addTrust(this, -30, "You attacked " + n.name + "!");
-            }
-        }
+    /** Ammunition the HUD shows for the held bow. */
+    public ItemType selectedBowAmmo() {
+        return combat.selectedBowAmmo();
     }
 
-    /** Advances the same melee cooldown used by the native LMB path. */
-    public void advancePlayerAttackCooldown(float dt) {
-        attackCooldown = Math.max(0f, attackCooldown - Math.max(0f, dt));
+    /** Native [R] bow command: switch between basic and iron arrows. */
+    public ItemType cycleBowAmmo() {
+        return combat.cycleBowAmmo();
     }
 
-    /**
-     * Gameplay melee command shared by native input and integration tests.
-     * Selection/aim remain the caller's job; this command enforces the live
-     * reach, cooldown, damage, durability and reputation path.
-     */
-    public boolean performPlayerAttack(Entity victim) {
-        if (player == null || player.dead || victim == null || victim.dead
-                || attackCooldown > 0f
-                || victim.distSqTo(player.pos.x, player.pos.y, player.pos.z) > 3.4 * 3.4) {
-            return false;
-        }
-        attackCooldown = 0.45f;
-        swingTimer = 0.35f;
-        attack(victim);
-        return true;
+    /** Starts a reload using the currently selected firearm. */
+    public boolean startReloadSelected() {
+        return combat.startReloadSelected();
     }
 
-    /** Wears the held item; breaks it when durability runs out. */
-    private void consumeDurability(ItemStack held, float amount) {
-        if (held == null || !held.type.hasDurability()) {
-            return;
-        }
-        held.durability -= amount;
-        if (held.durability <= 0) {
-            log("Your " + held.type.displayName + " broke!");
-            audio.playToolBreak();
-            player.inventory.set(player.hotbarSel, null);
-        }
+    /** Advances an active reload, completing or cancelling it. */
+    public void tickReload(float dt) {
+        combat.tickReload(dt);
     }
 
+    /** Drops an in-flight reload without consuming ammunition. */
+    public void cancelReload() {
+        combat.cancelReload();
+    }
+
+    /** True when the inventory holds any knife, which gates skinning yields. */
     public boolean playerHasKnife() {
-        return player.inventory.count(ItemType.BONE_KNIFE) > 0
-                || player.inventory.count(ItemType.IRON_KNIFE) > 0;
-    }
-
-    /** Wears down the first knife in the inventory; used when skinning. */
-    private void useKnife() {
-        for (int i = 0; i < player.inventory.size(); i++) {
-            ItemStack s = player.inventory.get(i);
-            if (s != null && (s.type == ItemType.BONE_KNIFE || s.type == ItemType.IRON_KNIFE)) {
-                s.durability -= 1.5f;
-                if (s.durability <= 0) {
-                    log("Your " + s.type.displayName + " broke!");
-                    audio.playToolBreak();
-                    player.inventory.set(i, null);
-                }
-                return;
-            }
-        }
+        return combat.playerHasKnife();
     }
 
     /** Called by EntityManager when the player's hit killed a creature. */
     public void onCreatureKilled(Creature c) {
-        if (c.type.predator) {
-            // A regional community gets first claim on a threat killed beside
-            // its walls; the starter camp is credited only when no settlement
-            // is the beneficiary.
-            if (settlementManager.onNearbyThreatCleared(this, c.pos.x, c.pos.z)) {
-                return;
-            }
-            if (world.campPos != null
-                    && c.distSqTo(world.campPos.x(), world.campPos.y(), world.campPos.z()) < 22 * 22) {
-                faction.addTrust(this, 10, "The camp saw you slay a predator");
-                faction.onPredatorKilledNearCamp(this);
-            }
-        }
+        combat.onCreatureKilled(c);
     }
 
+    /** Called by EntityManager when the player's hit killed a raider. */
     public void onRaiderKilled() {
-        faction.addTrust(this, 8, "You drove off a scavenger");
+        combat.onRaiderKilled();
     }
 
     public void updatePrompt() {
@@ -1919,7 +1508,7 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
         return held != null && held.type.tool == kind;
     }
 
-    private void mine(float dt) {
+    void mine(float dt) {
         BlockType t = targetHit.type();
         if (t.hardness < 0) {
             return;
@@ -2024,7 +1613,7 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
         world.setBlock(pos.x(), pos.y(), pos.z(), BlockType.AIR, true);
         audio.playBlockBreak(pos.x() + 0.5f, pos.y() + 0.5f, pos.z() + 0.5f);
         particles.blockDust(t, pos.x() + 0.5f, pos.y() + 0.5f, pos.z() + 0.5f, 12);
-        consumeDurability(held, 1f);
+        combat.consumeDurability(held, 1f);
         player.noise = Math.min(1f, player.noise + 0.3f);
 
         boolean structure = t == BlockType.WALL || t == BlockType.STONE_BRICK
@@ -2562,7 +2151,7 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
             }
             carcass.meatLeft = 0;
             carcass.hideLeft = 0;
-            useKnife();
+            combat.useKnife();
             audio.playEat();
             particles.blood(carcass.pos.x, carcass.pos.y + 0.3f, carcass.pos.z);
             log("Skinned the " + carcass.type.displayName + ": " + meat + " meat, " + hide
@@ -2874,39 +2463,6 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
             }
         }
         return deposited;
-    }
-
-    private Entity findAttackTarget(Vector3f dir) {
-        Entity best = null;
-        double bestD = 3.4 * 3.4;
-        for (Creature c : entities.creatures) {
-            double d = candidateDist(c, dir);
-            if (d >= 0 && d < bestD) {
-                bestD = d;
-                best = c;
-            }
-        }
-        for (Npc n : entities.npcs) {
-            double d = candidateDist(n, dir);
-            if (d >= 0 && d < bestD) {
-                bestD = d;
-                best = n;
-            }
-        }
-        return best;
-    }
-
-    private double candidateDist(Entity e, Vector3f dir) {
-        float ex = e.pos.x - camera.position.x;
-        float ey = (e.pos.y + e.height * 0.5f) - camera.position.y;
-        float ez = e.pos.z - camera.position.z;
-        double dist2 = ex * ex + ey * ey + ez * ez;
-        if (dist2 > 3.4 * 3.4 || dist2 < 1e-4) {
-            return -1;
-        }
-        double len = Math.sqrt(dist2);
-        double dot = (ex * dir.x + ey * dir.y + ez * dir.z) / len;
-        return dot > 0.80 ? dist2 : -1;
     }
 
     private void respawn() {
