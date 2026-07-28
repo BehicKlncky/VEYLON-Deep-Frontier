@@ -18,7 +18,6 @@ import com.veylon.entity.Npc;
 import com.veylon.entity.Player;
 import com.veylon.entity.PlayerMovementSystem;
 import com.veylon.entity.PlayerTreatmentSystem;
-import com.veylon.entity.Track;
 import com.veylon.item.EquipSlot;
 import com.veylon.item.Inventory;
 import com.veylon.item.ItemStack;
@@ -169,7 +168,7 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
     // Per-frame state.
     public Raycaster.Result targetHit;
     final Raycaster.MutableHit targetHitBuffer = new Raycaster.MutableHit();
-    private final Raycaster.MutableHit fluidHitBuffer = new Raycaster.MutableHit();
+    final Raycaster.MutableHit fluidHitBuffer = new Raycaster.MutableHit();
     public float miningProgress;
     Vec3i miningTarget;
     public String interactPrompt;
@@ -194,6 +193,9 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
 
     /** Melee, bow, firearm and thrown-weapon rules; see the delegates below. */
     private final PlayerCombatSystem combat = new PlayerCombatSystem(this);
+
+    /** Read-only builder for the HUD's "[F] ..." interaction hint. */
+    private final InteractPromptBuilder prompts = new InteractPromptBuilder(this);
 
     // Ranged-weapon aim state the HUD draws. The rules live in PlayerCombatSystem;
     // these stay here because Hud reads them straight off the Game instance.
@@ -1316,196 +1318,14 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
         combat.onRaiderKilled();
     }
 
+    /** Recomputes the HUD interaction hint for whatever the player is facing. */
     public void updatePrompt() {
-        interactPrompt = null;
-        Npc npc = nearestNpcForInteraction(3.2f);
-        NpcInteraction npcInteraction = npcInteraction(npc);
-        if (npcInteraction != NpcInteraction.NONE) {
-            interactPrompt = switch (npcInteraction) {
-                case TALK -> "[F] Talk to " + npc.name
-                        + (npc.settled() ? " (" + npc.jobName() + ")" : "");
-                case RESCUE_BLOCKED -> "Break the cage bars to rescue " + npc.name;
-                case RESCUE_READY -> "[F] Rescue " + npc.name;
-                case NONE -> null;
-            };
-            return;
-        }
-        // Recoverable arrows stuck in surfaces.
-        var stuckArrow = projectiles.nearestStuckArrow(
-                player.pos.x, player.pos.y + 1f, player.pos.z, 2.6f);
-        if (stuckArrow != null) {
-            interactPrompt = "[F] Recover arrow";
-            return;
-        }
-        Carcass carcass = entities.nearestCarcass(player.pos.x, player.pos.y, player.pos.z, 2.6f);
-        if (carcass != null) {
-            interactPrompt = "[F] Harvest " + carcass.type.displayName + " carcass"
-                    + (carcass.rotten() ? " (rotting!)" : "")
-                    + (playerHasKnife() ? "" : " (no knife: scraps only)");
-            return;
-        }
-        if (targetHit != null) {
-            int targetX = targetHit.x();
-            int targetY = targetHit.y();
-            int targetZ = targetHit.z();
-            switch (targetHit.type()) {
-                case BERRY_BUSH -> interactPrompt = "[F] Harvest berries";
-                case HERB_PLANT -> interactPrompt = "[F] Gather herbs";
-                case CAMPFIRE -> {
-                    Vec3i position = new Vec3i(targetX, targetY, targetZ);
-                    interactPrompt = "[F] Cook meat / boil water / add fuel ("
-                            + (int) (float) world.campfireFuel.getOrDefault(position, 0f)
-                            + "s fuel)";
-                }
-                case CRATE -> {
-                    var stores = world.settlementAt(targetX, targetZ);
-                    interactPrompt = stores != null && !stores.cleared && !stores.occupied
-                            ? "[F] Open " + (stores.hostile() ? "enemy" : "restricted")
-                            + " stores (taking supplies has consequences)"
-                            : "[F] Open crate";
-                }
-                case WORKBENCH -> interactPrompt = "[F] Use workbench";
-                case FURNACE -> interactPrompt = "[F] Use furnace (crafting)";
-                case ANVIL -> interactPrompt = "[F] Use anvil (crafting)";
-                case TANNERY -> interactPrompt = "[F] Use tannery (crafting)";
-                case HERB_STATION -> interactPrompt = "[F] Use herbalist bench (crafting)";
-                case MAP_TABLE -> interactPrompt = "[F] Use map table (decode blueprints)";
-                case DRYING_RACK -> interactPrompt = rackPrompt(
-                        new Vec3i(targetX, targetY, targetZ));
-                case RAIN_COLLECTOR -> {
-                    float liters = world.collectorWater.getOrDefault(
-                            new Vec3i(targetX, targetY, targetZ), 0f);
-                    interactPrompt = "[F] Rain collector: " + String.format("%.1f", liters)
-                            + "/3.0 L" + (liters >= 1f ? " (fill waterskin)" : "");
-                }
-                case LANTERN -> interactPrompt = lanternPrompt(
-                        new Vec3i(targetX, targetY, targetZ));
-                case BEDROLL -> interactPrompt = "[F] Sleep (bedroll)";
-                case CAMP_BED -> {
-                    var beds = world.settlementAt(targetX, targetZ);
-                    if (beds != null) {
-                        interactPrompt = beds.friendly() || beds.cleared
-                                ? "[F] Sleep safely (settlement bed)"
-                                : beds.hostile()
-                                ? "Hostile bed — clear the area before sleeping"
-                                : "Residents' bed — earn local friendship first";
-                    } else {
-                        interactPrompt = "[F] Sleep (camp bed"
-                                + (faction.campPrivileges() ? ")" : " - needs Friendly trust)");
-                    }
-                }
-                case BEACON -> interactPrompt = beaconPrompt();
-                case BEACON_LIT -> interactPrompt = "[F] Beacon transmitting... rescue inbound";
-                case POWDER_KEG -> {
-                    Float fuse = world.kegFuses.get(new Vec3i(targetX, targetY, targetZ));
-                    interactPrompt = fuse != null
-                            ? "FUSE BURNING — " + String.format("%.1f", fuse) + "s. RUN!"
-                            : "[F] Light the fuse (5s) — stand well clear";
-                }
-                case GATE -> {
-                    var gs = world.settlementAt(targetX, targetZ);
-                    boolean barred = gs != null && gs.hostile();
-                    interactPrompt = barred
-                            ? "Barred from the inside. A powder keg could breach it."
-                            : "[F] Open gate";
-                }
-                case GATE_OPEN -> interactPrompt = "Gate (closes on its own)";
-                case ALARM_BELL -> {
-                    var bs = world.settlementAt(targetX, targetZ);
-                    interactPrompt = bs != null && bs.hostile()
-                            ? "Alarm bell — destroy it to silence the garrison"
-                            : "[F] Ring the alarm";
-                }
-                case CAGE_BARS -> interactPrompt = "Cage bars (mine through to free captives)";
-                default -> {
-                }
-            }
-            // Outpost claim prompt overrides the campfire line.
-            if (targetHit.type() == BlockType.CAMPFIRE) {
-                var cs = world.settlementAt(targetX, targetZ);
-                if (cs != null && cs.hostile()
-                        && com.veylon.settlement.HumanFaction.FREE_SETTLERS.equals(cs.founderFaction)) {
-                    interactPrompt = "[F] Offer restitution (6 food, 2 medicine)";
-                } else if (cs != null && cs.hostile() && !cs.centralObjectiveControlled) {
-                    interactPrompt = "[F] Secure central capture objective";
-                } else if (cs != null && cs.cleared && !cs.occupied) {
-                    interactPrompt = "[F] Supply and claim outpost ("
-                            + com.veylon.settlement.SettlementManager.OCCUPY_FOOD + " food, "
-                            + com.veylon.settlement.SettlementManager.OCCUPY_WOOD + " logs)";
-                }
-            }
-            if (interactPrompt != null) {
-                return;
-            }
-            if (targetHit.type().requiresTool && !holdingTool(targetHit.type().preferredTool)) {
-                interactPrompt = "Requires " + targetHit.type().preferredTool.name().toLowerCase();
-                return;
-            }
-        }
-        // Crouching close to the ground reveals animal tracks.
-        if (player.crouching) {
-            Track track = entities.nearestTrack(player.pos.x, player.pos.y, player.pos.z, 3f);
-            if (track != null) {
-                interactPrompt = track.describe();
-                return;
-            }
-        }
-        Raycaster.Result fluid = Raycaster.castInto(world, camera.position, camera.front(),
-                4.0, true, fluidHitBuffer) ? fluidHitBuffer : null;
-        if (fluid != null && fluid.type() == BlockType.WATER) {
-            interactPrompt = player.inventory.count(ItemType.WATERSKIN_EMPTY) > 0
-                    ? "[F] Fill waterskin (untreated water)"
-                    : "[F] Drink (untreated water - risky)";
-        }
-    }
-
-    private String rackPrompt(Vec3i pos) {
-        RackBatch batch = world.rackBatches.get(pos);
-        if (batch == null) {
-            return "[F] Load drying rack (raw meat or berries)";
-        }
-        if (batch.done()) {
-            return "[F] Collect " + batch.count + "x " + batch.output().displayName;
-        }
-        int pct = (int) (batch.progress / batch.required() * 100);
-        return "Drying " + batch.count + "x " + batch.input.displayName + " (" + pct + "%)";
+        prompts.update();
     }
 
     /** HUD text for the same lantern state consumed by the F-key command. */
     public String lanternPrompt(Vec3i pos) {
-        World.LanternState state = world.lanternState(pos);
-        if (state == null) {
-            return "Lantern unavailable";
-        }
-        int fuel = (int) Math.ceil(state.fuelSeconds());
-        ItemStack held = player.selected();
-        if (held != null && held.type == ItemType.CHARCOAL
-                && state.fuelSeconds() < World.LANTERN_MAX_FUEL) {
-            return "[F] Refuel lantern with charcoal (" + fuel + "/"
-                    + (int) World.LANTERN_MAX_FUEL + "s)";
-        }
-        if (fuel <= 0) {
-            return "[F] Lantern UNLIT — hold charcoal to refuel";
-        }
-        return state.lit()
-                ? "[F] Extinguish lantern — LIT, " + fuel + "s fuel"
-                : "[F] Light lantern — UNLIT, " + fuel + "s fuel";
-    }
-
-    private String beaconPrompt() {
-        return switch (world.beaconStage) {
-            case 0 -> "[F] Install Signal Crystal (need 1, from ancient ruins)";
-            case 1 -> "[F] Wire the array (need 3 copper ingots)";
-            case 2 -> faction.trust >= 75
-                    ? "[F] Calibrate with the camp's codes (Allied)"
-                    : "Calibration needs the camp's codes - become Allied (trust 75+)";
-            default -> "[F] Distress beacon";
-        };
-    }
-
-    private boolean holdingTool(ToolKind kind) {
-        ItemStack held = player.selected();
-        return held != null && held.type.tool == kind;
+        return prompts.lanternPrompt(pos);
     }
 
     void mine(float dt) {
@@ -1891,7 +1711,7 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
     }
 
     /** Ignores closer hostile guards so a reachable prisoner remains selectable. */
-    private Npc nearestNpcForInteraction(float range) {
+    Npc nearestNpcForInteraction(float range) {
         Npc best = null;
         double bestD = range * range;
         for (Npc candidate : entities.npcs) {
