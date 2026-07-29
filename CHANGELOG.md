@@ -2,6 +2,54 @@
 
 All notable user-facing changes to VEYLON: Deep Frontier are recorded here.
 
+## [0.4.0] - 2026-07-29
+
+### Changed
+
+- Reduced `Game` from 4,380 to 1,489 lines by extracting nine focused
+  collaborators for QA automation, combat, block actions, world interaction,
+  consumables, crate transactions, prompts, ambience and sleep. Existing `Game`
+  commands remain as compatibility delegates for input, UI, saves and tests.
+- Moved player and simulation tuning values into eight focused constants classes.
+  Weather-specific values now live on the `Weather` enum so new weather states must
+  supply their complete configuration.
+- Added architecture and development guides covering initialization, tick ordering,
+  save/load contracts, extension recipes, deterministic RNG rules and known rough
+  edges.
+- Java sources are normalized to LF through the repository attributes policy.
+
+### Fixed
+
+- Every simulation RNG reachable from `Game` is now reseeded from the world seed with
+  an independent salt. Recreating a seed after another world has run in the same
+  process no longer inherits hidden random state.
+
+### Quality
+
+- Expanded the deterministic suite from 223 to 240 tests across 51 suites. New
+  coverage exercises tick-bucket ordering, world replacement/reset behavior,
+  save/load through production tick paths, projectile pool bounds and complete
+  simulation RNG reseeding.
+- Added reflection-backed protection that fails when a newly introduced simulation
+  `Random` is omitted from world reseeding.
+
+### Compatibility
+
+- Binary save version remains v3 and the historical v2 migration path is retained.
+- World generator version remains 3; existing saves and seed output are unchanged.
+- Serialized enums retain their existing order and append-only contract.
+- OpenGL 3.3 Core, Java 25, LWJGL 3.3.6 and the dependency set are unchanged.
+
+### Known limitations
+
+- `EventSystem` still selects events through an ordered 13-branch roll ladder.
+  Converting it to data-driven rules requires boundary and precondition regression
+  tests because failed conditions deliberately fall through differently.
+- The proposed nine interfaces, nine facades and service locator were not added.
+  That shape would retain the existing `Game` coupling while hiding dependencies
+  behind another delegation layer; future interfaces should follow concrete
+  substitution or testing needs.
+
 ## [0.3.1] - 2026-07-22
 
 ### Fixed

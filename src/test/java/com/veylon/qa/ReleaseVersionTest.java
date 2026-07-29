@@ -7,7 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 class ReleaseVersionTest {
 
     @Test
-    void gradleReleaseVersionIsStabilityPatchVersion() {
-        assertEquals("0.3.1", System.getProperty("veylon.version"));
+    void gradleReleaseVersionIsArchitectureReleaseVersion() {
+        assertEquals("0.4.0", System.getProperty("veylon.version"));
     }
 }

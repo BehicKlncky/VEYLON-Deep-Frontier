@@ -62,9 +62,9 @@ Windows x64 (PowerShell):
 
 ```powershell
 .\gradlew.bat build             # compile + unit tests + jar
-.\gradlew.bat fatJar            # build\libs\veylon-0.3.1-all.jar
+.\gradlew.bat fatJar            # build\libs\veylon-0.4.0-all.jar
 .\gradlew.bat jpackage          # build\jpackage\Veylon\Veylon.exe
-.\gradlew.bat appImageZip       # build\distributions\veylon-0.3.1-windows-x64.zip
+.\gradlew.bat appImageZip       # build\distributions\veylon-0.4.0-windows-x64.zip
 .\gradlew.bat releaseArtifacts  # tests + all host-specific release artifacts
 ```
 
@@ -74,7 +74,7 @@ macOS Intel or Apple Silicon (Terminal):
 ./gradlew build
 ./gradlew fatJar
 ./gradlew jpackage          # build/jpackage/Veylon.app
-./gradlew appImageZip       # build/distributions/veylon-0.3.1-macos-{x64|arm64}.zip
+./gradlew appImageZip       # build/distributions/veylon-0.4.0-macos-{x64|arm64}.zip
 ./gradlew releaseArtifacts
 ```
 
@@ -109,7 +109,7 @@ See [CHANGELOG.md](CHANGELOG.md) for release notes.
 Run the fat JAR with the same JVM options used by the packaged launchers:
 
 ```powershell
-java --enable-native-access=ALL-UNNAMED -Xmx2G -jar build\libs\veylon-0.3.1-all.jar
+java --enable-native-access=ALL-UNNAMED -Xmx2G -jar build\libs\veylon-0.4.0-all.jar
 ```
 
 ---
