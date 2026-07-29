@@ -11,6 +11,8 @@ import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 
+import static com.veylon.simulation.FireConstants.*;
+
 /**
  * Tick-based fire: burning blocks spread to flammable neighbors, damage nearby
  * entities, and finally turn to ash/air. Rain suppresses, drought accelerates.
@@ -54,7 +56,7 @@ public class FireSystem {
         if (burning.size() >= MAX_ACTIVE_FIRES) {
             return false;
         }
-        burning.put(p, 4f + rng.nextFloat() * 6f);
+        burning.put(p, BURN_SECONDS_MIN + rng.nextFloat() * BURN_SECONDS_RANGE);
         totalIgnitions++;
         return true;
     }
@@ -78,7 +80,7 @@ public class FireSystem {
             tickLanterns(g, dt);
             return;
         }
-        float rainFactor = g.weather.isPrecip() ? 0.12f : 1f;
+        float rainFactor = g.weather.isPrecip() ? RAIN_SPREAD_FACTOR : 1f;
         float spreadMul = g.events.fireSpreadMul() * rainFactor;
         // Spread targets are collected first; igniting while iterating would
         // modify the map under the iterator.
@@ -94,13 +96,14 @@ public class FireSystem {
             }
             // Rain extinguishes exposed fires quickly.
             float burnRate = dt;
-            if (g.weather.isPrecip() && g.world.skyLight(p.x(), p.y() + 1, p.z()) > 0.9f) {
-                burnRate = dt * 3.5f;
+            if (g.weather.isPrecip()
+                    && g.world.skyLight(p.x(), p.y() + 1, p.z()) > RAIN_EXPOSURE_SKYLIGHT) {
+                burnRate = dt * RAIN_BURN_RATE_MULT;
             }
             e.setValue(e.getValue() - burnRate);
 
             // Spread.
-            if (rng.nextFloat() < 0.22f * spreadMul) {
+            if (rng.nextFloat() < SPREAD_CHANCE * spreadMul) {
                 int dx = rng.nextInt(3) - 1;
                 int dy = rng.nextInt(3) - 1;
                 int dz = rng.nextInt(3) - 1;
@@ -129,23 +132,25 @@ public class FireSystem {
 
     private void damageNear(Game g, Vec3i p, float dt) {
         float cx = p.x() + 0.5f, cy = p.y() + 0.5f, cz = p.z() + 0.5f;
-        if (g.player.distSqTo(cx, cy, cz) < 2.4f) {
-            g.player.hurt(4f * dt * 2, false);
+        if (g.player.distSqTo(cx, cy, cz) < CONTACT_RANGE_SQ) {
+            g.player.hurt(PLAYER_BURN_DPS * dt, false);
             g.player.damageFlash = 1f;
-            if (!g.player.has(com.veylon.entity.Affliction.BURN) && rng.nextFloat() < 0.5f) {
+            if (!g.player.has(com.veylon.entity.Affliction.BURN)
+                    && rng.nextFloat() < BURN_AFFLICTION_CHANCE) {
                 g.player.addAffliction(com.veylon.entity.Affliction.BURN,
-                        60 + rng.nextFloat() * 40);
+                        BURN_AFFLICTION_SECONDS_MIN
+                                + rng.nextFloat() * BURN_AFFLICTION_SECONDS_RANGE);
                 g.log("The flames sear you - BURNS! Treat them with a herbal poultice.");
             }
         }
         for (Entity c : g.entities.creatures) {
-            if (c.distSqTo(cx, cy, cz) < 2.4f) {
-                c.hurt(5f * dt * 2, false);
+            if (c.distSqTo(cx, cy, cz) < CONTACT_RANGE_SQ) {
+                c.hurt(CREATURE_BURN_DPS * dt, false);
             }
         }
         for (Entity n : g.entities.npcs) {
-            if (n.distSqTo(cx, cy, cz) < 2.4f) {
-                n.hurt(4f * dt * 2, false);
+            if (n.distSqTo(cx, cy, cz) < CONTACT_RANGE_SQ) {
+                n.hurt(NPC_BURN_DPS * dt, false);
             }
         }
     }
@@ -160,7 +165,8 @@ public class FireSystem {
                 continue;
             }
             float fuel = e.getValue() - dt * (g.weather.isPrecip()
-                    && g.world.skyLight(p.x(), p.y() + 1, p.z()) > 0.9f ? 2.2f : 1f);
+                    && g.world.skyLight(p.x(), p.y() + 1, p.z()) > RAIN_EXPOSURE_SKYLIGHT
+                    ? RAIN_CAMPFIRE_DRAIN_MULT : 1f);
             if (fuel <= 0) {
                 it.remove();
                 g.world.setBlock(p.x(), p.y(), p.z(), BlockType.ASH, true);
@@ -175,7 +181,8 @@ public class FireSystem {
     /** Lit lanterns consume their own finite reservoirs; extinguished ones do not. */
     private void tickLanterns(Game g, float dt) {
         for (Vec3i pos : g.world.tickLanterns(dt)) {
-            if (pos.distSq(g.player.pos.x, g.player.pos.y, g.player.pos.z) < 32 * 32) {
+            if (pos.distSq(g.player.pos.x, g.player.pos.y, g.player.pos.z)
+                    < LANTERN_NOTICE_RANGE * LANTERN_NOTICE_RANGE) {
                 g.log("A lantern sputtered out of fuel.");
             }
         }
@@ -190,10 +197,10 @@ public class FireSystem {
                         continue;
                     }
                     Vec3i keg = flame.offset(dx, dy, dz);
-                    if (g.explosions.tryArmKeg(g, keg, 1.5f, false)) {
+                    if (g.explosions.tryArmKeg(g, keg, KEG_FUSE_SECONDS, false)) {
                         g.audio.playFuse(keg.x() + 0.5f, keg.y() + 0.5f, keg.z() + 0.5f);
-                        g.noise.emit(g, keg.x(), keg.y(), keg.z(), 12f, 0.4f,
-                                "fuse", false, null);
+                        g.noise.emit(g, keg.x(), keg.y(), keg.z(), KEG_FUSE_NOISE_RADIUS,
+                                KEG_FUSE_NOISE_STRENGTH, "fuse", false, null);
                         g.log("Flame catches a powder-keg fuse!");
                     }
                 }
