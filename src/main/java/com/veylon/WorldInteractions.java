@@ -268,6 +268,14 @@ final class WorldInteractions {
                 }
                 yield true;
             }
+            case BEACON -> {
+                beaconInteract();
+                yield true;
+            }
+            case BEACON_LIT -> {
+                game.log("The beacon thrums steadily, its signal cutting through the sky.");
+                yield true;
+            }
             default -> false;
         };
     }
@@ -327,7 +335,8 @@ final class WorldInteractions {
                 game.audio.playEat();
                 game.log("Gathered " + HERB_YIELD + " medicinal herbs.");
             }
-            case CAMPFIRE, LANTERN, POWDER_KEG, GATE, ALARM_BELL -> interactWithBlockAt(pos);
+            case CAMPFIRE, LANTERN, POWDER_KEG, GATE, ALARM_BELL, BEACON, BEACON_LIT ->
+                    interactWithBlockAt(pos);
             case CRATE -> game.openCrateAt(pos);
             case WORKBENCH, FURNACE, ANVIL, TANNERY, HERB_STATION, MAP_TABLE ->
                     game.uiMode = Game.UiMode.CRAFTING;
@@ -335,9 +344,6 @@ final class WorldInteractions {
             case RAIN_COLLECTOR -> collectorInteract(pos);
             case BEDROLL -> game.startSleep(false);
             case CAMP_BED -> sleepInBed(pos);
-            case BEACON -> beaconInteract();
-            case BEACON_LIT -> game.log(
-                    "The beacon thrums steadily, its signal cutting through the sky.");
             default -> {
                 return false;
             }
