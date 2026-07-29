@@ -201,6 +201,33 @@ class GameLoopIntegrationTest {
     }
 
     @Test
+    void meleeCooldownDoesNotCarryIntoTheNextWorld() {
+        Game game = new Game();
+        game.newWorld(7717L, true);
+
+        // Land a swing so the melee cooldown is genuinely running, and confirm
+        // it is: a second immediate swing must be refused.
+        assertTrue(game.performPlayerAttack(wolfInReach(game)),
+                "precondition: the first swing lands");
+        assertFalse(game.performPlayerAttack(wolfInReach(game)),
+                "precondition: the melee cooldown blocks an immediate second swing");
+
+        game.newWorld(7717L, true);
+
+        assertTrue(game.performPlayerAttack(wolfInReach(game)),
+                "the first swing in a new world must not be eaten by the previous world's cooldown");
+    }
+
+    /** A fresh wolf placed one block from the player, inside melee reach. */
+    private static com.veylon.entity.Creature wolfInReach(Game game) {
+        com.veylon.entity.Creature wolf = game.entities.spawnCreature(game.world,
+                com.veylon.entity.Creature.CreatureType.WOLF,
+                game.player.pos.x + 1f, game.player.pos.y, game.player.pos.z);
+        assertNotNull(wolf, "precondition: a wolf spawns beside the player");
+        return wolf;
+    }
+
+    @Test
     void twoWorldsFromTheSameSeedAgreeOnSpawnAndTerrain() {
         Game first = new Game();
         first.newWorld(31337L, true);

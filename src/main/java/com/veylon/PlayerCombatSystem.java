@@ -100,13 +100,14 @@ final class PlayerCombatSystem {
     /**
      * Clears per-world combat state so a new or loaded world starts clean.
      *
-     * <p>TODO: {@code attackCooldown} is deliberately left alone to match the
-     * pre-refactor reset exactly. Carrying at most {@value #MELEE_COOLDOWN}s of
-     * melee cooldown across a world change looks unintended, but changing it is
-     * a gameplay change and belongs in its own commit with its own test.
+     * <p>Both cooldowns are cleared. Up to {@value #MELEE_COOLDOWN}s of melee
+     * cooldown used to survive a world change, which meant the first swing in a
+     * new or loaded world could silently do nothing; combat state belongs to the
+     * world being left, not the one being entered.
      */
     void reset() {
         rangedCooldown = 0;
+        attackCooldown = 0;
         selectedBowAmmo = ItemType.ARROW;
         cancelReload();
     }
