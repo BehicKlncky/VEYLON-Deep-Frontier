@@ -18,10 +18,14 @@ import java.util.Set;
 import java.util.function.Predicate;
 
 /**
- * Settlement runtime: resident activation/dormancy, abstract off-screen
- * simulation (food, replenishment, morale), local + faction reputation,
- * capture/occupation/counterattack flow, patrols, bounty hunter parties,
- * alarm state and gate auto-closing.
+ * Settlement runtime: resident activation/dormancy, local + faction reputation,
+ * capture/occupation/counterattack flow, patrols, bounty hunter parties, alarm
+ * state and gate auto-closing.
+ *
+ * <p>The abstract off-screen simulation those dormant settlements run — food,
+ * illness, morale and replenishment — lives in
+ * {@link DormantSettlementSimulation}; this class decides <em>which</em>
+ * settlements are dormant and hands them to it.
  */
 public class SettlementManager {
 
@@ -77,6 +81,8 @@ public class SettlementManager {
     private boolean activeTheftPenaltyApplied;
     /** Persistent group-level state for occupied-outpost counterattacks. */
     public final CounterattackDirector counterattacks = new CounterattackDirector();
+    /** Off-screen food, illness, morale and population for dormant settlements. */
+    private final DormantSettlementSimulation dormantSim = new DormantSettlementSimulation();
 
     /** Admission categories for the single combined NPC budget. */
     public enum NpcCategory {
@@ -98,6 +104,7 @@ public class SettlementManager {
     /** Seeded per world so a given world seed replays identically. */
     public void setRandomSeed(long seed) {
         rng.setSeed(seed);
+        dormantSim.setRandomSeed(seed);
     }
 
     public void reset() {
@@ -109,6 +116,7 @@ public class SettlementManager {
         activeTheftTransferCount = 0;
         activeTheftPenaltyApplied = false;
         counterattacks.reset();
+        dormantSim.reset();
     }
 
     // ------------------------------------------------------------------
@@ -603,7 +611,7 @@ public class SettlementManager {
 
             // Never double-simulate active residents and their dormant records.
             if (!anyLive) {
-                dormantSim(g, s, dt);
+                dormantSim.simulate(s, g, dt);
             }
 
             // Occupied outposts face counterattacks.
@@ -914,147 +922,6 @@ public class SettlementManager {
             case SETTLEMENT_RESIDENT -> available;
         };
         return Math.max(0, available);
-    }
-
-    // ------------------------------------------------------------------
-    // Dormant simulation
-    // ------------------------------------------------------------------
-
-    /** Abstract jobs/stocks/population for settlements without live entities. */
-    private void dormantSim(Game g, Settlement s, float dt) {
-        int pop = s.aliveResidents();
-        if (pop <= 0 && !s.occupied) {
-            return;
-        }
-        s.dormantAccumulator += dt;
-        int steps = 0;
-        while (s.dormantAccumulator >= 60f && steps++ < 20) {
-            s.dormantAccumulator -= 60f;
-            simulateDormantMinute(g, s);
-        }
-
-        // Population replenishment: capacity + food + time + not cleared.
-        s.replenishTimer -= dt;
-        if (s.replenishTimer <= 0) {
-            s.replenishTimer = 420 + rng.nextInt(300);
-            int security = 0;
-            for (Settlement.Resident r : s.residents) {
-                if (r.alive && !r.rescued && !r.routed && !r.surrendered
-                        && (r.archetype == NpcArchetype.GUARD
-                        || r.archetype == NpcArchetype.ARCHER
-                        || r.archetype.hostileArchetype())) {
-                    security++;
-                }
-            }
-            if (!s.cleared && pop > 0 && pop < s.type.maxPopulation
-                    && s.foodStock >= 6 && s.medStock >= 1 && s.morale > 35
-                    && s.alertLevel < 60 && security > 0) {
-                Settlement.Resident template = null;
-                for (Settlement.Resident r : s.residents) {
-                    if (r.alive && !r.rescued && !r.archetype.leader) {
-                        template = r;
-                        break;
-                    }
-                }
-                if (template != null) {
-                    Settlement.Resident newcomer = new Settlement.Resident(
-                            template.name + " kin", template.archetype);
-                    newcomer.bedIndex = s.residents.size();
-                    newcomer.dutyIndex = s.residents.size();
-                    s.residents.add(newcomer);
-                    s.foodStock -= 3;
-                }
-            }
-        }
-    }
-
-    private void simulateDormantMinute(Game g, Settlement s) {
-        s.dormantStep++;
-        int pop = s.aliveResidents();
-        int farmers = 0, workers = 0, medics = 0, smiths = 0;
-        for (Settlement.Resident resident : s.residents) {
-            if (!resident.alive || resident.rescued || resident.routed || resident.surrendered) {
-                continue;
-            }
-            switch (resident.archetype) {
-                case FARMER -> farmers++;
-                case MEDIC -> medics++;
-                case SMITH -> smiths++;
-                case VILLAGER, GUARD, ARCHER, TRADER -> workers++;
-                default -> {
-                }
-            }
-        }
-        // Role-appropriate fixed-step outputs, all capped.
-        s.foodStock = Math.min(999, s.foodStock + Math.max(0, farmers));
-        s.woodStock = Math.min(999, s.woodStock + workers / 3);
-        if (s.woodStock > 0 && smiths > 0 && s.dormantStep % 3 == 0) {
-            s.woodStock--;
-            s.metalStock = Math.min(999, s.metalStock + smiths);
-        }
-        if (medics > 0 && s.foodStock > 0 && s.dormantStep % 4 == 0) {
-            s.foodStock--;
-            s.medStock = Math.min(999, s.medStock + 1);
-        }
-
-        if (s.dormantStep % 2 == 0) {
-            int meals = Math.max(1, (pop + 5) / 6);
-            if (s.foodStock >= meals) {
-                s.foodStock -= meals;
-                for (Settlement.Resident resident : s.residents) {
-                    if (resident.alive) {
-                        resident.hunger = Math.max(0, resident.hunger - 35);
-                    }
-                }
-                s.morale = MathUtil.clamp(s.morale + 0.5f, 0,
-                        s.leaderResident() != null ? 95 : 80);
-            } else {
-                s.foodStock = 0;
-                s.morale = Math.max(0, s.morale - 3f);
-                for (Settlement.Resident resident : s.residents) {
-                    if (resident.alive) {
-                        resident.hunger = Math.min(100, resident.hunger + 20);
-                    }
-                }
-            }
-        }
-
-        for (int i = 0; i < s.residents.size(); i++) {
-            Settlement.Resident resident = s.residents.get(i);
-            if (!resident.alive || resident.rescued || resident.routed || resident.surrendered) {
-                continue;
-            }
-            long rollBits = com.veylon.util.Noise.mix(g.world.seed ^ s.id
-                    ^ (s.dormantStep * 0x9E3779B97F4A7C15L) ^ i);
-            float roll = (rollBits >>> 40) / (float) (1 << 24);
-            if (!resident.sick) {
-                float risk = (s.foodStock == 0 ? 0.025f : 0.002f)
-                        + (s.medStock == 0 ? 0.006f : 0f)
-                        + (s.alertLevel > 70 ? 0.004f : 0f);
-                if (roll < risk) {
-                    resident.sick = true;
-                    resident.sicknessTimer = 0;
-                }
-                continue;
-            }
-            resident.sicknessTimer += 60;
-            if (s.medStock > 0 && medics > 0 && roll < 0.45f) {
-                s.medStock--;
-                resident.sick = false;
-                resident.sicknessTimer = 0;
-                resident.health = Math.min(resident.archetype.maxHealth, resident.health + 8);
-            } else if (resident.sicknessTimer > 600) {
-                resident.health -= s.foodStock == 0 ? 3f : 1.2f;
-                if (resident.health <= 0) {
-                    resident.health = 0;
-                    resident.alive = false;
-                    s.morale = Math.max(0, s.morale - 8);
-                }
-            }
-        }
-        if (s.alertLevel > 70) {
-            s.morale = Math.max(0, s.morale - 1);
-        }
     }
 
     // ------------------------------------------------------------------
