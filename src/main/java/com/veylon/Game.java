@@ -197,6 +197,9 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
     /** Read-only builder for the HUD's "[F] ..." interaction hint. */
     private final InteractPromptBuilder prompts = new InteractPromptBuilder(this);
 
+    /** Crate open/transfer commands and their theft attribution. */
+    private final CrateTransactionSystem crates = new CrateTransactionSystem(this);
+
     // Ranged-weapon aim state the HUD draws. The rules live in PlayerCombatSystem;
     // these stay here because Hud reads them straight off the Game instance.
     /** 0..1 bow draw progress while holding LMB with a bow. */
@@ -225,12 +228,6 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
     public Inventory openCrate;
     public Vec3i openCratePos;
     public Npc activeNpc;
-    private long nextTheftEventId = 1;
-    private long activeTheftEventId = Long.MIN_VALUE;
-    private Vec3i activeTheftEventCrate;
-    private final long[] activeTheftTransferIds = new long[
-            com.veylon.settlement.SettlementManager.MAX_THEFT_TRANSFERS_PER_EVENT];
-    private int activeTheftTransferCount;
 
     private final PlayerInteractionSystem.Commands interactionCommands =
             new PlayerInteractionSystem.Commands() {
@@ -532,10 +529,7 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
         drawingBow = false;
         bowDraw = 0;
         combat.reset();
-        nextTheftEventId = 1;
-        activeTheftEventId = Long.MIN_VALUE;
-        activeTheftEventCrate = null;
-        activeTheftTransferCount = 0;
+        crates.reset();
 
         // Synchronous initial generation around spawn.
         world.ensureChunks(8, 8, 5, 10_000);
@@ -2155,134 +2149,43 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
         }
     }
 
+    // ------------------------------------------------------------------
+    // Crate delegates
+    //
+    // Transaction and theft-attribution rules live in CrateTransactionSystem.
+    // These stay on Game because CrateScreen and the settlement tests drive
+    // crate interaction through the Game instance.
+    // ------------------------------------------------------------------
+
     /** Opens a real world crate; both RMB/F interaction paths use this command. */
     public boolean openCrateAt(Vec3i pos) {
-        if (pos == null || world.getBlock(pos.x(), pos.y(), pos.z()) != BlockType.CRATE) {
-            return false;
-        }
-        settlementManager.onRestrictedStorageOpened(this, pos);
-        openCrate = world.crateContents.computeIfAbsent(pos, k -> new Inventory(12));
-        openCratePos = pos;
-        uiMode = UiMode.CRATE;
-        return true;
+        return crates.openCrateAt(pos);
     }
 
     /** Called by the crate UI; taking from camp crates is stealing unless trusted. */
     public void onCrateItemTaken(ItemType type, int count) {
-        long eventId = nextLogicalTheftEventId();
-        onCrateItemTaken(type, count, eventId, eventId);
+        crates.onCrateItemTaken(type, count);
     }
 
-    /**
-     * Compatibility overload for a logical event with at most one transfer per
-     * item type. Callers batching multiple same-type stacks must supply distinct
-     * transfer ids through the four-argument overload.
-     */
+    /** Attributes one logical crime event with at most one transfer per item type. */
     public void onCrateItemTaken(ItemType type, int count, long logicalEventId) {
-        onCrateItemTaken(type, count, logicalEventId, type == null ? 0 : type.ordinal() + 1L);
+        crates.onCrateItemTaken(type, count, logicalEventId);
     }
 
-    /**
-     * Attributes a callback to one logical crime event and one physical transfer.
-     * Repeated delivery of the same transfer id is idempotent, while different
-     * transfer ids update every stack even when their item types are identical.
-     * The fixed window is cleared by the next event/crate.
-     */
+    /** Attributes a callback to one logical crime event and one physical transfer. */
     public void onCrateItemTaken(ItemType type, int count, long logicalEventId,
                                  long transferId) {
-        if (openCratePos == null || type == null || count <= 0) {
-            return;
-        }
-        boolean newEvent = activeTheftEventId != logicalEventId
-                || !openCratePos.equals(activeTheftEventCrate);
-        if (newEvent) {
-            activeTheftEventId = logicalEventId;
-            activeTheftEventCrate = openCratePos;
-            activeTheftTransferCount = 0;
-        }
-        if (!rememberTheftTransfer(transferId)) {
-            return;
-        }
-        if (newEvent && world.campPos != null && faction.trust < 75
-                && openCratePos.distSq(world.campPos.x(), world.campPos.y(), world.campPos.z()) < 9 * 9) {
-            faction.addTrust(this, -Math.min(12, 3 + count), "The camp caught you stealing!");
-        }
-        // Settlement crates: theft angers the locals.
-        settlementManager.onCrateTheft(
-                this, openCratePos, type, count, logicalEventId, transferId);
-        var settlement = world.settlementAt(openCratePos.x(), openCratePos.z());
-        if (settlement != null && settlement.hostile()) {
-            faction.onStolenSuppliesRecovered(this, settlement,
-                    com.veylon.ai.FactionSystem.settlementStorageId(
-                            settlement.id, openCratePos),
-                    type, count);
-        }
-    }
-
-    private boolean rememberTheftTransfer(long transferId) {
-        for (int i = 0; i < activeTheftTransferCount; i++) {
-            if (activeTheftTransferIds[i] == transferId) {
-                return false;
-            }
-        }
-        if (activeTheftTransferCount >= activeTheftTransferIds.length) {
-            throw new IllegalStateException("logical theft event exceeds transfer limit");
-        }
-        activeTheftTransferIds[activeTheftTransferCount++] = transferId;
-        return true;
-    }
-
-    private long nextLogicalTheftEventId() {
-        long id = nextTheftEventId++;
-        if (nextTheftEventId <= 0) {
-            nextTheftEventId = 1;
-        }
-        return id;
+        crates.onCrateItemTaken(type, count, logicalEventId, transferId);
     }
 
     /** Real crate-UI transfer command used by mouse input and integration tests. */
     public int transferCrateItemToPlayer(int slot) {
-        if (openCrate == null || slot < 0 || slot >= openCrate.size()) {
-            return 0;
-        }
-        ItemStack stack = openCrate.get(slot);
-        if (stack == null) {
-            return 0;
-        }
-        ItemType type = stack.type;
-        int before = stack.count;
-        int leftover = player.inventory.addStack(stack);
-        int taken = before - leftover;
-        openCrate.set(slot, leftover > 0 ? stack : null);
-        if (taken > 0) {
-            audio.playClick();
-            long eventId = nextLogicalTheftEventId();
-            onCrateItemTaken(type, taken, eventId, eventId);
-        }
-        return taken;
+        return crates.transferCrateItemToPlayer(slot);
     }
 
     /** Real crate-UI deposit command; returned supplies are attributed by crate position. */
     public int transferPlayerItemToCrate(int slot) {
-        if (openCrate == null || slot < 0 || slot >= player.inventory.size()) {
-            return 0;
-        }
-        ItemStack stack = player.inventory.get(slot);
-        if (stack == null) {
-            return 0;
-        }
-        ItemType type = stack.type;
-        int before = stack.count;
-        int leftover = openCrate.addStack(stack);
-        int deposited = before - leftover;
-        player.inventory.set(slot, leftover > 0 ? stack : null);
-        if (deposited > 0) {
-            audio.playClick();
-            if (openCratePos != null) {
-                settlementManager.onSuppliesReturned(this, openCratePos, type, deposited);
-            }
-        }
-        return deposited;
+        return crates.transferPlayerItemToCrate(slot);
     }
 
     private void respawn() {
