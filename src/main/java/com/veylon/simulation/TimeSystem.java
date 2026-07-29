@@ -1,65 +1,68 @@
 package com.veylon.simulation;
 
+import static com.veylon.simulation.TimeConstants.*;
+
 /**
  * In-game clock. One full day lasts 15 real minutes
  * (1 real second = 1.6 game minutes).
  */
 public class TimeSystem {
 
-    public static final double MINUTES_PER_REAL_SECOND = 1.6;
-
     /** Total game minutes elapsed since world start (starts at day 1, 08:00). */
-    public double totalMinutes = 8 * 60;
+    public double totalMinutes = START_HOUR * MINUTES_PER_HOUR;
 
     public void advance(double realSeconds) {
         totalMinutes += realSeconds * MINUTES_PER_REAL_SECOND;
     }
 
     public int day() {
-        return (int) (totalMinutes / 1440) + 1;
+        return (int) (totalMinutes / MINUTES_PER_DAY) + 1;
     }
 
     public int hour() {
-        return (int) ((totalMinutes % 1440) / 60);
+        return (int) ((totalMinutes % MINUTES_PER_DAY) / MINUTES_PER_HOUR);
     }
 
     public int minute() {
-        return (int) (totalMinutes % 60);
+        return (int) (totalMinutes % MINUTES_PER_HOUR);
     }
 
+    /** Hour of day as a fraction, e.g. 13.5 for 13:30. */
     public double hourF() {
-        return (totalMinutes % 1440) / 60.0;
+        return (totalMinutes % MINUTES_PER_DAY) / (double) MINUTES_PER_HOUR;
     }
 
-    /** Sun light factor 0.10 (night) .. 1.0 (midday). */
+    /** Sun light factor {@value TimeConstants#NIGHT_LIGHT} (night) .. 1.0 (midday). */
     public double dayLight() {
         double h = hourF();
-        if (h < 5 || h >= 21) {
-            return 0.10;
+        if (h < DAWN_START_HOUR || h >= NIGHT_START_HOUR) {
+            return NIGHT_LIGHT;
         }
-        if (h < 8) {
-            return 0.10 + (h - 5) / 3.0 * 0.90;
+        if (h < DAY_START_HOUR) {
+            // Dawn: ramp up.
+            return NIGHT_LIGHT + (h - DAWN_START_HOUR) / DAWN_DURATION_HOURS * LIGHT_RANGE;
         }
-        if (h < 17) {
-            return 1.0;
+        if (h < DUSK_START_HOUR) {
+            return FULL_LIGHT;
         }
-        return 1.0 - (h - 17) / 4.0 * 0.90;
+        // Dusk: ramp down.
+        return FULL_LIGHT - (h - DUSK_START_HOUR) / DUSK_DURATION_HOURS * LIGHT_RANGE;
     }
 
     public boolean isNight() {
         double h = hourF();
-        return h >= 21 || h < 5;
+        return h >= NIGHT_START_HOUR || h < DAWN_START_HOUR;
     }
 
     public String phase() {
         double h = hourF();
-        if (h >= 5 && h < 8) {
+        if (h >= DAWN_START_HOUR && h < DAY_START_HOUR) {
             return "Dawn";
         }
-        if (h >= 8 && h < 17) {
+        if (h >= DAY_START_HOUR && h < DUSK_START_HOUR) {
             return "Day";
         }
-        if (h >= 17 && h < 21) {
+        if (h >= DUSK_START_HOUR && h < NIGHT_START_HOUR) {
             return "Dusk";
         }
         return "Night";
@@ -68,7 +71,9 @@ public class TimeSystem {
     /** Diurnal temperature offset in degrees C: coldest ~04:00, warmest ~14:00. */
     public float tempOffset() {
         double h = hourF();
-        return (float) (-7.0 * Math.cos((h - 14.0) / 24.0 * 2 * Math.PI) - 1.0);
+        return (float) (-DIURNAL_TEMP_AMPLITUDE
+                * Math.cos((h - WARMEST_HOUR) / HOURS_PER_DAY * 2 * Math.PI)
+                - DIURNAL_TEMP_BIAS);
     }
 
     public String timeString() {

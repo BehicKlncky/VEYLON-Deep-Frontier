@@ -10,14 +10,14 @@ import java.util.HashSet;
 import java.util.Random;
 import java.util.Set;
 
+import static com.veylon.simulation.WaterConstants.*;
+
 /**
  * Cellular tick-based water: flows down into air, spreads sideways only at or
  * below sea level (self-limiting), refills rain puddles in depressions.
  * Budgeted per tick so it can never stall the game.
  */
 public class WaterSystem {
-
-    private static final int BUDGET_PER_TICK = 80;
 
     private final ArrayDeque<Vec3i> queue = new ArrayDeque<>();
     private final Set<Vec3i> scheduled = new HashSet<>();
@@ -82,9 +82,9 @@ public class WaterSystem {
 
         // Rain slowly fills shallow depressions and refreshes lakes.
         if (g.weather.isPrecip() && g.weather.effective() != WeatherSystem.Weather.SNOW) {
-            for (int i = 0; i < 4; i++) {
-                int x = (int) (g.player.pos.x + rng.nextInt(65) - 32);
-                int z = (int) (g.player.pos.z + rng.nextInt(65) - 32);
+            for (int i = 0; i < RAIN_FILL_ATTEMPTS; i++) {
+                int x = (int) (g.player.pos.x + rng.nextInt(RAIN_FILL_SPAN) - RAIN_FILL_RADIUS);
+                int z = (int) (g.player.pos.z + rng.nextInt(RAIN_FILL_SPAN) - RAIN_FILL_RADIUS);
                 if (world.getChunk(Math.floorDiv(x, 16), Math.floorDiv(z, 16)) == null) {
                     continue;
                 }
