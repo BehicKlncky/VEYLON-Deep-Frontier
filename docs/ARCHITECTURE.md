@@ -109,9 +109,11 @@ playable world, used by New Game, by save loading and by the QA harness. It
 1. Release GPU meshes of the outgoing world (`releaseWorldMeshes`).
 2. Reset every cross-world queue: scheduler, fire, water, events, plants, item
    conditions, noise, projectiles, explosions, settlements.
-3. Reseed the deterministic RNGs — particles, ambient emitters, and the *static*
-   AI jitter generators (`SettledNpcAI`, `CreatureAI`, `NpcAI`). Without this,
-   a second world in the same process would inherit RNG state from the first.
+3. `reseedSimulation(seed)` — seeds all 15 simulation generators, each with a
+   distinct salt so their streams stay independent. Without this, a second
+   world in the same process inherits RNG state from the first, which is what
+   made a settlement test intermittently fail. Presentation-only randomness
+   (`AudioManager`, `NpcScreen`) is deliberately excluded.
 4. Construct `World` and `Player`; register `Game` as `world.listener`.
 5. Clear entities and the event log; reset faction standing and the clock.
 6. Clear player action state: UI mode, mining, bow draw, reload, sleep, theft

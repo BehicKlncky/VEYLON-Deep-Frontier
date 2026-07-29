@@ -13,7 +13,7 @@ Setup requirements (JDK 25, OpenGL 3.3, the proxy workaround) are in
 
 ```bash
 ./gradlew run            # play the game
-./gradlew test           # 236 tests, headless, ~75 s (one is flaky, see below)
+./gradlew test           # 240 deterministic tests, headless, ~80 s
 ./gradlew build          # compile + test
 ./gradlew fatJar         # self-contained JAR in build/libs/
 ```
@@ -65,10 +65,12 @@ VEYLON_SEED=20260716 VEYLON_SCENE=day VEYLON_SHOT=6 ./gradlew run
    `dropCount`.
 2. Give it a material in `MaterialRegistry` (texture, tint, light emission).
 3. If it is not a full cube, handle its shape in `ChunkMesher`.
-4. If breaking it should have side effects (contents, fuel, reputation), add a
-   case to `Game.breakBlock`.
+4. If breaking it should have side effects, add a case to the right helper in
+   `PlayerBlockActions`: `spillContainerContents` for stored contents,
+   `awardDrops` for yields, `applyVandalismConsequences` for reputation.
 5. If it is interactable, add a prompt case in `InteractPromptBuilder` and a
-   handler case in `Game.rightClick` / `Game.interact`.
+   handler case in `WorldInteractions.rightClick` /
+   `WorldInteractions.interactWithTargetBlock`.
 
 ### An item
 
@@ -128,12 +130,14 @@ VEYLON_SEED=20260716 VEYLON_SCENE=day VEYLON_SHOT=6 ./gradlew run
 
 ### A simulation system
 
-1. New class in `simulation/`, with a `reset()`.
+1. New class in `simulation/`, with a `reset()` and a constants class beside it.
 2. Call its tick from the right bucket in `Game.fastTick`/`mediumTick`/
    `slowTick` — pick the *slowest* bucket that still feels responsive.
 3. Call its `reset()` from `Game.newWorld` and assert that in
    `GameLoopIntegrationTest.newWorldClearsSimulationQueuesAndPlayerActionState`.
-4. If it holds state that must survive a save, add a v3 extension section in
+4. If it holds a `Random`, give it `setRandomSeed(long)` and seed it from
+   `Game.reseedSimulation` with a salt no other system uses.
+5. If it holds state that must survive a save, add a v3 extension section in
    `SaveSystem` — do not change the base v3 layout.
 
 ---
@@ -164,9 +168,14 @@ a context. Drive gameplay through the tick methods and the command seams
 `interactWithBlockAt`, …), which exist precisely so tests don't have to
 synthesize GLFW input.
 
-**Static RNGs are shared across tests.** `SettledNpcAI`, `CreatureAI` and
-`NpcAI` hold static `Random` instances. `Game.newWorld` reseeds them per world
-so runs replay deterministically; if you add a static RNG, reseed it there too.
+**Any new `Random` must be seeded from the world seed.**
+`Game.reseedSimulation` seeds all 15 simulation generators, each with a
+distinct salt so their streams stay independent. Add yours there.
+`WorldSeedDeterminismTest` reflects over every `Random` reachable from `Game`
+and fails with your field's name if you forget — that test exists because ten
+generators were previously missed, which made a settlement test intermittently
+fail depending on what ran before it. Presentation-only randomness
+(`AudioManager`, `NpcScreen`) is exempt and listed in that test.
 
 **Adding transient player state?** Decide explicitly whether it survives a save.
 Reload progress and bow draw deliberately do not.
@@ -190,13 +199,6 @@ Reload progress and bow draw deliberately do not.
 ## Known rough edges
 
 Tracked honestly so nobody rediscovers them:
-
-- **`CounterattackLifecycleTest.activePartyLeavesARealHostileOriginAndContactLossDoesNotDeleteMission`
-  is flaky.** It asserts a war party closed distance over 120 ticks, but party
-  movement runs on the unseeded static `SettledNpcAI.RNG` and
-  `SettlementManager.rng`. It passes almost always and fails occasionally.
-  Fixing it means seeding those generators for the test, which is a determinism
-  change rather than a refactor.
 
 - **`PlayerCombatSystem.reset()` leaves `attackCooldown` alone**, matching the
   pre-refactor behaviour exactly. Carrying up to 0.45 s of melee cooldown across
