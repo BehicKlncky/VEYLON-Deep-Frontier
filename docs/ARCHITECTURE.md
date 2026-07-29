@@ -287,7 +287,18 @@ in a named collaborator:
 | `SleepSystem` | sleep eligibility, quality scoring, night effects |
 | `QaHarness` | benchmark scenes, showcases, release smoke gate |
 
-Tuning values are in `PlayerConstants`, `TimeConstants`,
-`TemperatureConstants`, `WaterConstants`, and as named constants inside each
-collaborator above. The remaining simulation systems still hold inline
-literals; see [DEVELOPING.md](DEVELOPING.md#known-rough-edges).
+Tuning values live in `PlayerConstants` plus one constants class per
+simulation system — `TimeConstants`, `TemperatureConstants`, `WaterConstants`,
+`WeatherConstants`, `FireConstants`, `PlantConstants`, `EventConstants` — and
+as named constants inside each collaborator above.
+
+Two conventions worth knowing when you edit them:
+
+- **Per-state values belong on the enum, not in a switch.**
+  `WeatherSystem.Weather` carries its own intensity, light, grayness, fog
+  distances and temperature offset. That replaced six parallel switches, and it
+  means the compiler now rejects a new weather state that forgets a value.
+- **Constant extraction must not regroup float arithmetic.** IEEE754
+  multiplication is not associative, so hoisting a shared subexpression out of
+  two probability thresholds can shift them by an ULP. `PlantSystem` carries a
+  comment where this bit.

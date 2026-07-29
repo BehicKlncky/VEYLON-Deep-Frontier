@@ -116,6 +116,16 @@ VEYLON_SEED=20260716 VEYLON_SCENE=day VEYLON_SHOT=6 ./gradlew run
    `Player.tickAfflictions`.
 3. Add a cure path in `PlayerTreatmentSystem` and the item that applies it.
 
+### A world event
+
+1. Append to `EventSystem.EventType`.
+2. Add a roll bound and a duration to `EventConstants`. The bounds are
+   cumulative and tested in ascending order, so inserting one means shifting
+   every bound after it — only the gaps between them are meaningful.
+3. Add the branch to the ladder in `EventSystem.slowTick`, in bound order.
+4. Add whatever modifier query other systems need (`growthMul`, `thirstMul`,
+   `wolfCapBonus`, …) rather than having them check `isActive` directly.
+
 ### A simulation system
 
 1. New class in `simulation/`, with a `reset()`.
@@ -193,13 +203,13 @@ Tracked honestly so nobody rediscovers them:
   a world change looks unintended; there is a `TODO` on the method. Changing it
   is a gameplay change and needs its own test.
 
-- **Four simulation systems still hold inline literals.** `PlayerConstants`,
-  `TimeConstants`, `TemperatureConstants` and `WaterConstants` exist, and each
-  collaborator extracted from `Game` names its own values. Still outstanding:
-  `WeatherSystem` (237 lines, no constants), `EventSystem` (397 lines, none),
-  `FireSystem` and `PlantSystem`. Follow the pattern in `TimeConstants`:
-  extract verbatim, then diff the numeric literals before and after to prove
-  nothing drifted.
+- **`EventSystem`'s roll ladder is still 13 chained `else if` branches.** The
+  thresholds are named now, but adding an event still means inserting a branch
+  in the right place and shifting the bounds after it. A table would be nicer;
+  it was left alone because each branch has different preconditions and side
+  effects, so converting it is a behavioral change rather than a rename.
+  `WeatherSystem` shows the shape to aim for — its per-state values moved onto
+  the enum, and the compiler now enforces completeness.
 
 - **No system interfaces exist.** Phases 1 and 3 of the 0.4.0 brief called for
   nine interfaces, nine facades and a service locator. They were not built: as
