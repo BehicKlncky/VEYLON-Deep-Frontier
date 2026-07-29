@@ -17,7 +17,7 @@ import static com.veylon.simulation.FireConstants.*;
  * Tick-based fire: burning blocks spread to flammable neighbors, damage nearby
  * entities, and finally turn to ash/air. Rain suppresses, drought accelerates.
  */
-public class FireSystem {
+public class FireSystem implements MediumTickSystem {
 
     /** Hard ceiling for simultaneously burning world cells. */
     public static final int MAX_ACTIVE_FIRES = 220;
@@ -34,6 +34,7 @@ public class FireSystem {
         return burning.size();
     }
 
+    @Override
     public void reset() {
         burning.clear();
         totalIgnitions = 0;
@@ -74,6 +75,7 @@ public class FireSystem {
         return best;
     }
 
+    @Override
     public void mediumTick(Game g, float dt) {
         if (burning.isEmpty()) {
             tickCampfires(g, dt);

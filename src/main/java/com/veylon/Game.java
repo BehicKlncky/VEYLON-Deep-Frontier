@@ -489,6 +489,9 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
         // its bounded GPU meshes and reset cross-world simulation queues first.
         releaseWorldMeshes();
         scheduler.reset();
+        time.reset();
+        weather.reset();
+        temperature.reset();
         fire.reset();
         water.reset();
         events.reset();
@@ -516,11 +519,6 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
         faction.upgradeStage = 0;
         faction.resetQuestRuntime();
         faction.alliedGiftGiven = false;
-        time.totalMinutes = 8 * 60;
-        weather.current = WeatherSystem.Weather.CLEAR;
-        weather.next = WeatherSystem.Weather.CLEAR;
-        weather.blend = 1f;
-        weather.changeTimer = 100;
         sleeping = false;
         sleepFade = 0;
         simPaused = false;

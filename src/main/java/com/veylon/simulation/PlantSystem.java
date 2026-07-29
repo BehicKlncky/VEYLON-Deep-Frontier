@@ -15,12 +15,13 @@ import static com.veylon.simulation.PlantConstants.*;
  * sapling growth and tree seeding. Rain raises moisture, drought lowers it,
  * cold slows everything.
  */
-public class PlantSystem {
+public class PlantSystem implements SlowTickSystem {
 
     private final Random rng = new Random();
     public long growthEvents = 0;
     public float lastAvgMoisture = DEFAULT_MOISTURE;
 
+    @Override
     public void reset() {
         growthEvents = 0;
         lastAvgMoisture = DEFAULT_MOISTURE;
@@ -31,6 +32,7 @@ public class PlantSystem {
         rng.setSeed(seed);
     }
 
+    @Override
     public void slowTick(Game g, float dt) {
         World world = g.world;
         int pcx = Math.floorDiv((int) g.player.pos.x, 16);

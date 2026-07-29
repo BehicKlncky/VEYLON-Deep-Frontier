@@ -18,7 +18,7 @@ import static com.veylon.simulation.EventConstants.*;
  * season and time instead of being purely random timers. Every event changes
  * real systems: temperature, growth, fire spread, wildlife, NPC behavior.
  */
-public class EventSystem {
+public class EventSystem implements SlowTickSystem {
 
     public enum EventType {
         STORM_FRONT("Storm Front"),
@@ -67,6 +67,7 @@ public class EventSystem {
         rng.setSeed(seed);
     }
 
+    @Override
     public void reset() {
         active.clear();
         cooldown = INITIAL_COOLDOWN;
@@ -182,6 +183,7 @@ public class EventSystem {
      * The conversion must reproduce the fall-through semantics and the camp
      * illness exception described above.
      */
+    @Override
     public void slowTick(Game g, float dt) {
         for (Iterator<ActiveEvent> it = active.iterator(); it.hasNext(); ) {
             ActiveEvent e = it.next();

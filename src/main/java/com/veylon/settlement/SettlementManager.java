@@ -27,7 +27,8 @@ import java.util.function.Predicate;
  * {@link DormantSettlementSimulation}; this class decides <em>which</em>
  * settlements are dormant and hands them to it.
  */
-public class SettlementManager {
+public class SettlementManager
+        implements com.veylon.simulation.FastTickSystem, com.veylon.simulation.SlowTickSystem {
 
     /** Residents materialize as live NPCs inside this range of the player. */
     public static final float ACTIVATE_RADIUS = 96f;
@@ -107,6 +108,7 @@ public class SettlementManager {
         dormantSim.setRandomSeed(seed);
     }
 
+    @Override
     public void reset() {
         bountyPartyCooldown = 120f;
         partySequence = 0;
@@ -555,6 +557,7 @@ public class SettlementManager {
     // ------------------------------------------------------------------
 
     /** Fast tick (20 Hz): gates plus bounded active/abstract counterattacks. */
+    @Override
     public void fastTick(Game g, float dt) {
         tickGates(g, dt);
         counterattacks.tick(g, dt);
@@ -581,6 +584,7 @@ public class SettlementManager {
     }
 
     /** Slow tick (~10 s): discovery, activation, dormant sim, parties. */
+    @Override
     public void slowTick(Game g, float dt) {
         float px = g.player.pos.x, pz = g.player.pos.z;
 

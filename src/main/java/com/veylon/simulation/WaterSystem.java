@@ -17,7 +17,7 @@ import static com.veylon.simulation.WaterConstants.*;
  * below sea level (self-limiting), refills rain puddles in depressions.
  * Budgeted per tick so it can never stall the game.
  */
-public class WaterSystem {
+public class WaterSystem implements MediumTickSystem {
 
     private final ArrayDeque<Vec3i> queue = new ArrayDeque<>();
     private final Set<Vec3i> scheduled = new HashSet<>();
@@ -52,12 +52,14 @@ public class WaterSystem {
         return queue.size();
     }
 
+    @Override
     public void reset() {
         queue.clear();
         scheduled.clear();
         cellsProcessed = 0;
     }
 
+    @Override
     public void mediumTick(Game g, float dt) {
         World world = g.world;
         int processed = 0;

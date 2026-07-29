@@ -15,12 +15,24 @@ import static com.veylon.simulation.TemperatureConstants.*;
  * Environmental temperature model: biome + time of day + weather + altitude +
  * underground stabilization + nearby fire heat.
  */
-public class TemperatureSystem {
+public class TemperatureSystem implements MediumTickSystem {
 
     /** Cached heat sources near the player (campfires, torches, burning blocks). */
     private final List<float[]> heatSources = new ArrayList<>();
 
+    /**
+     * Drops the cached heat sources, which name block positions in the world
+     * being left. Without this, a temperature query taken between a world
+     * change and the first medium tick of the new world would warm the player
+     * from a campfire that no longer exists.
+     */
+    @Override
+    public void reset() {
+        heatSources.clear();
+    }
+
     /** Refreshed on the medium tick; scans loaded light sources near the player. */
+    @Override
     public void mediumTick(Game g, float dt) {
         heatSources.clear();
         int pcx = Math.floorDiv((int) g.player.pos.x, 16);
