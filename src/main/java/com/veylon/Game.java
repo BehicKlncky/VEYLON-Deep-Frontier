@@ -205,6 +205,12 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
     /** F-key and right-click handlers against world state, NPCs and stations. */
     private final WorldInteractions interactions = new WorldInteractions(this);
 
+    /** Ambient particle emitters and the ambient audio mix. */
+    private final AmbienceSystem ambience = new AmbienceSystem(this);
+
+    /** Sleep eligibility, quality scoring and the night's effects. */
+    private final SleepSystem sleep = new SleepSystem(this);
+
     // Ranged-weapon aim state the HUD draws. The rules live in PlayerCombatSystem;
     // these stay here because Hud reads them straight off the Game instance.
     /** 0..1 bow draw progress while holding LMB with a bow. */
@@ -494,7 +500,7 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
         settlementManager.reset();
         particles.count = 0;
         particles.setRandomSeed(seed ^ 0x5645594c4f4eL);
-        emitterRng.setSeed(seed ^ 0x46584c4f4eL);
+        ambience.reseed(seed ^ 0x46584c4f4eL);
         // Static AI decision jitter must also replay deterministically per seed;
         // otherwise QA runs and tests inherit RNG state from earlier worlds.
         com.veylon.ai.SettledNpcAI.reseed(seed ^ 0x5345544e5043L);
@@ -891,166 +897,22 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
         }
     }
 
-    private final Random emitterRng = new Random();
-
     /** Ambient particle and sound emitters driven by world state. */
     private void updateEmitters(float dt) {
-        emitterTimer -= dt;
-        if (emitterTimer > 0) {
-            return;
-        }
-        emitterTimer = 0.12f;
-        Random rng = emitterRng;
-        float px = player.pos.x, py = player.pos.y, pz = player.pos.z;
-
-        // Precipitation around the player.
-        if (weather.isPrecip() && player.exposedToSky) {
-            boolean snow = weather.effective() == WeatherSystem.Weather.SNOW;
-            int n = (int) (5 * weather.intensity());
-            for (int i = 0; i < n; i++) {
-                float x = px + (rng.nextFloat() * 2 - 1) * 11;
-                float z = pz + (rng.nextFloat() * 2 - 1) * 11;
-                if (snow) {
-                    particles.snowflake(x, py + 6 + rng.nextFloat() * 5, z);
-                } else {
-                    particles.rainDrop(x, py + 6 + rng.nextFloat() * 5, z);
-                    if (rng.nextFloat() < 0.5f) {
-                        int gx = (int) x, gz = (int) z;
-                        if (world.getChunk(Math.floorDiv(gx, 16), Math.floorDiv(gz, 16)) != null) {
-                            particles.rainSplash(x, world.surfaceHeight(gx, gz) + 1.05f, z);
-                        }
-                    }
-                }
-            }
-        }
-        // Ashfall drifts grey flakes everywhere.
-        if (events.ashfall()) {
-            for (int i = 0; i < 3; i++) {
-                particles.ashFlake(px + (rng.nextFloat() * 2 - 1) * 10,
-                        py + 5 + rng.nextFloat() * 5, pz + (rng.nextFloat() * 2 - 1) * 10);
-            }
-        }
-        // Toxic fog carries slow, sickly motes at eye and ground level.
-        if (events.toxicFog()) {
-            for (int i = 0; i < 2; i++) {
-                particles.toxicMote(px + (rng.nextFloat() * 2 - 1) * 9,
-                        py + 0.3f + rng.nextFloat() * 2.2f,
-                        pz + (rng.nextFloat() * 2 - 1) * 9);
-            }
-        }
-        // Fire smoke and embers (burning blocks and fueled campfires).
-        for (Vec3i p : fire.burningCells()) {
-            if (p.distSq(px, py, pz) < 40 * 40) {
-                particles.smoke(p.x() + 0.5f, p.y() + 1f, p.z() + 0.5f, 1f);
-                particles.flame(p.x() + 0.5f, p.y() + 0.2f, p.z() + 0.5f);
-                if (rng.nextFloat() < 0.5f) {
-                    particles.ember(p.x() + 0.5f, p.y() + 0.6f, p.z() + 0.5f);
-                }
-            }
-        }
-        for (Vec3i p : world.campfireFuel.keySet()) {
-            if (p.distSq(px, py, pz) < 35 * 35
-                    && world.getBlock(p.x(), p.y(), p.z()) == BlockType.CAMPFIRE) {
-                particles.smoke(p.x() + 0.5f, p.y() + 0.7f, p.z() + 0.5f, 0.6f);
-                particles.flame(p.x() + 0.5f, p.y() + 0.15f, p.z() + 0.5f);
-                if (rng.nextFloat() < 0.35f) {
-                    particles.ember(p.x() + 0.5f, p.y() + 0.4f, p.z() + 0.5f);
-                }
-            }
-        }
-        // The active distress beacon sheds a bounded stream of cyan energy motes.
-        if (world.beaconStage >= 3 && world.beaconPos != null
-                && world.beaconPos.distSq(px, py, pz) < 55 * 55) {
-            Vec3i bp = world.beaconPos;
-            particles.beaconMote(bp.x() + 0.5f, bp.y() + 0.3f, bp.z() + 0.5f);
-            if (rng.nextFloat() < 0.45f) {
-                particles.beaconMote(bp.x() + 0.5f, bp.y() + 1.2f, bp.z() + 0.5f);
-            }
-        }
-        // Cold breath.
-        breathTimer -= 0.12f;
-        if (breathTimer <= 0 && player.envTemp < 2 && !player.inWater) {
-            breathTimer = 2.6f;
-            Vector3f f = camera.front();
-            particles.breath(camera.position.x, camera.position.y - 0.15f, camera.position.z, f.x, f.z);
-        }
-        // Coughing while smoke-poisoned.
-        coughTimer -= 0.12f;
-        if (coughTimer <= 0 && player.has(Affliction.SMOKE)) {
-            coughTimer = 3.5f;
-            audio.playCough();
-        }
+        ambience.updateEmitters(dt);
     }
 
     // ------------------------------------------------------------------
     // Sleep
     // ------------------------------------------------------------------
 
+    /** Attempts to begin sleeping; refusal is logged by the sleep system. */
     void startSleep(boolean campBed) {
-        Creature threat = entities.nearestCreature(player.pos.x, player.pos.y, player.pos.z, 12,
-                c -> c.type.predator);
-        if (threat != null) {
-            log("Too dangerous to sleep - a predator prowls nearby!");
-            return;
-        }
-        boolean night = time.hourF() >= 19 || time.hourF() < 5;
-        if (!night && player.fatigue < 55) {
-            log("You aren't tired enough to sleep (wait for night or fatigue 55+).");
-            return;
-        }
-        ShelterSystem.Shelter sh = ShelterSystem.evaluate(world, player.pos.x, player.pos.y, player.pos.z);
-        float quality = 0.35f;
-        quality += sh.coverage() * 0.3f;
-        if (campBed) {
-            quality += 0.2f;
-        }
-        if (player.nearFireHeat(this) > 3) {
-            quality += 0.15f;
-        }
-        if (player.wetness > 0.5f) {
-            quality -= 0.25f;
-        }
-        if (player.envTemp < 0) {
-            quality -= 0.2f;
-        }
-        sleepQuality = Math.max(0.1f, Math.min(1f, quality));
-        sleeping = true;
-        sleptMinutes = 0;
-        audio.playSleep();
-        log("You settle down to sleep" + (sleepQuality > 0.7f ? " comfortably."
-                : (sleepQuality < 0.4f ? " - cold, wet and uneasy." : ".")));
+        sleep.startSleep(campBed);
     }
 
     private void tickSleep(float dt) {
-        sleepFade = Math.min(1f, sleepFade + dt * 1.5f);
-        float minutes = dt * 170f;
-        time.totalMinutes += minutes;
-        sleptMinutes += minutes;
-
-        // Reduced needs while asleep, faster fatigue recovery with quality.
-        player.fatigue = Math.max(0, player.fatigue - dt * 9f * sleepQuality);
-        player.hunger = Math.max(0, player.hunger - dt * 0.10f);
-        player.thirst = Math.max(0, player.thirst - dt * 0.14f);
-        if (sleepQuality < 0.4f) {
-            player.bodyTemp -= dt * 0.25f;
-        }
-
-        boolean morning = time.hourF() >= 5.5f && time.hourF() < 9 && sleptMinutes > 90;
-        boolean rested = player.fatigue <= 1 && sleptMinutes > 120;
-        boolean attacked = player.damageFlash > 0.5f;
-        if (morning || rested || attacked) {
-            sleeping = false;
-            if (attacked) {
-                log("You are attacked in your sleep!");
-            } else {
-                log("You wake after " + (int) (sleptMinutes / 60f * 10) / 10f + " hours. Fatigue "
-                        + (int) player.fatigue + ".");
-                if (sleepQuality < 0.4f && Math.random() < 0.45) {
-                    player.addAffliction(Affliction.SICKNESS, 150);
-                    log("That miserable night left you SICK. Sleep warm, dry and sheltered.");
-                }
-            }
-        }
+        sleep.tickSleep(dt);
     }
 
     private void handleGlobalKeys() {
@@ -1520,38 +1382,7 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
             }
         }
 
-        updateAmbienceMix();
-    }
-
-    private void updateAmbienceMix() {
-        boolean snow = weather.effective() == WeatherSystem.Weather.SNOW;
-        float rainGain = weather.isPrecip() && !snow
-                ? weather.intensity() * (player.exposedToSky ? 1f : 0.45f) : 0f;
-        float windGain = 0f;
-        if (weather.isStormy()) {
-            windGain = 0.9f;
-        } else if (snow || player.pos.y > 52) {
-            windGain = 0.45f;
-        } else if (weather.effective() == WeatherSystem.Weather.CLOUDY) {
-            windGain = 0.2f;
-        }
-        float fireHeat = player.nearFireHeat(this);
-        float fireGain = fireHeat > 1 ? Math.min(1f, fireHeat / 14f) : 0f;
-        int surface = world.surfaceHeight((int) player.pos.x, (int) player.pos.z);
-        float caveGain = player.pos.y < surface - 5 ? 0.9f : 0f;
-        boolean cricketBiome = player.biome == com.veylon.world.Biome.MEADOW
-                || player.biome == com.veylon.world.Biome.PINE_FOREST
-                || player.biome == com.veylon.world.Biome.MARSH;
-        float cricketGain = time.isNight() && !weather.isPrecip() && caveGain == 0 && cricketBiome
-                ? 0.8f : 0f;
-        float beaconGain = 0f;
-        if (world.beaconStage >= 3 && world.beaconPos != null) {
-            double d = world.beaconPos.distSq(player.pos.x, player.pos.y, player.pos.z);
-            if (d < 22 * 22) {
-                beaconGain = (float) (1.0 - Math.sqrt(d) / 22.0);
-            }
-        }
-        audio.setAmbience(rainGain, windGain, fireGain, caveGain, cricketGain, beaconGain);
+        ambience.updateAmbienceMix();
     }
 
     @Override
