@@ -16,7 +16,7 @@ import java.util.Random;
  * maintainability and testability of the dormant simulation logic. The rules
  * are unchanged; only their owner moved.
  *
- * <h4>Determinism</h4>
+ * <h2>Determinism</h2>
  *
  * <p>Two independent sources of randomness feed this simulation, and the split
  * is deliberate:

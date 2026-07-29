@@ -99,42 +99,46 @@ public class EventSystem implements SlowTickSystem {
      *
      * <h4>The roll ladder</h4>
      *
-     * <p>A single {@code rng.nextFloat()} is compared against the {@code *_ROLL}
-     * bounds in {@link EventConstants}, which are <em>cumulative</em> upper
-     * bounds in ascending order rather than per-event probabilities. Each event's
-     * actual share of the probability space is the gap between its bound and the
-     * previous one, so a bound can only be understood relative to its neighbours:
-     * moving one silently re-weights the event above it as well. A roll above
-     * {@link EventConstants#LONE_METEOR_ROLL} (0.43) means no event this tick,
-     * which is the common case.
+     * <p>A single {@code rng.nextFloat()} is walked against {@link
+     * #DEFINITIONS}, an ordered table of {@link EventDefinition}s. Their bounds
+     * come from the {@code *_ROLL} values in {@link EventConstants}, which are
+     * <em>cumulative</em> upper bounds in ascending order rather than per-event
+     * probabilities. Each event's actual share of the probability space is the
+     * gap between its bound and the previous one, so a bound can only be
+     * understood relative to its neighbours: moving one silently re-weights the
+     * event above it as well. A roll above {@link
+     * EventConstants#LONE_METEOR_ROLL} (0.43) means no event this tick, which is
+     * the common case.
      *
      * <p>Season bias is applied to the <em>bound</em>, not to the roll, and only
-     * on the branches that name it. Widening one branch's bound takes space from
-     * the branch after it, because the ladder short-circuits at the first match:
-     * during a cold season, {@code COLD_SNAP_ROLL + 0.08} eats into the heat
-     * wave's window, which is the intent.
+     * on the rungs that name a season. Widening one rung's bound takes space
+     * from the rung after it, because the walk stops at the first match: during
+     * a cold season, {@code COLD_SNAP_ROLL + 0.08} eats into the heat wave's
+     * window, which is the intent.
      *
      * <h4>Fall-through is load-bearing</h4>
      *
-     * <p>The branches are chained with {@code else if}, so a branch whose
-     * precondition fails does not abort the roll — evaluation continues and the
-     * <em>next</em> event in the ladder gets a chance at the same roll. Every
-     * later bound is higher than the one that just failed, so the next branch's
-     * range test passes automatically and the roll effectively slides upward
-     * until some event accepts it. This is why an already-active cold snap turns
-     * a low roll into a heat wave rather than into nothing, and it is the
-     * behaviour any restructuring of this method must preserve.
+     * <p>A rung whose precondition fails does not abort the roll — the walk
+     * continues and the <em>next</em> event gets a chance at the same roll.
+     * Every later bound is higher than the one that just failed, so the next
+     * rung's range test passes automatically and the roll effectively slides
+     * upward until some event accepts it. This is why an already-active cold
+     * snap turns a low roll into a drought rather than into nothing, and it is
+     * the behaviour any further restructuring must preserve.
+     * {@code EventRollLadderTest} records the resulting distribution precisely
+     * so that a change to it cannot pass unnoticed.
      *
      * <p>The one deliberate exception is camp illness: its "a healthy camp NPC
-     * exists" test lives <em>inside</em> the branch rather than in the condition,
-     * so a camp with nobody left to fall ill consumes the roll and no event
-     * fires. Hoisting that test into the branch condition would let the roll fall
-     * through and carve a lone meteor crater instead — a real gameplay change.
+     * exists" test lives in the rung's <em>effect</em> rather than its
+     * precondition, so a camp with nobody left to fall ill consumes the roll and
+     * no event fires. Moving that test into the precondition would let the roll
+     * fall through and carve a lone meteor crater instead — a real gameplay
+     * change.
      *
-     * <h4>Branches, in ladder order</h4>
+     * <h4>Rungs, in table order</h4>
      *
      * <table>
-     *   <caption>Each branch's bound, extra precondition and side effects</caption>
+     *   <caption>Each rung's bound, extra precondition and side effects</caption>
      *   <tr><th>Bound</th><th>Event</th><th>Precondition beyond "not already
      *       active"</th><th>Side effects beyond starting the event</th></tr>
      *   <tr><td>0.06 (+0.08 cold)</td><td>Cold snap</td><td>no heat wave active
@@ -177,11 +181,10 @@ public class EventSystem implements SlowTickSystem {
      *       </tr>
      * </table>
      *
-     * <p>TODO (v0.4.1, Phase 2): replace this ladder with a table of event
-     * definitions carrying their own bound, precondition and effect, so that
-     * adding an event no longer means splicing a branch into the right position.
-     * The conversion must reproduce the fall-through semantics and the camp
-     * illness exception described above.
+     * <p>Adding an event means adding one {@link EventDefinition} at the right
+     * position and raising every bound above it, rather than splicing a branch
+     * into the middle of a conditional chain. The table above still has to be
+     * updated by hand, because JavaDoc cannot read the definitions.
      */
     @Override
     public void slowTick(Game g, float dt) {
@@ -211,88 +214,175 @@ public class EventSystem implements SlowTickSystem {
         SeasonSystem.Season season = g.seasons.current(g.time);
 
         // Roll one potential new event, weighted by world state and season.
-        // One roll walks the ladder of cumulative bounds; the first branch whose
-        // bound and precondition both accept it wins, and a rejected branch hands
-        // the same roll to the next one. See the method JavaDoc before reordering
-        // anything here — position in this chain is part of each event's odds.
+        // The roll walks DEFINITIONS in order; the first rung whose bound and
+        // precondition both accept it fires, and a rejected rung hands the same
+        // roll to the next one. See the method JavaDoc before reordering
+        // anything: position in this table is part of each event's odds.
         float r = rng.nextFloat();
-        float coldBias = season == SeasonSystem.Season.COLD ? COLD_SEASON_BIAS : 0f;
-        float dryBias = season == SeasonSystem.Season.DRY ? DRY_SEASON_BIAS : 0f;
-        float wetBias = season == SeasonSystem.Season.WET ? WET_SEASON_BIAS : 0f;
-
-        if (r < COLD_SNAP_ROLL + coldBias && !isActive(EventType.COLD_SNAP) && !isActive(EventType.HEAT_WAVE)) {
-            start(g, EventType.COLD_SNAP,
-                    COLD_SNAP_SECONDS_MIN + rng.nextInt(COLD_SNAP_SECONDS_RANGE), 1f,
-                    "A cold snap grips the land. Stay warm!");
-        } else if (r < HEAT_WAVE_ROLL + dryBias && !isActive(EventType.HEAT_WAVE) && !isActive(EventType.COLD_SNAP)) {
-            start(g, EventType.HEAT_WAVE,
-                    HEAT_WAVE_SECONDS_MIN + rng.nextInt(HEAT_WAVE_SECONDS_RANGE), 1f,
-                    "A heat wave shimmers over Veylon. Thirst drains faster.");
-        } else if (r < DROUGHT_ROLL + dryBias && !isActive(EventType.DROUGHT) && g.plants.lastAvgMoisture < DROUGHT_MAX_MOISTURE) {
-            start(g, EventType.DROUGHT,
-                    DROUGHT_SECONDS_MIN + rng.nextInt(DROUGHT_SECONDS_RANGE), 1f,
-                    "Drought! Soil dries out and fire spreads easily.");
-        } else if (r < BERRY_BLOOM_ROLL + wetBias && !isActive(EventType.BERRY_BLOOM) && g.plants.lastAvgMoisture > BERRY_BLOOM_MIN_MOISTURE) {
-            start(g, EventType.BERRY_BLOOM,
-                    BERRY_BLOOM_SECONDS_MIN + rng.nextInt(BERRY_BLOOM_SECONDS_RANGE), 1f,
-                    "Berry bloom! Bushes regrow rapidly.");
-        } else if (r < PREDATOR_MIGRATION_ROLL && !isActive(EventType.PREDATOR_MIGRATION)) {
-            start(g, EventType.PREDATOR_MIGRATION, PREDATOR_MIGRATION_SECONDS, 1f,
-                    "Predator migration - wolf howls echo in the distance...");
-            for (int i = 0; i < MIGRATION_WOLVES; i++) {
-                spawnWolfAtEdge(g, MIGRATION_SPAWN_DIST);
+        for (EventDefinition def : DEFINITIONS) {
+            if (def.accepts(this, g, r, season)) {
+                def.effect().apply(this, g);
+                return;
             }
-        } else if (r < TRADER_VISIT_ROLL && !isActive(EventType.TRADER_VISIT) && g.faction.trust > TRADER_MIN_TRUST && !g.faction.hostile) {
-            start(g, EventType.TRADER_VISIT, TRADER_VISIT_SECONDS, 1f,
-                    "A wandering trader is approaching - look for them nearby (press F to trade).");
-            spawnTrader(g);
-        } else if (r < TOXIC_FOG_ROLL && !isActive(EventType.TOXIC_FOG)) {
-            start(g, EventType.TOXIC_FOG,
-                    TOXIC_FOG_SECONDS_MIN + rng.nextInt(TOXIC_FOG_SECONDS_RANGE), 1f,
-                    "TOXIC FOG rolls in! Stay indoors or risk sickness.");
-        } else if (r < ASHFALL_ROLL && !isActive(EventType.ASHFALL)) {
-            start(g, EventType.ASHFALL,
-                    ASHFALL_SECONDS_MIN + rng.nextInt(ASHFALL_SECONDS_RANGE), 1f,
-                    "Ashfall darkens the sky. Plants choke under the grey dust.");
-        } else if (r < METEOR_SHOWER_ROLL && !isActive(EventType.METEOR_SHOWER)) {
-            start(g, EventType.METEOR_SHOWER,
-                    METEOR_SHOWER_SECONDS_MIN + rng.nextInt(METEOR_SHOWER_SECONDS_RANGE), 1f,
-                    "METEOR SHOWER! Shards are streaking down around you.");
-            meteorTimer = METEOR_SHOWER_FIRST_SHARD;
-        } else if (r < PREDATOR_RAID_ROLL && !isActive(EventType.PREDATOR_RAID) && g.world.campPos != null) {
-            start(g, EventType.PREDATOR_RAID, PREDATOR_RAID_SECONDS, 1f,
-                    "Wolves are raiding the NPC camp! Help defend it for trust.");
-            for (int i = 0; i < CAMP_RAID_WOLVES; i++) {
-                spawnWolfAtCamp(g);
-            }
-        } else if (r < SCAVENGER_RAID_ROLL && !isActive(EventType.SCAVENGER_RAID) && g.world.campPos != null
-                && g.faction.upgradeStage >= 1) {
-            start(g, EventType.SCAVENGER_RAID, SCAVENGER_RAID_SECONDS, 1f,
-                    "Hostile scavengers are attacking the camp!");
-            int count = RAIDERS_MIN + rng.nextInt(RAIDERS_RANGE);
-            for (int i = 0; i < count; i++) {
-                spawnRaider(g, i);
-            }
-        } else if (r < NPC_ILLNESS_ROLL && !isActive(EventType.NPC_ILLNESS)) {
-            // The victim search stays inside the branch on purpose: a camp with
-            // nobody left to fall ill consumes the roll silently instead of
-            // falling through and dropping a meteor on the player.
-            Npc victim = null;
-            for (Npc n : g.entities.npcs) {
-                if (!n.isTrader && !n.raider && !n.sick && !n.dead) {
-                    victim = n;
-                    break;
-                }
-            }
-            if (victim != null) {
-                victim.sick = true;
-                victim.sickTimer = 0;
-                start(g, EventType.NPC_ILLNESS, NPC_ILLNESS_SECONDS, 1f,
-                        victim.name + " has fallen ill. The camp needs MEDICINE (herbalist bench).");
-            }
-        } else if (r < LONE_METEOR_ROLL) {
-            meteorShard(g, true);
         }
+    }
+
+    // ------------------------------------------------------------------
+    // The selection ladder, as data
+    // ------------------------------------------------------------------
+
+    /** The selection ladder, for tests that check the table's own invariants. */
+    static List<EventDefinition> definitions() {
+        return DEFINITIONS;
+    }
+
+    /** True when {@code type} is not already running. The common guard. */
+    private static EventDefinition.Precondition idle(EventType type) {
+        return (events, g) -> !events.isActive(type);
+    }
+
+    /**
+     * The selection ladder. Ordered by ascending bound, which is also the order
+     * a rejected roll walks. Each entry is the complete definition of one
+     * event's odds, eligibility and consequences.
+     */
+    private static final List<EventDefinition> DEFINITIONS = List.of(
+
+            // Cold snap and heat wave are mutually exclusive: the world cannot
+            // be having both, and whichever is running blocks the other's rung.
+            EventDefinition.seasonal(EventType.COLD_SNAP, COLD_SNAP_ROLL,
+                    SeasonSystem.Season.COLD, COLD_SEASON_BIAS,
+                    (events, g) -> !events.isActive(EventType.COLD_SNAP)
+                            && !events.isActive(EventType.HEAT_WAVE),
+                    (events, g) -> events.start(g, EventType.COLD_SNAP,
+                            COLD_SNAP_SECONDS_MIN + events.rng.nextInt(COLD_SNAP_SECONDS_RANGE),
+                            1f, "A cold snap grips the land. Stay warm!")),
+
+            EventDefinition.seasonal(EventType.HEAT_WAVE, HEAT_WAVE_ROLL,
+                    SeasonSystem.Season.DRY, DRY_SEASON_BIAS,
+                    (events, g) -> !events.isActive(EventType.HEAT_WAVE)
+                            && !events.isActive(EventType.COLD_SNAP),
+                    (events, g) -> events.start(g, EventType.HEAT_WAVE,
+                            HEAT_WAVE_SECONDS_MIN + events.rng.nextInt(HEAT_WAVE_SECONDS_RANGE),
+                            1f, "A heat wave shimmers over Veylon. Thirst drains faster.")),
+
+            // Drought and berry bloom read the same moisture average from
+            // opposite sides, so at most one of them is ever eligible.
+            EventDefinition.seasonal(EventType.DROUGHT, DROUGHT_ROLL,
+                    SeasonSystem.Season.DRY, DRY_SEASON_BIAS,
+                    (events, g) -> !events.isActive(EventType.DROUGHT)
+                            && g.plants.lastAvgMoisture < DROUGHT_MAX_MOISTURE,
+                    (events, g) -> events.start(g, EventType.DROUGHT,
+                            DROUGHT_SECONDS_MIN + events.rng.nextInt(DROUGHT_SECONDS_RANGE),
+                            1f, "Drought! Soil dries out and fire spreads easily.")),
+
+            EventDefinition.seasonal(EventType.BERRY_BLOOM, BERRY_BLOOM_ROLL,
+                    SeasonSystem.Season.WET, WET_SEASON_BIAS,
+                    (events, g) -> !events.isActive(EventType.BERRY_BLOOM)
+                            && g.plants.lastAvgMoisture > BERRY_BLOOM_MIN_MOISTURE,
+                    (events, g) -> events.start(g, EventType.BERRY_BLOOM,
+                            BERRY_BLOOM_SECONDS_MIN + events.rng.nextInt(BERRY_BLOOM_SECONDS_RANGE),
+                            1f, "Berry bloom! Bushes regrow rapidly.")),
+
+            EventDefinition.of(EventType.PREDATOR_MIGRATION, PREDATOR_MIGRATION_ROLL,
+                    idle(EventType.PREDATOR_MIGRATION),
+                    (events, g) -> {
+                        events.start(g, EventType.PREDATOR_MIGRATION,
+                                PREDATOR_MIGRATION_SECONDS, 1f,
+                                "Predator migration - wolf howls echo in the distance...");
+                        for (int i = 0; i < MIGRATION_WOLVES; i++) {
+                            events.spawnWolfAtEdge(g, MIGRATION_SPAWN_DIST);
+                        }
+                    }),
+
+            // A camp that distrusts you, or has turned on you, sends no trader.
+            EventDefinition.of(EventType.TRADER_VISIT, TRADER_VISIT_ROLL,
+                    (events, g) -> !events.isActive(EventType.TRADER_VISIT)
+                            && g.faction.trust > TRADER_MIN_TRUST && !g.faction.hostile,
+                    (events, g) -> {
+                        events.start(g, EventType.TRADER_VISIT, TRADER_VISIT_SECONDS, 1f,
+                                "A wandering trader is approaching - look for them nearby "
+                                        + "(press F to trade).");
+                        events.spawnTrader(g);
+                    }),
+
+            EventDefinition.of(EventType.TOXIC_FOG, TOXIC_FOG_ROLL,
+                    idle(EventType.TOXIC_FOG),
+                    (events, g) -> events.start(g, EventType.TOXIC_FOG,
+                            TOXIC_FOG_SECONDS_MIN + events.rng.nextInt(TOXIC_FOG_SECONDS_RANGE),
+                            1f, "TOXIC FOG rolls in! Stay indoors or risk sickness.")),
+
+            EventDefinition.of(EventType.ASHFALL, ASHFALL_ROLL,
+                    idle(EventType.ASHFALL),
+                    (events, g) -> events.start(g, EventType.ASHFALL,
+                            ASHFALL_SECONDS_MIN + events.rng.nextInt(ASHFALL_SECONDS_RANGE),
+                            1f, "Ashfall darkens the sky. Plants choke under the grey dust.")),
+
+            EventDefinition.of(EventType.METEOR_SHOWER, METEOR_SHOWER_ROLL,
+                    idle(EventType.METEOR_SHOWER),
+                    (events, g) -> {
+                        events.start(g, EventType.METEOR_SHOWER,
+                                METEOR_SHOWER_SECONDS_MIN
+                                        + events.rng.nextInt(METEOR_SHOWER_SECONDS_RANGE),
+                                1f, "METEOR SHOWER! Shards are streaking down around you.");
+                        events.meteorTimer = METEOR_SHOWER_FIRST_SHARD;
+                    }),
+
+            // Both camp raids need a camp to raid.
+            EventDefinition.of(EventType.PREDATOR_RAID, PREDATOR_RAID_ROLL,
+                    (events, g) -> !events.isActive(EventType.PREDATOR_RAID)
+                            && g.world.campPos != null,
+                    (events, g) -> {
+                        events.start(g, EventType.PREDATOR_RAID, PREDATOR_RAID_SECONDS, 1f,
+                                "Wolves are raiding the NPC camp! Help defend it for trust.");
+                        for (int i = 0; i < CAMP_RAID_WOLVES; i++) {
+                            events.spawnWolfAtCamp(g);
+                        }
+                    }),
+
+            // Scavengers only bother with a camp worth robbing.
+            EventDefinition.of(EventType.SCAVENGER_RAID, SCAVENGER_RAID_ROLL,
+                    (events, g) -> !events.isActive(EventType.SCAVENGER_RAID)
+                            && g.world.campPos != null && g.faction.upgradeStage >= 1,
+                    (events, g) -> {
+                        events.start(g, EventType.SCAVENGER_RAID, SCAVENGER_RAID_SECONDS, 1f,
+                                "Hostile scavengers are attacking the camp!");
+                        int count = RAIDERS_MIN + events.rng.nextInt(RAIDERS_RANGE);
+                        for (int i = 0; i < count; i++) {
+                            events.spawnRaider(g, i);
+                        }
+                    }),
+
+            // The victim search stays in the effect on purpose: a camp with
+            // nobody left to fall ill consumes the roll silently instead of
+            // falling through and dropping a meteor on the player. Hoisting it
+            // into the precondition would be a real gameplay change.
+            EventDefinition.of(EventType.NPC_ILLNESS, NPC_ILLNESS_ROLL,
+                    idle(EventType.NPC_ILLNESS),
+                    EventSystem::afflictCampWithIllness),
+
+            // The bottom of the table: no "already active" guard, because a lone
+            // meteor is an instant, and every roll this far up is spent.
+            EventDefinition.of(EventType.METEOR_SHARD, LONE_METEOR_ROLL,
+                    (events, g) -> true,
+                    (events, g) -> events.meteorShard(g, true)));
+
+    /** Makes one healthy camp resident sick, or does nothing if there is none. */
+    private static void afflictCampWithIllness(EventSystem events, Game g) {
+        Npc victim = null;
+        for (Npc n : g.entities.npcs) {
+            if (!n.isTrader && !n.raider && !n.sick && !n.dead) {
+                victim = n;
+                break;
+            }
+        }
+        if (victim == null) {
+            return;
+        }
+        victim.sick = true;
+        victim.sickTimer = 0;
+        events.start(g, EventType.NPC_ILLNESS, NPC_ILLNESS_SECONDS, 1f,
+                victim.name + " has fallen ill. The camp needs MEDICINE (herbalist bench).");
     }
 
     private void start(Game g, EventType type, float duration, float severity, String message) {

@@ -10,6 +10,10 @@ package com.veylon.simulation;
  * gaps are meaningful. Anything above {@link #LONE_METEOR_ROLL} means no event
  * fires this tick.
  *
+ * <p>The bounds are consumed by the {@link EventDefinition} table in
+ * {@link EventSystem}, which is the authority on their order and on each
+ * event's preconditions.
+ *
  * <p>Extracted verbatim from {@link EventSystem}; changing one is a gameplay
  * change, not a refactor.
  */
@@ -40,18 +44,42 @@ public final class EventConstants {
     // Roll bounds, ascending
     // ------------------------------------------------------------------
 
+    // These are cumulative, so the number on each line is not that event's
+    // chance — the gap from the line above is. The share noted per line is that
+    // gap, and it is what a tuning change should be reasoning about. Raising one
+    // bound without raising the ones after it shrinks its neighbour instead of
+    // making the world busier; to make events rarer overall, raise the cooldown.
+    //
+    // The broad shape is deliberate: weather-shaped events that merely colour
+    // the next few minutes are common, events that spawn hostile entities or
+    // permanently alter terrain are rare, and 57% of rolls are nothing at all,
+    // so the world is usually quiet.
+
+    /** 6.0% — the widest share; a cold snap only inconveniences a warm player. */
     public static final float COLD_SNAP_ROLL = 0.06f;
+    /** 4.0% — the heat wave's mirror, minus the cold season's help. */
     public static final float HEAT_WAVE_ROLL = 0.10f;
+    /** 4.0% — gated on dry soil, so its effective rate is lower than its share. */
     public static final float DROUGHT_ROLL = 0.14f;
+    /** 5.0% — the one purely generous event, so it gets more room. */
     public static final float BERRY_BLOOM_ROLL = 0.19f;
+    /** 4.0% — the first rung that spawns predators; also absorbs blocked rolls. */
     public static final float PREDATOR_MIGRATION_ROLL = 0.23f;
+    /** 4.0% — frequent enough that trading is a real supply line, not a fluke. */
     public static final float TRADER_VISIT_ROLL = 0.27f;
+    /** 3.0% — punishing to be caught outdoors in, so rarer than the weather. */
     public static final float TOXIC_FOG_ROLL = 0.30f;
+    /** 2.5% — suppresses growth for minutes; rare enough not to stall farming. */
     public static final float ASHFALL_ROLL = 0.325f;
+    /** 2.0% — carves repeated craters, so it is treated as terrain damage. */
     public static final float METEOR_SHOWER_ROLL = 0.345f;
+    /** 2.0% — a defense set piece; too often would make the camp a chore. */
     public static final float PREDATOR_RAID_ROLL = 0.365f;
+    /** 2.0% — the hostile-human counterpart, gated on an upgraded camp. */
     public static final float SCAVENGER_RAID_ROLL = 0.385f;
+    /** 2.0% — costs medicine to resolve, so it must not stack up. */
     public static final float NPC_ILLNESS_ROLL = 0.405f;
+    /** 2.5% — permanent terrain change, and it sets a longer cooldown after. */
     public static final float LONE_METEOR_ROLL = 0.43f;
 
     // ------------------------------------------------------------------

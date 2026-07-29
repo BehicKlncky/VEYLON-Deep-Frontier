@@ -7,6 +7,7 @@ import org.junit.jupiter.api.Test;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
 import java.util.stream.Collectors;
 
@@ -157,6 +158,88 @@ class EventRollLadderTest {
         assertTrue(coldSnaps > temperateColdSnaps,
                 "a cold season produces more cold snaps: " + coldSnaps
                         + " vs " + temperateColdSnaps);
+    }
+
+    // ------------------------------------------------------------------
+    // Invariants of the definition table itself
+    // ------------------------------------------------------------------
+
+    @Test
+    void definitionBoundsAscendSoEveryRungCanBeReached() {
+        // Cumulative bounds only mean anything in ascending order. A rung whose
+        // bound is not above its predecessor's owns an empty slice and can never
+        // fire; one placed out of order steals its neighbour's slice.
+        float previous = 0f;
+        for (EventDefinition def : EventSystem.definitions()) {
+            assertTrue(def.bound() > previous,
+                    def.type() + " has bound " + def.bound()
+                            + ", which does not exceed the previous rung's " + previous);
+            previous = def.bound();
+        }
+        assertTrue(previous <= 1f, "the last bound must stay inside the roll's range");
+    }
+
+    @Test
+    void everyEventTypeThatCanBeRolledAppearsExactlyOnce() {
+        List<EventSystem.EventType> types = EventSystem.definitions().stream()
+                .map(EventDefinition::type)
+                .toList();
+        assertEquals(types.size(), Set.copyOf(types).size(),
+                "a duplicated rung would make the second copy unreachable");
+
+        // The remaining event types exist but are never selected by a roll: they
+        // are pushed in by other systems.
+        Set<EventSystem.EventType> rolled = Set.copyOf(types);
+        for (EventSystem.EventType type : List.of(EventSystem.EventType.STORM_FRONT,
+                EventSystem.EventType.FOREST_FIRE)) {
+            assertFalse(rolled.contains(type),
+                    type + " is raised by weather, not by the selection roll");
+        }
+    }
+
+    @Test
+    void seasonBiasOnlyWidensTheSeasonItNames() {
+        for (EventDefinition def : EventSystem.definitions()) {
+            for (SeasonSystem.Season season : SeasonSystem.Season.values()) {
+                float bound = def.boundIn(season);
+                assertTrue(bound >= def.bound(),
+                        def.type() + " must never be narrowed by a season");
+                if (season != def.biasSeason()) {
+                    assertEquals(def.bound(), bound, 1e-6f,
+                            def.type() + " must be unbiased outside " + def.biasSeason());
+                }
+            }
+        }
+    }
+
+    @Test
+    void preconditionsAreFreeOfSideEffectsSoTheWalkCanTestThemAll() {
+        // The roll walks rungs until one accepts, testing every precondition
+        // below the winner. If any of them changed the world, the events that
+        // did not fire would still have left a mark.
+        Game g = world();
+        neutralState(g);
+        prepare(g);
+        g.events.active.clear();
+
+        String before = worldFingerprint(g);
+        for (EventDefinition def : EventSystem.definitions()) {
+            for (int i = 0; i < 3; i++) {
+                def.precondition().test(g.events, g);
+            }
+        }
+        assertEquals(before, worldFingerprint(g),
+                "a precondition mutated the world instead of merely reading it");
+    }
+
+    /** Everything an event effect is capable of touching. */
+    private static String worldFingerprint(Game g) {
+        return "npcs=" + g.entities.npcCount()
+                + " creatures=" + g.entities.creatureCount()
+                + " fires=" + g.fire.count()
+                + " active=" + g.events.summary()
+                + " triggered=" + g.events.totalEventsTriggered
+                + " trust=" + g.faction.trust;
     }
 
     @Test
