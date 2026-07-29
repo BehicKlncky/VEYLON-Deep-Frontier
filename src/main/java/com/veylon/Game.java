@@ -23,7 +23,6 @@ import com.veylon.item.Inventory;
 import com.veylon.item.ItemStack;
 import com.veylon.item.ItemType;
 import com.veylon.item.Station;
-import com.veylon.item.ToolKind;
 import com.veylon.input.PlayerInteractionSystem;
 import com.veylon.gfx.FrameProfiler;
 import com.veylon.save.SaveSystem;
@@ -192,7 +191,10 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
     private final QaHarness qa = new QaHarness(this);
 
     /** Melee, bow, firearm and thrown-weapon rules; see the delegates below. */
-    private final PlayerCombatSystem combat = new PlayerCombatSystem(this);
+    final PlayerCombatSystem combat = new PlayerCombatSystem(this);
+
+    /** Hold-to-mine, block breaking outcomes and placement. */
+    private final PlayerBlockActions blockActions = new PlayerBlockActions(this);
 
     /** Read-only builder for the HUD's "[F] ..." interaction hint. */
     private final InteractPromptBuilder prompts = new InteractPromptBuilder(this);
@@ -214,7 +216,7 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
     public float swingTimer;
     public float walkBob;
     private float footstepTimer;
-    private float hitSoundTimer;
+    float hitSoundTimer;
     private float emitterTimer;
     private float breathTimer;
     private float coughTimer;
@@ -1322,146 +1324,14 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
         return prompts.lanternPrompt(pos);
     }
 
+    /** Advances the hold-to-mine timer against the currently targeted block. */
     void mine(float dt) {
-        BlockType t = targetHit.type();
-        if (t.hardness < 0) {
-            return;
-        }
-        Vec3i pos = new Vec3i(targetHit.x(), targetHit.y(), targetHit.z());
-        if (!pos.equals(miningTarget)) {
-            miningTarget = pos;
-            miningProgress = 0;
-        }
-        ItemStack held = player.selected();
-        float mult = 1f;
-        if (held != null && held.type.tool != ToolKind.NONE && held.type.tool == t.preferredTool) {
-            mult = held.type.toolPower;
-        }
-        if (t.requiresTool && (held == null || held.type.tool != t.preferredTool)) {
-            miningProgress = 0;
-            return;
-        }
-        swingTimer = Math.max(swingTimer, 0.18f);
-        player.noise = Math.min(1f, player.noise + 0.35f * dt);
-        if (hitSoundTimer <= 0) {
-            hitSoundTimer = 0.32f;
-            audio.playBlockHit(t, pos.x() + 0.5f, pos.y() + 0.5f, pos.z() + 0.5f);
-            particles.blockDust(t, pos.x() + 0.5f, pos.y() + 0.5f, pos.z() + 0.5f, 3);
-            noise.emit(this, pos.x() + 0.5f, pos.y() + 0.5f, pos.z() + 0.5f,
-                    24f, 0.35f, "mining", true, player);
-        }
-        miningProgress += dt * mult / Math.max(0.05f, t.hardness);
-        if (miningProgress >= 1f) {
-            completePlayerBlockBreak(pos);
-            miningProgress = 0;
-            miningTarget = null;
-        }
+        blockActions.mine(dt);
     }
 
-    /**
-     * Completes a player mining action after the hold-to-mine timer succeeds.
-     * Keeping the block outcome in this command lets gameplay integration tests
-     * exercise real drops, durability, changed-block persistence and hooks.
-     */
+    /** Completes a player mining action after the hold-to-mine timer succeeds. */
     public boolean completePlayerBlockBreak(Vec3i pos) {
-        if (pos == null) {
-            return false;
-        }
-        BlockType type = world.getBlock(pos.x(), pos.y(), pos.z());
-        ItemStack held = player.selected();
-        if (type.hardness < 0
-                || (type.requiresTool && (held == null || held.type.tool != type.preferredTool))) {
-            return false;
-        }
-        breakBlock(pos, type, held);
-        return true;
-    }
-
-    private void breakBlock(Vec3i pos, BlockType t, ItemStack held) {
-        // Crates dump their contents to the player.
-        int brokenCrateContents = 0;
-        if (t == BlockType.CRATE) {
-            Inventory crate = world.crateContents.remove(pos);
-            if (crate != null) {
-                for (int i = 0; i < crate.size(); i++) {
-                    ItemStack s = crate.get(i);
-                    if (s != null) {
-                        brokenCrateContents += s.count;
-                        player.inventory.addStack(s);
-                    }
-                }
-            }
-        }
-        if (t == BlockType.CAMPFIRE) {
-            world.campfireFuel.remove(pos);
-        }
-        if (t == BlockType.DRYING_RACK) {
-            RackBatch batch = world.rackBatches.remove(pos);
-            if (batch != null) {
-                player.inventory.add(batch.done() ? batch.output() : batch.input, batch.count);
-            }
-        }
-        if (t == BlockType.RAIN_COLLECTOR) {
-            world.collectorWater.remove(pos);
-        }
-        if (t == BlockType.BEACON && pos.equals(world.beaconPos)) {
-            world.beaconPos = null;
-            world.beaconStage = -1;
-            log("You dismantled the distress beacon.");
-        }
-
-        // Drops.
-        if (t.drop != null) {
-            boolean dropOk = !t.requiresTool || (held != null && held.type.tool == t.preferredTool);
-            if (t == BlockType.LEAVES) {
-                dropOk = Math.random() < 0.35;
-            }
-            if (dropOk) {
-                player.inventory.add(t.drop, t.dropCount);
-            }
-        }
-        if (t == BlockType.BERRY_BUSH) {
-            player.inventory.add(ItemType.FIBER, 1);
-        }
-
-        world.setBlock(pos.x(), pos.y(), pos.z(), BlockType.AIR, true);
-        audio.playBlockBreak(pos.x() + 0.5f, pos.y() + 0.5f, pos.z() + 0.5f);
-        particles.blockDust(t, pos.x() + 0.5f, pos.y() + 0.5f, pos.z() + 0.5f, 12);
-        combat.consumeDurability(held, 1f);
-        player.noise = Math.min(1f, player.noise + 0.3f);
-
-        boolean structure = t == BlockType.WALL || t == BlockType.STONE_BRICK
-                || t == BlockType.GATE || t == BlockType.CRATE || t == BlockType.CAMPFIRE
-                || t == BlockType.CAMP_BED || t == BlockType.PLANK || t == BlockType.LOG
-                || t == BlockType.WORKBENCH || t == BlockType.FURNACE || t == BlockType.ANVIL;
-        noise.emit(this, pos.x() + 0.5f, pos.y() + 0.5f, pos.z() + 0.5f,
-                structure ? 32f : 22f, structure ? 0.55f : 0.35f,
-                structure ? "structure-break" : "mining-break", true, player);
-
-        // Damaging camp structures angers the camp.
-        if (world.campPos != null && !faction.hostile
-                && (t == BlockType.CRATE || t == BlockType.CAMPFIRE || t == BlockType.WALL
-                || t == BlockType.WORKBENCH || t == BlockType.TORCH || t == BlockType.CAMP_BED
-                || t == BlockType.HERB_STATION || t == BlockType.DRYING_RACK)
-                && pos.distSq(world.campPos.x(), world.campPos.y(), world.campPos.z()) < 14 * 14) {
-            faction.addTrust(this, -15, "The camp saw you wreck their property!");
-        }
-
-        // Settlement structures: reputation and alarm consequences.
-        var bs = world.settlementAt(pos.x(), pos.z());
-        if (bs != null) {
-            if (t == BlockType.ALARM_BELL && bs.hostile()) {
-                log("The alarm bell clatters down — the garrison can't ring it now.");
-                settlementManager.onAlarmSabotaged(this, bs);
-            } else if (t == BlockType.CRATE) {
-                settlementManager.onContainerBroken(this, bs, brokenCrateContents);
-            } else {
-                settlementManager.onStructureDestroyed(this, bs, t);
-            }
-        }
-        if (t == BlockType.POWDER_KEG) {
-            world.kegFuses.remove(pos);
-        }
+        return blockActions.completePlayerBlockBreak(pos);
     }
 
     private void rightClick() {
@@ -1523,37 +1393,7 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
 
     /** Gameplay placement command shared by RMB and integration tests. */
     public boolean placeSelectedBlockAt(int px, int py, int pz) {
-        ItemStack held = player.selected();
-        BlockType place = held == null ? null : held.type.places();
-        if (place == null || !world.getBlock(px, py, pz).isReplaceable()) {
-            return false;
-        }
-        // Don't place inside the player or an entity.
-        if (place.solid && wouldCollide(px, py, pz)) {
-            return false;
-        }
-        world.setBlock(px, py, pz, place, true);
-        if (world.getBlock(px, py, pz) != place) {
-            return false;
-        }
-        Vec3i pos = new Vec3i(px, py, pz);
-        switch (place) {
-            case CAMPFIRE -> world.campfireFuel.put(pos, 300f);
-            case CRATE -> world.crateContents.put(pos, new Inventory(12));
-            case RAIN_COLLECTOR -> world.collectorWater.put(pos, 0f);
-            case LANTERN -> log("Lantern placed empty. Hold charcoal and press [F] to refuel it.");
-            case BEACON -> {
-                world.beaconPos = pos;
-                world.beaconStage = 0;
-                log("Beacon frame placed. It needs a signal crystal, copper wiring and calibration.");
-            }
-            default -> {
-            }
-        }
-        player.inventory.shrink(player.hotbarSel, 1);
-        audio.playBlockPlace(px + 0.5f, py + 0.5f, pz + 0.5f);
-        particles.blockDust(place, px + 0.5f, py + 0.8f, pz + 0.5f, 5);
-        return true;
+        return blockActions.placeSelectedBlockAt(px, py, pz);
     }
 
     /** True when no cage bars or walls block the line to an NPC (rescues). */
@@ -1573,30 +1413,6 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
             }
         }
         return true;
-    }
-
-    private boolean wouldCollide(int bx, int by, int bz) {
-        if (aabbIntersectsBlock(player, bx, by, bz)) {
-            return true;
-        }
-        for (Creature c : entities.creatures) {
-            if (aabbIntersectsBlock(c, bx, by, bz)) {
-                return true;
-            }
-        }
-        for (Npc n : entities.npcs) {
-            if (aabbIntersectsBlock(n, bx, by, bz)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private boolean aabbIntersectsBlock(Entity e, int bx, int by, int bz) {
-        float hw = e.width / 2f;
-        return e.pos.x + hw > bx && e.pos.x - hw < bx + 1
-                && e.pos.y + e.height > by && e.pos.y < by + 1
-                && e.pos.z + hw > bz && e.pos.z - hw < bz + 1;
     }
 
     // ------------------------------------------------------------------
