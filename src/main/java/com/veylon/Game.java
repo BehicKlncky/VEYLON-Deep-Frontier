@@ -499,13 +499,7 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
         explosions.reset();
         settlementManager.reset();
         particles.count = 0;
-        particles.setRandomSeed(seed ^ 0x5645594c4f4eL);
-        ambience.reseed(seed ^ 0x46584c4f4eL);
-        // Static AI decision jitter must also replay deterministically per seed;
-        // otherwise QA runs and tests inherit RNG state from earlier worlds.
-        com.veylon.ai.SettledNpcAI.reseed(seed ^ 0x5345544e5043L);
-        com.veylon.ai.CreatureAI.reseed(seed ^ 0x435245415455L);
-        com.veylon.ai.NpcAI.reseed(seed ^ 0x4c454741434eL);
+        reseedSimulation(seed);
         world = new World(seed, generatorVersion);
         world.listener = this;
         player = new Player(world);
@@ -592,6 +586,39 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
      * Deterministically builds the NPC camp near spawn. Runs for both new games
      * and loads (loads then overwrite crate contents/fuel from the save).
      */
+    /**
+     * Reseeds every generator that affects simulation outcomes, so one world
+     * seed replays identically instead of inheriting RNG state from whatever
+     * world ran before it in the same process.
+     *
+     * <p>Each system gets a distinct salt so their streams stay independent —
+     * seeding them all identically would correlate, say, weather rolls with
+     * creature decisions. Presentation-only randomness (audio variation, NPC
+     * screen flavour) is deliberately left unseeded; it cannot affect outcomes.
+     *
+     * <p>Tests that need an exact sequence still call {@code setRandomSeed}
+     * directly after {@code newWorld}, and those explicit seeds win.
+     */
+    private void reseedSimulation(long seed) {
+        particles.setRandomSeed(seed ^ 0x5645594c4f4eL);
+        ambience.reseed(seed ^ 0x46584c4f4eL);
+        entities.setRandomSeed(seed ^ 0x454e5449545933L);
+        projectiles.setRandomSeed(seed ^ 0x50524f4a4543L);
+        explosions.setRandomSeed(seed ^ 0x4558504c4f53L);
+        settlementManager.setRandomSeed(seed ^ 0x534554544c4dL);
+        faction.setRandomSeed(seed ^ 0x464143544e53L);
+        weather.setRandomSeed(seed ^ 0x574541544852L);
+        water.setRandomSeed(seed ^ 0x5741544552L);
+        fire.setRandomSeed(seed ^ 0x4649524553L);
+        plants.setRandomSeed(seed ^ 0x504c414e5453L);
+        events.setRandomSeed(seed ^ 0x4556454e5453L);
+        // Static AI decision jitter must also replay deterministically per seed;
+        // otherwise QA runs and tests inherit RNG state from earlier worlds.
+        com.veylon.ai.SettledNpcAI.reseed(seed ^ 0x5345544e5043L);
+        com.veylon.ai.CreatureAI.reseed(seed ^ 0x435245415455L);
+        com.veylon.ai.NpcAI.reseed(seed ^ 0x4c454741434eL);
+    }
+
     private void setupCamp(boolean fresh) {
         Random rng = new Random(world.seed * 31 + 7);
         int baseX = (int) spawnPos.x, baseZ = (int) spawnPos.z;

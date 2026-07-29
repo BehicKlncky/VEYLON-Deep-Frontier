@@ -24,6 +24,11 @@ public class WaterSystem {
     private final Random rng = new Random();
     public long cellsProcessed = 0;
 
+    /** Seeded per world so a given world seed replays identically. */
+    public void setRandomSeed(long seed) {
+        rng.setSeed(seed);
+    }
+
     public void notifyBlockChanged(World world, int x, int y, int z) {
         // Wake water adjacent to any change (including the changed cell itself).
         scheduleIfWater(world, x, y, z);

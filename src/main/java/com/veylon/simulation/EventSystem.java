@@ -62,6 +62,11 @@ public class EventSystem {
     private float meteorTimer;
     public int totalEventsTriggered = 0;
 
+    /** Seeded per world so a given world seed replays identically. */
+    public void setRandomSeed(long seed) {
+        rng.setSeed(seed);
+    }
+
     public void reset() {
         active.clear();
         cooldown = INITIAL_COOLDOWN;

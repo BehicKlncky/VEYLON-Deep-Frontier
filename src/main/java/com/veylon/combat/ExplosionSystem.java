@@ -49,6 +49,11 @@ public class ExplosionSystem {
     private final Map<Settlement, PropertyDamage> playerPropertyDamage = new HashMap<>();
     private boolean playerDamagedLegacyCamp;
 
+    /** Seeded per world so a given world seed replays identically. */
+    public void setRandomSeed(long seed) {
+        rng.setSeed(seed);
+    }
+
     public void reset() {
         chainQueue.clear();
         chainBudget = MAX_CHAIN;

@@ -60,6 +60,11 @@ public class WeatherSystem {
 
     private final Random rng = new Random();
 
+    /** Seeded per world so a given world seed replays identically. */
+    public void setRandomSeed(long seed) {
+        rng.setSeed(seed);
+    }
+
     public Weather current = Weather.CLEAR;
     public Weather next = Weather.CLEAR;
     /** 0..1 progress of the transition from current to next. */

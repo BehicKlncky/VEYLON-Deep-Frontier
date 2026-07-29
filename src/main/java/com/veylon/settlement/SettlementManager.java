@@ -95,6 +95,11 @@ public class SettlementManager {
         }
     }
 
+    /** Seeded per world so a given world seed replays identically. */
+    public void setRandomSeed(long seed) {
+        rng.setSeed(seed);
+    }
+
     public void reset() {
         bountyPartyCooldown = 120f;
         partySequence = 0;

@@ -52,6 +52,11 @@ public class FactionSystem {
     private long questSequence;
     private final Random rng = new Random();
 
+    /** Seeded per world so a given world seed replays identically. */
+    public void setRandomSeed(long seed) {
+        rng.setSeed(seed);
+    }
+
     public void addTrust(Game g, float delta, String reason) {
         trust = MathUtil.clamp(trust + delta, 0, 100);
         if (reason != null && Math.abs(delta) >= 1) {
