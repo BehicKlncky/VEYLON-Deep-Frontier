@@ -7,27 +7,70 @@ import com.veylon.world.Biome;
 
 import java.util.Random;
 
+import static com.veylon.simulation.WeatherConstants.*;
+
 /** Dynamic weather with gradual transitions, biome tendencies and storm lightning. */
 public class WeatherSystem {
 
+    /**
+     * A weather state and everything that distinguishes it.
+     *
+     * <p>These used to be six parallel {@code switch} statements over this
+     * enum, so adding a weather state meant finding all six. Declaring the
+     * values here makes each row the complete definition of one state, and the
+     * compiler will not let a new constant omit any of them.
+     *
+     * <p>Persisted by ordinal — append only, never reorder.
+     *
+     * @param displayName  shown in the HUD and the simulation panel
+     * @param intensity    precipitation strength, 0..1
+     * @param lightMul     daylight multiplier, 0..1
+     * @param grayness     how desaturated the sky looks, 0..1
+     * @param fogStart     distance in blocks at which fog begins
+     * @param fogEnd       distance in blocks at which fog is opaque
+     * @param tempOffset   temperature offset in degrees C
+     */
     public enum Weather {
-        CLEAR("Clear"), CLOUDY("Cloudy"), RAIN("Rain"), STORM("Storm"), FOG("Fog"), SNOW("Snow");
+        CLEAR("Clear", 0f, 1f, 0f, 65f, 115f, 1f),
+        CLOUDY("Cloudy", 0f, 0.85f, 0.45f, 55f, 100f, -1f),
+        RAIN("Rain", 0.6f, 0.7f, 0.6f, 38f, 80f, -4f),
+        STORM("Storm", 1f, 0.55f, 0.75f, 28f, 60f, -6f),
+        FOG("Fog", 0f, 0.75f, 0.7f, 10f, 34f, -2f),
+        SNOW("Snow", 0.5f, 0.8f, 0.5f, 35f, 72f, -7f);
 
         public final String displayName;
+        public final float intensity;
+        public final float lightMul;
+        public final float grayness;
+        public final float fogStart;
+        public final float fogEnd;
+        public final float tempOffset;
 
-        Weather(String displayName) {
+        Weather(String displayName, float intensity, float lightMul, float grayness,
+                float fogStart, float fogEnd, float tempOffset) {
             this.displayName = displayName;
+            this.intensity = intensity;
+            this.lightMul = lightMul;
+            this.grayness = grayness;
+            this.fogStart = fogStart;
+            this.fogEnd = fogEnd;
+            this.tempOffset = tempOffset;
         }
     }
 
     private final Random rng = new Random();
+
+    /** Seeded per world so a given world seed replays identically. */
+    public void setRandomSeed(long seed) {
+        rng.setSeed(seed);
+    }
 
     public Weather current = Weather.CLEAR;
     public Weather next = Weather.CLEAR;
     /** 0..1 progress of the transition from current to next. */
     public float blend = 1f;
     /** Seconds until a new target weather is rolled. */
-    public float changeTimer = 120;
+    public float changeTimer = INITIAL_CHANGE_TIMER;
     private float flashTimer = 0;
     public int lightningStrikes = 0;
 
@@ -35,7 +78,7 @@ public class WeatherSystem {
         flashTimer = Math.max(0, flashTimer - dt);
 
         if (blend < 1f) {
-            blend = Math.min(1f, blend + dt / 25f);
+            blend = Math.min(1f, blend + dt / TRANSITION_SECONDS);
             if (blend >= 1f) {
                 current = next;
                 announce(g);
@@ -44,7 +87,7 @@ public class WeatherSystem {
 
         changeTimer -= dt;
         if (changeTimer <= 0) {
-            changeTimer = 90 + rng.nextFloat() * 150;
+            changeTimer = CHANGE_TIMER_MIN + rng.nextFloat() * CHANGE_TIMER_RANGE;
             Weather target = pickNext(g);
             if (target != current) {
                 next = target;
@@ -53,7 +96,7 @@ public class WeatherSystem {
         }
 
         // Lightning during storms.
-        if (effective() == Weather.STORM && rng.nextFloat() < 0.05f) {
+        if (effective() == Weather.STORM && rng.nextFloat() < LIGHTNING_CHANCE_PER_TICK) {
             strikeLightning(g);
         }
     }
@@ -67,20 +110,19 @@ public class WeatherSystem {
         float r = rng.nextFloat();
         float wet = biome.moisture;
         // Seasons shift the whole distribution: wet season rains, dry season bakes.
-        float seasonRain = g.seasons.current(g.time).rainBias;
-        r += seasonRain;
+        r += g.seasons.current(g.time).rainBias;
         // Wetter biomes rain more; scrubland almost never.
-        if (r < 0.34f + wet * 0.08f) {
+        if (r < CLEAR_THRESHOLD + wet * CLEAR_MOISTURE_BIAS) {
             return Weather.CLEAR;
         }
-        if (r < 0.58f) {
+        if (r < CLOUDY_THRESHOLD) {
             return Weather.CLOUDY;
         }
-        if (r < 0.62f + wet * 0.05f) {
+        if (r < FOG_THRESHOLD + wet * FOG_MOISTURE_BIAS) {
             return Weather.FOG;
         }
-        if (r < 0.86f) {
-            return envTemp < 0 ? Weather.SNOW : Weather.RAIN;
+        if (r < PRECIPITATION_THRESHOLD) {
+            return envTemp < SNOW_TEMP ? Weather.SNOW : Weather.RAIN;
         }
         return Weather.STORM;
     }
@@ -100,11 +142,11 @@ public class WeatherSystem {
     }
 
     public void strikeLightning(Game g) {
-        flashTimer = 0.35f;
+        flashTimer = FLASH_SECONDS;
         lightningStrikes++;
         g.audio.playThunder();
-        int x = (int) (g.player.pos.x + rng.nextInt(81) - 40);
-        int z = (int) (g.player.pos.z + rng.nextInt(81) - 40);
+        int x = (int) (g.player.pos.x + rng.nextInt(LIGHTNING_SPAN) - LIGHTNING_RADIUS);
+        int z = (int) (g.player.pos.z + rng.nextInt(LIGHTNING_SPAN) - LIGHTNING_RADIUS);
         if (g.world.getChunk(Math.floorDiv(x, 16), Math.floorDiv(z, 16)) == null) {
             return;
         }
@@ -117,7 +159,7 @@ public class WeatherSystem {
         }
         // Panic nearby wildlife.
         for (var c : g.entities.creatures) {
-            if (c.distSqTo(x, y, z) < 30 * 30) {
+            if (c.distSqTo(x, y, z) < LIGHTNING_PANIC_RADIUS * LIGHTNING_PANIC_RADIUS) {
                 c.fear = 1f;
             }
         }
@@ -125,7 +167,7 @@ public class WeatherSystem {
 
     /** The weather players currently experience (snaps halfway through a transition). */
     public Weather effective() {
-        return blend < 0.5f ? current : next;
+        return blend < TRANSITION_SNAP ? current : next;
     }
 
     public boolean isPrecip() {
@@ -139,99 +181,33 @@ public class WeatherSystem {
 
     /** Precipitation strength 0..1 considering the transition blend. */
     public float intensity() {
-        float a = rawIntensity(current);
-        float b = rawIntensity(next);
-        return MathUtil.lerp(a, b, blend);
-    }
-
-    private float rawIntensity(Weather w) {
-        return switch (w) {
-            case RAIN -> 0.6f;
-            case STORM -> 1f;
-            case SNOW -> 0.5f;
-            default -> 0f;
-        };
+        return MathUtil.lerp(current.intensity, next.intensity, blend);
     }
 
     public float lightMul() {
-        return MathUtil.lerp(rawLight(current), rawLight(next), blend);
-    }
-
-    private float rawLight(Weather w) {
-        return switch (w) {
-            case CLEAR -> 1f;
-            case CLOUDY -> 0.85f;
-            case FOG -> 0.75f;
-            case RAIN -> 0.7f;
-            case SNOW -> 0.8f;
-            case STORM -> 0.55f;
-        };
+        return MathUtil.lerp(current.lightMul, next.lightMul, blend);
     }
 
     /** How desaturated/gray the sky looks. */
     public float grayness() {
-        return MathUtil.lerp(rawGray(current), rawGray(next), blend);
-    }
-
-    private float rawGray(Weather w) {
-        return switch (w) {
-            case CLEAR -> 0f;
-            case CLOUDY -> 0.45f;
-            case FOG -> 0.7f;
-            case RAIN -> 0.6f;
-            case SNOW -> 0.5f;
-            case STORM -> 0.75f;
-        };
+        return MathUtil.lerp(current.grayness, next.grayness, blend);
     }
 
     public float fogStart() {
-        return MathUtil.lerp(rawFogStart(current), rawFogStart(next), blend);
+        return MathUtil.lerp(current.fogStart, next.fogStart, blend);
     }
 
     public float fogEnd() {
-        return MathUtil.lerp(rawFogEnd(current), rawFogEnd(next), blend);
-    }
-
-    private float rawFogStart(Weather w) {
-        return switch (w) {
-            case CLEAR -> 65f;
-            case CLOUDY -> 55f;
-            case RAIN -> 38f;
-            case SNOW -> 35f;
-            case STORM -> 28f;
-            case FOG -> 10f;
-        };
-    }
-
-    private float rawFogEnd(Weather w) {
-        return switch (w) {
-            case CLEAR -> 115f;
-            case CLOUDY -> 100f;
-            case RAIN -> 80f;
-            case SNOW -> 72f;
-            case STORM -> 60f;
-            case FOG -> 34f;
-        };
+        return MathUtil.lerp(current.fogEnd, next.fogEnd, blend);
     }
 
     /** Temperature offset from weather in degrees C. */
     public float tempOffset() {
-        return MathUtil.lerp(rawTemp(current), rawTemp(next), blend);
-    }
-
-    private float rawTemp(Weather w) {
-        return switch (w) {
-            case CLEAR -> 1f;
-            case CLOUDY -> -1f;
-            case FOG -> -2f;
-            case RAIN -> -4f;
-            case SNOW -> -7f;
-            case STORM -> -6f;
-        };
+        return MathUtil.lerp(current.tempOffset, next.tempOffset, blend);
     }
 
     /** Lightning screen flash 0..1. */
     public float flashLight() {
-        return flashTimer > 0 ? Math.min(1f, flashTimer / 0.35f) : 0f;
+        return flashTimer > 0 ? Math.min(1f, flashTimer / FLASH_SECONDS) : 0f;
     }
 }
