@@ -10,7 +10,6 @@ import com.veylon.engine.Renderer;
 import com.veylon.engine.UiRenderer;
 import com.veylon.engine.Window;
 import com.veylon.entity.Affliction;
-import com.veylon.entity.Carcass;
 import com.veylon.entity.Creature;
 import com.veylon.entity.Entity;
 import com.veylon.entity.EntityManager;
@@ -18,7 +17,6 @@ import com.veylon.entity.Npc;
 import com.veylon.entity.Player;
 import com.veylon.entity.PlayerMovementSystem;
 import com.veylon.entity.PlayerTreatmentSystem;
-import com.veylon.item.EquipSlot;
 import com.veylon.item.Inventory;
 import com.veylon.item.ItemStack;
 import com.veylon.item.ItemType;
@@ -55,7 +53,6 @@ import com.veylon.util.Vec3i;
 import com.veylon.world.BlockType;
 import com.veylon.world.Chunk;
 import com.veylon.world.Poi;
-import com.veylon.world.RackBatch;
 import com.veylon.world.Raycaster;
 import com.veylon.world.World;
 import org.joml.Vector3f;
@@ -119,7 +116,7 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
     private final PlayerInteractionSystem playerInteractions = new PlayerInteractionSystem();
     private final PlayerInteractionSystem.FrameInput interactionInput =
             new PlayerInteractionSystem.FrameInput();
-    private final PlayerTreatmentSystem playerTreatments = new PlayerTreatmentSystem();
+    final PlayerTreatmentSystem playerTreatments = new PlayerTreatmentSystem();
 
     // World & simulation.
     public World world;
@@ -202,6 +199,12 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
     /** Crate open/transfer commands and their theft attribution. */
     private final CrateTransactionSystem crates = new CrateTransactionSystem(this);
 
+    /** Eating, drinking, treating wounds and wearing gear. */
+    final PlayerConsumables consumables = new PlayerConsumables(this);
+
+    /** F-key and right-click handlers against world state, NPCs and stations. */
+    private final WorldInteractions interactions = new WorldInteractions(this);
+
     // Ranged-weapon aim state the HUD draws. The rules live in PlayerCombatSystem;
     // these stay here because Hud reads them straight off the Game instance.
     /** 0..1 bow draw progress while holding LMB with a bow. */
@@ -264,12 +267,12 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
 
                 @Override
                 public void useSecondary() {
-                    rightClick();
+                    interactions.rightClick();
                 }
 
                 @Override
                 public void interact() {
-                    Game.this.interact();
+                    interactions.interact();
                 }
             };
 
@@ -983,7 +986,7 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
     // Sleep
     // ------------------------------------------------------------------
 
-    private void startSleep(boolean campBed) {
+    void startSleep(boolean campBed) {
         Creature threat = entities.nearestCreature(player.pos.x, player.pos.y, player.pos.z, 12,
                 c -> c.type.predator);
         if (threat != null) {
@@ -1334,635 +1337,58 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
         return blockActions.completePlayerBlockBreak(pos);
     }
 
-    private void rightClick() {
-        // Interactable blocks first.
-        if (targetHit != null) {
-            switch (targetHit.type()) {
-                case WORKBENCH, FURNACE, ANVIL, TANNERY, HERB_STATION, MAP_TABLE -> {
-                    uiMode = UiMode.CRAFTING;
-                    return;
-                }
-                case CRATE -> {
-                    openCrateAt(new Vec3i(targetHit.x(), targetHit.y(), targetHit.z()));
-                    return;
-                }
-                case CAMPFIRE -> {
-                    campfireInteract(new Vec3i(targetHit.x(), targetHit.y(), targetHit.z()));
-                    return;
-                }
-                default -> {
-                }
-            }
-        }
-
-        ItemStack held = player.selected();
-        if (held == null) {
-            return;
-        }
-        // A short restrained dip gives drinking, medicine, food and placement tactile feedback.
-        swingTimer = Math.max(swingTimer, 0.35f);
-        // Drink from waterskins.
-        if (held.type == ItemType.WATERSKIN_CLEAN || held.type == ItemType.WATERSKIN_DIRTY) {
-            drink(held);
-            return;
-        }
-        // Treat wounds.
-        if (held.type.isMedical()) {
-            applyMedical(held);
-            return;
-        }
-        // Wear gear.
-        if (held.type.isEquippable()) {
-            equipHeld(held);
-            return;
-        }
-        // Eat.
-        if (held.type.isEdible()) {
-            eat(held);
-            return;
-        }
-        // Place.
-        BlockType place = held.type.places();
-        if (place != null && targetHit != null) {
-            int px = targetHit.x() + targetHit.nx();
-            int py = targetHit.y() + targetHit.ny();
-            int pz = targetHit.z() + targetHit.nz();
-            placeSelectedBlockAt(px, py, pz);
-        }
-    }
-
     /** Gameplay placement command shared by RMB and integration tests. */
     public boolean placeSelectedBlockAt(int px, int py, int pz) {
         return blockActions.placeSelectedBlockAt(px, py, pz);
     }
 
-    /** True when no cage bars or walls block the line to an NPC (rescues). */
-    private boolean clearPathToNpc(Npc npc) {
-        // Player position is authoritative.  The camera is synchronized later in
-        // the frame and may legitimately lag during save/load or command tests.
-        float ox = player.pos.x, oy = player.pos.y + player.eyeHeight(), oz = player.pos.z;
-        float tx = npc.pos.x, ty = npc.pos.y + 1.2f, tz = npc.pos.z;
-        float dx = tx - ox, dy = ty - oy, dz = tz - oz;
-        float dist = (float) Math.sqrt(dx * dx + dy * dy + dz * dz);
-        int steps = Math.max(1, (int) (dist * 2));
-        for (int i = 1; i < steps; i++) {
-            float f = i / (float) steps;
-            if (world.getBlock((int) Math.floor(ox + dx * f), (int) Math.floor(oy + dy * f),
-                    (int) Math.floor(oz + dz * f)).solid) {
-                return false;
-            }
-        }
-        return true;
-    }
-
     // ------------------------------------------------------------------
-    // Consuming, treating, equipping
-    // ------------------------------------------------------------------
-
-    private void eat(ItemStack held) {
-        Player p = player;
-        if (p.hunger > 98) {
-            return;
-        }
-        ItemType t = held.type;
-        float freshness = held.freshnessFrac();
-        p.hunger = Math.min(100, p.hunger + t.food * (0.5f + 0.5f * freshness));
-        p.thirst = Math.min(100, p.thirst + t.hydration);
-        switch (t.group) {
-            case MEAT -> p.protein = Math.min(100, p.protein + t.food * 0.9f);
-            case PLANT -> p.vitamins = Math.min(100, p.vitamins + t.food * 1.1f);
-            case NONE -> {
-            }
-        }
-
-        float poisonChance = 0f;
-        if (t == ItemType.SPOILED_MEAT) {
-            poisonChance = 0.75f;
-        } else if (t == ItemType.RAW_MEAT) {
-            poisonChance = 0.25f;
-        } else if (freshness < 0.3f) {
-            poisonChance = 0.35f;
-        }
-        if (poisonChance > 0 && Math.random() < poisonChance) {
-            p.addAffliction(Affliction.FOOD_POISONING, 90 + (float) Math.random() * 60);
-            log("That food didn't sit well... FOOD POISONING sets in.");
-        }
-        p.inventory.shrink(p.hotbarSel, 1);
-        audio.playEat();
-        log("Ate " + t.displayName + " (+" + t.food + " food"
-                + (freshness < 0.5f && t.spoils() ? ", going off" : "") + ")");
-    }
-
-    private void drink(ItemStack held) {
-        Player p = player;
-        boolean clean = held.type == ItemType.WATERSKIN_CLEAN;
-        p.thirst = Math.min(100, p.thirst + (clean ? 60 : 35));
-        p.inventory.shrink(p.hotbarSel, 1);
-        p.inventory.add(ItemType.WATERSKIN_EMPTY, 1);
-        audio.playDrink();
-        if (clean) {
-            log("You drink clean water (+60 thirst).");
-        } else if (Math.random() < 0.30) {
-            p.addAffliction(Affliction.FOOD_POISONING, 90 + (float) Math.random() * 60);
-            log("The dirty water churns in your gut... FOOD POISONING.");
-        } else {
-            log("You drink dirty water (+35 thirst). You got lucky this time.");
-        }
-    }
-
-    private void applyMedical(ItemStack held) {
-        PlayerTreatmentSystem.Result result = playerTreatments.apply(player, held);
-        if (result != PlayerTreatmentSystem.Result.INVALID) {
-            log(result.message());
-        }
-        if (result.used()) {
-            player.inventory.shrink(player.hotbarSel, 1);
-            audio.playEquip();
-        }
-    }
-
-    private void equipHeld(ItemStack held) {
-        EquipSlot slot = held.type.equipSlot;
-        ItemStack prev = player.equipment[slot.ordinal()];
-        player.equipment[slot.ordinal()] = held.copy();
-        player.equipment[slot.ordinal()].count = 1;
-        player.inventory.shrink(player.hotbarSel, 1);
-        if (prev != null) {
-            player.inventory.addStack(prev);
-        }
-        audio.playEquip();
-        log("Equipped " + held.type.displayName + " (" + slot.displayName + ").");
-    }
-
-    // ------------------------------------------------------------------
-    // Interactions (F)
+    // Interaction delegates
+    //
+    // Routing and the station handlers live in WorldInteractions; self-directed
+    // item use lives in PlayerConsumables. These entry points stay on Game
+    // because native input, the HUD prompt builder and the gameplay tests all
+    // drive interaction through the Game instance.
     // ------------------------------------------------------------------
 
     /** Normal talk/trade gate. Captives use the rescue action and never this UI. */
     public boolean canOpenNpcInteraction(Npc npc) {
-        return npc != null && !npc.dead && !npc.raider
-                && npc.archetype != com.veylon.settlement.NpcArchetype.CAPTIVE
-                && !npc.hostileToPlayer();
+        return interactions.canOpenNpcInteraction(npc);
     }
 
     /** Shared decision used by the HUD prompt and the real interaction command. */
     public NpcInteraction npcInteraction(Npc npc) {
-        if (npc == null || npc.dead || npc.raider) {
-            return NpcInteraction.NONE;
-        }
-        if (npc.archetype == com.veylon.settlement.NpcArchetype.CAPTIVE) {
-            if (!settlementManager.canRescueCaptive(this, npc)) {
-                return NpcInteraction.NONE;
-            }
-            return clearPathToNpc(npc)
-                    ? NpcInteraction.RESCUE_READY : NpcInteraction.RESCUE_BLOCKED;
-        }
-        return canOpenNpcInteraction(npc) ? NpcInteraction.TALK : NpcInteraction.NONE;
+        return interactions.npcInteraction(npc);
     }
 
     /** Ignores closer hostile guards so a reachable prisoner remains selectable. */
     Npc nearestNpcForInteraction(float range) {
-        Npc best = null;
-        double bestD = range * range;
-        for (Npc candidate : entities.npcs) {
-            if (npcInteraction(candidate) == NpcInteraction.NONE) {
-                continue;
-            }
-            double d = candidate.distSqTo(player.pos.x, player.pos.y, player.pos.z);
-            if (d < bestD) {
-                bestD = d;
-                best = candidate;
-            }
-        }
-        return best;
+        return interactions.nearestNpcForInteraction(range);
     }
 
-    /**
-     * Gameplay command used by the F-key path and integration tests. Returns
-     * true when an NPC action consumed the interaction.
-     */
+    /** Gameplay command used by the F-key path and integration tests. */
     public boolean interactWithNearbyNpc() {
-        Npc npc = nearestNpcForInteraction(3.2f);
-        return switch (npcInteraction(npc)) {
-            case TALK -> {
-                activeNpc = npc;
-                npcScreen.open();
-                uiMode = UiMode.NPC;
-                yield true;
-            }
-            case RESCUE_BLOCKED -> {
-                log("The cage bars are in the way — break them first.");
-                yield true;
-            }
-            case RESCUE_READY -> {
-                settlementManager.rescueCaptive(this, npc);
-                yield true;
-            }
-            case NONE -> false;
-        };
+        return interactions.interactWithNearbyNpc();
     }
 
-    /**
-     * Gameplay block-interaction command shared by the real F-key path and
-     * integration tests. It deliberately covers world-state interactions;
-     * UI-only containers and stations remain on their existing screen path.
-     */
+    /** Gameplay block-interaction command shared by the F-key path and tests. */
     public boolean interactWithBlockAt(Vec3i pos) {
-        if (pos == null) {
-            return false;
-        }
-        return switch (world.getBlock(pos.x(), pos.y(), pos.z())) {
-            case CAMPFIRE -> {
-                campfireInteract(pos);
-                yield true;
-            }
-            case LANTERN -> interactLantern(pos);
-            case POWDER_KEG -> {
-                if (explosions.tryArmKeg(this, pos, 5f, true)) {
-                    audio.playFuse(pos.x() + 0.5f, pos.y() + 0.5f, pos.z() + 0.5f);
-                    log("Fuse lit! Five seconds — RUN.");
-                    noise.emit(this, pos.x(), pos.y(), pos.z(), 12f, 0.4f,
-                            "fuse", true, player);
-                } else if (!world.kegFuses.containsKey(pos)) {
-                    log("Too many powder-keg fuses are already burning.");
-                }
-                yield true;
-            }
-            case GATE -> {
-                var settlement = world.settlementAt(pos.x(), pos.z());
-                if (settlement != null && settlement.hostile()) {
-                    log("The gate is barred from the inside.");
-                } else {
-                    // Open the complete two-wide/two-high doorway around the hit block.
-                    settlementManager.openGate(this, pos);
-                    settlementManager.openGate(this, pos.offset(0, 1, 0));
-                    settlementManager.openGate(this, pos.offset(0, -1, 0));
-                    settlementManager.openGate(this, pos.offset(1, 0, 0));
-                    settlementManager.openGate(this, pos.offset(-1, 0, 0));
-                }
-                yield true;
-            }
-            case ALARM_BELL -> {
-                var settlement = world.settlementAt(pos.x(), pos.z());
-                if (settlement != null) {
-                    settlementManager.triggerAlarm(this, settlement);
-                    log("The bell tolls across the settlement.");
-                }
-                yield true;
-            }
-            default -> false;
-        };
-    }
-
-    private void interact() {
-        // NPCs first, through the same command seam used by tests.
-        if (interactWithNearbyNpc()) {
-            return;
-        }
-        // Recover stuck arrows through the shared gameplay command.
-        if (recoverNearbyArrow()) {
-            return;
-        }
-        // Carcasses.
-        if (interactWithNearbyCarcass()) {
-            return;
-        }
-        if (targetHit != null) {
-            Vec3i pos = new Vec3i(targetHit.x(), targetHit.y(), targetHit.z());
-            switch (targetHit.type()) {
-                case BERRY_BUSH -> {
-                    world.setBlock(pos.x(), pos.y(), pos.z(), BlockType.BERRY_BUSH_EMPTY, true);
-                    player.inventory.add(ItemType.BERRY, 2);
-                    audio.playEat();
-                    log("Harvested 2 berries (the bush will regrow).");
-                    return;
-                }
-                case HERB_PLANT -> {
-                    world.setBlock(pos.x(), pos.y(), pos.z(), BlockType.AIR, true);
-                    player.inventory.add(ItemType.HERB, 2);
-                    audio.playEat();
-                    log("Gathered 2 medicinal herbs.");
-                    return;
-                }
-                case CAMPFIRE -> {
-                    interactWithBlockAt(pos);
-                    return;
-                }
-                case CRATE -> {
-                    openCrateAt(pos);
-                    return;
-                }
-                case WORKBENCH, FURNACE, ANVIL, TANNERY, HERB_STATION, MAP_TABLE -> {
-                    uiMode = UiMode.CRAFTING;
-                    return;
-                }
-                case DRYING_RACK -> {
-                    rackInteract(pos);
-                    return;
-                }
-                case RAIN_COLLECTOR -> {
-                    collectorInteract(pos);
-                    return;
-                }
-                case LANTERN -> {
-                    interactWithBlockAt(pos);
-                    return;
-                }
-                case BEDROLL -> {
-                    startSleep(false);
-                    return;
-                }
-                case CAMP_BED -> {
-                    boolean atCamp = world.campPos != null
-                            && pos.distSq(world.campPos.x(), world.campPos.y(), world.campPos.z()) < 14 * 14;
-                    if (atCamp && !faction.campPrivileges()) {
-                        log("The camp won't let you use their beds yet (needs Friendly trust).");
-                        return;
-                    }
-                    var bedSettlement = world.settlementAt(pos.x(), pos.z());
-                    if (bedSettlement != null && !bedSettlement.friendly()
-                            && !bedSettlement.cleared) {
-                        log(bedSettlement.hostile()
-                                ? "Sleeping in a hostile camp? Not a chance."
-                                : "These beds belong to the residents. Earn their friendship first.");
-                        return;
-                    }
-                    startSleep(true);
-                    return;
-                }
-                case BEACON -> {
-                    beaconInteract();
-                    return;
-                }
-                case BEACON_LIT -> {
-                    log("The beacon thrums steadily, its signal cutting through the sky.");
-                    return;
-                }
-                case POWDER_KEG -> {
-                    interactWithBlockAt(pos);
-                    return;
-                }
-                case GATE -> {
-                    interactWithBlockAt(pos);
-                    return;
-                }
-                case ALARM_BELL -> {
-                    interactWithBlockAt(pos);
-                    return;
-                }
-                default -> {
-                }
-            }
-        }
-        // Drink from / fill at water.
-        Raycaster.Result fluid = Raycaster.castInto(world, camera.position, camera.front(),
-                4.0, true, fluidHitBuffer) ? fluidHitBuffer : null;
-        if (fluid != null && fluid.type() == BlockType.WATER) {
-            if (player.inventory.count(ItemType.WATERSKIN_EMPTY) > 0) {
-                player.inventory.remove(ItemType.WATERSKIN_EMPTY, 1);
-                player.inventory.add(ItemType.WATERSKIN_DIRTY, 1);
-                audio.playDrink();
-                log("Filled a waterskin with untreated water. Boil it at a campfire.");
-                return;
-            }
-            player.thirst = Math.min(100, player.thirst + 35);
-            audio.playDrink();
-            if (Math.random() < 0.25) {
-                player.addAffliction(Affliction.FOOD_POISONING, 90 + (float) Math.random() * 60);
-                log("You drank dirty water and feel ill...");
-            } else {
-                log("You drink from the water (+35 thirst).");
-            }
-        }
+        return interactions.interactWithBlockAt(pos);
     }
 
     /** Gameplay command shared by the real F-key path and integration tests. */
     public boolean recoverNearbyArrow() {
-        if (player == null) {
-            return false;
-        }
-        var stuckArrow = projectiles.nearestStuckArrow(
-                player.pos.x, player.pos.y + 1f, player.pos.z, 2.6f);
-        if (stuckArrow == null) {
-            return false;
-        }
-        projectiles.pickUp(this, stuckArrow);
-        return true;
+        return interactions.recoverNearbyArrow();
     }
 
     /** Gameplay command shared by the real F-key path for harvesting carcasses. */
     public boolean interactWithNearbyCarcass() {
-        if (player == null) {
-            return false;
-        }
-        Carcass carcass = entities.nearestCarcass(
-                player.pos.x, player.pos.y, player.pos.z, 2.6f);
-        if (carcass == null) {
-            return false;
-        }
-        harvestCarcass(carcass);
-        return true;
-    }
-
-    private void harvestCarcass(Carcass carcass) {
-        boolean knife = playerHasKnife();
-        ItemType meatType = carcass.rotten() ? ItemType.SPOILED_MEAT : ItemType.RAW_MEAT;
-        if (knife) {
-            int meat = carcass.meatLeft;
-            int hide = carcass.hideLeft;
-            if (meat > 0) {
-                player.inventory.add(meatType, meat);
-            }
-            if (hide > 0) {
-                player.inventory.add(ItemType.HIDE, hide);
-            }
-            if (Math.random() < 0.6) {
-                player.inventory.add(ItemType.BONE, 1);
-            }
-            carcass.meatLeft = 0;
-            carcass.hideLeft = 0;
-            combat.useKnife();
-            audio.playEat();
-            particles.blood(carcass.pos.x, carcass.pos.y + 0.3f, carcass.pos.z);
-            log("Skinned the " + carcass.type.displayName + ": " + meat + " meat, " + hide
-                    + " hide" + (carcass.rotten() ? " (the meat is spoiled)" : "") + ".");
-            // Lodged arrows come back with the hide.
-            if (carcass.stuckArrows > 0) {
-                ItemType arrowType = carcass.stuckArrowType != null
-                        ? carcass.stuckArrowType : ItemType.ARROW;
-                player.inventory.add(arrowType, carcass.stuckArrows);
-                log("Recovered " + carcass.stuckArrows + "x " + arrowType.displayName + ".");
-                carcass.stuckArrows = 0;
-            }
-        } else if (carcass.meatLeft > 0) {
-            carcass.meatLeft--;
-            player.inventory.add(meatType, 1);
-            audio.playEat();
-            particles.blood(carcass.pos.x, carcass.pos.y + 0.3f, carcass.pos.z);
-            log("You tear off some meat with your hands. A knife would salvage the hide.");
-        } else {
-            log("Nothing left worth taking.");
-        }
-        player.scent = Math.min(1f, player.scent + 0.3f);
-    }
-
-    private void campfireInteract(Vec3i pos) {
-        // A cleared settlement's fire is where the player claims the outpost.
-        var cs = world.settlementAt(pos.x(), pos.z());
-        if (cs != null && cs.hostile()
-                && com.veylon.settlement.HumanFaction.FREE_SETTLERS.equals(cs.founderFaction)) {
-            settlementManager.offerRestitution(this, cs);
-            return;
-        }
-        if (cs != null && cs.hostile()) {
-            settlementManager.controlCentralObjective(this, cs);
-            return;
-        }
-        if (cs != null && cs.cleared && !cs.occupied) {
-            settlementManager.occupy(this, cs);
-            return;
-        }
-        boolean lit = world.campfireFuel.getOrDefault(pos, 0f) > 0;
-        if (lit && player.inventory.has(ItemType.RAW_MEAT, 1)) {
-            player.inventory.remove(ItemType.RAW_MEAT, 1);
-            player.inventory.add(ItemType.COOKED_MEAT, 1);
-            audio.playClick();
-            particles.smoke(pos.x() + 0.5f, pos.y() + 0.8f, pos.z() + 0.5f, 1f);
-            log("Cooked meat over the campfire.");
-        } else if (lit && player.inventory.has(ItemType.WATERSKIN_DIRTY, 1)) {
-            player.inventory.remove(ItemType.WATERSKIN_DIRTY, 1);
-            player.inventory.add(ItemType.WATERSKIN_CLEAN, 1);
-            audio.playBoil();
-            log("Boiled the waterskin - the water is safe to drink now.");
-        } else if (player.inventory.has(ItemType.LOG, 1)) {
-            player.inventory.remove(ItemType.LOG, 1);
-            world.campfireFuel.merge(pos, 120f, Float::sum);
-            audio.playClick();
-            log("Added a log to the fire (+120s fuel).");
-        } else {
-            log(lit ? "Bring raw meat to cook, dirty water to boil, or a log for fuel."
-                    : "The fire is out. Add a log to relight it.");
-        }
+        return interactions.interactWithNearbyCarcass();
     }
 
     /** Gameplay command shared by the real F-key interaction and integration tests. */
     public boolean interactLantern(Vec3i pos) {
-        World.LanternState state = world.lanternState(pos);
-        if (state == null) {
-            return false;
-        }
-        ItemStack held = player.selected();
-        if (held != null && held.type == ItemType.CHARCOAL
-                && state.fuelSeconds() < World.LANTERN_MAX_FUEL) {
-            player.inventory.shrink(player.hotbarSel, 1);
-            float fuel = world.addLanternFuel(pos, World.LANTERN_FUEL_PER_CHARCOAL);
-            audio.playClick();
-            log(state.lit()
-                    ? "Added charcoal to the lit lantern (" + (int) fuel + "s fuel)."
-                    : "Added charcoal to the lantern (" + (int) fuel
-                    + "s fuel). Press [F] again to light it.");
-            return true;
-        }
-        if (state.fuelSeconds() <= 0) {
-            log("The lantern is empty. Hold charcoal and press [F] to refuel it.");
-            return true;
-        }
-        boolean light = !state.lit();
-        world.setLanternLit(pos, light);
-        audio.playClick();
-        log(light ? "Lantern lit." : "Lantern extinguished; its remaining fuel is preserved.");
-        return true;
-    }
-
-    private void rackInteract(Vec3i pos) {
-        RackBatch batch = world.rackBatches.get(pos);
-        if (batch != null && batch.done()) {
-            player.inventory.add(batch.output(), batch.count);
-            world.rackBatches.remove(pos);
-            audio.playClick();
-            log("Collected " + batch.count + "x " + batch.output().displayName + " from the rack.");
-            return;
-        }
-        if (batch != null) {
-            int pct = (int) (batch.progress / batch.required() * 100);
-            log("Still drying: " + batch.count + "x " + batch.input.displayName + " (" + pct + "%).");
-            return;
-        }
-        ItemType input = null;
-        if (player.inventory.count(ItemType.RAW_MEAT) > 0) {
-            input = ItemType.RAW_MEAT;
-        } else if (player.inventory.count(ItemType.BERRY) > 0) {
-            input = ItemType.BERRY;
-        }
-        if (input == null) {
-            log("You need raw meat or berries to dry on the rack.");
-            return;
-        }
-        int count = Math.min(4, player.inventory.count(input));
-        player.inventory.remove(input, count);
-        world.rackBatches.put(pos, new RackBatch(input, count));
-        audio.playClick();
-        log("Hung " + count + "x " + input.displayName + " to dry. Keep it out of the rain.");
-    }
-
-    private void collectorInteract(Vec3i pos) {
-        float liters = world.collectorWater.getOrDefault(pos, 0f);
-        if (liters >= 1f && player.inventory.count(ItemType.WATERSKIN_EMPTY) > 0) {
-            player.inventory.remove(ItemType.WATERSKIN_EMPTY, 1);
-            player.inventory.add(ItemType.WATERSKIN_CLEAN, 1);
-            world.collectorWater.put(pos, liters - 1f);
-            audio.playDrink();
-            log("Filled a waterskin with clean rainwater.");
-        } else if (liters >= 1f) {
-            player.thirst = Math.min(100, player.thirst + 40);
-            world.collectorWater.put(pos, liters - 1f);
-            audio.playDrink();
-            log("You drink fresh rainwater (+40 thirst).");
-        } else {
-            log("The collector holds " + String.format("%.1f", liters)
-                    + " L. It fills while it rains.");
-        }
-    }
-
-    private void beaconInteract() {
-        switch (world.beaconStage) {
-            case 0 -> {
-                if (player.inventory.has(ItemType.SIGNAL_CRYSTAL, 1)) {
-                    player.inventory.remove(ItemType.SIGNAL_CRYSTAL, 1);
-                    world.beaconStage = 1;
-                    audio.playCraft();
-                    log("Signal crystal installed. Next: wire the array with 3 copper ingots.");
-                } else {
-                    log("The beacon needs a SIGNAL CRYSTAL. Ancient ruins hold resonant cores...");
-                }
-            }
-            case 1 -> {
-                if (player.inventory.has(ItemType.COPPER_INGOT, 3)) {
-                    player.inventory.remove(ItemType.COPPER_INGOT, 3);
-                    world.beaconStage = 2;
-                    audio.playCraft();
-                    log("Wiring complete. The beacon needs calibration codes from the camp (Allied).");
-                } else {
-                    log("Wiring requires 3 COPPER INGOTS (smelt copper ore at a furnace).");
-                }
-            }
-            case 2 -> {
-                if (faction.trust >= 75) {
-                    world.beaconStage = 3;
-                    Vec3i bp = world.beaconPos;
-                    world.setBlock(bp.x(), bp.y(), bp.z(), BlockType.BEACON_LIT, true);
-                    audio.playDiscover();
-                    log("=== THE DISTRESS BEACON IS ALIVE! Its signal pierces the sky. ===");
-                    log("You did it. Rescue will come. Survive until then - Veylon isn't done with you.");
-                    closeScreens();
-                    appState = AppState.VICTORY;
-                } else {
-                    log("The camp must trust you as an ALLY (trust 75+) to share calibration codes.");
-                }
-            }
-            default -> {
-            }
-        }
+        return interactions.interactLantern(pos);
     }
 
     // ------------------------------------------------------------------
