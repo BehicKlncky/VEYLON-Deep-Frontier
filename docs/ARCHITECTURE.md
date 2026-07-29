@@ -27,18 +27,29 @@ Main.main
         ├── settlement SettlementManager (+ planner, builder, counterattack director)
         ├── ai         FactionSystem
         ├── ui         Hud + one instance per screen, EventLog
-        └── (this repo's own splits)
-              QaHarness             opt-in benchmark/capture scaffolding
-              PlayerCombatSystem    melee, bow, firearm, thrown, reload, durability
-              InteractPromptBuilder read-only HUD interaction hint
+        └── collaborators split out of Game (all in com.veylon)
+              QaHarness              opt-in benchmark/capture scaffolding
+              PlayerCombatSystem     melee, bow, firearm, thrown, reload, durability
+              PlayerBlockActions     hold-to-mine, break outcomes, placement
+              WorldInteractions      F/RMB routing, NPCs, stations, beacon endgame
+              PlayerConsumables      eat, drink, treat, equip
+              CrateTransactionSystem crate transfers and theft attribution
+              InteractPromptBuilder  read-only HUD interaction hint
+              AmbienceSystem         ambient particles and audio mix
+              SleepSystem            sleep eligibility, quality, night effects
 ```
 
 Most systems take `Game g` as their first method parameter rather than holding a
 reference. This is a deliberate trade: it keeps every system constructible with
 a no-arg constructor (so tests can build one in isolation), at the cost of
-giving each system reach over the whole object graph. The three classes above
-hold a `Game` field instead, because they are extractions *from* `Game` and
-share its lifetime exactly.
+giving each system reach over the whole object graph. The nine collaborators
+above hold a `Game` field instead, because they are extractions *from* `Game`
+and share its lifetime exactly.
+
+Each of those keeps its public commands on `Game` as one-line delegates. That
+is not ceremony: native input, the HUD, `EntityManager`, `CrateScreen` and the
+gameplay tests all reach these through the `Game` instance, so moving the rules
+out without moving the entry points keeps every existing caller working.
 
 ### Dependency direction
 
@@ -259,17 +270,24 @@ this: append new constants at the end, never reorder or delete. Reordering
 
 ### Where gameplay rules live now
 
-After the 0.4.0 debt work, `Game` is orchestration plus world interaction. The
-rules that were interleaved with it live in:
+After the 0.4.0 debt work, `Game` is orchestration only — the loop, the app
+state machine, world setup, input routing and tick wiring. It went from 4,381
+lines to 1,462. Every gameplay rule that used to be interleaved with it lives
+in a named collaborator:
 
-- `PlayerCombatSystem` — all damage the player deals, plus durability and the
-  reputation consequences of a kill. Public commands stay on `Game` as
-  delegates because input, `EntityManager` and tests all drive them there.
-- `InteractPromptBuilder` — the `[F] …` hint. Pure read; changing wording here
-  can never change what F does.
-- `PlayerConstants` — every survival tuning value, grouped by system.
-- `QaHarness` — benchmark scenes, showcases and the release smoke gate.
+| Class | Owns |
+|---|---|
+| `PlayerCombatSystem` | all damage the player deals, durability, kill reputation |
+| `PlayerBlockActions` | hold-to-mine, break drops/spill/vandalism, placement |
+| `WorldInteractions` | F and RMB routing, NPC talk/rescue, stations, beacon endgame |
+| `PlayerConsumables` | eat, drink, treat wounds, equip gear |
+| `CrateTransactionSystem` | crate transfers and theft attribution |
+| `InteractPromptBuilder` | the `[F] …` hint (pure read — cannot change what F does) |
+| `AmbienceSystem` | ambient particles and the audio mix |
+| `SleepSystem` | sleep eligibility, quality scoring, night effects |
+| `QaHarness` | benchmark scenes, showcases, release smoke gate |
 
-`Game` still holds the interaction handlers (mining, placement, eating,
-stations, crates, NPC dialogue). Those are the next extraction; see
-[DEVELOPING.md](DEVELOPING.md#known-rough-edges).
+Tuning values are in `PlayerConstants`, `TimeConstants`,
+`TemperatureConstants`, `WaterConstants`, and as named constants inside each
+collaborator above. The remaining simulation systems still hold inline
+literals; see [DEVELOPING.md](DEVELOPING.md#known-rough-edges).

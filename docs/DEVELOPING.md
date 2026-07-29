@@ -13,7 +13,7 @@ Setup requirements (JDK 25, OpenGL 3.3, the proxy workaround) are in
 
 ```bash
 ./gradlew run            # play the game
-./gradlew test           # 236 deterministic tests, headless, ~75 s
+./gradlew test           # 236 tests, headless, ~75 s (one is flaky, see below)
 ./gradlew build          # compile + test
 ./gradlew fatJar         # self-contained JAR in build/libs/
 ```
@@ -181,15 +181,6 @@ Reload progress and bow draw deliberately do not.
 
 Tracked honestly so nobody rediscovers them:
 
-- **`Game.java` is still ~2,500 lines.** The 0.4.0 debt pass took it from 4,381
-  by extracting `QaHarness`, `PlayerCombatSystem` and `InteractPromptBuilder`.
-  The largest remaining block is world interaction — `mine`, `breakBlock`,
-  `rightClick`, `placeSelectedBlockAt`, `interact`, the station handlers
-  (campfire, lantern, rack, collector, beacon) and the crate/theft transaction
-  code, roughly 1,100 lines. Extracting it the same way (`PlayerActionSystem`
-  plus `CrateTransactionSystem`, with the public commands left on `Game` as
-  delegates because tests call them there) would bring `Game` under 1,500.
-
 - **`CounterattackLifecycleTest.activePartyLeavesARealHostileOriginAndContactLossDoesNotDeleteMission`
   is flaky.** It asserts a war party closed distance over 120 ticks, but party
   movement runs on the unseeded static `SettledNpcAI.RNG` and
@@ -202,7 +193,18 @@ Tracked honestly so nobody rediscovers them:
   a world change looks unintended; there is a `TODO` on the method. Changing it
   is a gameplay change and needs its own test.
 
-- **Magic numbers remain outside `Player`.** `PlayerConstants` covers the
-  survival simulation and `PlayerCombatSystem` names its own. The simulation
-  systems (`TimeSystem`, `WeatherSystem`, `TemperatureSystem`, `FireSystem`,
-  `WaterSystem`, `PlantSystem`, `EventSystem`) still hold inline literals.
+- **Four simulation systems still hold inline literals.** `PlayerConstants`,
+  `TimeConstants`, `TemperatureConstants` and `WaterConstants` exist, and each
+  collaborator extracted from `Game` names its own values. Still outstanding:
+  `WeatherSystem` (237 lines, no constants), `EventSystem` (397 lines, none),
+  `FireSystem` and `PlantSystem`. Follow the pattern in `TimeConstants`:
+  extract verbatim, then diff the numeric literals before and after to prove
+  nothing drifted.
+
+- **No system interfaces exist.** Phases 1 and 3 of the 0.4.0 brief called for
+  nine interfaces, nine facades and a service locator. They were not built: as
+  specified each facade would wrap an existing system *and* hold a `Game`
+  reference for cross-system calls, adding a delegation layer without removing
+  the coupling. The size reduction came from extracting collaborators instead.
+  If interfaces are wanted later, the extracted classes above are the natural
+  seams — they already have narrow, documented surfaces.
