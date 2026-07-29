@@ -11,6 +11,8 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Random;
 
+import static com.veylon.simulation.EventConstants.*;
+
 /**
  * State-driven world events. Triggers consider weather, moisture, trust,
  * season and time instead of being purely random timers. Every event changes
@@ -56,13 +58,13 @@ public class EventSystem {
 
     public final List<ActiveEvent> active = new ArrayList<>();
     private final Random rng = new Random();
-    private float cooldown = 60;
+    private float cooldown = INITIAL_COOLDOWN;
     private float meteorTimer;
     public int totalEventsTriggered = 0;
 
     public void reset() {
         active.clear();
-        cooldown = 60f;
+        cooldown = INITIAL_COOLDOWN;
         meteorTimer = 0f;
         totalEventsTriggered = 0;
     }
@@ -99,7 +101,7 @@ public class EventSystem {
         if (isActive(EventType.METEOR_SHOWER)) {
             meteorTimer -= dt;
             if (meteorTimer <= 0) {
-                meteorTimer = 15 + rng.nextInt(15);
+                meteorTimer = METEOR_INTERVAL_MIN + rng.nextInt(METEOR_INTERVAL_RANGE);
                 meteorShard(g, false);
             }
         }
@@ -113,57 +115,64 @@ public class EventSystem {
 
         // Roll one potential new event, weighted by world state and season.
         float r = rng.nextFloat();
-        float coldBias = season == SeasonSystem.Season.COLD ? 0.08f : 0f;
-        float dryBias = season == SeasonSystem.Season.DRY ? 0.08f : 0f;
-        float wetBias = season == SeasonSystem.Season.WET ? 0.06f : 0f;
+        float coldBias = season == SeasonSystem.Season.COLD ? COLD_SEASON_BIAS : 0f;
+        float dryBias = season == SeasonSystem.Season.DRY ? DRY_SEASON_BIAS : 0f;
+        float wetBias = season == SeasonSystem.Season.WET ? WET_SEASON_BIAS : 0f;
 
-        if (r < 0.06f + coldBias && !isActive(EventType.COLD_SNAP) && !isActive(EventType.HEAT_WAVE)) {
-            start(g, EventType.COLD_SNAP, 120 + rng.nextInt(120), 1f,
+        if (r < COLD_SNAP_ROLL + coldBias && !isActive(EventType.COLD_SNAP) && !isActive(EventType.HEAT_WAVE)) {
+            start(g, EventType.COLD_SNAP,
+                    COLD_SNAP_SECONDS_MIN + rng.nextInt(COLD_SNAP_SECONDS_RANGE), 1f,
                     "A cold snap grips the land. Stay warm!");
-        } else if (r < 0.10f + dryBias && !isActive(EventType.HEAT_WAVE) && !isActive(EventType.COLD_SNAP)) {
-            start(g, EventType.HEAT_WAVE, 120 + rng.nextInt(120), 1f,
+        } else if (r < HEAT_WAVE_ROLL + dryBias && !isActive(EventType.HEAT_WAVE) && !isActive(EventType.COLD_SNAP)) {
+            start(g, EventType.HEAT_WAVE,
+                    HEAT_WAVE_SECONDS_MIN + rng.nextInt(HEAT_WAVE_SECONDS_RANGE), 1f,
                     "A heat wave shimmers over Veylon. Thirst drains faster.");
-        } else if (r < 0.14f + dryBias && !isActive(EventType.DROUGHT) && g.plants.lastAvgMoisture < 0.55f) {
-            start(g, EventType.DROUGHT, 180 + rng.nextInt(120), 1f,
+        } else if (r < DROUGHT_ROLL + dryBias && !isActive(EventType.DROUGHT) && g.plants.lastAvgMoisture < DROUGHT_MAX_MOISTURE) {
+            start(g, EventType.DROUGHT,
+                    DROUGHT_SECONDS_MIN + rng.nextInt(DROUGHT_SECONDS_RANGE), 1f,
                     "Drought! Soil dries out and fire spreads easily.");
-        } else if (r < 0.19f + wetBias && !isActive(EventType.BERRY_BLOOM) && g.plants.lastAvgMoisture > 0.45f) {
-            start(g, EventType.BERRY_BLOOM, 150 + rng.nextInt(120), 1f,
+        } else if (r < BERRY_BLOOM_ROLL + wetBias && !isActive(EventType.BERRY_BLOOM) && g.plants.lastAvgMoisture > BERRY_BLOOM_MIN_MOISTURE) {
+            start(g, EventType.BERRY_BLOOM,
+                    BERRY_BLOOM_SECONDS_MIN + rng.nextInt(BERRY_BLOOM_SECONDS_RANGE), 1f,
                     "Berry bloom! Bushes regrow rapidly.");
-        } else if (r < 0.23f && !isActive(EventType.PREDATOR_MIGRATION)) {
-            start(g, EventType.PREDATOR_MIGRATION, 180, 1f,
+        } else if (r < PREDATOR_MIGRATION_ROLL && !isActive(EventType.PREDATOR_MIGRATION)) {
+            start(g, EventType.PREDATOR_MIGRATION, PREDATOR_MIGRATION_SECONDS, 1f,
                     "Predator migration - wolf howls echo in the distance...");
-            for (int i = 0; i < 2; i++) {
-                spawnWolfAtEdge(g, 55);
+            for (int i = 0; i < MIGRATION_WOLVES; i++) {
+                spawnWolfAtEdge(g, MIGRATION_SPAWN_DIST);
             }
-        } else if (r < 0.27f && !isActive(EventType.TRADER_VISIT) && g.faction.trust > 20 && !g.faction.hostile) {
-            start(g, EventType.TRADER_VISIT, 240, 1f,
+        } else if (r < TRADER_VISIT_ROLL && !isActive(EventType.TRADER_VISIT) && g.faction.trust > TRADER_MIN_TRUST && !g.faction.hostile) {
+            start(g, EventType.TRADER_VISIT, TRADER_VISIT_SECONDS, 1f,
                     "A wandering trader is approaching - look for them nearby (press F to trade).");
             spawnTrader(g);
-        } else if (r < 0.30f && !isActive(EventType.TOXIC_FOG)) {
-            start(g, EventType.TOXIC_FOG, 90 + rng.nextInt(80), 1f,
+        } else if (r < TOXIC_FOG_ROLL && !isActive(EventType.TOXIC_FOG)) {
+            start(g, EventType.TOXIC_FOG,
+                    TOXIC_FOG_SECONDS_MIN + rng.nextInt(TOXIC_FOG_SECONDS_RANGE), 1f,
                     "TOXIC FOG rolls in! Stay indoors or risk sickness.");
-        } else if (r < 0.325f && !isActive(EventType.ASHFALL)) {
-            start(g, EventType.ASHFALL, 120 + rng.nextInt(100), 1f,
+        } else if (r < ASHFALL_ROLL && !isActive(EventType.ASHFALL)) {
+            start(g, EventType.ASHFALL,
+                    ASHFALL_SECONDS_MIN + rng.nextInt(ASHFALL_SECONDS_RANGE), 1f,
                     "Ashfall darkens the sky. Plants choke under the grey dust.");
-        } else if (r < 0.345f && !isActive(EventType.METEOR_SHOWER)) {
-            start(g, EventType.METEOR_SHOWER, 70 + rng.nextInt(40), 1f,
+        } else if (r < METEOR_SHOWER_ROLL && !isActive(EventType.METEOR_SHOWER)) {
+            start(g, EventType.METEOR_SHOWER,
+                    METEOR_SHOWER_SECONDS_MIN + rng.nextInt(METEOR_SHOWER_SECONDS_RANGE), 1f,
                     "METEOR SHOWER! Shards are streaking down around you.");
-            meteorTimer = 5;
-        } else if (r < 0.365f && !isActive(EventType.PREDATOR_RAID) && g.world.campPos != null) {
-            start(g, EventType.PREDATOR_RAID, 90, 1f,
+            meteorTimer = METEOR_SHOWER_FIRST_SHARD;
+        } else if (r < PREDATOR_RAID_ROLL && !isActive(EventType.PREDATOR_RAID) && g.world.campPos != null) {
+            start(g, EventType.PREDATOR_RAID, PREDATOR_RAID_SECONDS, 1f,
                     "Wolves are raiding the NPC camp! Help defend it for trust.");
-            for (int i = 0; i < 3; i++) {
+            for (int i = 0; i < CAMP_RAID_WOLVES; i++) {
                 spawnWolfAtCamp(g);
             }
-        } else if (r < 0.385f && !isActive(EventType.SCAVENGER_RAID) && g.world.campPos != null
+        } else if (r < SCAVENGER_RAID_ROLL && !isActive(EventType.SCAVENGER_RAID) && g.world.campPos != null
                 && g.faction.upgradeStage >= 1) {
-            start(g, EventType.SCAVENGER_RAID, 110, 1f,
+            start(g, EventType.SCAVENGER_RAID, SCAVENGER_RAID_SECONDS, 1f,
                     "Hostile scavengers are attacking the camp!");
-            int count = 2 + rng.nextInt(2);
+            int count = RAIDERS_MIN + rng.nextInt(RAIDERS_RANGE);
             for (int i = 0; i < count; i++) {
                 spawnRaider(g, i);
             }
-        } else if (r < 0.405f && !isActive(EventType.NPC_ILLNESS)) {
+        } else if (r < NPC_ILLNESS_ROLL && !isActive(EventType.NPC_ILLNESS)) {
             Npc victim = null;
             for (Npc n : g.entities.npcs) {
                 if (!n.isTrader && !n.raider && !n.sick && !n.dead) {
@@ -174,10 +183,10 @@ public class EventSystem {
             if (victim != null) {
                 victim.sick = true;
                 victim.sickTimer = 0;
-                start(g, EventType.NPC_ILLNESS, 600, 1f,
+                start(g, EventType.NPC_ILLNESS, NPC_ILLNESS_SECONDS, 1f,
                         victim.name + " has fallen ill. The camp needs MEDICINE (herbalist bench).");
             }
-        } else if (r < 0.43f) {
+        } else if (r < LONE_METEOR_ROLL) {
             meteorShard(g, true);
         }
     }
@@ -185,21 +194,21 @@ public class EventSystem {
     private void start(Game g, EventType type, float duration, float severity, String message) {
         active.add(new ActiveEvent(type, duration, severity));
         totalEventsTriggered++;
-        cooldown = 70 + rng.nextInt(60);
+        cooldown = COOLDOWN_MIN + rng.nextInt(COOLDOWN_RANGE);
         g.log("EVENT: " + message);
     }
 
     public void onStormStarted(Game g) {
         if (!isActive(EventType.STORM_FRONT)) {
-            active.add(new ActiveEvent(EventType.STORM_FRONT, 90, 1f));
+            active.add(new ActiveEvent(EventType.STORM_FRONT, STORM_FRONT_SECONDS, 1f));
             totalEventsTriggered++;
-            g.faction.alert = Math.min(100, g.faction.alert + 15);
+            g.faction.alert = Math.min(100, g.faction.alert + STORM_ALERT_INCREASE);
         }
     }
 
     public void onLightningFire(Game g) {
         if (!isActive(EventType.FOREST_FIRE)) {
-            active.add(new ActiveEvent(EventType.FOREST_FIRE, 60, 1f));
+            active.add(new ActiveEvent(EventType.FOREST_FIRE, FOREST_FIRE_SECONDS, 1f));
             totalEventsTriggered++;
         }
     }
@@ -211,7 +220,7 @@ public class EventSystem {
 
     private void meteorShard(Game g, boolean announce) {
         double ang = rng.nextDouble() * Math.PI * 2;
-        double dist = 25 + rng.nextDouble() * 35;
+        double dist = METEOR_DIST_MIN + rng.nextDouble() * METEOR_DIST_RANGE;
         int x = (int) (g.player.pos.x + Math.cos(ang) * dist);
         int z = (int) (g.player.pos.z + Math.sin(ang) * dist);
         if (g.world.getChunk(Math.floorDiv(x, 16), Math.floorDiv(z, 16)) == null) {
@@ -219,10 +228,10 @@ public class EventSystem {
         }
         int y = g.world.surfaceHeight(x, z);
         // Carve a small crater with a rich ore core.
-        for (int dx = -2; dx <= 2; dx++) {
-            for (int dz = -2; dz <= 2; dz++) {
-                for (int dy = -1; dy <= 2; dy++) {
-                    if (dx * dx + dz * dz + dy * dy <= 5) {
+        for (int dx = -CRATER_RADIUS; dx <= CRATER_RADIUS; dx++) {
+            for (int dz = -CRATER_RADIUS; dz <= CRATER_RADIUS; dz++) {
+                for (int dy = -CRATER_DEPTH; dy <= CRATER_HEIGHT; dy++) {
+                    if (dx * dx + dz * dz + dy * dy <= CRATER_SHAPE_CUTOFF) {
                         g.world.setBlock(x + dx, y + dy, z + dz, BlockType.AIR, true);
                     }
                 }
@@ -237,9 +246,9 @@ public class EventSystem {
         g.particles.meteorImpact(x + 0.5f, y + 0.2f, z + 0.5f);
         g.audio.playThunder();
         if (announce) {
-            active.add(new ActiveEvent(EventType.METEOR_SHARD, 30, 1f));
+            active.add(new ActiveEvent(EventType.METEOR_SHARD, METEOR_SHARD_SECONDS, 1f));
             totalEventsTriggered++;
-            cooldown = 100 + rng.nextInt(80);
+            cooldown = METEOR_COOLDOWN_MIN + rng.nextInt(METEOR_COOLDOWN_RANGE);
             g.log("EVENT: A meteor shard crashed near (" + x + ", " + z + ")! Rich ore at the impact site.");
         } else {
             g.log("A meteor shard slams down near (" + x + ", " + z + ")!");
@@ -255,21 +264,21 @@ public class EventSystem {
         }
         int y = g.world.surfaceHeight(x, z) + 1;
         Creature wolf = g.entities.spawnCreature(g.world, Creature.CreatureType.WOLF, x + 0.5f, y, z + 0.5f);
-        wolf.hunger = 70;
+        wolf.hunger = MIGRATION_WOLF_HUNGER;
         g.audio.playHowl(x + 0.5f, y, z + 0.5f);
     }
 
     private void spawnWolfAtCamp(Game g) {
         var camp = g.world.campPos;
         double ang = rng.nextDouble() * Math.PI * 2;
-        int x = (int) (camp.x() + Math.cos(ang) * 18);
-        int z = (int) (camp.z() + Math.sin(ang) * 18);
+        int x = (int) (camp.x() + Math.cos(ang) * CAMP_WOLF_SPAWN_DIST);
+        int z = (int) (camp.z() + Math.sin(ang) * CAMP_WOLF_SPAWN_DIST);
         if (g.world.getChunk(Math.floorDiv(x, 16), Math.floorDiv(z, 16)) == null) {
             return;
         }
         int y = g.world.surfaceHeight(x, z) + 1;
         Creature wolf = g.entities.spawnCreature(g.world, Creature.CreatureType.WOLF, x + 0.5f, y, z + 0.5f);
-        wolf.hunger = 90;
+        wolf.hunger = CAMP_WOLF_HUNGER;
         g.audio.playHowl(x + 0.5f, y, z + 0.5f);
     }
 
@@ -279,10 +288,10 @@ public class EventSystem {
         }
         var camp = g.world.campPos;
         double ang = rng.nextDouble() * Math.PI * 2;
-        int x = (int) (camp.x() + Math.cos(ang) * 24);
-        int z = (int) (camp.z() + Math.sin(ang) * 24);
+        int x = (int) (camp.x() + Math.cos(ang) * RAIDER_SPAWN_DIST);
+        int z = (int) (camp.z() + Math.sin(ang) * RAIDER_SPAWN_DIST);
         if (g.world.getChunk(Math.floorDiv(x, 16), Math.floorDiv(z, 16)) == null) {
-            x = camp.x() + 20;
+            x = camp.x() + RAIDER_FALLBACK_OFFSET;
             z = camp.z();
         }
         int y = g.world.surfaceHeight(x, z) + 1;
@@ -290,9 +299,9 @@ public class EventSystem {
         Npc raider = g.entities.spawnNpc(g.world, names[idx % names.length] + " (Scavenger)",
                 x + 0.5f, y, z + 0.5f);
         raider.raider = true;
-        raider.leaveTimer = 90;
-        raider.maxHealth = 28;
-        raider.health = 28;
+        raider.leaveTimer = RAIDER_LEAVE_SECONDS;
+        raider.maxHealth = RAIDER_HEALTH;
+        raider.health = RAIDER_HEALTH;
     }
 
     private void spawnTrader(Game g) {
@@ -300,16 +309,16 @@ public class EventSystem {
             return;
         }
         double ang = rng.nextDouble() * Math.PI * 2;
-        int x = (int) (g.player.pos.x + Math.cos(ang) * 35);
-        int z = (int) (g.player.pos.z + Math.sin(ang) * 35);
+        int x = (int) (g.player.pos.x + Math.cos(ang) * TRADER_SPAWN_DIST);
+        int z = (int) (g.player.pos.z + Math.sin(ang) * TRADER_SPAWN_DIST);
         if (g.world.getChunk(Math.floorDiv(x, 16), Math.floorDiv(z, 16)) == null) {
-            x = (int) g.player.pos.x + 6;
-            z = (int) g.player.pos.z + 6;
+            x = (int) g.player.pos.x + TRADER_FALLBACK_OFFSET;
+            z = (int) g.player.pos.z + TRADER_FALLBACK_OFFSET;
         }
         int y = g.world.surfaceHeight(x, z) + 1;
         Npc trader = g.entities.spawnNpc(g.world, "Trader Ressk", x + 0.5f, y, z + 0.5f);
         trader.isTrader = true;
-        trader.leaveTimer = 240;
+        trader.leaveTimer = TRADER_LEAVE_SECONDS;
     }
 
     // ---- Modifier queries used by other systems ----
@@ -317,44 +326,44 @@ public class EventSystem {
     public float tempOffset() {
         float t = 0;
         if (isActive(EventType.COLD_SNAP)) {
-            t -= 12;
+            t -= TEMP_SWING;
         }
         if (isActive(EventType.HEAT_WAVE)) {
-            t += 12;
+            t += TEMP_SWING;
         }
         return t;
     }
 
     public float thirstMul() {
-        return isActive(EventType.HEAT_WAVE) ? 1.6f : 1f;
+        return isActive(EventType.HEAT_WAVE) ? HEAT_WAVE_THIRST_MULT : 1f;
     }
 
     public float growthMul() {
         float m = 1f;
         if (isActive(EventType.DROUGHT)) {
-            m *= 0.3f;
+            m *= DROUGHT_GROWTH_MULT;
         }
         if (isActive(EventType.ASHFALL)) {
-            m *= 0.5f;
+            m *= ASHFALL_GROWTH_MULT;
         }
         return m;
     }
 
     public float berryMul() {
-        return isActive(EventType.BERRY_BLOOM) ? 4f : 1f;
+        return isActive(EventType.BERRY_BLOOM) ? BERRY_BLOOM_MULT : 1f;
     }
 
     public float fireSpreadMul() {
-        return isActive(EventType.DROUGHT) ? 1.9f : 1f;
+        return isActive(EventType.DROUGHT) ? DROUGHT_FIRE_SPREAD_MULT : 1f;
     }
 
     public int wolfCapBonus() {
         int bonus = 0;
         if (isActive(EventType.PREDATOR_MIGRATION)) {
-            bonus += 4;
+            bonus += MIGRATION_WOLF_CAP_BONUS;
         }
         if (isActive(EventType.PREDATOR_RAID)) {
-            bonus += 3;
+            bonus += RAID_WOLF_CAP_BONUS;
         }
         return bonus;
     }
@@ -369,7 +378,7 @@ public class EventSystem {
 
     /** Extra darkening of the sky during ashfall. */
     public float skyLightMul() {
-        return isActive(EventType.ASHFALL) ? 0.7f : 1f;
+        return isActive(EventType.ASHFALL) ? ASHFALL_SKYLIGHT_MULT : 1f;
     }
 
     /** Green tint and shortened fog while toxic fog is active. */
