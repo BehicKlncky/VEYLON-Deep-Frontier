@@ -6,10 +6,20 @@ import static com.veylon.simulation.TimeConstants.*;
  * In-game clock. One full day lasts 15 real minutes
  * (1 real second = 1.6 game minutes).
  */
-public class TimeSystem {
+public class TimeSystem implements SimulationSystem {
 
     /** Total game minutes elapsed since world start (starts at day 1, 08:00). */
     public double totalMinutes = START_HOUR * MINUTES_PER_HOUR;
+
+    /**
+     * Returns the clock to day 1, 08:00. The clock has no tick of its own — the
+     * run loop calls {@link #advance(double)} with real frame time — but it is
+     * still per-world state that a new world must not inherit.
+     */
+    @Override
+    public void reset() {
+        totalMinutes = START_HOUR * MINUTES_PER_HOUR;
+    }
 
     public void advance(double realSeconds) {
         totalMinutes += realSeconds * MINUTES_PER_REAL_SECOND;

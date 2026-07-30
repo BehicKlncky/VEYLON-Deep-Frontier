@@ -13,7 +13,8 @@ Setup requirements (JDK 25, OpenGL 3.3, the proxy workaround) are in
 
 ```bash
 ./gradlew run            # play the game
-./gradlew test           # 240 deterministic tests, headless, ~80 s
+./gradlew test           # 266 deterministic tests, headless, ~80 s
+./gradlew performanceTest # 4 opt-in wall-clock benchmarks; reference PC only
 ./gradlew build          # compile + test
 ./gradlew fatJar         # self-contained JAR in build/libs/
 ```
@@ -124,17 +125,23 @@ VEYLON_SEED=20260716 VEYLON_SCENE=day VEYLON_SHOT=6 ./gradlew run
 2. Add a roll bound and a duration to `EventConstants`. The bounds are
    cumulative and tested in ascending order, so inserting one means shifting
    every bound after it — only the gaps between them are meaningful.
-3. Add the branch to the ladder in `EventSystem.slowTick`, in bound order.
-4. Add whatever modifier query other systems need (`growthMul`, `thirstMul`,
+3. Add an `EventDefinition` to `EventSystem.DEFINITIONS`, in bound order. Keep
+   eligibility in its side-effect-free precondition and mutations in its effect;
+   a rejected definition deliberately hands the same roll to the next rung.
+4. Update the hand-maintained rung table in `EventSystem.slowTick`'s JavaDoc and
+   extend `EventRollLadderTest`'s characterization/invariant coverage.
+5. Add whatever modifier query other systems need (`growthMul`, `thirstMul`,
    `wolfCapBonus`, …) rather than having them check `isActive` directly.
 
 ### A simulation system
 
-1. New class in `simulation/`, with a `reset()` and a constants class beside it.
-2. Call its tick from the right bucket in `Game.fastTick`/`mediumTick`/
-   `slowTick` — pick the *slowest* bucket that still feels responsive.
-3. Call its `reset()` from `Game.newWorld` and assert that in
-   `GameLoopIntegrationTest.newWorldClearsSimulationQueuesAndPlayerActionState`.
+1. Add a class in `simulation/`, with a `reset()` and a constants class beside it.
+2. Implement `FastTickSystem`, `MediumTickSystem` or `SlowTickSystem` — pick the
+   *slowest* cadence that still feels responsive. A stateful system without a
+   scheduler bucket implements the base `SimulationSystem`.
+3. Call its tick from the matching `Game` bucket and its `reset()` from
+   `Game.newWorld`. Add it to `SimulationSystemContractTest`, including a
+   behavior-level assertion for every per-world cache or counter it clears.
 4. If it holds a `Random`, give it `setRandomSeed(long)` and seed it from
    `Game.reseedSimulation` with a salt no other system uses.
 5. If it holds state that must survive a save, add a v3 extension section in
@@ -184,7 +191,12 @@ Reload progress and bow draw deliberately do not.
 
 ## Testing conventions
 
-- Tests are deterministic and headless; a fixed seed goes in the test.
+- The default `test` suite is deterministic and headless; a fixed seed goes in
+  the test.
+- Wall-clock budgets are tagged `performance`, run only through
+  `performanceTest`, and are calibrated for the machine recorded in
+  `docs/PERFORMANCE_BENCHMARKS.md`. Do not add them to portable release
+  packaging or re-baseline them on an arbitrary CI runner.
 - Build an isolated arena rather than relying on generated terrain when the test
   is about mechanics — see `CombatSystemsTest.setUp`, which flattens four chunks
   to stone at y=40.
@@ -200,23 +212,16 @@ Reload progress and bow draw deliberately do not.
 
 Tracked honestly so nobody rediscovers them:
 
-- **`PlayerCombatSystem.reset()` leaves `attackCooldown` alone**, matching the
-  pre-refactor behaviour exactly. Carrying up to 0.45 s of melee cooldown across
-  a world change looks unintended; there is a `TODO` on the method. Changing it
-  is a gameplay change and needs its own test.
+- **The event probability table is documented twice.** `EventSystem.DEFINITIONS`
+  is executable authority, while the `slowTick` JavaDoc table is maintained by
+  hand for readers. `EventRollLadderTest` protects the executable ordering and
+  distribution, but cannot prove that the prose table was updated.
 
-- **`EventSystem`'s roll ladder is still 13 chained `else if` branches.** The
-  thresholds are named now, but adding an event still means inserting a branch
-  in the right place and shifting the bounds after it. A table would be nicer;
-  it was left alone because each branch has different preconditions and side
-  effects, so converting it is a behavioral change rather than a rename.
-  `WeatherSystem` shows the shape to aim for — its per-state values moved onto
-  the enum, and the compiler now enforces completeness.
+- **Performance budgets are single-machine.** `performanceTest` catches large
+  simulation/save regressions on the recorded reference PC, not portable timing
+  differences. Rendering still requires the fixed-seed OpenGL smoke gate.
 
-- **No system interfaces exist.** Phases 1 and 3 of the 0.4.0 brief called for
-  nine interfaces, nine facades and a service locator. They were not built: as
-  specified each facade would wrap an existing system *and* hold a `Game`
-  reference for cross-system calls, adding a delegation layer without removing
-  the coupling. The size reduction came from extracting collaborators instead.
-  If interfaces are wanted later, the extracted classes above are the natural
-  seams — they already have narrow, documented surfaces.
+- **Cadence interfaces are contracts, not dependency injection.** Systems still
+  receive `Game` for cross-system coordination. Introducing a service locator
+  or one facade per system would add indirection without narrowing that
+  dependency and remains intentionally out of scope.

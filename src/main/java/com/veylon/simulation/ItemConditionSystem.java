@@ -15,14 +15,16 @@ import java.util.Map;
  * Ticks per-item state: food spoilage in the player inventory and crates,
  * drying-rack progress and rain-collector fill. Runs on the slow tick.
  */
-public class ItemConditionSystem {
+public class ItemConditionSystem implements SlowTickSystem {
 
     public int itemsSpoiled;
 
+    @Override
     public void reset() {
         itemsSpoiled = 0;
     }
 
+    @Override
     public void slowTick(Game g, float dt) {
         // Cold air preserves food; heat spoils it faster.
         float envRate = spoilRate(g.player.envTemp);

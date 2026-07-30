@@ -141,25 +141,30 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
     public final EventLog eventLog = new EventLog();
     private final SimulationScheduler scheduler = new SimulationScheduler();
 
-    // UI.
-    public final Hud hud = new Hud();
-    public final InventoryScreen inventoryScreen = new InventoryScreen();
-    public final CraftingScreen craftingScreen = new CraftingScreen();
-    public final CrateScreen crateScreen = new CrateScreen();
+    // UI. Screens are drawn and driven from this class alone — nothing outside
+    // com.veylon holds one — so they stay package-private. A screen that needs
+    // to be reachable from elsewhere should expose a command on Game rather than
+    // handing out its instance.
+    final Hud hud = new Hud();
+    final InventoryScreen inventoryScreen = new InventoryScreen();
+    final CraftingScreen craftingScreen = new CraftingScreen();
+    final CrateScreen crateScreen = new CrateScreen();
+    /** @VisibleForTesting — public only for gameplay tests outside com.veylon. */
     public final NpcScreen npcScreen = new NpcScreen();
-    public final PauseMenu pauseMenu = new PauseMenu();
-    public final MapScreen mapScreen = new MapScreen();
-    public final DebugOverlay debugOverlay = new DebugOverlay();
-    public final SimulationPanel simulationPanel = new SimulationPanel();
-    public final TitleScreen titleScreen = new TitleScreen();
-    public final GraphicsOptionsScreen graphicsOptionsScreen = new GraphicsOptionsScreen();
+    final PauseMenu pauseMenu = new PauseMenu();
+    final MapScreen mapScreen = new MapScreen();
+    final DebugOverlay debugOverlay = new DebugOverlay();
+    final SimulationPanel simulationPanel = new SimulationPanel();
+    final TitleScreen titleScreen = new TitleScreen();
+    final GraphicsOptionsScreen graphicsOptionsScreen = new GraphicsOptionsScreen();
 
+    /** @VisibleForTesting — public only for gameplay tests outside com.veylon. */
     public UiMode uiMode = UiMode.NONE;
-    public boolean debugShown;
-    public boolean simPanelShown;
+    boolean debugShown;
+    boolean simPanelShown;
     public boolean simPaused;
     /** Set by F2; the run loop captures the back buffer after the frame renders. */
-    public boolean pendingScreenshot;
+    boolean pendingScreenshot;
 
     // Per-frame state.
     public Raycaster.Result targetHit;
@@ -237,6 +242,7 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
     private float sleptMinutes;
 
     public Inventory openCrate;
+    /** @VisibleForTesting — public only for gameplay tests outside com.veylon. */
     public Vec3i openCratePos;
     public Npc activeNpc;
 
@@ -489,6 +495,9 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
         // its bounded GPU meshes and reset cross-world simulation queues first.
         releaseWorldMeshes();
         scheduler.reset();
+        time.reset();
+        weather.reset();
+        temperature.reset();
         fire.reset();
         water.reset();
         events.reset();
@@ -516,11 +525,6 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
         faction.upgradeStage = 0;
         faction.resetQuestRuntime();
         faction.alliedGiftGiven = false;
-        time.totalMinutes = 8 * 60;
-        weather.current = WeatherSystem.Weather.CLEAR;
-        weather.next = WeatherSystem.Weather.CLEAR;
-        weather.blend = 1f;
-        weather.changeTimer = 100;
         sleeping = false;
         sleepFade = 0;
         simPaused = false;

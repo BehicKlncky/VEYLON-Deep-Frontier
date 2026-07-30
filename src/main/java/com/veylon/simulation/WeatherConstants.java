@@ -24,8 +24,15 @@ public final class WeatherConstants {
      */
     public static final float TRANSITION_SNAP = 0.5f;
 
-    /** Seconds before the first weather roll of a world. */
+    /**
+     * Seconds before the first weather roll, for a {@link WeatherSystem} that
+     * has never been given a world. Every real world goes through
+     * {@link WeatherSystem#reset()} and therefore uses
+     * {@link #NEW_WORLD_CHANGE_TIMER} instead.
+     */
     public static final float INITIAL_CHANGE_TIMER = 120f;
+    /** Seconds of guaranteed opening weather when a world starts or loads. */
+    public static final float NEW_WORLD_CHANGE_TIMER = 100f;
     /** Minimum seconds between weather rolls. */
     public static final float CHANGE_TIMER_MIN = 90f;
     /** Additional random seconds on top of the minimum. */

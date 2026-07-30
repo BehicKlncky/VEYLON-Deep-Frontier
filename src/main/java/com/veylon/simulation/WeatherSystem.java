@@ -10,7 +10,7 @@ import java.util.Random;
 import static com.veylon.simulation.WeatherConstants.*;
 
 /** Dynamic weather with gradual transitions, biome tendencies and storm lightning. */
-public class WeatherSystem {
+public class WeatherSystem implements MediumTickSystem {
 
     /**
      * A weather state and everything that distinguishes it.
@@ -74,6 +74,22 @@ public class WeatherSystem {
     private float flashTimer = 0;
     public int lightningStrikes = 0;
 
+    /**
+     * Starts every world on settled clear weather. A load overwrites this from
+     * the save immediately afterwards; a new game keeps it, which is why the
+     * player never crash-lands into a storm.
+     */
+    @Override
+    public void reset() {
+        current = Weather.CLEAR;
+        next = Weather.CLEAR;
+        blend = 1f;
+        changeTimer = NEW_WORLD_CHANGE_TIMER;
+        flashTimer = 0;
+        lightningStrikes = 0;
+    }
+
+    @Override
     public void mediumTick(Game g, float dt) {
         flashTimer = Math.max(0, flashTimer - dt);
 
