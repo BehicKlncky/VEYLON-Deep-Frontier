@@ -62,9 +62,10 @@ Windows x64 (PowerShell):
 
 ```powershell
 .\gradlew.bat build             # compile + unit tests + jar
-.\gradlew.bat fatJar            # build\libs\veylon-0.4.0-all.jar
+.\gradlew.bat performanceTest   # opt-in benchmarks calibrated for the reference PC
+.\gradlew.bat fatJar            # build\libs\veylon-0.4.1-all.jar
 .\gradlew.bat jpackage          # build\jpackage\Veylon\Veylon.exe
-.\gradlew.bat appImageZip       # build\distributions\veylon-0.4.0-windows-x64.zip
+.\gradlew.bat appImageZip       # build\distributions\veylon-0.4.1-windows-x64.zip
 .\gradlew.bat releaseArtifacts  # tests + all host-specific release artifacts
 ```
 
@@ -74,7 +75,7 @@ macOS Intel or Apple Silicon (Terminal):
 ./gradlew build
 ./gradlew fatJar
 ./gradlew jpackage          # build/jpackage/Veylon.app
-./gradlew appImageZip       # build/distributions/veylon-0.4.0-macos-{x64|arm64}.zip
+./gradlew appImageZip       # build/distributions/veylon-0.4.1-macos-{x64|arm64}.zip
 ./gradlew releaseArtifacts
 ```
 
@@ -109,7 +110,7 @@ See [CHANGELOG.md](CHANGELOG.md) for release notes.
 Run the fat JAR with the same JVM options used by the packaged launchers:
 
 ```powershell
-java --enable-native-access=ALL-UNNAMED -Xmx2G -jar build\libs\veylon-0.4.0-all.jar
+java --enable-native-access=ALL-UNNAMED -Xmx2G -jar build\libs\veylon-0.4.1-all.jar
 ```
 
 ---
@@ -277,12 +278,14 @@ com.veylon
                                 SettlementBuilder (modular biome-adapted layouts),
                                 Settlement (+dormant residents), SettlementManager
                                 (activation, reputation, capture, patrols, bounty),
+                                DormantSettlementSimulation (off-screen life),
                                 SettlementType, NpcArchetype, HumanFaction
   combat/                     - WeaponDefinition/WeaponRegistry (string-id stats shared
                                 by player and NPCs), ProjectileSystem, ExplosionSystem,
                                 WorldNoise (positional perception events)
-  simulation/                 - SimulationScheduler, Time, Weather, Temperature, Water,
-                                Fire, Plant, Event, Season, Shelter, ItemCondition
+  simulation/                 - SimulationScheduler, cadence interfaces, Time, Weather,
+                                Temperature, Water, Fire, Plant, data-driven Event,
+                                Season, Shelter, ItemCondition
   entity/                     - Entity, Player, Creature, Npc, EntityManager,
                                 PlayerMovementSystem, PlayerTreatmentSystem,
                                 VoxelPhysics, Affliction, Carcass, Track

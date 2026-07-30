@@ -4,7 +4,7 @@ plugins {
 }
 
 group = 'com.veylon'
-version = '0.4.0'
+version = '0.4.1'
 
 def osName = System.getProperty('os.name').toLowerCase(java.util.Locale.ROOT)
 def osArch = System.getProperty('os.arch').toLowerCase(java.util.Locale.ROOT)
@@ -87,6 +87,26 @@ tasks.withType(JavaCompile).configureEach {
 tasks.withType(Test).configureEach {
     useJUnitPlatform()
     systemProperty 'veylon.version', project.version.toString()
+}
+
+// Wall-clock budgets are calibrated for one reference machine and therefore
+// are opt-in rather than part of the portable deterministic suite.
+tasks.named('test', Test) {
+    useJUnitPlatform {
+        excludeTags 'performance'
+    }
+}
+
+tasks.register('performanceTest', Test) {
+    group = 'verification'
+    description = 'Runs the hardware-calibrated simulation and save/load benchmarks.'
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath
+    outputs.upToDateWhen { false }
+    useJUnitPlatform {
+        includeTags 'performance'
+    }
+    shouldRunAfter tasks.named('test')
 }
 
 jar {

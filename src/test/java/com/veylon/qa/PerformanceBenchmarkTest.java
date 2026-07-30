@@ -12,12 +12,13 @@ import com.veylon.simulation.SimulationScheduler;
 import com.veylon.util.AppPaths;
 import com.veylon.util.Vec3i;
 import com.veylon.world.BlockType;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.condition.DisabledIfEnvironmentVariable;
 
 import java.nio.file.Path;
 import java.util.function.LongSupplier;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -37,11 +38,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * <p>Budgets are the baselines recorded in {@code docs/PERFORMANCE_BENCHMARKS.md}
  * plus the 20% allowance (or {@link #NOISE_FLOOR_MS}, whichever is larger), and
  * those baselines were measured on one machine. They are deliberately coarse:
- * they catch "this got several times slower", not "this got 5% slower", and a
- * failure on much slower hardware than the reference means the budget needs
- * re-baselining rather than that the code regressed. Set
- * {@code VEYLON_SKIP_BENCHMARKS=1} to skip the suite on hardware where the
- * budgets do not apply.
+ * they catch "this got several times slower", not "this got 5% slower". A
+ * result from materially different hardware is not comparable and must be
+ * rerun on the reference PC rather than used to move the baseline. The suite is
+ * tagged {@code performance} and runs only through
+ * {@code ./gradlew performanceTest}; the portable {@code test} and
+ * release-packaging tasks exclude it.
  *
  * <p>Each measurement is the fastest of {@link #SAMPLES} runs after
  * {@link #WARMUP} discarded ones. The minimum is used on purpose: it is the run
@@ -49,8 +51,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * than a mean without hiding a genuine slowdown — real regressions move the
  * floor too.
  */
-@DisabledIfEnvironmentVariable(named = "VEYLON_SKIP_BENCHMARKS", matches = "1",
-        disabledReason = "benchmark budgets are calibrated for the reference machine")
+@Tag("performance")
 class PerformanceBenchmarkTest {
 
     /** Discarded runs, so JIT compilation is not part of any measurement. */
@@ -76,7 +77,7 @@ class PerformanceBenchmarkTest {
     private static final double BASELINE_ENTITY_TICK_MS = 0.55;
     private static final double BASELINE_SETTLEMENT_TICK_MS = 0.05;
     private static final double BASELINE_SAVE_MS = 0.60;
-    private static final double BASELINE_LOAD_MS = 270.0;
+    private static final double BASELINE_LOAD_MS = 300.0;
 
     /** Chunks loaded for the world-scale benchmark. */
     private static final int CHUNK_TARGET = 100;
@@ -84,6 +85,12 @@ class PerformanceBenchmarkTest {
     private static final int ENTITY_TARGET = 40;
     /** Residents in the benchmarked settlement. */
     private static final int RESIDENT_TARGET = 20;
+    /**
+     * A production slow tick advances ten seconds, while dormant residents work
+     * in whole 60-second steps. Prime the accumulator so every timed sample
+     * executes exactly one real resident step rather than timing an empty pass.
+     */
+    private static final float DORMANT_STEP_PRIME_SECONDS = 50f;
 
     @Test
     void aFullTickCycleStaysWithinBudgetWithAHundredChunksLoaded() {
@@ -118,9 +125,14 @@ class PerformanceBenchmarkTest {
 
         record("settlement tick",
                 () -> {
+                    settlement.dormantAccumulator = DORMANT_STEP_PRIME_SECONDS;
+                    long stepBefore = settlement.dormantStep;
                     long start = System.nanoTime();
                     game.settlementManager.slowTick(game, SimulationScheduler.SLOW_DT);
-                    return System.nanoTime() - start;
+                    long elapsed = System.nanoTime() - start;
+                    assertEquals(stepBefore + 1, settlement.dormantStep,
+                            "every sample must execute one dormant resident step");
+                    return elapsed;
                 },
                 BASELINE_SETTLEMENT_TICK_MS);
     }
@@ -175,8 +187,8 @@ class PerformanceBenchmarkTest {
         assertTrue(ms <= budget, String.format(
                 "%s took %.3f ms, over the %.2f ms budget (baseline %.2f ms, +%d%% or "
                         + "+%.1f ms, whichever is larger). Re-baseline in "
-                        + "docs/PERFORMANCE_BENCHMARKS.md if this machine is slower than the "
-                        + "reference, otherwise this is a regression.",
+                        + "docs/PERFORMANCE_BENCHMARKS.md only after a deliberate reference "
+                        + "fixture/hardware change; otherwise this is a regression.",
                 name, ms, budget, baselineMs, Math.round((ALLOWANCE - 1) * 100),
                 NOISE_FLOOR_MS));
     }

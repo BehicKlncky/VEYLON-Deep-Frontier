@@ -58,6 +58,9 @@ class SimulationSystemContractTest {
         game.weather.next = WeatherSystem.Weather.SNOW;
         game.weather.blend = 0.25f;
         game.weather.changeTimer = 3f;
+        game.weather.strikeLightning(game);
+        assertTrue(game.weather.flashLight() > 0,
+                "precondition: lightning has armed the screen flash");
         game.weather.lightningStrikes = 7;
         int fx = (int) game.player.pos.x + 5;
         int fz = (int) game.player.pos.z + 5;
@@ -65,6 +68,13 @@ class SimulationSystemContractTest {
         game.world.setBlock(fx, fy, fz, BlockType.LOG, true);
         game.fire.ignite(game, fx, fy, fz);
         assertTrue(game.fire.count() > 0, "precondition: something is burning");
+        int hx = (int) game.player.pos.x + 2;
+        int hz = (int) game.player.pos.z + 2;
+        int hy = game.world.surfaceHeight(hx, hz) + 1;
+        game.world.setBlock(hx, hy, hz, BlockType.TORCH, true);
+        game.temperature.mediumTick(game, 0f);
+        assertTrue(game.temperature.fireHeatAt(hx + 0.5f, hy + 0.5f, hz + 0.5f) > 0,
+                "precondition: the temperature cache contains the old world's torch");
         game.events.onStormStarted(game);
         assertTrue(game.events.totalEventsTriggered > 0, "precondition: an event is running");
 
@@ -80,6 +90,11 @@ class SimulationSystemContractTest {
         assertEquals(WeatherConstants.NEW_WORLD_CHANGE_TIMER, game.weather.changeTimer, 1e-6f);
         assertEquals(0, game.weather.lightningStrikes,
                 "storm statistics do not carry into the next world");
+        assertEquals(0f, game.weather.flashLight(), 1e-6f,
+                "a lightning flash does not carry into the next world");
+        assertEquals(0f, game.temperature.fireHeatAt(
+                        hx + 0.5f, hy + 0.5f, hz + 0.5f), 1e-6f,
+                "cached heat-source positions do not carry into the next world");
         assertEquals(0, game.fire.count(), "burning cells do not carry over");
         assertTrue(game.events.active.isEmpty(), "active events do not carry over");
         assertEquals(0, game.events.totalEventsTriggered);

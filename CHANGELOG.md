@@ -2,6 +2,49 @@
 
 All notable user-facing changes to VEYLON: Deep Frontier are recorded here.
 
+## [0.4.1] - 2026-07-30
+
+### Fixed
+
+- Starting or loading a world now clears the player's melee cooldown, so the first
+  swing cannot be silently consumed by combat state from the previous world.
+- New-world reset now clears weather lightning/flash state and cached heat-source
+  positions from the world being replaced.
+
+### Changed
+
+- Converted the ordered 13-branch event roll ladder into an explicit
+  `EventDefinition` table while preserving cumulative bounds, season bias,
+  rejected-rung fall-through and the empty-camp illness exception.
+- Extracted off-screen food, illness, morale and replenishment rules into
+  `DormantSettlementSimulation`. Replenishment uses its own world-seeded RNG stream;
+  its distribution is unchanged, but a given seed's interval sequence differs from
+  0.4.0.
+- Added `SimulationSystem` cadence contracts and moved time, weather and temperature
+  world-reset ownership onto the systems themselves.
+- Reduced internal UI-screen and debug-toggle fields on `Game` from public to
+  package-private. `Game` remains the application composition root; these fields were
+  not a supported external API.
+
+### Quality
+
+- Added characterization coverage around all event-roll rungs before the data-driven
+  conversion, plus focused dormant-settlement and simulation-reset contract tests.
+- Added production-path integration coverage for the complete beacon endgame,
+  save/load during a partial repair and melee cooldown reset.
+- The portable deterministic suite contains 266 tests across 55 classes. Four
+  hardware-calibrated wall-clock benchmarks run separately through
+  `performanceTest`, keeping platform packaging independent of single-machine
+  budgets.
+
+### Compatibility
+
+- Binary save version remains v3; historical v0.2.0/v2 and original v3 saves retain
+  their existing migration paths.
+- World generator version remains 3, serialized enum order is unchanged and existing
+  world edits and beacon progress continue to load.
+- OpenGL 3.3 Core, Java 25, LWJGL 3.3.6 and the dependency set are unchanged.
+
 ## [0.4.0] - 2026-07-29
 
 ### Changed

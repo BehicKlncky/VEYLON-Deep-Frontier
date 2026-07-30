@@ -12,8 +12,10 @@ the contracts between systems rather than repeating that inventory.
 
 ## 1. System overview
 
-`Game` is the composition root. It owns one instance of every subsystem as a
-public final field and passes *itself* to each of them:
+`Game` is the composition root. It owns one instance of every subsystem and
+passes *itself* to each of them. Runtime systems used across packages remain
+public; UI screens and debug toggles that never leave `com.veylon` are
+package-private:
 
 ```
 Main.main
@@ -22,9 +24,11 @@ Main.main
         ├── world      World (+ Chunk, WorldGenerator), and Game as its BlockListener
         ├── entity     Player, EntityManager, PlayerMovementSystem, PlayerTreatmentSystem
         ├── combat     ProjectileSystem, ExplosionSystem, WorldNoise
-        ├── simulation SimulationScheduler + Time/Weather/Temperature/Water/Fire/Plant/
-        │              Event/Season/ItemCondition
-        ├── settlement SettlementManager (+ planner, builder, counterattack director)
+        ├── simulation SimulationScheduler + cadence interfaces +
+        │              Time/Weather/Temperature/Water/Fire/Plant/
+        │              Event definitions/Season/ItemCondition
+        ├── settlement SettlementManager (+ dormant simulation, planner, builder,
+        │              counterattack director)
         ├── ai         FactionSystem
         ├── ui         Hud + one instance per screen, EventLog
         └── collaborators split out of Game (all in com.veylon)
@@ -107,8 +111,9 @@ playable world, used by New Game, by save loading and by the QA harness. It
 **resets before it constructs**, in this order:
 
 1. Release GPU meshes of the outgoing world (`releaseWorldMeshes`).
-2. Reset every cross-world queue: scheduler, fire, water, events, plants, item
-   conditions, noise, projectiles, explosions, settlements.
+2. Reset every cross-world system: scheduler, time, weather, temperature, fire,
+   water, events, plants, item conditions, noise, projectiles, explosions and
+   settlements.
 3. `reseedSimulation(seed)` — seeds all 15 simulation generators, each with a
    distinct salt so their streams stay independent. Without this, a second
    world in the same process inherits RNG state from the first, which is what
@@ -173,6 +178,11 @@ while (!window.shouldClose())
 | fast | 1/20 s | player needs, entity AI and movement, settlement fast tick |
 | medium | 1/2 s | weather, temperature, water, fire, shelter, smoke, ambience |
 | slow | 10 s | plants, events, faction, spawning, item spoilage, settlements |
+
+Stateful systems implement `SimulationSystem`; scheduled systems additionally
+declare `FastTickSystem`, `MediumTickSystem` or `SlowTickSystem`. These interfaces
+pin cadence and the cross-world `reset()` contract. They do not hide the existing
+`Game` coordination parameter.
 
 Two invariants, both pinned by `GameLoopIntegrationTest`:
 
@@ -264,7 +274,8 @@ Consequences for contributors:
 | a settlement type | `SettlementType` | `SettlementPlanner` placement, `SettlementBuilder` layout |
 | an affliction | `Affliction` | `PlayerConstants` damage rate, `Player.tickAfflictions`, `PlayerTreatmentSystem` cure |
 | a weather state | `WeatherSystem.Weather` | `SkyRenderer`, `Environment`, `TemperatureSystem` |
-| a simulation system | new class in `simulation/` | a tick call in `Game.fastTick`/`mediumTick`/`slowTick`, a `reset()` call in `newWorld`, save/load if it holds state |
+| a world event | `EventType`, `EventConstants`, `EventSystem.DEFINITIONS` | JavaDoc rung table, modifier query, `EventRollLadderTest` |
+| a simulation system | new class + cadence interface in `simulation/` | matching `Game` tick, `newWorld` reset, `SimulationSystemContractTest`, save/load if it holds state |
 
 **Enum ordinals are part of the save format.** `SerializedEnumOrderTest` guards
 this: append new constants at the end, never reorder or delete. Reordering
