@@ -2,6 +2,56 @@
 
 All notable user-facing changes to VEYLON: Deep Frontier are recorded here.
 
+## [0.5.0] - 2026-07-31
+
+A stability and technical-baseline release. No new content; existing saves and
+worlds are unchanged.
+
+### Fixed
+
+- A corrupt or truncated save no longer crashes the game. Five readers in the
+  save format used a number taken straight from the file as an array index or a
+  list capacity, so a file damaged by a power loss during a quick save could
+  take the running game down with it — after the live world had already been
+  released. Every such value is now bounded, and a damaged file fails the load
+  with a message instead.
+- Bleeding, sprains, wound infection, food and water poisoning, sleep sickness,
+  toxic-fog sickness and break drops now replay from the world seed. Fourteen
+  gameplay rolls used the global random number generator, which meant the
+  survival layer's entire failure model was the one part of the game a seed did
+  not reproduce.
+- An under-drawn bow shot no longer slows an arrow that is already in flight.
+  Once 96 projectiles were airborne, the draw-power adjustment was applied to
+  the newest earlier arrow instead of the one just fired.
+- A save that loads with a non-finite player value is now rejected rather than
+  producing a character who cannot die, heal or eat.
+
+### Changed
+
+- Loading a world is about 27% faster; the simulation tick is 18–24% cheaper.
+  World terrain is bit-identical, so existing saves are unaffected.
+- `Game` is down from 1,496 lines to 886, with world setup, the automated-run
+  driver, the front-end states, hotkey routing and the player-environment tick
+  extracted into named collaborators. No gameplay rule moved.
+
+### Quality
+
+- 299 deterministic tests across 61 classes, up from 266 across 55.
+- Generated terrain is now pinned against recorded fingerprints, so a refactor
+  that reshapes worlds fails the build instead of silently rewriting the ground
+  under existing saves.
+- A per-system tick profile joins the benchmark suite, and the wall-clock
+  baselines were lowered to match the new figures rather than left where a
+  regression to the previous release would still pass.
+- A source-size budget holds `Game` under 1,000 lines.
+
+### Compatibility
+
+- Save format v3 and world generator version 3 are unchanged. Existing saves
+  load with identical terrain.
+- Persisted enum order is unchanged.
+- Java 25, OpenGL 3.3 Core, LWJGL 3.3.6 and the dependency set are unchanged.
+
 ## [0.4.1] - 2026-07-30
 
 ### Fixed

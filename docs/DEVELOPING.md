@@ -13,8 +13,9 @@ Setup requirements (JDK 25, OpenGL 3.3, the proxy workaround) are in
 
 ```bash
 ./gradlew run            # play the game
-./gradlew test           # 266 deterministic tests, headless, ~80 s
-./gradlew performanceTest # 4 opt-in wall-clock benchmarks; reference PC only
+./gradlew test           # 299 deterministic tests, headless, ~90 s
+./gradlew performanceTest # 5 wall-clock benchmarks + the per-system tick
+                          # profile; reference PC only
 ./gradlew build          # compile + test
 ./gradlew fatJar         # self-contained JAR in build/libs/
 ```
