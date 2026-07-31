@@ -9,7 +9,6 @@ import com.veylon.engine.ParticleSystem;
 import com.veylon.engine.Renderer;
 import com.veylon.engine.UiRenderer;
 import com.veylon.engine.Window;
-import com.veylon.entity.Affliction;
 import com.veylon.entity.Creature;
 import com.veylon.entity.Entity;
 import com.veylon.entity.EntityManager;
@@ -600,6 +599,19 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
      * creature decisions. Presentation-only randomness (audio variation, NPC
      * screen flavour) is deliberately left unseeded; it cannot affect outcomes.
      *
+     * <p>This covers the player-outcome rolls too. Bleeding, sprains,
+     * infection, food and water poisoning, sleep sickness, toxic fog and break
+     * drops all used {@code Math.random()} through 0.4.1, which made the
+     * survival layer's entire failure model the one part of the game a seed did
+     * not reproduce.</p>
+     *
+     * <p>{@code WorldSeedDeterminismTest} enforces this reflectively: any
+     * {@link Random} field on a system reachable from {@code Game} must agree
+     * across two worlds built from one seed. That is why these are fields
+     * rather than calls into a shared static.</p>
+     *
+     * @see com.veylon.entity.PlayerConstants#AFFLICTION_RNG_SALT
+     *
      * <p>Tests that need an exact sequence still call {@code setRandomSeed}
      * directly after {@code newWorld}, and those explicit seeds win.
      */
@@ -616,6 +628,13 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
         fire.setRandomSeed(seed ^ 0x4649524553L);
         plants.setRandomSeed(seed ^ 0x504c414e5453L);
         events.setRandomSeed(seed ^ 0x4556454e5453L);
+        // Player-outcome rolls. These collaborators outlive a world, so they
+        // need the same explicit reseed the simulation systems get; the Player
+        // itself seeds from the world it is constructed for, just below.
+        consumables.setRandomSeed(seed ^ 0x434f4e53554dL);
+        interactions.setRandomSeed(seed ^ 0x494e54455241L);
+        blockActions.setRandomSeed(seed ^ 0x424c4f434b41L);
+        sleep.setRandomSeed(seed ^ 0x534c454550L);
         // Static AI decision jitter must also replay deterministically per seed;
         // otherwise QA runs and tests inherit RNG state from earlier worlds.
         com.veylon.ai.SettledNpcAI.reseed(seed ^ 0x5345544e5043L);
@@ -1372,12 +1391,7 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
             particles.smoke(fumarole.x() + 0.5f, fumarole.y() + 0.35f,
                     fumarole.z() + 0.5f, 0.75f);
         }
-        if (events.toxicFog() && player.exposedToSky && !player.shelter.roofed()) {
-            if (Math.random() < 0.04 && !player.has(Affliction.SICKNESS)) {
-                player.addAffliction(Affliction.SICKNESS, 120);
-                log("The toxic fog claws at your lungs... SICKNESS takes hold.");
-            }
-        }
+        player.tickToxicFogExposure(this);
 
         // Open flame cooks off adjacent powder kegs.
         for (Vec3i f : fire.burningCells()) {

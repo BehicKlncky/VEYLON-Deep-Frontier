@@ -231,6 +231,17 @@ public final class PlayerConstants {
     public static final float INFECTION_DURATION_MIN = 240f;
     public static final float INFECTION_DURATION_RANGE = 120f;
 
+    /** Per medium tick, while a toxic-fog event has the player out in the open. */
+    public static final double TOXIC_FOG_SICKNESS_CHANCE = 0.04;
+    public static final float TOXIC_FOG_SICKNESS_SECONDS = 120f;
+
+    /**
+     * Salt for the player's affliction generator, so its stream stays
+     * independent of the fifteen simulation generators seeded from the same
+     * world seed in {@code Game.reseedSimulation}.
+     */
+    public static final long AFFLICTION_RNG_SALT = 0x4146464c4354L;
+
     // ------------------------------------------------------------------
     // Smoke
     // ------------------------------------------------------------------

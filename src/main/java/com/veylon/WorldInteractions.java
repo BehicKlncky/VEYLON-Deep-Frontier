@@ -13,6 +13,8 @@ import com.veylon.world.RackBatch;
 import com.veylon.world.Raycaster;
 import com.veylon.world.World;
 
+import java.util.Random;
+
 /**
  * What the F key and right mouse button actually do against the world: talking
  * to and rescuing NPCs, harvesting, working stations, and the multi-stage
@@ -78,9 +80,19 @@ final class WorldInteractions {
     private static final int BEACON_COPPER_REQUIRED = 3;
 
     private final Game game;
+    /**
+     * Outcome rolls for drinking untreated water and for skinning yields.
+     * Reseeded per world by {@code Game.reseedSimulation}, like the simulation
+     * systems this collaborator sits beside.
+     */
+    private final Random rng = new Random();
 
     WorldInteractions(Game game) {
         this.game = game;
+    }
+
+    void setRandomSeed(long seed) {
+        rng.setSeed(seed);
     }
 
     // ------------------------------------------------------------------
@@ -385,9 +397,9 @@ final class WorldInteractions {
         }
         game.player.thirst = Math.min(MAX_NEED, game.player.thirst + WATER_THIRST);
         game.audio.playDrink();
-        if (Math.random() < WATER_POISON_CHANCE) {
+        if (rng.nextFloat() < WATER_POISON_CHANCE) {
             game.player.addAffliction(Affliction.FOOD_POISONING,
-                    PlayerConsumables.rollPoisonDuration());
+                    PlayerConsumables.rollPoisonDuration(rng));
             game.log("You drank dirty water and feel ill...");
         } else {
             game.log("You drink from the water (+" + (int) WATER_THIRST + " thirst).");
@@ -451,7 +463,7 @@ final class WorldInteractions {
         if (hide > 0) {
             game.player.inventory.add(ItemType.HIDE, hide);
         }
-        if (Math.random() < CARCASS_BONE_CHANCE) {
+        if (rng.nextFloat() < CARCASS_BONE_CHANCE) {
             game.player.inventory.add(ItemType.BONE, 1);
         }
         carcass.meatLeft = 0;

@@ -7,6 +7,8 @@ import com.veylon.item.EquipSlot;
 import com.veylon.item.ItemStack;
 import com.veylon.item.ItemType;
 
+import java.util.Random;
+
 /**
  * Using a held item on yourself: eating, drinking, treating wounds and wearing
  * gear. These are the branches of the secondary (right-click) action that act
@@ -46,9 +48,21 @@ final class PlayerConsumables {
     private static final double DIRTY_WATER_POISON_CHANCE = 0.30;
 
     private final Game game;
+    /**
+     * Poisoning rolls. This collaborator shares {@code Game}'s lifetime rather
+     * than a world's, so it needs the explicit reseed hook the simulation
+     * systems have; a {@code Math.random()} here meant that whether a meal
+     * poisoned you was the one thing a replayed seed would not reproduce.
+     */
+    private final Random rng = new Random();
 
     PlayerConsumables(Game game) {
         this.game = game;
+    }
+
+    /** Reseeded per world by {@code Game.reseedSimulation}. */
+    void setRandomSeed(long seed) {
+        rng.setSeed(seed);
     }
 
     void eat(ItemStack held) {
@@ -70,8 +84,8 @@ final class PlayerConsumables {
         }
 
         float poisonChance = poisonChanceFor(t, freshness);
-        if (poisonChance > 0 && Math.random() < poisonChance) {
-            p.addAffliction(Affliction.FOOD_POISONING, rollPoisonDuration());
+        if (poisonChance > 0 && rng.nextFloat() < poisonChance) {
+            p.addAffliction(Affliction.FOOD_POISONING, rollPoisonDuration(rng));
             game.log("That food didn't sit well... FOOD POISONING sets in.");
         }
         p.inventory.shrink(p.hotbarSel, 1);
@@ -90,9 +104,13 @@ final class PlayerConsumables {
         return freshness < STALE_FRESHNESS ? STALE_FOOD_POISON_CHANCE : 0f;
     }
 
-    /** Shared by every food-poisoning source so they all last the same range. */
-    static float rollPoisonDuration() {
-        return POISON_DURATION_MIN + (float) Math.random() * POISON_DURATION_RANGE;
+    /**
+     * Shared by every food-poisoning source so they all last the same range.
+     * The generator is a parameter because the callers live in different
+     * systems, and each owns its own per-world stream.
+     */
+    static float rollPoisonDuration(Random rng) {
+        return POISON_DURATION_MIN + rng.nextFloat() * POISON_DURATION_RANGE;
     }
 
     void drink(ItemStack held) {
@@ -105,8 +123,8 @@ final class PlayerConsumables {
         game.audio.playDrink();
         if (clean) {
             game.log("You drink clean water (+" + (int) CLEAN_WATER_THIRST + " thirst).");
-        } else if (Math.random() < DIRTY_WATER_POISON_CHANCE) {
-            p.addAffliction(Affliction.FOOD_POISONING, rollPoisonDuration());
+        } else if (rng.nextFloat() < DIRTY_WATER_POISON_CHANCE) {
+            p.addAffliction(Affliction.FOOD_POISONING, rollPoisonDuration(rng));
             game.log("The dirty water churns in your gut... FOOD POISONING.");
         } else {
             game.log("You drink dirty water (+" + (int) DIRTY_WATER_THIRST

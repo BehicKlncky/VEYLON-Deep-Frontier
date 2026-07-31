@@ -11,6 +11,8 @@ import com.veylon.util.Vec3i;
 import com.veylon.world.BlockType;
 import com.veylon.world.RackBatch;
 
+import java.util.Random;
+
 /**
  * Breaking and placing blocks: the hold-to-mine timer, what a broken block
  * drops or spills, and the consequences of destroying something that belongs
@@ -60,9 +62,15 @@ final class PlayerBlockActions {
     private static final int PLACE_DUST_PARTICLES = 5;
 
     private final Game game;
+    /** Break-outcome rolls; reseeded per world by {@code Game.reseedSimulation}. */
+    private final Random rng = new Random();
 
     PlayerBlockActions(Game game) {
         this.game = game;
+    }
+
+    void setRandomSeed(long seed) {
+        rng.setSeed(seed);
     }
 
     // ------------------------------------------------------------------
@@ -194,7 +202,7 @@ final class PlayerBlockActions {
         if (t.drop != null) {
             boolean dropOk = !t.requiresTool || (held != null && held.type.tool == t.preferredTool);
             if (t == BlockType.LEAVES) {
-                dropOk = Math.random() < LEAF_DROP_CHANCE;
+                dropOk = rng.nextFloat() < LEAF_DROP_CHANCE;
             }
             if (dropOk) {
                 game.player.inventory.add(t.drop, t.dropCount);
