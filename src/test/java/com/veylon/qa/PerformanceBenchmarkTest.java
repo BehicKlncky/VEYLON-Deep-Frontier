@@ -73,11 +73,17 @@ class PerformanceBenchmarkTest {
 
     // Baselines in milliseconds, from docs/PERFORMANCE_BENCHMARKS.md. Update
     // that document and these constants together, and only with a stated reason.
-    private static final double BASELINE_CHUNK_TICK_MS = 0.50;
-    private static final double BASELINE_ENTITY_TICK_MS = 0.55;
-    private static final double BASELINE_SETTLEMENT_TICK_MS = 0.05;
+    //
+    // Re-baselined for v0.5.0 after two deliberate optimizations: memoizing the
+    // generator's per-column queries (load) and caching the last chunk resolved
+    // by a block query (all three tick buckets). Lowering them is the point --
+    // left at the old figures, a regression all the way back to v0.4.1 would
+    // still have passed.
+    private static final double BASELINE_CHUNK_TICK_MS = 0.42;
+    private static final double BASELINE_ENTITY_TICK_MS = 0.45;
+    private static final double BASELINE_SETTLEMENT_TICK_MS = 0.02;
     private static final double BASELINE_SAVE_MS = 0.60;
-    private static final double BASELINE_LOAD_MS = 300.0;
+    private static final double BASELINE_LOAD_MS = 200.0;
 
     /** Chunks loaded for the world-scale benchmark. */
     private static final int CHUNK_TARGET = 100;
