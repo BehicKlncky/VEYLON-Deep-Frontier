@@ -107,7 +107,7 @@ public class Settlement {
     public boolean centralObjectiveControlled;
     /** Known only as a vague fortress rumor until normal discovery. */
     public boolean rumored;
-    /** Seconds until a hostile counterattack tests an occupied outpost (<=0 = none pending). */
+    /** Seconds until a hostile counterattack tests an occupied outpost ({@code <= 0}: none). */
     public float counterattackTimer;
     /** Seconds until population replenishment is evaluated. */
     public float replenishTimer = 600;

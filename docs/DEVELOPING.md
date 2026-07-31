@@ -13,7 +13,7 @@ Setup requirements (JDK 25, OpenGL 3.3, the proxy workaround) are in
 
 ```bash
 ./gradlew run            # play the game
-./gradlew test           # 299 deterministic tests, headless, ~90 s
+./gradlew test           # 302 deterministic tests, headless, ~90 s
 ./gradlew performanceTest # 5 wall-clock benchmarks + the per-system tick
                           # profile; reference PC only
 ./gradlew build          # compile + test
@@ -143,8 +143,9 @@ VEYLON_SEED=20260716 VEYLON_SCENE=day VEYLON_SHOT=6 ./gradlew run
 3. Call its tick from the matching `Game` bucket and its `reset()` from
    `Game.newWorld`. Add it to `SimulationSystemContractTest`, including a
    behavior-level assertion for every per-world cache or counter it clears.
-4. If it holds a `Random`, give it `setRandomSeed(long)` and seed it from
-   `Game.reseedSimulation` with a salt no other system uses.
+4. If it holds a `Random`, keep it on an instance reachable from `Game`, give
+   that owner a seed hook and seed it from `WorldBootstrap` with a salt no other
+   stream uses. Never put outcome randomness in a static field.
 5. If it holds state that must survive a save, add a v3 extension section in
    `SaveSystem` — do not change the base v3 layout.
 
@@ -177,8 +178,8 @@ a context. Drive gameplay through the tick methods and the command seams
 synthesize GLFW input.
 
 **Any new `Random` must be seeded from the world seed.**
-`Game.reseedSimulation` seeds all 15 simulation generators, each with a
-distinct salt so their streams stay independent. Add yours there.
+`WorldBootstrap` seeds every simulation and AI stream with a distinct salt so
+their streams stay independent. Add yours there.
 `WorldSeedDeterminismTest` reflects over every `Random` reachable from `Game`
 and fails with your field's name if you forget — that test exists because ten
 generators were previously missed, which made a settlement test intermittently

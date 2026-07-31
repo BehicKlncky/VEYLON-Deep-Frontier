@@ -143,7 +143,7 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
     final InventoryScreen inventoryScreen = new InventoryScreen();
     final CraftingScreen craftingScreen = new CraftingScreen();
     final CrateScreen crateScreen = new CrateScreen();
-    /** @VisibleForTesting — public only for gameplay tests outside com.veylon. */
+    /** Visible for testing; public only for gameplay tests outside {@code com.veylon}. */
     public final NpcScreen npcScreen = new NpcScreen();
     final PauseMenu pauseMenu = new PauseMenu();
     final MapScreen mapScreen = new MapScreen();
@@ -152,7 +152,7 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
     final TitleScreen titleScreen = new TitleScreen();
     final GraphicsOptionsScreen graphicsOptionsScreen = new GraphicsOptionsScreen();
 
-    /** @VisibleForTesting — public only for gameplay tests outside com.veylon. */
+    /** Visible for testing; public only for gameplay tests outside {@code com.veylon}. */
     public UiMode uiMode = UiMode.NONE;
     boolean debugShown;
     boolean simPanelShown;
@@ -244,7 +244,7 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
     public float sleepFade;
 
     public Inventory openCrate;
-    /** @VisibleForTesting — public only for gameplay tests outside com.veylon. */
+    /** Visible for testing; public only for gameplay tests outside {@code com.veylon}. */
     public Vec3i openCratePos;
     public Npc activeNpc;
 

@@ -21,14 +21,6 @@ public class WeatherSystem implements MediumTickSystem {
      * compiler will not let a new constant omit any of them.
      *
      * <p>Persisted by ordinal — append only, never reorder.
-     *
-     * @param displayName  shown in the HUD and the simulation panel
-     * @param intensity    precipitation strength, 0..1
-     * @param lightMul     daylight multiplier, 0..1
-     * @param grayness     how desaturated the sky looks, 0..1
-     * @param fogStart     distance in blocks at which fog begins
-     * @param fogEnd       distance in blocks at which fog is opaque
-     * @param tempOffset   temperature offset in degrees C
      */
     public enum Weather {
         CLEAR("Clear", 0f, 1f, 0f, 65f, 115f, 1f),
@@ -46,6 +38,15 @@ public class WeatherSystem implements MediumTickSystem {
         public final float fogEnd;
         public final float tempOffset;
 
+        /**
+         * @param displayName shown in the HUD and the simulation panel
+         * @param intensity precipitation strength, 0..1
+         * @param lightMul daylight multiplier, 0..1
+         * @param grayness how desaturated the sky looks, 0..1
+         * @param fogStart distance in blocks at which fog begins
+         * @param fogEnd distance in blocks at which fog is opaque
+         * @param tempOffset temperature offset in degrees C
+         */
         Weather(String displayName, float intensity, float lightMul, float grayness,
                 float fogStart, float fogEnd, float tempOffset) {
             this.displayName = displayName;

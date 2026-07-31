@@ -13,8 +13,14 @@ worlds are unchanged.
   save format used a number taken straight from the file as an array index or a
   list capacity, so a file damaged by a power loss during a quick save could
   take the running game down with it — after the live world had already been
-  released. Every such value is now bounded, and a damaged file fails the load
-  with a message instead.
+  released. Dangerous counts, ordinals and player scalars are now validated,
+  and a damaged file fails the load with a message instead.
+- Save publication is failure-atomic: a complete payload is flushed to a
+  sibling temporary file before it replaces the destination. A failed write
+  therefore keeps the previous save intact, and a failed quick load validates
+  in isolation before it can replace the live session.
+- Unsupported world-generator versions are rejected at the save boundary
+  instead of being interpreted as current terrain rules.
 - Bleeding, sprains, wound infection, food and water poisoning, sleep sickness,
   toxic-fog sickness and break drops now replay from the world seed. Fourteen
   gameplay rolls used the global random number generator, which meant the
@@ -36,7 +42,7 @@ worlds are unchanged.
 
 ### Quality
 
-- 299 deterministic tests across 61 classes, up from 266 across 55.
+- 302 deterministic tests across 61 classes, up from 266 across 55.
 - Generated terrain is now pinned against recorded fingerprints, so a refactor
   that reshapes worlds fails the build instead of silently rewriting the ground
   under existing saves.
@@ -44,6 +50,15 @@ worlds are unchanged.
   baselines were lowered to match the new figures rather than left where a
   regression to the previous release would still pass.
 - A source-size budget holds `Game` under 1,000 lines.
+- AI decision randomness is owned by each `Game` instance rather than three
+  mutable static generators, preserving the seeded sequences without allowing
+  validation or test instances to perturb one another.
+- `javadoc` doclint is clean and is now part of the ordinary `check`/release
+  build rather than an optional broken task.
+- The Gradle wrapper pins the official 9.1.0 binary distribution checksum; a
+  substituted build-tool archive now fails verification before execution.
+- The fixed-seed 30-second OpenGL release smoke passes at 1600x900 with save/load
+  complete, all hard limits respected and zero GL/KHR errors.
 
 ### Compatibility
 
