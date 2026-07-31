@@ -36,8 +36,13 @@ import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
+import java.nio.channels.Channels;
+import java.nio.channels.FileChannel;
+import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
+import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -66,13 +71,14 @@ import java.util.Set;
  * <h2>Reading untrusted bytes</h2>
  *
  * <p>"The game keeps running" is a contract, not a hope, and it applies to
- * every malformed file — not only to recognisably old ones. A save can be
- * truncated by a power loss mid-write or corrupted on disk, and a load starts
- * by calling {@code newWorld}, so a failure part-way through happens
- * <em>after</em> the player's live world is gone. Escaping with an unchecked
- * exception would therefore kill the process rather than lose one load.</p>
+ * every malformed file — not only to recognisably old ones. Save writes go to
+ * a sibling temporary file and replace the destination only after the complete
+ * payload has been flushed. A load over a live game is first proved readable
+ * against an isolated game instance, so malformed bytes never release or
+ * partially replace the world the player is currently in.</p>
  *
- * <p>So every value the file controls is bounded before it is used:</p>
+ * <p>Values that can allocate a collection, select an index, or poison core
+ * player state are validated before they are used:</p>
  * <ul>
  *   <li>entry counts go through {@link #readCount}, because an unchecked one
  *       reaches {@code new ArrayList<>(n)};</li>
@@ -101,6 +107,8 @@ public final class SaveSystem {
      * is ~52 MB of deltas — beyond any played world, and still finite.
      */
     private static final int MAX_SERIALIZED_BLOCK_EDITS = 4_000_000;
+    /** Hard cap before a file is retained in memory for a transaction-safe load. */
+    private static final int MAX_SAVE_BYTES = 128 * 1024 * 1024;
     private static final int MAX_V3_EXTENSION_SECTIONS = 256;
     private static final int MAX_V3_SECTION_BYTES = 16 * 1024 * 1024;
     private static final int V3_SECTION_ENVELOPE_MAGIC = 0x53334543; // "S3EC"
@@ -130,14 +138,18 @@ public final class SaveSystem {
     }
 
     public static boolean save(Game g, Path savePath) {
+        Objects.requireNonNull(g, "g");
         Objects.requireNonNull(savePath, "savePath");
+        Path target = savePath.toAbsolutePath();
+        Path temporary = null;
         try {
-            Path parent = savePath.getParent();
-            if (parent != null) {
-                Files.createDirectories(parent);
-            }
-            try (DataOutputStream out = new DataOutputStream(
-                    new BufferedOutputStream(Files.newOutputStream(savePath)))) {
+            Path parent = target.getParent();
+            Files.createDirectories(parent);
+            temporary = Files.createTempFile(parent, "veylon-save-", ".tmp");
+            try (FileChannel channel = FileChannel.open(temporary,
+                    StandardOpenOption.WRITE, StandardOpenOption.TRUNCATE_EXISTING);
+                 DataOutputStream out = new DataOutputStream(
+                         new BufferedOutputStream(Channels.newOutputStream(channel)))) {
                 out.writeInt(MAGIC);
                 out.writeInt(VERSION);
                 out.writeLong(g.world.seed);
@@ -343,11 +355,35 @@ public final class SaveSystem {
                     out.writeFloat(e.getValue());
                 }
                 writeV3Extension(out, g, npcs);
+                out.flush();
+                channel.force(true);
             }
+            replaceAtomically(temporary, target);
+            temporary = null;
             return true;
-        } catch (IOException ex) {
+        } catch (IOException | RuntimeException ex) {
             System.err.println("Save failed: " + ex);
             return false;
+        } finally {
+            if (temporary != null) {
+                try {
+                    Files.deleteIfExists(temporary);
+                } catch (IOException cleanupFailure) {
+                    System.err.println("Could not remove incomplete save " + temporary
+                            + ": " + cleanupFailure);
+                }
+            }
+        }
+    }
+
+    private static void replaceAtomically(Path source, Path target) throws IOException {
+        try {
+            Files.move(source, target, StandardCopyOption.ATOMIC_MOVE,
+                    StandardCopyOption.REPLACE_EXISTING);
+        } catch (AtomicMoveNotSupportedException ex) {
+            // Same-directory replacement still keeps the completed temporary
+            // payload separate from the destination until this final step.
+            Files.move(source, target, StandardCopyOption.REPLACE_EXISTING);
         }
     }
 
@@ -356,12 +392,38 @@ public final class SaveSystem {
     }
 
     public static boolean load(Game g, Path savePath) {
+        Objects.requireNonNull(g, "g");
         Objects.requireNonNull(savePath, "savePath");
         if (!Files.exists(savePath)) {
             return false;
         }
-        try (DataInputStream in = new DataInputStream(
-                new BufferedInputStream(Files.newInputStream(savePath)))) {
+        final byte[] payload;
+        try (BufferedInputStream source = new BufferedInputStream(Files.newInputStream(savePath))) {
+            payload = source.readNBytes(MAX_SAVE_BYTES + 1);
+            if (payload.length > MAX_SAVE_BYTES) {
+                System.err.println("Load failed: save exceeds " + MAX_SAVE_BYTES + " bytes");
+                return false;
+            }
+        } catch (IOException ex) {
+            System.err.println("Load failed: " + ex);
+            return false;
+        }
+
+        // Loading is destructive because newWorld releases the current GPU
+        // meshes and resets long-lived systems. Prove the immutable payload on
+        // an isolated graph before touching a live session. Title-screen loads
+        // have no state to protect and keep the one-pass fast path.
+        if (g.world != null || g.player != null) {
+            Game verifier = new Game();
+            if (!loadPayload(verifier, payload)) {
+                return false;
+            }
+        }
+        return loadPayload(g, payload);
+    }
+
+    private static boolean loadPayload(Game g, byte[] payload) {
+        try (DataInputStream in = new DataInputStream(new ByteArrayInputStream(payload))) {
             if (in.readInt() != MAGIC) {
                 System.err.println("Save file has wrong magic");
                 return false;
@@ -376,6 +438,10 @@ public final class SaveSystem {
             long seed = in.readLong();
             // v2 worlds keep their legacy terrain forever; v3 records the version.
             int generatorVersion = version >= 3 ? in.readInt() : com.veylon.world.World.GEN_LEGACY;
+            if (generatorVersion < World.GEN_LEGACY
+                    || generatorVersion > World.CURRENT_GENERATOR) {
+                throw new IOException("unsupported world generator version " + generatorVersion);
+            }
             g.newWorld(seed, false, generatorVersion);
             if (version == 2) {
                 System.out.println("[save] migrating v2 save: legacy terrain preserved; "

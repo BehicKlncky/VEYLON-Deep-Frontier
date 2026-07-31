@@ -82,7 +82,10 @@ class PerformanceBenchmarkTest {
     private static final double BASELINE_CHUNK_TICK_MS = 0.42;
     private static final double BASELINE_ENTITY_TICK_MS = 0.45;
     private static final double BASELINE_SETTLEMENT_TICK_MS = 0.02;
-    private static final double BASELINE_SAVE_MS = 0.60;
+    // A save now includes flush-to-device and atomic publication. The old
+    // 0.60 ms figure measured only buffered serialization and is not the same
+    // durability contract; see PERFORMANCE_BENCHMARKS.md.
+    private static final double BASELINE_SAVE_MS = 1.70;
     private static final double BASELINE_LOAD_MS = 200.0;
 
     /** Chunks loaded for the world-scale benchmark. */

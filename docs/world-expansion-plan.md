@@ -43,8 +43,8 @@ black-powder / explosives update. Kept current as phases land.
    perception (LOS + hearing) consumes them; gunshots and explosions emit them.
 7. **Batch world edits**: `World.beginBatch()/endBatch()` coalesces heightmap,
    light and dirty-mesh work for explosions.
-8. **Deterministic AI jitter.** The static decision RNGs in `SettledNpcAI`,
-   `CreatureAI` and `NpcAI` are reseeded from the world seed in
+8. **Deterministic AI jitter.** The instance-owned decision RNGs used by
+   `SettledNpcAI`, `CreatureAI` and `NpcAI` are reseeded from the world seed in
    `Game.newWorld(...)` (which the save-load path also uses). A fixed seed
    therefore replays identically, and tests cannot inherit RNG state from
    earlier worlds in the same JVM.

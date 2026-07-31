@@ -8,20 +8,11 @@ import com.veylon.util.Vec3i;
 import com.veylon.world.BlockType;
 import com.veylon.world.World;
 
-import java.util.Random;
-
 /**
  * Camp NPC behavior: jobs (guard, hunter, gatherer, medic), warmth, sleep,
  * defense, building, trading - plus hostile scavenger raiders.
  */
 public final class NpcAI {
-
-    private static final Random RNG = new Random();
-
-    /** Re-seeds decision jitter so a fixed world seed replays identically. */
-    public static void reseed(long seed) {
-        RNG.setSeed(seed);
-    }
 
     private NpcAI() {
     }
@@ -143,24 +134,25 @@ public final class NpcAI {
         // Sick NPCs rest by the fire all day.
         if (n.sick) {
             n.state = NpcState.WARM_BY_FIRE;
-            goNear(n, camp, 2.4f, 1.8f);
+            goNear(g, n, camp, 2.4f, 1.8f);
             return;
         }
         if (night) {
             n.state = NpcState.SLEEP;
-            goNear(n, camp, 3.0f, 2.4f);
+            goNear(g, n, camp, 3.0f, 2.4f);
             return;
         }
         if (envTemp < 1f) {
             n.state = NpcState.WARM_BY_FIRE;
-            goNear(n, camp, 2.2f, 3.0f);
+            goNear(g, n, camp, 2.2f, 3.0f);
             return;
         }
 
         // Construction work takes priority while an upgrade is in progress.
         if (n.faction != null && n.faction.buildTimer > 0 && n.campIndex % 4 == 2) {
             n.state = NpcState.BUILD;
-            goNear(n, new Vec3i(camp.x() + 4, camp.y(), camp.z() - 4), 1.6f, 2.4f);
+            goNear(g, n, new Vec3i(camp.x() + 4, camp.y(), camp.z() - 4),
+                    1.6f, 2.4f);
             return;
         }
 
@@ -181,8 +173,8 @@ public final class NpcAI {
         switch (n.state) {
             case GUARD -> {
                 if (n.decideTimer <= 0) {
-                    n.decideTimer = 3 + RNG.nextFloat() * 4;
-                    double ang = RNG.nextDouble() * Math.PI * 2;
+                    n.decideTimer = 3 + g.entities.nextNpcAiFloat() * 4;
+                    double ang = g.entities.nextNpcAiDouble() * Math.PI * 2;
                     n.target.set(camp.x() + (float) Math.cos(ang) * 6, camp.y(),
                             camp.z() + (float) Math.sin(ang) * 6);
                     n.hasTarget = true;
@@ -220,8 +212,9 @@ public final class NpcAI {
         if (prey == null) {
             // Patrol hunting grounds.
             if (n.decideTimer <= 0) {
-                n.decideTimer = 4 + RNG.nextFloat() * 4;
-                n.target.set(camp.x() + RNG.nextInt(31) - 15, camp.y(), camp.z() + RNG.nextInt(31) - 15);
+                n.decideTimer = 4 + g.entities.nextNpcAiFloat() * 4;
+                n.target.set(camp.x() + g.entities.nextNpcAiInt(31) - 15, camp.y(),
+                        camp.z() + g.entities.nextNpcAiInt(31) - 15);
                 n.hasTarget = true;
             }
             walkOrStop(n, 2.4f, 1.5f);
@@ -263,7 +256,7 @@ public final class NpcAI {
                 if (n.workTimer > 2.5f) {
                     n.workTimer = 0;
                     patient.health = Math.min(patient.maxHealth, patient.health + 4);
-                    if (patient.sick && RNG.nextFloat() < 0.06f) {
+                    if (patient.sick && g.entities.nextNpcAiFloat() < 0.06f) {
                         patient.sick = false;
                         g.log(n.name + " has nursed " + patient.name + " back to health.");
                     }
@@ -292,7 +285,7 @@ public final class NpcAI {
             }
             return;
         }
-        goNear(n, camp, 3.5f, 1.6f);
+        goNear(g, n, camp, 3.5f, 1.6f);
     }
 
     private static void gatherJob(Game g, Npc n, Vec3i camp, BlockType wanted, float dt) {
@@ -301,7 +294,8 @@ public final class NpcAI {
             n.targetBlock = findBlock(g.world, camp.x(), camp.z(), 22, wanted);
             if (n.targetBlock == null) {
                 // Nothing nearby; wander a bit.
-                n.target.set(camp.x() + RNG.nextInt(17) - 8, camp.y(), camp.z() + RNG.nextInt(17) - 8);
+                n.target.set(camp.x() + g.entities.nextNpcAiInt(17) - 8, camp.y(),
+                        camp.z() + g.entities.nextNpcAiInt(17) - 8);
                 n.hasTarget = true;
             }
         }
@@ -444,8 +438,9 @@ public final class NpcAI {
         if (pd > 10) {
             Steering.moveToward(n, g.player.pos.x, g.player.pos.z, 2.8f);
         } else if (n.decideTimer <= 0) {
-            n.decideTimer = 3 + RNG.nextFloat() * 3;
-            n.target.set(g.player.pos.x + RNG.nextInt(13) - 6, n.pos.y, g.player.pos.z + RNG.nextInt(13) - 6);
+            n.decideTimer = 3 + g.entities.nextNpcAiFloat() * 3;
+            n.target.set(g.player.pos.x + g.entities.nextNpcAiInt(13) - 6, n.pos.y,
+                    g.player.pos.z + g.entities.nextNpcAiInt(13) - 6);
             n.hasTarget = true;
         } else {
             walkOrStop(n, 1.6f, 1.5f);
@@ -461,11 +456,11 @@ public final class NpcAI {
         }
     }
 
-    private static void goNear(Npc n, Vec3i spot, float within, float speed) {
+    private static void goNear(Game g, Npc n, Vec3i spot, float within, float speed) {
         double d2 = n.distSqTo(spot.x() + 0.5f, n.pos.y, spot.z() + 0.5f);
         if (d2 > within * within) {
-            Steering.moveToward(n, spot.x() + 0.5f + RNG.nextFloat() - 0.5f,
-                    spot.z() + 0.5f + RNG.nextFloat() - 0.5f, speed);
+            Steering.moveToward(n, spot.x() + 0.5f + g.entities.nextNpcAiFloat() - 0.5f,
+                    spot.z() + 0.5f + g.entities.nextNpcAiFloat() - 0.5f, speed);
         } else {
             Steering.stop(n);
         }

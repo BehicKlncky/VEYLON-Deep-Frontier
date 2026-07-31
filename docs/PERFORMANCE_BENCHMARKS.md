@@ -48,7 +48,7 @@ empty accumulator pass.
 | `chunk tick` | one fast + medium + slow cycle, 100 chunks loaded | 0.42 ms | 0.92 ms | 0.359–0.404 |
 | `entity tick` | one fast + medium + slow cycle, 40 entities alive | 0.45 ms | 0.95 ms | 0.279–0.625 |
 | `settlement tick` | one real fixed step, 20 dormant residents | 0.02 ms | 0.52 ms | 0.013 |
-| `save` | `SaveSystem.save` of a typical world | 0.60 ms | 1.10 ms | 0.510–0.645 |
+| `save` | durable, atomically published `SaveSystem.save` of a typical world | 1.70 ms | 2.20 ms | 1.481–1.603 |
 | `load` | `SaveSystem.load` of the same file | 200 ms | 240 ms | 183–201 |
 
 The "typical world" for the save/load pair is 60 loaded chunks, 20 entities, 400
@@ -66,12 +66,20 @@ below exists for.
 | `chunk tick` | 0.50 | 0.42 | chunk lookup cache |
 | `entity tick` | 0.55 | 0.45 | chunk lookup cache |
 | `settlement tick` | 0.05 | 0.02 | chunk lookup cache |
-| `save` | 0.60 | 0.60 | unchanged |
+| `save` | 0.60 | 1.70 | flush-to-device + atomic replacement |
 | `load` | 300 | 200 | generator column memo |
 
 Lowering a baseline after an improvement is the point of having one. Left at
 300 ms, `load` would have accepted a regression all the way back to the v0.4.1
 figure without complaint; at 200 ms, the 240 ms budget catches it.
+
+The save row is the deliberate exception: v0.4.1/v0.5.0 originally timed a
+buffered write directly into the destination. The release review made save
+publication failure-atomic: serialization now finishes in a sibling temporary
+file, flushes it to the device, and only then atomically replaces the last good
+save. The extra ~1.1 ms buys a different durability guarantee, so retaining the
+old 0.60 ms baseline would compare unlike operations rather than catch a
+regression.
 
 The two changes are documented in
 [`v0.5.0-technical-baseline-audit.md`](engineering/v0.5.0-technical-baseline-audit.md).
@@ -93,7 +101,7 @@ as intended.
 
 ## Reading the numbers
 
-**`save` is 500× cheaper than `load`, and that is expected.** A save writes a
+**`save` is over 100× cheaper than `load`, and that is expected.** A save writes a
 delta: player state, entities, settlements and the player's block edits, which is
 why a played-in world is only kilobytes. A load has to regenerate the terrain
 from the world seed before replaying that delta, so it pays full worldgen cost.

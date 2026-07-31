@@ -121,6 +121,7 @@ final class WorldBootstrap {
         game.particles.setRandomSeed(seed ^ 0x5645594c4f4eL);
         game.ambience.reseed(seed ^ 0x46584c4f4eL);
         game.entities.setRandomSeed(seed ^ 0x454e5449545933L);
+        game.entities.setAiRandomSeed(seed);
         game.projectiles.setRandomSeed(seed ^ 0x50524f4a4543L);
         game.explosions.setRandomSeed(seed ^ 0x4558504c4f53L);
         game.settlementManager.setRandomSeed(seed ^ 0x534554544c4dL);
@@ -136,11 +137,6 @@ final class WorldBootstrap {
         game.interactions.setRandomSeed(seed ^ 0x494e54455241L);
         game.blockActions.setRandomSeed(seed ^ 0x424c4f434b41L);
         game.sleep.setRandomSeed(seed ^ 0x534c454550L);
-        // Static AI decision jitter must also replay deterministically per seed;
-        // otherwise QA runs and tests inherit RNG state from earlier worlds.
-        com.veylon.ai.SettledNpcAI.reseed(seed ^ 0x5345544e5043L);
-        com.veylon.ai.CreatureAI.reseed(seed ^ 0x435245415455L);
-        com.veylon.ai.NpcAI.reseed(seed ^ 0x4c454741434eL);
     }
 
     /** Entities, log, faction standing and every in-progress player action. */

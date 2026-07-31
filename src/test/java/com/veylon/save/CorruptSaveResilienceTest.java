@@ -1,11 +1,14 @@
 package com.veylon.save;
 
 import com.veylon.Game;
+import com.veylon.combat.ExplosionSystem;
 import com.veylon.entity.Carcass;
 import com.veylon.entity.Creature;
 import com.veylon.item.EquipSlot;
 import com.veylon.item.ItemType;
 import com.veylon.simulation.EventSystem;
+import com.veylon.util.Vec3i;
+import com.veylon.world.World;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -16,8 +19,11 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -169,6 +175,60 @@ class CorruptSaveResilienceTest {
         assertFalse(target.entities.creatures.isEmpty(), "the creature must come back");
         assertFalse(target.entities.carcasses.isEmpty(), "the carcass must come back");
         assertFalse(target.events.active.isEmpty(), "the active event must come back");
+    }
+
+    @Test
+    void failedSaveKeepsTheLastCompleteFile(@TempDir Path dir) throws IOException {
+        Game game = new Game();
+        game.newWorld(40_111L, true);
+        Path save = dir.resolve("atomic.dat");
+        assertTrue(SaveSystem.save(game, save));
+        byte[] complete = Files.readAllBytes(save);
+
+        // The writer discovers this invalid runtime state near the end of the
+        // payload. Writing directly to the destination used to leave the last
+        // good save truncated at precisely this point.
+        game.world.kegFuses.clear();
+        for (int i = 0; i <= ExplosionSystem.MAX_ACTIVE_FUSES; i++) {
+            game.world.kegFuses.put(new Vec3i(i, 1, 0), 1f);
+        }
+
+        assertFalse(SaveSystem.save(game, save), "an invalid snapshot must not be published");
+        assertArrayEquals(complete, Files.readAllBytes(save),
+                "a failed write must leave the previous complete save byte-identical");
+    }
+
+    @Test
+    void failedQuickLoadDoesNotReplaceTheLiveWorld(@TempDir Path dir) throws IOException {
+        Path save = fixture(dir, 40_112L);
+        byte[] complete = Files.readAllBytes(save);
+        Path truncated = dir.resolve("late-truncation.dat");
+        Files.write(truncated, Arrays.copyOf(complete, complete.length - 1));
+
+        Game target = new Game();
+        target.newWorld(91_337L, true);
+        World liveWorld = target.world;
+        var livePlayer = target.player;
+        float liveHealth = target.player.health;
+
+        assertFalse(SaveSystem.load(target, truncated));
+        assertSame(liveWorld, target.world, "validation must happen before destructive newWorld");
+        assertSame(livePlayer, target.player, "a failed F9 must keep the current player graph");
+        assertEquals(liveHealth, target.player.health);
+    }
+
+    @Test
+    void unsupportedGeneratorVersionIsRejectedBeforeWorldReplacement(@TempDir Path dir)
+            throws IOException {
+        Path save = fixture(dir, 40_113L);
+        // magic + save version + seed = 16 bytes before generatorVersion.
+        Path futureGenerator = corrupt(dir, save, 16, World.CURRENT_GENERATOR + 1);
+        Game target = new Game();
+        target.newWorld(91_338L, true);
+        World liveWorld = target.world;
+
+        assertFalse(SaveSystem.load(target, futureGenerator));
+        assertSame(liveWorld, target.world);
     }
 
     // ------------------------------------------------------------------
