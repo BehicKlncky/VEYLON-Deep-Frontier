@@ -70,13 +70,22 @@ public class ProjectileSystem {
         stuck.clear();
     }
 
-    /** Fires one shot (all pellets) from an entity's eye toward a direction. */
-    public void fire(Game g, Entity owner, boolean fromPlayer, float ox, float oy, float oz,
-                     float dx, float dy, float dz, WeaponDefinition def, ItemType ammoUsed) {
+    /**
+     * Fires one shot (all pellets) from an entity's eye toward a direction.
+     *
+     * @return how many projectiles this shot actually put in the air, which is
+     *         fewer than {@code def.pellets} once {@link #MAX_LIVE} is reached
+     *         and zero at the cap. Callers that adjust what they just fired
+     *         must use this rather than assuming the newest live projectile is
+     *         theirs: at the cap it belongs to an earlier shot.
+     */
+    public int fire(Game g, Entity owner, boolean fromPlayer, float ox, float oy, float oz,
+                    float dx, float dy, float dz, WeaponDefinition def, ItemType ammoUsed) {
         int pellets = Math.max(1, def.pellets);
+        int spawned = 0;
         for (int i = 0; i < pellets; i++) {
             if (live.size() >= MAX_LIVE) {
-                return;
+                return spawned;
             }
             Projectile p = acquire();
             p.kind = switch (def.category) {
@@ -109,6 +118,26 @@ public class ProjectileSystem {
             p.vz = sz / len * def.projectileSpeed;
             updateFacing(p);
             live.add(p);
+            spawned++;
+        }
+        return spawned;
+    }
+
+    /**
+     * Scales the velocity of the {@code count} most recently fired projectiles,
+     * which are the tail of {@link #live}. Paired with the count {@link #fire}
+     * returns, so a shot can only ever slow its own projectiles.
+     */
+    public void scaleNewestVelocities(int count, float scale) {
+        if (count <= 0 || scale == 1f) {
+            return;
+        }
+        for (int i = live.size() - Math.min(count, live.size()); i < live.size(); i++) {
+            Projectile p = live.get(i);
+            p.vx *= scale;
+            p.vy *= scale;
+            p.vz *= scale;
+            updateFacing(p);
         }
     }
 

@@ -1,6 +1,5 @@
 package com.veylon;
 
-import com.veylon.combat.ProjectileSystem;
 import com.veylon.combat.WeaponDefinition;
 import com.veylon.combat.WeaponRegistry;
 import com.veylon.entity.Creature;
@@ -415,19 +414,14 @@ final class PlayerCombatSystem {
         game.player.inventory.remove(arrow, 1);
         float power = BOW_MIN_POWER + BOW_POWER_RANGE * game.bowDraw;
         Vector3f o = game.camera.position;
-        game.projectiles.fire(game, game.player, true, o.x, o.y - 0.08f, o.z,
+        // Under-drawn arrows fly slower, so the shot is retro-scaled after it
+        // spawns. Scale exactly what this call put in the air: at the live
+        // projectile cap `fire` adds nothing, and searching the list for "an
+        // arrow" instead found the newest earlier one and decelerated a shot
+        // the player had already released at full draw.
+        int spawned = game.projectiles.fire(game, game.player, true, o.x, o.y - 0.08f, o.z,
                 dir.x, dir.y, dir.z, weapon, arrow);
-        // Under-drawn arrows fly slower: retro-scale the newly spawned arrows.
-        for (int i = game.projectiles.live.size() - 1; i >= 0; i--) {
-            var p = game.projectiles.live.get(i);
-            if (p.fromPlayer && p.kind == ProjectileSystem.Kind.ARROW
-                    && p.stuckTime == 0 && p.life > 0 && power < 0.999f) {
-                p.vx *= power;
-                p.vy *= power;
-                p.vz *= power;
-                break;
-            }
-        }
+        game.projectiles.scaleNewestVelocities(spawned, power);
         game.audio.playBowRelease(o.x, o.y, o.z);
         game.noise.emit(game, o.x, o.y, o.z, weapon.noiseRadius, BOW_NOISE_STRENGTH,
                 "bow", true, game.player);
