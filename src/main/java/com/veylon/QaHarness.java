@@ -206,7 +206,7 @@ final class QaHarness {
                 System.err.println("[qa] bad option value '" + pair + "'");
             }
         }
-        game.applyGraphicsOptions(new GraphicsOptionsScreen.Result(
+        game.frontend.applyGraphicsOptions(new GraphicsOptionsScreen.Result(
                 GraphicsOptionsScreen.Action.APPLY, s.windowWidth, s.windowHeight));
         System.out.println("[qa] options applied+saved via APPLY path: " + script);
     }
