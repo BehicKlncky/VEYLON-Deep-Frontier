@@ -89,7 +89,9 @@ public class PlantSystem implements SlowTickSystem {
             int wz = c.cz * 16 + lz;
             int h = c.height(lx, lz);
             BlockType surface = c.get(lx, h, lz);
-            BlockType above = world.getBlock(wx, h + 1, wz);
+            // The column is inside this chunk by construction, so read it
+            // directly rather than resolving the chunk again through the world.
+            BlockType above = c.get(lx, h + 1, lz);
 
             // Berry bushes regrow their berries.
             if (above == BlockType.BERRY_BUSH_EMPTY) {

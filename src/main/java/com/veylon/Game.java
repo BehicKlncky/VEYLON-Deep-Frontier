@@ -1393,17 +1393,6 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
         }
         player.tickToxicFogExposure(this);
 
-        // Open flame cooks off adjacent powder kegs.
-        for (Vec3i f : fire.burningCells()) {
-            for (int[] off : new int[][]{{1, 0, 0}, {-1, 0, 0}, {0, 1, 0},
-                    {0, -1, 0}, {0, 0, 1}, {0, 0, -1}}) {
-                Vec3i k = new Vec3i(f.x() + off[0], f.y() + off[1], f.z() + off[2]);
-                if (explosions.tryArmKeg(this, k, 1.5f, false)) {
-                    audio.playFuse(k.x() + 0.5f, k.y() + 0.5f, k.z() + 0.5f);
-                }
-            }
-        }
-
         // POI discovery.
         for (Poi poi : world.pois) {
             if (!poi.discovered
