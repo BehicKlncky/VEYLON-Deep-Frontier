@@ -20,6 +20,12 @@ public final class PlayerConstants {
     // ------------------------------------------------------------------
 
     public static final int INVENTORY_SLOTS = 36;
+    /**
+     * Inventory slots bound to the number keys and the scroll wheel. These are
+     * the first slots of {@link #INVENTORY_SLOTS}, so the hotbar is a view of
+     * the inventory rather than separate storage.
+     */
+    public static final int HOTBAR_SLOTS = 9;
     public static final float BODY_WIDTH = 0.6f;
     public static final float BODY_HEIGHT = 1.8f;
     public static final float MAX_HEALTH = 100f;
