@@ -26,6 +26,12 @@ public class WorldGenerator {
     public static final int RESONANT_DEPTH = 28;
     /** Minimum open height of the deliberately carved Basalt-depth shafts. */
     public static final int BASALT_SHAFT_HEIGHT = 7;
+    /**
+     * How near zero both worm-tunnel fields must be for a cell to be carved.
+     * Widening this thickens every tunnel in every world, so it is part of the
+     * generator contract, not a tuning knob.
+     */
+    private static final double TUNNEL_THRESHOLD = 0.065;
 
     private final World world;
     private final long seed;
@@ -41,6 +47,28 @@ public class WorldGenerator {
     private final Noise tunnelNoiseB;
     private final Noise warpNoise;
     private final Noise chamberNoise;
+
+    /**
+     * Memos for the three pure per-column queries.
+     *
+     * <p>{@code heightAt}, {@code mountainFactor} and {@code biomeAt} depend on
+     * nothing but the seed and the column, and they are asked for the same
+     * column two to four times over a single chunk generation:
+     * {@code generate} calls both, {@code biomeAt} recomputes
+     * {@code mountainFactor} and may call {@code heightAt} again,
+     * {@code decorate} repeats both for all 256 columns,
+     * {@code decorateCaveIdentities} repeats {@code heightAt} for 144 of them,
+     * and {@code placePoi} and the settlement queries repeat it again from
+     * outside the loop. Each of those is a multi-octave fBm.
+     *
+     * <p>These return the identical {@code double}/{@code int}/{@code Biome},
+     * so downstream arithmetic is bit-identical; a collision recomputes and is
+     * still exact. Held per {@link WorldGenerator}, which is per {@link World},
+     * so nothing is shared between worlds.
+     */
+    private final ColumnMemo.OfInt heightMemo = new ColumnMemo.OfInt();
+    private final ColumnMemo.OfDouble mountainMemo = new ColumnMemo.OfDouble();
+    private final ColumnMemo.OfBiome biomeMemo = new ColumnMemo.OfBiome();
 
     public WorldGenerator(World world, long seed) {
         this.world = world;
@@ -93,8 +121,12 @@ public class WorldGenerator {
     }
 
     public double mountainFactor(int x, int z) {
+        int slot = mountainMemo.slot(x, z);
+        if (mountainMemo.holds(slot, x, z)) {
+            return mountainMemo.value(slot);
+        }
         double m = mountainNoise.fbm2(x * 0.004, z * 0.004, 3, 2.1, 0.5) * 0.5 + 0.5;
-        return m;
+        return mountainMemo.store(slot, x, z, m);
     }
 
     public double temperature01(int x, int z) {
@@ -106,6 +138,14 @@ public class WorldGenerator {
     }
 
     public Biome biomeAt(int x, int z) {
+        int slot = biomeMemo.slot(x, z);
+        if (biomeMemo.holds(slot, x, z)) {
+            return biomeMemo.value(slot);
+        }
+        return biomeMemo.store(slot, x, z, computeBiomeAt(x, z));
+    }
+
+    private Biome computeBiomeAt(int x, int z) {
         double m = mountainFactor(x, z);
         double t = temperature01(x, z);
         double mo = moisture01(x, z);
@@ -128,12 +168,16 @@ public class WorldGenerator {
     }
 
     public int heightAt(int x, int z) {
+        int slot = heightMemo.slot(x, z);
+        if (heightMemo.holds(slot, x, z)) {
+            return heightMemo.value(slot);
+        }
         double base = heightNoise.fbm2(x * 0.011, z * 0.011, 4, 2.05, 0.5);
         double m = mountainFactor(x, z);
         double mountain = Math.max(0, m - 0.55) / 0.45;
         double detail = detailNoise.value2(x * 0.06, z * 0.06);
         double h = 33 + base * 9 + mountain * mountain * 36 + detail * 2.2;
-        return (int) Math.max(4, Math.min(Chunk.SY - 12, h));
+        return heightMemo.store(slot, x, z, (int) Math.max(4, Math.min(Chunk.SY - 12, h)));
     }
 
     public void generate(Chunk c) {
@@ -271,11 +315,21 @@ public class WorldGenerator {
 
             // Domain-warped worm tunnels: the intersection of two ridged fields
             // traces long connected passages with natural vertical wander.
+            //
+            // The second field is evaluated inside the condition, not before
+            // it. A cell is a tunnel only where both fields are near zero, and
+            // the first rejects the large majority — so computing t2 eagerly
+            // spent a full two-octave 3D fbm (sixteen hashed lattice samples)
+            // on cells whose fate was already decided. This is the hottest
+            // arithmetic in the codebase: a load regenerates every chunk from
+            // the seed, which is why loading costs 500x what saving does.
+            // Same values, same order, same terrain.
             if (!carve && depth >= 5) {
                 double warp = warpNoise.fbm3(wx * 0.012, y * 0.02, wz * 0.012, 2, 2.0, 0.5) * 14.0;
                 double t1 = tunnelNoiseA.fbm3((wx + warp) * 0.021, y * 0.045, wz * 0.021, 2, 2.0, 0.5);
-                double t2 = tunnelNoiseB.fbm3(wx * 0.021, y * 0.045, (wz - warp) * 0.021, 2, 2.0, 0.5);
-                carve = Math.abs(t1) < 0.065 && Math.abs(t2) < 0.065;
+                carve = Math.abs(t1) < TUNNEL_THRESHOLD
+                        && Math.abs(tunnelNoiseB.fbm3(wx * 0.021, y * 0.045,
+                                (wz - warp) * 0.021, 2, 2.0, 0.5)) < TUNNEL_THRESHOLD;
             }
 
             // Resonant depths: rare crystal chambers at the very bottom.
