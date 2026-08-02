@@ -134,12 +134,9 @@ Cleanup: PR #2 closed, branch `tmp/003-ci-negative-proof` deleted on the remote 
 ### Concurrency cancellation — demonstrated live
 Two commits were pushed to `session/003-pr-ci` in quick succession while PR #1 was open:
 
-| Run | Head commit | Conclusion |
-|---|---|---|
-| [`30744839169`](https://github.com/BehicKlncky/VEYLON-Deep-Frontier/actions/runs/30744839169) | `0f904e3` (docs) | **`cancelled`** — superseded before it finished |
-| the run for the commit that added this table | `9a58b3d` (docs) | ran to completion |
+Run [`30744839169`](https://github.com/BehicKlncky/VEYLON-Deep-Frontier/actions/runs/30744839169) (head `0f904e3`) was still running when commit `9f6d354` was pushed to the same PR. Its conclusion is **`cancelled`** — superseded, not failed.
 
-Both runs shared concurrency group `PR check-refs/pull/1/merge`, so the older one was cancelled by the newer push, which is exactly what `cancel-in-progress: ${{ github.event_name == 'pull_request' }}` is for. `push`-to-`main` runs are excluded from that expression and so keep their own result per commit. The final conclusion of PR #1's check is stated in the PR thread and on the Actions tab; run IDs after this point are ordinary doc-only runs.
+Both runs shared concurrency group `PR check-refs/pull/1/merge`, so the older was cancelled by the newer push, which is exactly what `cancel-in-progress: ${{ github.event_name == 'pull_request' }}` is for. `push`-to-`main` runs are excluded by that expression and so each keeps its own recorded result. Later doc-only commits on this branch produce ordinary runs; PR #1's current check conclusion is on the Actions tab and in the PR thread.
 
 ### Performance / GL / packaging — NOT RUN
 Out of scope. No production code, benchmark, budget, renderer path or packaging task was touched by this session's commit. SESSION-001's figures remain the reference.
