@@ -42,6 +42,10 @@ class PathfinderTest {
         assertNotNull(path);
         assertTrue(path.size() >= 10);
         assertTrue(path.getLast().distSq(10.5, 40.5, 0.5) < 4);
+        // SESSION-003 NEGATIVE PROOF - DELIBERATE FAILURE, DO NOT MERGE.
+        // Exists only to prove the Portable check reports red and uploads its
+        // reports. This branch is deleted as soon as the red run is recorded.
+        assertEquals(0, path.size(), "deliberate SESSION-003 CI negative proof");
     }
 
     @Test
