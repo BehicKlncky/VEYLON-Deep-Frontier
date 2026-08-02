@@ -23,6 +23,22 @@ Setup requirements (JDK 25, OpenGL 3.3, the proxy workaround) are in
 On Windows use `.\gradlew.bat`. Tests need no display or GPU — they construct
 `Game` directly and never enter the render loop.
 
+### Platform support
+
+`check` — compilation, the headless suite and doclint — plus `javadoc` and
+dependency inspection run on **any** operating system, so Linux CI is a valid
+verification host and needs no natives on the runtime classpath. LWJGL natives
+and the app-image classifier are defined only for Windows and macOS on
+x64/arm64, so `run`, `fatJar`, `jpackage`, `appImageZip`, `releaseArtifacts` and
+`build` (whose `assemble` half produces distribution archives) all depend on
+`requireReleasePlatform` and fail elsewhere with an explicit message rather than
+packaging without natives. Use `check`, not `build`, as the portable gate.
+
+`verifyPlatformContract` runs inside `check` and pins the whole os/arch →
+classifier mapping, the natives actually on the resolved runtime classpath, and
+the fact that every distribution-group task is behind that gate. A new packaging
+task that skips the gate fails the build.
+
 ### Running a single test
 
 ```bash

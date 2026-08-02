@@ -58,6 +58,17 @@ world content. Saves from the pre-0.1.0 prototype are not loadable.
 The native dependencies and self-contained app-image are selected for the current
 host architecture. Build each package on its target operating system.
 
+Verification is platform-neutral: `check` (compilation, the headless test suite
+and doclint), `javadoc` and dependency inspection run on **any** OS, so ordinary
+Linux CI is a valid verification host. LWJGL natives and the app-image classifier
+exist only for Windows and macOS on x64/arm64, so `run`, `build`, `fatJar`,
+`jpackage`, `appImageZip` and `releaseArtifacts` fail on any other host with an
+explicit message instead of producing a package without natives.
+
+```bash
+./gradlew clean check   # the portable gate — runs anywhere, including Linux
+```
+
 Windows x64 (PowerShell):
 
 ```powershell
