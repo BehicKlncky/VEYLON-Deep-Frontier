@@ -10,21 +10,12 @@ import com.veylon.entity.Track;
 import com.veylon.util.Vec3i;
 import com.veylon.world.BlockType;
 
-import java.util.Random;
-
 /**
  * Wildlife AI: finite states driven by a perception model. Predators hear
  * noise (sprinting, mining), smell blood and raw meat, lose track of crouched
  * prey, follow blood trails and scavenge carcasses. Fire and light are feared.
  */
 public final class CreatureAI {
-
-    private static final Random RNG = new Random();
-
-    /** Re-seeds decision jitter so a fixed world seed replays identically. */
-    public static void reseed(long seed) {
-        RNG.setSeed(seed);
-    }
 
     private static final float STALKER_STRONG_LIGHT = 0.42f;
     private static final float STALKER_DARK_PREY_LIGHT = 0.32f;
@@ -107,18 +98,18 @@ public final class CreatureAI {
             c.state = CreatureState.FLEE;
             fleeFrom(c, p.pos.x, p.pos.z);
         } else if (c.decideTimer <= 0) {
-            c.decideTimer = 1.5f + RNG.nextFloat() * 2.5f;
-            if (g.time.isNight() && RNG.nextFloat() < 0.6f) {
+            c.decideTimer = 1.5f + g.entities.nextCreatureAiFloat() * 2.5f;
+            if (g.time.isNight() && g.entities.nextCreatureAiFloat() < 0.6f) {
                 c.state = CreatureState.REST;
             } else if (c.hunger > 55) {
                 c.state = CreatureState.GRAZE;
-                pickNearbyPoint(c, 9);
-            } else if (RNG.nextFloat() < 0.12f) {
+                pickNearbyPoint(g, c, 9);
+            } else if (g.entities.nextCreatureAiFloat() < 0.12f) {
                 c.state = CreatureState.SEEK_WATER;
-                pickNearbyPoint(c, 14);
+                pickNearbyPoint(g, c, 14);
             } else {
                 c.state = CreatureState.WANDER;
-                pickNearbyPoint(c, 12);
+                pickNearbyPoint(g, c, 12);
             }
         }
 
@@ -181,13 +172,13 @@ public final class CreatureAI {
             return;
         }
         if (c.decideTimer <= 0) {
-            c.decideTimer = 1f + RNG.nextFloat() * 2f;
+            c.decideTimer = 1f + g.entities.nextCreatureAiFloat() * 2f;
             if (c.hunger > 50) {
                 c.state = CreatureState.GRAZE;
             } else {
                 c.state = CreatureState.WANDER;
             }
-            pickNearbyPoint(c, 7);
+            pickNearbyPoint(g, c, 7);
         }
         if (c.state == CreatureState.GRAZE) {
             grazeBehavior(g, c, dt);
@@ -231,9 +222,9 @@ public final class CreatureAI {
         }
 
         if (c.decideTimer <= 0) {
-            c.decideTimer = 2f + RNG.nextFloat() * 3f;
+            c.decideTimer = 2f + g.entities.nextCreatureAiFloat() * 3f;
             c.state = c.hunger > 50 ? CreatureState.GRAZE : CreatureState.WANDER;
-            pickNearbyPoint(c, 10);
+            pickNearbyPoint(g, c, 10);
         }
         if (c.state == CreatureState.GRAZE) {
             grazeBehavior(g, c, dt);
@@ -260,7 +251,8 @@ public final class CreatureAI {
         float lightHere = g.world.blockLight((int) c.pos.x, (int) c.pos.y, (int) c.pos.z);
         if (lightHere > 0.35f) {
             c.state = CreatureState.FLEE;
-            fleeFrom(c, c.pos.x + RNG.nextFloat() - 0.5f, c.pos.z + RNG.nextFloat() - 0.5f);
+            fleeFrom(c, c.pos.x + g.entities.nextCreatureAiFloat() - 0.5f,
+                    c.pos.z + g.entities.nextCreatureAiFloat() - 0.5f);
             Vec3i camp = g.world.campPos;
             if (camp != null) {
                 fleeFrom(c, camp.x(), camp.z());
@@ -369,11 +361,11 @@ public final class CreatureAI {
         }
 
         if (c.decideTimer <= 0) {
-            c.decideTimer = 2f + RNG.nextFloat() * 3f;
+            c.decideTimer = 2f + g.entities.nextCreatureAiFloat() * 3f;
             c.state = CreatureState.WANDER;
-            pickNearbyPoint(c, 16);
+            pickNearbyPoint(g, c, 16);
             // Night chorus.
-            if (g.time.isNight() && RNG.nextFloat() < 0.12f) {
+            if (g.time.isNight() && g.entities.nextCreatureAiFloat() < 0.12f) {
                 g.audio.playHowl(c.pos.x, c.pos.y, c.pos.z);
             }
         }
@@ -490,9 +482,9 @@ public final class CreatureAI {
         }
 
         if (c.decideTimer <= 0) {
-            c.decideTimer = 2f + RNG.nextFloat() * 4f;
+            c.decideTimer = 2f + g.entities.nextCreatureAiFloat() * 4f;
             c.state = CreatureState.WANDER;
-            pickNearbyPoint(c, 10);
+            pickNearbyPoint(g, c, 10);
         }
         if (c.hasTarget && c.distSqTo(c.target.x, c.pos.y, c.target.z) > 2) {
             Steering.moveToward(c, c.target.x, c.target.z, c.type.speed * 0.6f);
@@ -572,16 +564,16 @@ public final class CreatureAI {
             return;
         }
         if (c.decideTimer <= 0) {
-            c.decideTimer = 2f + RNG.nextFloat() * 4f;
-            int x = (int) (c.pos.x + RNG.nextInt(31) - 15);
-            int z = (int) (c.pos.z + RNG.nextInt(31) - 15);
+            c.decideTimer = 2f + g.entities.nextCreatureAiFloat() * 4f;
+            int x = (int) (c.pos.x + g.entities.nextCreatureAiInt(31) - 15);
+            int z = (int) (c.pos.z + g.entities.nextCreatureAiInt(31) - 15);
             float groundY = 40;
             if (g.world.getChunk(Math.floorDiv(x, 16), Math.floorDiv(z, 16)) != null) {
                 groundY = g.world.surfaceHeight(x, z);
             }
-            c.target.set(x, groundY + 5 + RNG.nextFloat() * 8, z);
+            c.target.set(x, groundY + 5 + g.entities.nextCreatureAiFloat() * 8, z);
             c.hasTarget = true;
-            if (!g.time.isNight() && RNG.nextFloat() < 0.25f) {
+            if (!g.time.isNight() && g.entities.nextCreatureAiFloat() < 0.25f) {
                 g.audio.playChirp(c.pos.x, c.pos.y, c.pos.z);
             }
         }
@@ -608,11 +600,11 @@ public final class CreatureAI {
         c.fear = 1f;
     }
 
-    private static void pickNearbyPoint(Creature c, int radius) {
+    private static void pickNearbyPoint(Game g, Creature c, int radius) {
         c.target.set(
-                c.pos.x + RNG.nextInt(radius * 2 + 1) - radius,
+                c.pos.x + g.entities.nextCreatureAiInt(radius * 2 + 1) - radius,
                 c.pos.y,
-                c.pos.z + RNG.nextInt(radius * 2 + 1) - radius);
+                c.pos.z + g.entities.nextCreatureAiInt(radius * 2 + 1) - radius);
         c.hasTarget = true;
     }
 }

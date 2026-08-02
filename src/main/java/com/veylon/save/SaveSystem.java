@@ -8,6 +8,7 @@ import com.veylon.entity.Affliction;
 import com.veylon.entity.Carcass;
 import com.veylon.entity.Creature;
 import com.veylon.entity.Npc;
+import com.veylon.entity.PlayerConstants;
 import com.veylon.item.EquipSlot;
 import com.veylon.item.Inventory;
 import com.veylon.item.ItemStack;
@@ -35,8 +36,13 @@ import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
+import java.nio.channels.Channels;
+import java.nio.channels.FileChannel;
+import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
+import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -61,6 +67,29 @@ import java.util.Set;
  *
  * <p>Version 1 saves (pre-overhaul prototype) are not migrated; loading one
  * fails with a clear console message and the game keeps running.</p>
+ *
+ * <h2>Reading untrusted bytes</h2>
+ *
+ * <p>"The game keeps running" is a contract, not a hope, and it applies to
+ * every malformed file — not only to recognisably old ones. Save writes go to
+ * a sibling temporary file and replace the destination only after the complete
+ * payload has been flushed. A load over a live game is first proved readable
+ * against an isolated game instance, so malformed bytes never release or
+ * partially replace the world the player is currently in.</p>
+ *
+ * <p>Values that can allocate a collection, select an index, or poison core
+ * player state are validated before they are used:</p>
+ * <ul>
+ *   <li>entry counts go through {@link #readCount}, because an unchecked one
+ *       reaches {@code new ArrayList<>(n)};</li>
+ *   <li>enum ordinals and the hotbar index go through {@link #readOrdinal},
+ *       because an unchecked one indexes {@code values()};</li>
+ *   <li>player scalars go through {@link #readFinite}, because NaN health or
+ *       position is loaded state nothing can recover from;</li>
+ *   <li>and {@link #load} catches {@link RuntimeException} as well as
+ *       {@link IOException}, so a future unguarded read degrades to a failed
+ *       load instead of a crash.</li>
+ * </ul>
  */
 public final class SaveSystem {
 
@@ -71,6 +100,15 @@ public final class SaveSystem {
     private static final int V3_EXTENSION_MAGIC = 0x57334558; // "W3EX"
     private static final int V3_EXTENSION_VERSION = 2;
     private static final int MAX_SERIALIZED_ENTRIES = 100_000;
+    /**
+     * Block edits get their own, far looser ceiling: they are the one section
+     * a long-lived world can legitimately grow without bound, and rejecting a
+     * real save is worse than accepting an implausible one. Four million edits
+     * is ~52 MB of deltas — beyond any played world, and still finite.
+     */
+    private static final int MAX_SERIALIZED_BLOCK_EDITS = 4_000_000;
+    /** Hard cap before a file is retained in memory for a transaction-safe load. */
+    private static final int MAX_SAVE_BYTES = 128 * 1024 * 1024;
     private static final int MAX_V3_EXTENSION_SECTIONS = 256;
     private static final int MAX_V3_SECTION_BYTES = 16 * 1024 * 1024;
     private static final int V3_SECTION_ENVELOPE_MAGIC = 0x53334543; // "S3EC"
@@ -100,14 +138,18 @@ public final class SaveSystem {
     }
 
     public static boolean save(Game g, Path savePath) {
+        Objects.requireNonNull(g, "g");
         Objects.requireNonNull(savePath, "savePath");
+        Path target = savePath.toAbsolutePath();
+        Path temporary = null;
         try {
-            Path parent = savePath.getParent();
-            if (parent != null) {
-                Files.createDirectories(parent);
-            }
-            try (DataOutputStream out = new DataOutputStream(
-                    new BufferedOutputStream(Files.newOutputStream(savePath)))) {
+            Path parent = target.getParent();
+            Files.createDirectories(parent);
+            temporary = Files.createTempFile(parent, "veylon-save-", ".tmp");
+            try (FileChannel channel = FileChannel.open(temporary,
+                    StandardOpenOption.WRITE, StandardOpenOption.TRUNCATE_EXISTING);
+                 DataOutputStream out = new DataOutputStream(
+                         new BufferedOutputStream(Channels.newOutputStream(channel)))) {
                 out.writeInt(MAGIC);
                 out.writeInt(VERSION);
                 out.writeLong(g.world.seed);
@@ -313,11 +355,35 @@ public final class SaveSystem {
                     out.writeFloat(e.getValue());
                 }
                 writeV3Extension(out, g, npcs);
+                out.flush();
+                channel.force(true);
             }
+            replaceAtomically(temporary, target);
+            temporary = null;
             return true;
-        } catch (IOException ex) {
+        } catch (IOException | RuntimeException ex) {
             System.err.println("Save failed: " + ex);
             return false;
+        } finally {
+            if (temporary != null) {
+                try {
+                    Files.deleteIfExists(temporary);
+                } catch (IOException cleanupFailure) {
+                    System.err.println("Could not remove incomplete save " + temporary
+                            + ": " + cleanupFailure);
+                }
+            }
+        }
+    }
+
+    private static void replaceAtomically(Path source, Path target) throws IOException {
+        try {
+            Files.move(source, target, StandardCopyOption.ATOMIC_MOVE,
+                    StandardCopyOption.REPLACE_EXISTING);
+        } catch (AtomicMoveNotSupportedException ex) {
+            // Same-directory replacement still keeps the completed temporary
+            // payload separate from the destination until this final step.
+            Files.move(source, target, StandardCopyOption.REPLACE_EXISTING);
         }
     }
 
@@ -326,12 +392,38 @@ public final class SaveSystem {
     }
 
     public static boolean load(Game g, Path savePath) {
+        Objects.requireNonNull(g, "g");
         Objects.requireNonNull(savePath, "savePath");
         if (!Files.exists(savePath)) {
             return false;
         }
-        try (DataInputStream in = new DataInputStream(
-                new BufferedInputStream(Files.newInputStream(savePath)))) {
+        final byte[] payload;
+        try (BufferedInputStream source = new BufferedInputStream(Files.newInputStream(savePath))) {
+            payload = source.readNBytes(MAX_SAVE_BYTES + 1);
+            if (payload.length > MAX_SAVE_BYTES) {
+                System.err.println("Load failed: save exceeds " + MAX_SAVE_BYTES + " bytes");
+                return false;
+            }
+        } catch (IOException ex) {
+            System.err.println("Load failed: " + ex);
+            return false;
+        }
+
+        // Loading is destructive because newWorld releases the current GPU
+        // meshes and resets long-lived systems. Prove the immutable payload on
+        // an isolated graph before touching a live session. Title-screen loads
+        // have no state to protect and keep the one-pass fast path.
+        if (g.world != null || g.player != null) {
+            Game verifier = new Game();
+            if (!loadPayload(verifier, payload)) {
+                return false;
+            }
+        }
+        return loadPayload(g, payload);
+    }
+
+    private static boolean loadPayload(Game g, byte[] payload) {
+        try (DataInputStream in = new DataInputStream(new ByteArrayInputStream(payload))) {
             if (in.readInt() != MAGIC) {
                 System.err.println("Save file has wrong magic");
                 return false;
@@ -346,6 +438,10 @@ public final class SaveSystem {
             long seed = in.readLong();
             // v2 worlds keep their legacy terrain forever; v3 records the version.
             int generatorVersion = version >= 3 ? in.readInt() : com.veylon.world.World.GEN_LEGACY;
+            if (generatorVersion < World.GEN_LEGACY
+                    || generatorVersion > World.CURRENT_GENERATOR) {
+                throw new IOException("unsupported world generator version " + generatorVersion);
+            }
             g.newWorld(seed, false, generatorVersion);
             if (version == 2) {
                 System.out.println("[save] migrating v2 save: legacy terrain preserved; "
@@ -355,30 +451,33 @@ public final class SaveSystem {
             g.time.totalMinutes = in.readDouble();
 
             WeatherSystem.Weather[] weathers = WeatherSystem.Weather.values();
-            g.weather.current = weathers[in.readInt()];
-            g.weather.next = weathers[in.readInt()];
+            g.weather.current = weathers[readOrdinal(in, "current weather", weathers.length)];
+            g.weather.next = weathers[readOrdinal(in, "next weather", weathers.length)];
             g.weather.blend = in.readFloat();
             g.weather.changeTimer = in.readFloat();
 
             var p = g.player;
-            p.pos.set(in.readFloat(), in.readFloat(), in.readFloat());
-            g.camera.yaw = in.readFloat();
-            g.camera.pitch = in.readFloat();
-            p.health = in.readFloat();
-            p.hunger = in.readFloat();
-            p.thirst = in.readFloat();
-            p.stamina = in.readFloat();
-            p.bodyTemp = in.readFloat();
-            p.fatigue = in.readFloat();
-            p.wetness = in.readFloat();
-            p.protein = in.readFloat();
-            p.vitamins = in.readFloat();
-            p.smokeExposure = in.readFloat();
+            p.pos.set(readFinite(in, "player x"), readFinite(in, "player y"),
+                    readFinite(in, "player z"));
+            g.camera.yaw = readFinite(in, "camera yaw");
+            g.camera.pitch = readFinite(in, "camera pitch");
+            p.health = readFinite(in, "health");
+            p.hunger = readFinite(in, "hunger");
+            p.thirst = readFinite(in, "thirst");
+            p.stamina = readFinite(in, "stamina");
+            p.bodyTemp = readFinite(in, "body temperature");
+            p.fatigue = readFinite(in, "fatigue");
+            p.wetness = readFinite(in, "wetness");
+            p.protein = readFinite(in, "protein");
+            p.vitamins = readFinite(in, "vitamins");
+            p.smokeExposure = readFinite(in, "smoke exposure");
             p.woundClean = in.readBoolean();
-            p.hotbarSel = in.readInt();
+            // The hotbar index reaches the inventory on the first frame after a
+            // load, so an out-of-range one crashes play rather than loading.
+            p.hotbarSel = readOrdinal(in, "hotbar slot", PlayerConstants.HOTBAR_SLOTS);
 
             p.afflictions.clear();
-            int nAfflictions = in.readInt();
+            int nAfflictions = readCount(in, "affliction");
             Affliction[] afflictionTypes = Affliction.values();
             for (int i = 0; i < nAfflictions; i++) {
                 int ord = in.readInt();
@@ -389,7 +488,7 @@ public final class SaveSystem {
             }
 
             p.blueprints.clear();
-            int nBlueprints = in.readInt();
+            int nBlueprints = readCount(in, "blueprint");
             for (int i = 0; i < nBlueprints; i++) {
                 p.blueprints.add(in.readUTF());
             }
@@ -399,9 +498,11 @@ public final class SaveSystem {
                 p.equipment[i] = readStack(in, version);
             }
 
-            // Changed blocks: ensure target chunks exist, then apply.
-            int nBlocks = in.readInt();
-            List<int[]> blocks = new ArrayList<>(nBlocks);
+            // Changed blocks: ensure target chunks exist, then apply. The
+            // capacity hint is clamped separately from the bound, so a hostile
+            // length cannot reserve gigabytes before the first read fails.
+            int nBlocks = readCount(in, "changed block", MAX_SERIALIZED_BLOCK_EDITS);
+            List<int[]> blocks = new ArrayList<>(Math.min(nBlocks, 4096));
             for (int i = 0; i < nBlocks; i++) {
                 blocks.add(new int[]{in.readInt(), in.readInt(), in.readInt(), in.readByte()});
             }
@@ -413,14 +514,14 @@ public final class SaveSystem {
 
             // Campfire fuel.
             g.world.campfireFuel.clear();
-            int nFires = in.readInt();
+            int nFires = readCount(in, "campfire");
             for (int i = 0; i < nFires; i++) {
                 g.world.campfireFuel.put(readVec(in), in.readFloat());
             }
 
             // Crates.
             Map<Vec3i, Inventory> crates = new HashMap<>();
-            int nCrates = in.readInt();
+            int nCrates = readCount(in, "crate");
             for (int i = 0; i < nCrates; i++) {
                 Vec3i pos = readVec(in);
                 Inventory inv = new Inventory(12);
@@ -432,7 +533,7 @@ public final class SaveSystem {
 
             // Drying racks.
             g.world.rackBatches.clear();
-            int nRacks = in.readInt();
+            int nRacks = readCount(in, "drying rack");
             ItemType[] itemTypes = ItemType.values();
             for (int i = 0; i < nRacks; i++) {
                 Vec3i pos = readVec(in);
@@ -448,14 +549,14 @@ public final class SaveSystem {
 
             // Rain collectors.
             g.world.collectorWater.clear();
-            int nCollectors = in.readInt();
+            int nCollectors = readCount(in, "rain collector");
             for (int i = 0; i < nCollectors; i++) {
                 g.world.collectorWater.put(readVec(in), in.readFloat());
             }
 
             // Discovered POIs (re-flag the ones regenerated with the world).
             g.world.discoveredPois.clear();
-            int nDiscovered = in.readInt();
+            int nDiscovered = readCount(in, "discovered POI");
             for (int i = 0; i < nDiscovered; i++) {
                 g.world.discoveredPois.add(readVec(in));
             }
@@ -511,7 +612,7 @@ public final class SaveSystem {
 
             // NPCs.
             g.entities.npcs.clear();
-            int nNpcs = in.readInt();
+            int nNpcs = readCount(in, "NPC");
             for (int i = 0; i < nNpcs; i++) {
                 String name = in.readUTF();
                 Npc n = new Npc(g.world, name);
@@ -544,9 +645,10 @@ public final class SaveSystem {
             // Creatures.
             g.entities.creatures.clear();
             Creature.CreatureType[] types = Creature.CreatureType.values();
-            int nCreatures = in.readInt();
+            int nCreatures = readCount(in, "creature");
             for (int i = 0; i < nCreatures; i++) {
-                Creature c = new Creature(g.world, types[in.readInt()]);
+                Creature c = new Creature(g.world,
+                        types[readOrdinal(in, "creature type", types.length)]);
                 c.pos.set(in.readFloat(), in.readFloat(), in.readFloat());
                 c.health = in.readFloat();
                 c.hunger = in.readFloat();
@@ -556,9 +658,9 @@ public final class SaveSystem {
 
             // Carcasses.
             g.entities.carcasses.clear();
-            int nCarcasses = in.readInt();
+            int nCarcasses = readCount(in, "carcass");
             for (int i = 0; i < nCarcasses; i++) {
-                Carcass c = new Carcass(types[in.readInt()],
+                Carcass c = new Carcass(types[readOrdinal(in, "carcass type", types.length)],
                         in.readFloat(), in.readFloat(), in.readFloat());
                 c.meatLeft = in.readInt();
                 c.hideLeft = in.readInt();
@@ -569,15 +671,16 @@ public final class SaveSystem {
             // Events.
             g.events.active.clear();
             EventSystem.EventType[] eventTypes = EventSystem.EventType.values();
-            int nEvents = in.readInt();
+            int nEvents = readCount(in, "active event");
             for (int i = 0; i < nEvents; i++) {
                 g.events.active.add(new EventSystem.ActiveEvent(
-                        eventTypes[in.readInt()], in.readFloat(), in.readFloat()));
+                        eventTypes[readOrdinal(in, "event type", eventTypes.length)],
+                        in.readFloat(), in.readFloat()));
             }
 
             // Event log.
             g.eventLog.clear();
-            int nLog = in.readInt();
+            int nLog = readCount(in, "event log line");
             for (int i = 0; i < nLog; i++) {
                 g.eventLog.add(in.readUTF());
             }
@@ -610,6 +713,13 @@ public final class SaveSystem {
             return true;
         } catch (IOException ex) {
             System.err.println("Load failed: " + ex);
+            return false;
+        } catch (RuntimeException ex) {
+            // Defence in depth for the validation above. Every known bad-input
+            // path now throws IOException, but an unchecked exception escaping
+            // here would leave Game.run with no world and take the process with
+            // it, which is strictly worse than reporting a failed load.
+            System.err.println("Load failed on malformed save data: " + ex);
             return false;
         }
     }
@@ -1443,11 +1553,49 @@ public final class SaveSystem {
     }
 
     private static int readCount(DataInputStream in, String label) throws IOException {
+        return readCount(in, label, MAX_SERIALIZED_ENTRIES);
+    }
+
+    /**
+     * Reads an entry count that a damaged file may have chosen freely.
+     *
+     * <p>The bound matters more than its exact value: without one, a corrupt
+     * length reaches {@code new ArrayList<>(n)} and throws
+     * {@link IllegalArgumentException} or {@link OutOfMemoryError} — neither of
+     * which is an {@link IOException}, so neither is caught as a failed load.
+     */
+    private static int readCount(DataInputStream in, String label, int max) throws IOException {
         int count = in.readInt();
-        if (count < 0 || count > MAX_SERIALIZED_ENTRIES) {
+        if (count < 0 || count > max) {
             throw new IOException("invalid " + label + " count: " + count);
         }
         return count;
+    }
+
+    /**
+     * Reads a serialized enum ordinal, rejecting anything outside the enum.
+     *
+     * <p>Indexing {@code values()} with an unchecked ordinal throws
+     * {@link ArrayIndexOutOfBoundsException}, which escapes the load guard and
+     * takes the process with it. Every ordinal in the core body goes through
+     * here so a bad one is an ordinary failed load.
+     */
+    private static int readOrdinal(DataInputStream in, String label, int count)
+            throws IOException {
+        int ordinal = in.readInt();
+        if (ordinal < 0 || ordinal >= count) {
+            throw new IOException("invalid " + label + " ordinal: " + ordinal);
+        }
+        return ordinal;
+    }
+
+    /** Reads a scalar that must be a real number; NaN player state is unplayable. */
+    private static float readFinite(DataInputStream in, String label) throws IOException {
+        float value = in.readFloat();
+        if (!Float.isFinite(value)) {
+            throw new IOException("non-finite " + label + ": " + value);
+        }
+        return value;
     }
 
     private static NpcArchetype requireArchetype(String id) throws IOException {
@@ -1626,7 +1774,7 @@ public final class SaveSystem {
 
     private static void readInventory(DataInputStream in, Inventory inv, int version)
             throws IOException {
-        int size = in.readInt();
+        int size = readCount(in, "inventory slot", PlayerConstants.INVENTORY_SLOTS);
         for (int i = 0; i < size; i++) {
             ItemStack stack = readStack(in, version);
             if (i < inv.size()) {

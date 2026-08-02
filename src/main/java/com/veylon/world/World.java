@@ -138,8 +138,36 @@ public class World {
         return ((long) cx << 32) ^ (cz & 0xffffffffL);
     }
 
+    /**
+     * The most recently resolved chunk, so a run of lookups inside one chunk
+     * pays for the map once.
+     *
+     * <p>Every block query in the engine funnels through here, and
+     * {@code chunks} is a {@code Map<Long, Chunk>} — so each one boxed a fresh
+     * {@link Long} before it could even hash. The access pattern is strongly
+     * local: plant growth walks a chunk it already holds, the mesher walks one
+     * chunk's neighbourhood, fire and water work a cell at a time, and
+     * raycasts step through a few metres.
+     *
+     * <p>This can never go stale. Chunks are only ever added to the map —
+     * unloading frees GPU meshes and leaves the block data in place — and a new
+     * world is a new {@link World}, so there is no invalidation to get wrong.
+     */
+    private int cachedCx = Integer.MIN_VALUE;
+    private int cachedCz = Integer.MIN_VALUE;
+    private Chunk cachedChunk;
+
     public Chunk getChunk(int cx, int cz) {
-        return chunks.get(key(cx, cz));
+        if (cx == cachedCx && cz == cachedCz) {
+            return cachedChunk;
+        }
+        Chunk c = chunks.get(key(cx, cz));
+        if (c != null) {
+            cachedCx = cx;
+            cachedCz = cz;
+            cachedChunk = c;
+        }
+        return c;
     }
 
     public Chunk getOrCreateChunk(int cx, int cz) {
@@ -540,10 +568,16 @@ public class World {
      * identity pass. Ordinary sulfur veins therefore remain safe to mine.
      */
     public boolean isBasaltFumarole(int x, int y, int z) {
+        // Ordered rarest predicate first. Every term is pure, so the order is
+        // free to choose, and the choice matters: nearestBasaltFumarole runs
+        // this over 1,331 cells twice a second, and open air is the *most*
+        // common thing in that volume while exposed sulfur underfoot is the
+        // rarest. Testing air first paid three chunk lookups per cell to
+        // reject; testing the floor first pays one.
         if (generatorVersion < GEN_CAVE_IDENTITIES
+                || getBlock(x, y - 1, z) != BlockType.SULFUR_ORE
                 || getBlock(x, y, z) != BlockType.AIR
                 || getBlock(x, y + 1, z) != BlockType.AIR
-                || getBlock(x, y - 1, z) != BlockType.SULFUR_ORE
                 || generator.caveZoneAt(x, y, z) != WorldGenerator.CaveZone.BASALT) {
             return false;
         }

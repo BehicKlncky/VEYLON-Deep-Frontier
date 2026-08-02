@@ -13,6 +13,7 @@ import com.veylon.world.World;
 import java.util.EnumMap;
 import java.util.HashSet;
 import java.util.Map;
+import java.util.Random;
 import java.util.Set;
 
 import static com.veylon.entity.PlayerConstants.*;
@@ -62,12 +63,26 @@ public class Player extends Entity {
 
     private float pendingFallDamage;
 
+    /**
+     * Every roll that decides whether the player is wounded, sprained,
+     * infected or made sick.
+     *
+     * <p>These used {@code Math.random()}, which meant the survival layer's
+     * whole failure model was the one part of the simulation a world seed did
+     * not reproduce. A bug report with a seed, a seeded QA capture and a fixed-
+     * seed regression test all silently observed a different game from the one
+     * being described. A player belongs to exactly one world, so seeding from
+     * that world here is enough — there is no cross-world state to reset.
+     */
+    private final Random rng;
+
     public Player(World world) {
         super(world);
         width = BODY_WIDTH;
         height = BODY_HEIGHT;
         maxHealth = MAX_HEALTH;
         health = MAX_HEALTH;
+        rng = new Random(world.seed ^ AFFLICTION_RNG_SALT);
     }
 
     public float eyeHeight() {
@@ -194,12 +209,12 @@ public class Player extends Entity {
                 }
             }
         }
-        if (canBleed && Math.random() < BLEED_CHANCE) {
+        if (canBleed && rng.nextDouble() < BLEED_CHANCE) {
             if (!has(Affliction.BLEEDING)) {
                 g.log("You are BLEEDING! Bandage the wound before it festers.");
             }
             addAffliction(Affliction.BLEEDING,
-                    BLEEDING_DURATION_MIN + (float) Math.random() * BLEEDING_DURATION_RANGE);
+                    BLEEDING_DURATION_MIN + rng.nextFloat() * BLEEDING_DURATION_RANGE);
             woundClean = false;
         }
     }
@@ -255,10 +270,10 @@ public class Player extends Entity {
         hurtPhysical(g, pendingFallDamage, false);
         g.log("You hit the ground hard (-" + (int) pendingFallDamage + " HP)");
         g.audio.playHurt();
-        if (pendingFallDamage > SPRAIN_DAMAGE_THRESHOLD && Math.random() < SPRAIN_CHANCE
+        if (pendingFallDamage > SPRAIN_DAMAGE_THRESHOLD && rng.nextDouble() < SPRAIN_CHANCE
                 && !has(Affliction.SPRAIN)) {
             addAffliction(Affliction.SPRAIN,
-                    SPRAIN_DURATION_MIN + (float) Math.random() * SPRAIN_DURATION_RANGE);
+                    SPRAIN_DURATION_MIN + rng.nextFloat() * SPRAIN_DURATION_RANGE);
             g.log("You SPRAINED your leg in the fall. Splint it or hobble.");
         }
         pendingFallDamage = 0;
@@ -418,9 +433,9 @@ public class Player extends Entity {
         }
         // A wound that clotted on its own (never bandaged) risks infection.
         if (bleedEnded) {
-            if (!woundClean && Math.random() < INFECTION_FROM_UNCLEAN_WOUND_CHANCE) {
+            if (!woundClean && rng.nextDouble() < INFECTION_FROM_UNCLEAN_WOUND_CHANCE) {
                 addAffliction(Affliction.INFECTION,
-                        INFECTION_DURATION_MIN + (float) Math.random() * INFECTION_DURATION_RANGE);
+                        INFECTION_DURATION_MIN + rng.nextFloat() * INFECTION_DURATION_RANGE);
                 g.log("The untreated wound has become INFECTED. Fever sets in...");
             } else {
                 g.log("The bleeding stopped on its own.");
@@ -428,6 +443,28 @@ public class Player extends Entity {
         }
 
         tickSmokeExposure(g, dt);
+    }
+
+    /**
+     * Rolls for sickness while a toxic-fog event has the player out in the
+     * open. Driven from the medium tick, which is what evaluates shelter.
+     *
+     * <p>This lived inline in {@code Game.mediumTick}. It is one more roll that
+     * decides whether the player gets an affliction, so it belongs beside the
+     * others and shares their seeded generator rather than reaching for
+     * {@code Math.random()}.
+     *
+     * @return true only when this call inflicted sickness
+     */
+    public boolean tickToxicFogExposure(Game g) {
+        if (!g.events.toxicFog() || !exposedToSky || shelter.roofed()
+                || has(Affliction.SICKNESS)
+                || rng.nextDouble() >= TOXIC_FOG_SICKNESS_CHANCE) {
+            return false;
+        }
+        addAffliction(Affliction.SICKNESS, TOXIC_FOG_SICKNESS_SECONDS);
+        g.log("The toxic fog claws at your lungs... SICKNESS takes hold.");
+        return true;
     }
 
     /** Smoke exposure converts to the smoke affliction. */

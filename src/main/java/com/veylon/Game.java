@@ -9,7 +9,6 @@ import com.veylon.engine.ParticleSystem;
 import com.veylon.engine.Renderer;
 import com.veylon.engine.UiRenderer;
 import com.veylon.engine.Window;
-import com.veylon.entity.Affliction;
 import com.veylon.entity.Creature;
 import com.veylon.entity.Entity;
 import com.veylon.entity.EntityManager;
@@ -60,7 +59,6 @@ import org.joml.Vector3f;
 import java.nio.file.Path;
 import java.util.EnumSet;
 import java.util.Locale;
-import java.util.Random;
 import java.util.Set;
 
 import static org.lwjgl.glfw.GLFW.*;
@@ -95,10 +93,6 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
         boolean rendersWorld() {
             return this != TITLE && this != TITLE_OPTIONS && this != LOADING;
         }
-    }
-
-    private enum LoadRequest {
-        NEW_GAME, LOAD_GAME
     }
 
     // Engine.
@@ -139,7 +133,7 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
     public final SeasonSystem seasons = new SeasonSystem();
     public final ItemConditionSystem itemConditions = new ItemConditionSystem();
     public final EventLog eventLog = new EventLog();
-    private final SimulationScheduler scheduler = new SimulationScheduler();
+    final SimulationScheduler scheduler = new SimulationScheduler();
 
     // UI. Screens are drawn and driven from this class alone — nothing outside
     // com.veylon holds one — so they stay package-private. A screen that needs
@@ -149,7 +143,7 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
     final InventoryScreen inventoryScreen = new InventoryScreen();
     final CraftingScreen craftingScreen = new CraftingScreen();
     final CrateScreen crateScreen = new CrateScreen();
-    /** @VisibleForTesting — public only for gameplay tests outside com.veylon. */
+    /** Visible for testing; public only for gameplay tests outside {@code com.veylon}. */
     public final NpcScreen npcScreen = new NpcScreen();
     final PauseMenu pauseMenu = new PauseMenu();
     final MapScreen mapScreen = new MapScreen();
@@ -158,7 +152,7 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
     final TitleScreen titleScreen = new TitleScreen();
     final GraphicsOptionsScreen graphicsOptionsScreen = new GraphicsOptionsScreen();
 
-    /** @VisibleForTesting — public only for gameplay tests outside com.veylon. */
+    /** Visible for testing; public only for gameplay tests outside {@code com.veylon}. */
     public UiMode uiMode = UiMode.NONE;
     boolean debugShown;
     boolean simPanelShown;
@@ -181,40 +175,53 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
     private double fpsTimer;
 
     AppState appState = AppState.TITLE;
-    private LoadRequest loadRequest;
-    private boolean loadingPresented;
     private boolean automatedRun;
     long sessionSeed;
-    private float deathTimer;
+    float deathTimer;
     /** Counted here because world teardown owns it; the QA report reads it. */
     long chunkMeshDeletes;
 
     /** Opt-in benchmark, capture and release-smoke scaffolding. Inert without VEYLON_* env. */
-    private final QaHarness qa = new QaHarness(this);
+    final QaHarness qa = new QaHarness(this);
+
+    /** Reset, reseed, construct and camp placement for every new or loaded world. */
+    private final WorldBootstrap bootstrap = new WorldBootstrap(this);
+
+    /** Title, graphics options and loading -- the states with no world in them. */
+    final FrontendController frontend = new FrontendController(this);
+
+    /** VEYLON_* benchmark scenes, timed captures and the release smoke gate. */
+    private final AutomatedRunDriver automation = new AutomatedRunDriver(this);
+
+    /** Global keys: screens, debug overlays, quick save/load, hotbar. */
+    private final HotkeyRouter hotkeys = new HotkeyRouter(this);
+
+    /** Shelter, smoke, vents, discovery and the stations within reach. */
+    private final PlayerEnvironmentSystem environment = new PlayerEnvironmentSystem(this);
 
     /** Melee, bow, firearm and thrown-weapon rules; see the delegates below. */
     final PlayerCombatSystem combat = new PlayerCombatSystem(this);
 
     /** Hold-to-mine, block breaking outcomes and placement. */
-    private final PlayerBlockActions blockActions = new PlayerBlockActions(this);
+    final PlayerBlockActions blockActions = new PlayerBlockActions(this);
 
     /** Read-only builder for the HUD's "[F] ..." interaction hint. */
     private final InteractPromptBuilder prompts = new InteractPromptBuilder(this);
 
     /** Crate open/transfer commands and their theft attribution. */
-    private final CrateTransactionSystem crates = new CrateTransactionSystem(this);
+    final CrateTransactionSystem crates = new CrateTransactionSystem(this);
 
     /** Eating, drinking, treating wounds and wearing gear. */
     final PlayerConsumables consumables = new PlayerConsumables(this);
 
     /** F-key and right-click handlers against world state, NPCs and stations. */
-    private final WorldInteractions interactions = new WorldInteractions(this);
+    final WorldInteractions interactions = new WorldInteractions(this);
 
     /** Ambient particle emitters and the ambient audio mix. */
-    private final AmbienceSystem ambience = new AmbienceSystem(this);
+    final AmbienceSystem ambience = new AmbienceSystem(this);
 
     /** Sleep eligibility, quality scoring and the night's effects. */
-    private final SleepSystem sleep = new SleepSystem(this);
+    final SleepSystem sleep = new SleepSystem(this);
 
     // Ranged-weapon aim state the HUD draws. The rules live in PlayerCombatSystem;
     // these stay here because Hud reads them straight off the Game instance.
@@ -231,18 +238,13 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
     public float walkBob;
     private float footstepTimer;
     float hitSoundTimer;
-    private float emitterTimer;
-    private float breathTimer;
-    private float coughTimer;
 
     // Sleep.
     public boolean sleeping;
     public float sleepFade;
-    private float sleepQuality;
-    private float sleptMinutes;
 
     public Inventory openCrate;
-    /** @VisibleForTesting — public only for gameplay tests outside com.veylon. */
+    /** Visible for testing; public only for gameplay tests outside {@code com.veylon}. */
     public Vec3i openCratePos;
     public Npc activeNpc;
 
@@ -302,86 +304,16 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
         ui.init();
         audio.init();
         sessionSeed = qa.configuredSeed();
+        automatedRun = automation.configure();
 
-        boolean smoke = System.getenv("VEYLON_SMOKE") != null;
-        String scene = System.getenv("VEYLON_SCENE");
-        String shotEnv = System.getenv("VEYLON_SHOT");
-        String frontend = System.getenv("VEYLON_FRONTEND");
-        boolean frontendQa = frontend != null && !frontend.isBlank();
-        automatedRun = smoke || (scene != null && !scene.isBlank())
-                || (shotEnv != null && !shotEnv.isBlank()) || frontendQa;
-        if (automatedRun && !frontendQa) {
-            newWorld(sessionSeed, true);
-            qa.applyBenchmarkScene(scene);
-            appState = AppState.PLAYING;
-            window.captureCursor(true, input);
-        } else {
-            appState = AppState.TITLE;
-            window.captureCursor(false, input);
-            if (frontendQa) {
-                switch (frontend.trim().toLowerCase(Locale.ROOT)) {
-                    case "options" -> {
-                        graphicsOptionsScreen.open(renderer.settings,
-                                window.windowedWidth(), window.windowedHeight());
-                        appState = AppState.TITLE_OPTIONS;
-                    }
-                    case "loading" -> {
-                        appState = AppState.LOADING;
-                        qa.setStaticLoadingQa(true);
-                    }
-                    case "death", "victory" -> {
-                        newWorld(sessionSeed, true);
-                        appState = frontend.trim().equalsIgnoreCase("death")
-                                ? AppState.DEATH : AppState.VICTORY;
-                        deathTimer = 30f;
-                    }
-                    case "glyphs" -> titleScreen.notice(
-                            "Türkçe glif doğrulama: Çığ, İĞÜÖŞ, çğıöşü");
-                    default -> {
-                    }
-                }
-            }
-        }
-
-        double smokeSeconds = 6;
-        if (smoke) {
-            try {
-                smokeSeconds = Math.max(6, Double.parseDouble(System.getenv("VEYLON_SMOKE")));
-            } catch (NumberFormatException ignored) {
-            }
-        }
-        // VEYLON_SHOT="5,10" saves screenshots under the writable app-data directory.
-        double[] shotMarks = new double[0];
-        if (shotEnv != null && !shotEnv.isBlank()) {
-            String[] parts = shotEnv.split(",");
-            shotMarks = new double[parts.length];
-            for (int i = 0; i < parts.length; i++) {
-                try {
-                    shotMarks[i] = Double.parseDouble(parts[i].trim());
-                } catch (NumberFormatException e) {
-                    shotMarks[i] = -1;
-                }
-            }
-        }
-        int shotIndex = 0;
-        String scenePrefix = scene != null && !scene.isBlank() ? scene
-                : (frontendQa ? "frontend_" + frontend.trim().toLowerCase(Locale.ROOT) : "shot");
-        String captureTag = System.getenv("VEYLON_CAPTURE_TAG");
-        if (captureTag != null && !captureTag.isBlank()) {
-            scenePrefix = captureTag.trim().replaceAll("[^A-Za-z0-9._-]", "_");
-        }
-        int smokePhase = 0;
-        boolean smokeSaveOk = false;
-        boolean smokeLoadOk = false;
-        String smokeGateFailure = null;
-        Path smokeSave = AppPaths.dataDirectory().resolve("build/qa/smoke-save.dat");
-        double start = glfwGetTime();
-        double last = start;
+        double last = glfwGetTime();
         frameProfiler.reset();
-        qa.resetSmokeRun();
+        automation.beginSession(last);
         while (!window.shouldClose()) {
             double now = glfwGetTime();
             double rawDt = now - last;
+            // The frame delta is clamped so a stall advances the world a little
+            // rather than replaying hundreds of ticks; see SimulationScheduler.
             double dt = Math.min(0.1, rawDt);
             last = now;
             totalTime = now;
@@ -390,95 +322,40 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
             qa.recordFortressApproach(rawDt, now);
 
             window.poll();
-            qa.updateShowcases(now - start);
+            qa.updateShowcases(automation.elapsed(now));
             frame(dt);
             qa.sampleRenderStats();
-            if (shotIndex < shotMarks.length && now - start >= shotMarks[shotIndex]) {
-                com.veylon.gfx.ScreenshotUtil.capture(window.framebufferWidth(), window.framebufferHeight(),
-                        scenePrefix + "_" + (int) shotMarks[shotIndex] + "s");
-                System.out.println("[capture] tag=" + scenePrefix
-                        + " scene=" + (scene == null ? "frontend" : scene)
-                        + " framebuffer=" + window.framebufferWidth() + "x" + window.framebufferHeight()
-                        + " particles=" + renderer.particlesDrawn
-                        + " particleSubmissions=" + renderer.particleDrawCalls
-                        + " drawCalls=" + (renderer.drawCalls + ui.drawCallsLastFrame())
-                        + " triangles=" + renderer.trianglesRendered
-                        + " glErrors=" + window.glErrorCount()
-                        + " khrErrors=" + window.glDebugErrorCount());
-                shotIndex++;
-                if (shotIndex >= shotMarks.length && !smoke) {
-                    window.requestClose();
-                }
-            }
+            automation.captureDueScreenshots(now);
             if (pendingScreenshot) {
                 pendingScreenshot = false;
-                com.veylon.gfx.ScreenshotUtil.capture(window.framebufferWidth(), window.framebufferHeight(), null);
+                com.veylon.gfx.ScreenshotUtil.capture(
+                        window.framebufferWidth(), window.framebufferHeight(), null);
             }
             window.swap();
             input.endFrame();
-            if (appState == AppState.LOADING && loadingPresented && !qa.staticLoadingQa()) {
-                completeLoading();
+            if (frontend.loadingFramePresented() && !qa.staticLoadingQa()) {
+                frontend.completeLoading();
             }
-
-            fpsCounter++;
-            fpsTimer += rawDt;
-            if (fpsTimer >= 1.0) {
-                fps = (int) Math.round(fpsCounter / fpsTimer);
-                frameMs = fpsTimer * 1000.0 / Math.max(1, fpsCounter);
-                fpsCounter = 0;
-                fpsTimer = 0;
-            }
-            if (smoke && world != null && appState == AppState.PLAYING) {
-                if (smokePhase == 0 && now - start > 2.5) {
-                    smokePhase = 1;
-                    world.setBlock((int) player.pos.x + 2, (int) player.pos.y + 1,
-                            (int) player.pos.z + 2, BlockType.TORCH, true);
-                    player.inventory.add(ItemType.HIDE_COAT, 1);
-                    qa.equipFromInventoryFirst(ItemType.HIDE_COAT);
-                    smokeSaveOk = SaveSystem.save(this, smokeSave);
-                    System.out.println("[smoke] isolated save=" + smokeSaveOk + " path=" + smokeSave);
-                }
-                if (smokePhase == 1 && now - start > 4.0) {
-                    smokePhase = 2;
-                    smokeLoadOk = SaveSystem.load(this, smokeSave);
-                    System.out.println("[smoke] isolated load=" + smokeLoadOk + " path=" + smokeSave);
-                }
-                if (smokePhase == 2 && now - start > 5.0) {
-                    smokePhase = 3;
-                    // Stress fire + storm systems: build a small wooden stack and torch it.
-                    int fx = (int) player.pos.x + 4, fz = (int) player.pos.z + 4;
-                    int fy = world.surfaceHeight(fx, fz) + 1;
-                    world.setBlock(fx, fy, fz, BlockType.LOG, true);
-                    world.setBlock(fx, fy + 1, fz, BlockType.LOG, true);
-                    world.setBlock(fx + 1, fy, fz, BlockType.PLANK, true);
-                    fire.ignite(this, fx, fy, fz);
-                    System.out.println("[smoke] ignited log stack at " + fx + "," + fy + "," + fz);
-                    weather.next = WeatherSystem.Weather.STORM;
-                    weather.blend = 0.6f;
-                }
-                if (smokePhase == 3 && now - start > 7.0) {
-                    smokePhase = 4;
-                    qa.beginSmokeFortressApproach(now);
-                }
-                if (now - start > smokeSeconds) {
-                    window.pollGlErrors("smoke-gate");
-                    smokeGateFailure = qa.emitSmokeReport(smokeSeconds, smokeSaveOk, smokeLoadOk);
-                    window.requestClose();
-                }
-            }
+            countFrame(rawDt);
+            automation.advanceSmokeRun(now);
         }
         renderer.delete();
         ui.delete();
         audio.shutdown();
         window.pollGlErrors("resource-delete");
-        if (smoke && (window.glErrorCount() != 0 || window.glDebugErrorCount() != 0)) {
-            smokeGateFailure = smokeGateFailure == null
-                    ? "OpenGL errors observed during resource cleanup"
-                    : smokeGateFailure + "OpenGL errors observed during resource cleanup; ";
-        }
+        automation.assertSmokeGatePassed();
         window.destroy();
-        if (smokeGateFailure != null) {
-            throw new IllegalStateException("Graphics smoke gate failed: " + smokeGateFailure);
+    }
+
+    /** Rolling one-second FPS and average frame time for the HUD and debug overlay. */
+    private void countFrame(double rawDt) {
+        fpsCounter++;
+        fpsTimer += rawDt;
+        if (fpsTimer >= 1.0) {
+            fps = (int) Math.round(fpsCounter / fpsTimer);
+            frameMs = fpsTimer * 1000.0 / Math.max(1, fpsCounter);
+            fpsCounter = 0;
+            fpsTimer = 0;
         }
     }
 
@@ -490,204 +367,21 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
         newWorld(seed, fresh, World.CURRENT_GENERATOR);
     }
 
+    /**
+     * The single path that produces a playable world, used by New Game, by save
+     * loading and by the QA harness. See {@link WorldBootstrap} for the reset
+     * ordering it guarantees and the tests that pin it.
+     */
     public void newWorld(long seed, boolean fresh, int generatorVersion) {
-        // Save-load and front-end transitions can replace a live world. Release
-        // its bounded GPU meshes and reset cross-world simulation queues first.
-        releaseWorldMeshes();
-        scheduler.reset();
-        time.reset();
-        weather.reset();
-        temperature.reset();
-        fire.reset();
-        water.reset();
-        events.reset();
-        plants.reset();
-        itemConditions.reset();
-        noise.reset();
-        projectiles.reset();
-        explosions.reset();
-        settlementManager.reset();
-        particles.count = 0;
-        reseedSimulation(seed);
-        world = new World(seed, generatorVersion);
-        world.listener = this;
-        player = new Player(world);
-        entities.creatures.clear();
-        entities.npcs.clear();
-        entities.carcasses.clear();
-        entities.tracks.clear();
-        eventLog.clear();
-        faction.trust = 35;
-        faction.alert = 0;
-        faction.foodStock = 10;
-        faction.woodStock = 8;
-        faction.hostile = false;
-        faction.upgradeStage = 0;
-        faction.resetQuestRuntime();
-        faction.alliedGiftGiven = false;
-        sleeping = false;
-        sleepFade = 0;
-        simPaused = false;
-        simPanelShown = false;
-        uiMode = UiMode.NONE;
-        targetHit = null;
-        miningTarget = null;
-        miningProgress = 0;
-        swingTimer = 0;
-        walkBob = 0;
-        drawingBow = false;
-        bowDraw = 0;
-        combat.reset();
-        crates.reset();
-
-        // Synchronous initial generation around spawn.
-        world.ensureChunks(8, 8, 5, 10_000);
-        // Find dry land for the crash site (don't spawn in a lake).
-        int sx = 8, sz = 8;
-        outer:
-        for (int r = 0; r <= 48; r += 4) {
-            for (int dx = -r; dx <= r; dx += 4) {
-                for (int dz = -r; dz <= r; dz += 4) {
-                    if (Math.max(Math.abs(dx), Math.abs(dz)) != r) {
-                        continue;
-                    }
-                    world.ensureChunks(8 + dx, 8 + dz, 1, 10_000);
-                    if (world.surfaceHeight(8 + dx, 8 + dz) > World.SEA_LEVEL + 1) {
-                        sx = 8 + dx;
-                        sz = 8 + dz;
-                        break outer;
-                    }
-                }
-            }
-        }
-        world.ensureChunks(sx, sz, 5, 10_000);
-        int sy = world.surfaceHeight(sx, sz) + 1;
-        spawnPos.set(sx + 0.5f, sy + 0.2f, sz + 0.5f);
-        player.pos.set(spawnPos);
-        camera.yaw = 35;
-        camera.pitch = 8;
-
-        setupCamp(fresh);
-
-        if (fresh) {
-            player.inventory.add(ItemType.BERRY, 4);
-            player.inventory.add(ItemType.LOG, 2);
-            player.inventory.add(ItemType.STICK, 2);
-            player.inventory.add(ItemType.FIBER, 4);
-            player.inventory.add(ItemType.TORCH, 2);
-            player.inventory.add(ItemType.BANDAGE, 1);
-            player.inventory.add(ItemType.WATERSKIN_EMPTY, 1);
-            log("You crash-landed on Veylon. Survive.");
-            log("Gather wood and berries; craft tools with [C]. Watch your wounds.");
-            log("An NPC camp lies somewhere nearby - and stranger things besides...");
-            for (int i = 0; i < 8; i++) {
-                entities.slowTick(this);
-            }
-        }
+        bootstrap.newWorld(seed, fresh, generatorVersion);
     }
 
-    /**
-     * Deterministically builds the NPC camp near spawn. Runs for both new games
-     * and loads (loads then overwrite crate contents/fuel from the save).
-     */
-    /**
-     * Reseeds every generator that affects simulation outcomes, so one world
-     * seed replays identically instead of inheriting RNG state from whatever
-     * world ran before it in the same process.
-     *
-     * <p>Each system gets a distinct salt so their streams stay independent —
-     * seeding them all identically would correlate, say, weather rolls with
-     * creature decisions. Presentation-only randomness (audio variation, NPC
-     * screen flavour) is deliberately left unseeded; it cannot affect outcomes.
-     *
-     * <p>Tests that need an exact sequence still call {@code setRandomSeed}
-     * directly after {@code newWorld}, and those explicit seeds win.
-     */
-    private void reseedSimulation(long seed) {
-        particles.setRandomSeed(seed ^ 0x5645594c4f4eL);
-        ambience.reseed(seed ^ 0x46584c4f4eL);
-        entities.setRandomSeed(seed ^ 0x454e5449545933L);
-        projectiles.setRandomSeed(seed ^ 0x50524f4a4543L);
-        explosions.setRandomSeed(seed ^ 0x4558504c4f53L);
-        settlementManager.setRandomSeed(seed ^ 0x534554544c4dL);
-        faction.setRandomSeed(seed ^ 0x464143544e53L);
-        weather.setRandomSeed(seed ^ 0x574541544852L);
-        water.setRandomSeed(seed ^ 0x5741544552L);
-        fire.setRandomSeed(seed ^ 0x4649524553L);
-        plants.setRandomSeed(seed ^ 0x504c414e5453L);
-        events.setRandomSeed(seed ^ 0x4556454e5453L);
-        // Static AI decision jitter must also replay deterministically per seed;
-        // otherwise QA runs and tests inherit RNG state from earlier worlds.
-        com.veylon.ai.SettledNpcAI.reseed(seed ^ 0x5345544e5043L);
-        com.veylon.ai.CreatureAI.reseed(seed ^ 0x435245415455L);
-        com.veylon.ai.NpcAI.reseed(seed ^ 0x4c454741434eL);
-    }
-
-    private void setupCamp(boolean fresh) {
-        Random rng = new Random(world.seed * 31 + 7);
-        int baseX = (int) spawnPos.x, baseZ = (int) spawnPos.z;
-        int cx = baseX, cz = baseZ, h = 0;
-        for (int attempt = 0; attempt < 10; attempt++) {
-            cx = baseX + 28 + rng.nextInt(14) + attempt * 8;
-            cz = baseZ + 22 + rng.nextInt(14);
-            world.ensureChunks(cx, cz, 3, 10_000);
-            h = world.surfaceHeight(cx, cz);
-            if (h > World.SEA_LEVEL + 1 && h < Chunk.SY - 14) {
-                break;
-            }
+    void releaseWorldMeshes() {
+        if (world == null) {
+            return;
         }
-        // Flatten a 9x9 pad.
-        for (int dx = -4; dx <= 4; dx++) {
-            for (int dz = -4; dz <= 4; dz++) {
-                int x = cx + dx, z = cz + dz;
-                for (int y = h + 1; y <= h + 7; y++) {
-                    if (world.getBlock(x, y, z) != BlockType.AIR) {
-                        world.setBlock(x, y, z, BlockType.AIR, false);
-                    }
-                }
-                for (int y = Math.max(2, h - 3); y < h; y++) {
-                    if (!world.getBlock(x, y, z).solid) {
-                        world.setBlock(x, y, z, BlockType.DIRT, false);
-                    }
-                }
-                world.setBlock(x, h, z, BlockType.GRASS, false);
-            }
-        }
-        Vec3i campPos = new Vec3i(cx, h + 1, cz);
-        world.campPos = campPos;
-        faction.campPos = campPos;
-
-        world.setBlock(cx, h + 1, cz, BlockType.CAMPFIRE, false);
-        world.campfireFuel.putIfAbsent(campPos, 600f);
-        world.setBlock(cx - 2, h + 1, cz - 2, BlockType.CRATE, false);
-        world.setBlock(cx + 2, h + 1, cz + 2, BlockType.CRATE, false);
-        world.setBlock(cx + 2, h + 1, cz - 2, BlockType.WORKBENCH, false);
-        world.setBlock(cx - 3, h + 1, cz + 3, BlockType.TORCH, false);
-        world.setBlock(cx + 3, h + 1, cz - 3, BlockType.TORCH, false);
-        for (int dx = -3; dx <= -1; dx++) {
-            world.setBlock(cx + dx, h + 1, cz - 4, BlockType.WALL, false);
-        }
-
-        Inventory crate1 = new Inventory(12);
-        crate1.add(ItemType.BERRY, 6);
-        crate1.add(ItemType.PLANK, 4);
-        crate1.add(ItemType.STICK, 4);
-        crate1.add(ItemType.COAL, 2);
-        world.crateContents.putIfAbsent(new Vec3i(cx - 2, h + 1, cz - 2), crate1);
-        Inventory crate2 = new Inventory(12);
-        crate2.add(ItemType.LOG, 6);
-        crate2.add(ItemType.FIBER, 4);
-        crate2.add(ItemType.STONE, 3);
-        world.crateContents.putIfAbsent(new Vec3i(cx + 2, h + 1, cz + 2), crate2);
-
-        if (fresh) {
-            String[] names = {"Maro", "Senna", "Korrin", "Della"};
-            for (int i = 0; i < names.length; i++) {
-                Npc n = entities.spawnNpc(world, names[i],
-                        cx + 1.5f + (i % 2) * 2 - 2, h + 1.2f, cz + 1.5f + (i / 2) * 2 - 2);
-                n.faction = faction;
-                n.campIndex = i;
-            }
+        for (Chunk c : world.loadedChunks()) {
+            c.deleteMeshes();
         }
     }
 
@@ -696,9 +390,8 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
     // ------------------------------------------------------------------
 
     private void frame(double dtD) {
-        if (appState == AppState.TITLE || appState == AppState.TITLE_OPTIONS
-                || appState == AppState.LOADING) {
-            frameFrontend((float) dtD);
+        if (frontend.owns(appState)) {
+            frontend.frame((float) dtD);
             return;
         }
 
@@ -706,8 +399,8 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
         if (appState == AppState.DEATH) {
             deathTimer -= dt;
             if (input.wasKeyPressed(GLFW_KEY_ESCAPE)) {
-                returnToTitle();
-                frameFrontend(dt);
+                frontend.returnToTitle();
+                frontend.frame(dt);
                 return;
             }
             if (deathTimer <= 0 || input.wasKeyPressed(GLFW_KEY_ENTER)) {
@@ -716,15 +409,15 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
             }
         } else if (appState == AppState.VICTORY) {
             if (input.wasKeyPressed(GLFW_KEY_ESCAPE)) {
-                returnToTitle();
-                frameFrontend(dt);
+                frontend.returnToTitle();
+                frontend.frame(dt);
                 return;
             }
             if (input.wasKeyPressed(GLFW_KEY_ENTER)) {
                 appState = AppState.PLAYING;
             }
         } else {
-            handleGlobalKeys();
+            hotkeys.update();
         }
         window.captureCursor(appState == AppState.PLAYING && uiMode == UiMode.NONE, input);
 
@@ -794,7 +487,7 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
             case NPC -> npcScreen.update(this);
             case MAP -> mapScreen.update(this);
             case PAUSE -> pauseMenu.update(this);
-            case OPTIONS -> handlePauseOptions(graphicsOptionsScreen.update(this));
+            case OPTIONS -> frontend.handlePauseOptions(graphicsOptionsScreen.update(this));
             case NONE -> {
             }
         }
@@ -812,120 +505,10 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
         ui.end();
     }
 
-    private void frameFrontend(float dt) {
-        window.captureCursor(false, input);
-        audio.update(dt);
-        beginUiFrame();
-        if (appState == AppState.TITLE) {
-            TitleScreen.Action action = titleScreen.update(this);
-            switch (action) {
-                case NEW_GAME -> beginLoading(LoadRequest.NEW_GAME);
-                case LOAD_GAME -> beginLoading(LoadRequest.LOAD_GAME);
-                case OPTIONS -> {
-                    graphicsOptionsScreen.open(renderer.settings,
-                            window.windowedWidth(), window.windowedHeight());
-                    appState = AppState.TITLE_OPTIONS;
-                }
-                case QUIT -> window.requestClose();
-                case NONE -> {
-                }
-            }
-        } else if (appState == AppState.TITLE_OPTIONS) {
-            qa.updateTitleOptionsQa(dt);
-            GraphicsOptionsScreen.Result result = graphicsOptionsScreen.update(this);
-            if (result.action() == GraphicsOptionsScreen.Action.APPLY) {
-                applyGraphicsOptions(result);
-                titleScreen.notice("Graphics settings applied.");
-                appState = AppState.TITLE;
-            } else if (result.action() == GraphicsOptionsScreen.Action.CANCEL) {
-                appState = AppState.TITLE;
-            }
-        } else {
-            String detail = loadRequest == LoadRequest.LOAD_GAME
-                    ? "Restoring your frontier..." : "Mapping atmosphere and terrain...";
-            PresentationOverlay.loading(ui, detail, totalTime);
-            loadingPresented = true;
-        }
-        ui.end();
-    }
-
-    private void beginUiFrame() {
+    void beginUiFrame() {
         ui.begin(window.framebufferWidth(), window.framebufferHeight(), renderer.settings.uiScale);
         input.setCursorScale(window.cursorToFramebufferScaleX() / ui.uiScale(),
                 window.cursorToFramebufferScaleY() / ui.uiScale());
-    }
-
-    private void beginLoading(LoadRequest request) {
-        loadRequest = request;
-        loadingPresented = false;
-        appState = AppState.LOADING;
-    }
-
-    /** Runs after a loading frame has been swapped, keeping the synchronous work honest. */
-    private void completeLoading() {
-        loadingPresented = false;
-        boolean loaded;
-        if (loadRequest == LoadRequest.LOAD_GAME) {
-            loaded = SaveSystem.load(this);
-        } else {
-            newWorld(sessionSeed, true);
-            loaded = true;
-        }
-        loadRequest = null;
-        if (loaded) {
-            appState = AppState.PLAYING;
-            closeScreens();
-            window.captureCursor(true, input);
-        } else {
-            releaseWorldMeshes();
-            world = null;
-            player = null;
-            titleScreen.notice("No compatible save was found.");
-            appState = AppState.TITLE;
-        }
-    }
-
-    private void handlePauseOptions(GraphicsOptionsScreen.Result result) {
-        if (result.action() == GraphicsOptionsScreen.Action.NONE) {
-            return;
-        }
-        if (result.action() == GraphicsOptionsScreen.Action.APPLY) {
-            applyGraphicsOptions(result);
-        }
-        uiMode = UiMode.PAUSE;
-    }
-
-    void applyGraphicsOptions(GraphicsOptionsScreen.Result result) {
-        renderer.settings.windowWidth = result.width();
-        renderer.settings.windowHeight = result.height();
-        window.setWindowedResolution(result.width(), result.height());
-        window.setFullscreen(renderer.settings.fullscreen);
-        window.setVsync(renderer.settings.vsync);
-        renderer.settings.save();
-    }
-
-    private void returnToTitle() {
-        releaseWorldMeshes();
-        world = null;
-        player = null;
-        particles.count = 0;
-        entities.creatures.clear();
-        entities.npcs.clear();
-        entities.carcasses.clear();
-        entities.tracks.clear();
-        closeScreens();
-        simPaused = false;
-        appState = AppState.TITLE;
-        titleScreen.notice("");
-    }
-
-    private void releaseWorldMeshes() {
-        if (world == null) {
-            return;
-        }
-        for (Chunk c : world.loadedChunks()) {
-            c.deleteMeshes();
-        }
     }
 
     /** Ambient particle and sound emitters driven by world state. */
@@ -946,91 +529,6 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
         sleep.tickSleep(dt);
     }
 
-    private void handleGlobalKeys() {
-        if (uiMode == UiMode.OPTIONS) {
-            return; // GraphicsOptionsScreen owns Escape/F5/navigation while open.
-        }
-        if (uiMode == UiMode.PAUSE && input.wasKeyPressed(GLFW_KEY_O)) {
-            graphicsOptionsScreen.open(renderer.settings,
-                    window.windowedWidth(), window.windowedHeight());
-            uiMode = UiMode.OPTIONS;
-            return;
-        }
-        if (input.wasKeyPressed(GLFW_KEY_ESCAPE)) {
-            if (sleeping) {
-                sleeping = false;
-                log("You wake up early.");
-            } else if (uiMode == UiMode.NONE) {
-                uiMode = UiMode.PAUSE;
-            } else {
-                closeScreens();
-            }
-        }
-        if (sleeping) {
-            return;
-        }
-        if (input.wasKeyPressed(GLFW_KEY_E)) {
-            toggle(UiMode.INVENTORY);
-            inventoryScreen.reset();
-        }
-        if (input.wasKeyPressed(GLFW_KEY_C)) {
-            toggle(UiMode.CRAFTING);
-        }
-        if (input.wasKeyPressed(GLFW_KEY_M)) {
-            toggle(UiMode.MAP);
-        }
-        if (input.wasKeyPressed(GLFW_KEY_TAB)) {
-            simPanelShown = !simPanelShown;
-        }
-        if (input.wasKeyPressed(GLFW_KEY_F3)) {
-            debugShown = !debugShown;
-        }
-        if (input.wasKeyPressed(GLFW_KEY_F2)) {
-            pendingScreenshot = true;
-        }
-        if (input.wasKeyPressed(GLFW_KEY_P)) {
-            simPaused = !simPaused;
-        }
-        if (input.wasKeyPressed(GLFW_KEY_F5)) {
-            if (SaveSystem.save(this)) {
-                log("Game saved.");
-            } else {
-                log("Save FAILED (see console).");
-            }
-        }
-        if (input.wasKeyPressed(GLFW_KEY_F9)) {
-            if (SaveSystem.load(this)) {
-                closeScreens();
-                log("Game loaded.");
-            } else {
-                log("No save found (or load failed).");
-            }
-        }
-        if (uiMode == UiMode.PAUSE && input.wasKeyPressed(GLFW_KEY_Q)) {
-            window.requestClose();
-        }
-        if ((uiMode == UiMode.CRATE || uiMode == UiMode.NPC) && input.wasKeyPressed(GLFW_KEY_F)) {
-            closeScreens();
-        }
-        if (uiMode == UiMode.NONE) {
-            for (int i = 0; i < 9; i++) {
-                if (input.wasKeyPressed(GLFW_KEY_1 + i)) {
-                    player.hotbarSel = i;
-                }
-            }
-            int scroll = (int) input.scrollDelta();
-            if (scroll != 0) {
-                player.hotbarSel = Math.floorMod(player.hotbarSel - scroll, 9);
-            }
-        }
-    }
-
-    private void toggle(UiMode mode) {
-        uiMode = uiMode == mode ? UiMode.NONE : mode;
-        if (uiMode == UiMode.NONE) {
-            closeScreens();
-        }
-    }
 
     public void closeScreens() {
         uiMode = UiMode.NONE;
@@ -1356,63 +854,7 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
         temperature.mediumTick(this, dt);
         water.mediumTick(this, dt);
         fire.mediumTick(this, dt);
-
-        // Shelter, smoke buildup, toxic fog exposure.
-        player.shelter = ShelterSystem.evaluate(world, player.pos.x, player.pos.y, player.pos.z);
-        if (player.shelter.indoor() && player.nearFireHeat(this) > 3) {
-            player.smokeExposure += 9f * dt;
-            if (player.smokeExposure > 30) {
-                particles.smoke(player.pos.x, player.pos.y + 1.9f, player.pos.z, 0.4f);
-            }
-        }
-        Vec3i fumarole = world.nearestBasaltFumarole(
-                player.pos.x, player.pos.y + 0.5f, player.pos.z, 5);
-        if (fumarole != null) {
-            player.smokeExposure += 14f * dt;
-            particles.smoke(fumarole.x() + 0.5f, fumarole.y() + 0.35f,
-                    fumarole.z() + 0.5f, 0.75f);
-        }
-        if (events.toxicFog() && player.exposedToSky && !player.shelter.roofed()) {
-            if (Math.random() < 0.04 && !player.has(Affliction.SICKNESS)) {
-                player.addAffliction(Affliction.SICKNESS, 120);
-                log("The toxic fog claws at your lungs... SICKNESS takes hold.");
-            }
-        }
-
-        // Open flame cooks off adjacent powder kegs.
-        for (Vec3i f : fire.burningCells()) {
-            for (int[] off : new int[][]{{1, 0, 0}, {-1, 0, 0}, {0, 1, 0},
-                    {0, -1, 0}, {0, 0, 1}, {0, 0, -1}}) {
-                Vec3i k = new Vec3i(f.x() + off[0], f.y() + off[1], f.z() + off[2]);
-                if (explosions.tryArmKeg(this, k, 1.5f, false)) {
-                    audio.playFuse(k.x() + 0.5f, k.y() + 0.5f, k.z() + 0.5f);
-                }
-            }
-        }
-
-        // POI discovery.
-        for (Poi poi : world.pois) {
-            if (!poi.discovered
-                    && poi.pos.distSq(player.pos.x, player.pos.y, player.pos.z) < 15 * 15) {
-                poi.discovered = true;
-                world.discoveredPois.add(poi.pos);
-                audio.playDiscover();
-                log("DISCOVERED: " + poi.type.displayName + " (marked on your map)");
-                if (poi.type == Poi.PoiType.PREDATOR_DEN) {
-                    log("Bones and claw marks everywhere... wolves den here.");
-                }
-                faction.onPoiDiscovered(this, poi);
-                if (poi.type == Poi.PoiType.ABANDONED_MINE
-                        || poi.type == Poi.PoiType.SMUGGLER_CACHE
-                        || poi.type == Poi.PoiType.HIDEOUT_CAVE
-                        || poi.type == Poi.PoiType.RESONANT_SHRINE
-                        || poi.type == Poi.PoiType.STALKER_NEST
-                        || poi.type == Poi.PoiType.EXPEDITION_CAMP) {
-                    faction.onCaveExplored(this, poi);
-                }
-            }
-        }
-
+        environment.mediumTick(dt);
         ambience.updateAmbienceMix();
     }
 
@@ -1425,29 +867,7 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
         entities.tickWorldDetritus(this, dt);
         itemConditions.slowTick(this, dt);
         settlementManager.slowTick(this, dt);
-
-        // Clear the camp illness event once everyone has recovered.
-        boolean anySick = false;
-        for (Npc n : entities.npcs) {
-            if (n.sick && !n.dead) {
-                anySick = true;
-                break;
-            }
-        }
-        if (!anySick) {
-            events.onCampCured();
-        }
-
-        // Free GPU meshes for far-away chunks (block data stays loaded).
-        int pcx = Math.floorDiv((int) player.pos.x, 16);
-        int pcz = Math.floorDiv((int) player.pos.z, 16);
-        for (Chunk c : world.loadedChunks()) {
-            if (c.meshOpaque != null
-                    && Math.max(Math.abs(c.cx - pcx), Math.abs(c.cz - pcz)) > renderer.renderRadius() + 3) {
-                c.deleteMeshes();
-                chunkMeshDeletes++;
-            }
-        }
+        environment.slowTick();
     }
 
     @Override
@@ -1457,34 +877,7 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
 
     /** Crafting stations within working distance of the player. */
     public Set<Station> nearbyStations() {
-        EnumSet<Station> found = EnumSet.of(Station.HAND);
-        int px = (int) Math.floor(player.pos.x);
-        int py = (int) Math.floor(player.pos.y);
-        int pz = (int) Math.floor(player.pos.z);
-        for (int dx = -3; dx <= 3; dx++) {
-            for (int dy = -2; dy <= 2; dy++) {
-                for (int dz = -3; dz <= 3; dz++) {
-                    BlockType t = world.getBlock(px + dx, py + dy, pz + dz);
-                    switch (t) {
-                        case WORKBENCH -> found.add(Station.WORKBENCH);
-                        case CAMPFIRE -> {
-                            if (world.campfireFuel.getOrDefault(
-                                    new Vec3i(px + dx, py + dy, pz + dz), 0f) > 0) {
-                                found.add(Station.CAMPFIRE);
-                            }
-                        }
-                        case FURNACE -> found.add(Station.FURNACE);
-                        case ANVIL -> found.add(Station.ANVIL);
-                        case TANNERY -> found.add(Station.TANNERY);
-                        case HERB_STATION -> found.add(Station.HERB_STATION);
-                        case MAP_TABLE -> found.add(Station.MAP_TABLE);
-                        default -> {
-                        }
-                    }
-                }
-            }
-        }
-        return found;
+        return environment.nearbyStations();
     }
 
     public void log(String msg) {

@@ -20,6 +20,12 @@ public final class PlayerConstants {
     // ------------------------------------------------------------------
 
     public static final int INVENTORY_SLOTS = 36;
+    /**
+     * Inventory slots bound to the number keys and the scroll wheel. These are
+     * the first slots of {@link #INVENTORY_SLOTS}, so the hotbar is a view of
+     * the inventory rather than separate storage.
+     */
+    public static final int HOTBAR_SLOTS = 9;
     public static final float BODY_WIDTH = 0.6f;
     public static final float BODY_HEIGHT = 1.8f;
     public static final float MAX_HEALTH = 100f;
@@ -224,6 +230,17 @@ public final class PlayerConstants {
     public static final double INFECTION_FROM_UNCLEAN_WOUND_CHANCE = 0.55;
     public static final float INFECTION_DURATION_MIN = 240f;
     public static final float INFECTION_DURATION_RANGE = 120f;
+
+    /** Per medium tick, while a toxic-fog event has the player out in the open. */
+    public static final double TOXIC_FOG_SICKNESS_CHANCE = 0.04;
+    public static final float TOXIC_FOG_SICKNESS_SECONDS = 120f;
+
+    /**
+     * Salt for the player's affliction generator, so its stream stays
+     * independent of the fifteen simulation generators seeded from the same
+     * world seed in {@code Game.reseedSimulation}.
+     */
+    public static final long AFFLICTION_RNG_SALT = 0x4146464c4354L;
 
     // ------------------------------------------------------------------
     // Smoke

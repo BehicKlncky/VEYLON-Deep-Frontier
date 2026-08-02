@@ -14,7 +14,6 @@ import com.veylon.util.Vec3i;
 import com.veylon.world.BlockType;
 
 import java.util.List;
-import java.util.Random;
 
 /**
  * Behavior for settlement residents and traveling war parties: daily routines
@@ -25,15 +24,9 @@ import java.util.Random;
  */
 public final class SettledNpcAI {
 
-    private static final Random RNG = new Random();
-
     /** Seconds between perception (LOS) evaluations per NPC. */
     public static final float PERCEPTION_INTERVAL = 0.3f;
 
-    /** Re-seeds decision jitter so a fixed world seed replays identically. */
-    public static void reseed(long seed) {
-        RNG.setSeed(seed);
-    }
     /** Seconds between repath attempts. */
     private static final float REPATH_COOLDOWN = 1.6f;
 
@@ -307,7 +300,7 @@ public final class SettledNpcAI {
                 // request or chunk generation is needed to represent it.
                 Steering.stop(n);
             } else {
-                wanderNear(n, (int) n.partyDestination.x, (int) n.partyDestination.z,
+                wanderNear(g, n, (int) n.partyDestination.x, (int) n.partyDestination.z,
                         12, a.speed * 0.75f, dt);
             }
             return true;
@@ -506,8 +499,8 @@ public final class SettledNpcAI {
         }
         // Friendly-fire check along the firing line.
         if (allyInLine(g, n, p.pos.x, p.pos.y + 1.0f, p.pos.z)) {
-            Steering.moveToward(n, n.pos.x + RNG.nextFloat() * 4 - 2,
-                    n.pos.z + RNG.nextFloat() * 4 - 2, a.speed * 0.6f);
+            Steering.moveToward(n, n.pos.x + g.entities.nextSettledNpcAiFloat() * 4 - 2,
+                    n.pos.z + g.entities.nextSettledNpcAiFloat() * 4 - 2, a.speed * 0.6f);
             return;
         }
 
@@ -528,11 +521,13 @@ public final class SettledNpcAI {
             g.particles.muzzleFlash(ox, oy, oz, dx / (float) dist, dy / (float) dist,
                     dz / (float) dist);
             g.noise.emit(g, ox, oy, oz, weapon.noiseRadius, 0.9f, "gunshot", false, n);
-            n.attackCooldown = weapon.attackInterval + 0.4f + RNG.nextFloat() * 0.5f;
+            n.attackCooldown = weapon.attackInterval + 0.4f
+                    + g.entities.nextSettledNpcAiFloat() * 0.5f;
         } else {
             g.audio.playBowRelease(ox, oy, oz);
             g.noise.emit(g, ox, oy, oz, weapon.noiseRadius, 0.3f, "bow", false, n);
-            n.attackCooldown = weapon.drawTime + 0.8f + RNG.nextFloat() * 0.8f;
+            n.attackCooldown = weapon.drawTime + 0.8f
+                    + g.entities.nextSettledNpcAiFloat() * 0.8f;
         }
         if (s != null) {
             s.alertLevel = 100;
@@ -650,7 +645,7 @@ public final class SettledNpcAI {
                 n.dead = true;
                 n.lastHitByPlayer = false;
             }
-            wanderNear(n, (int) n.pos.x, (int) n.pos.z, 8, a.speed * 0.7f, dt);
+            wanderNear(g, n, (int) n.pos.x, (int) n.pos.z, 8, a.speed * 0.7f, dt);
             return;
         }
 
@@ -740,7 +735,8 @@ public final class SettledNpcAI {
         n.state = NpcState.GUARD;
         List<Vec3i> route = s.patrolPoints;
         if (route.isEmpty()) {
-            wanderNear(n, s.center.x(), s.center.z(), s.radius - 2, a.speed * 0.7f, 0);
+            wanderNear(g, n, s.center.x(), s.center.z(), s.radius - 2,
+                    a.speed * 0.7f, 0);
             return;
         }
         if (n.patrolIndex < 0 || n.patrolIndex >= route.size()) {
@@ -815,7 +811,7 @@ public final class SettledNpcAI {
                     }
                 }
             }
-            wanderNear(n, duty.x(), duty.z(), 3, a.speed * 0.5f, dt);
+            wanderNear(g, n, duty.x(), duty.z(), 3, a.speed * 0.5f, dt);
         }
     }
 
@@ -838,11 +834,13 @@ public final class SettledNpcAI {
         return s.center;
     }
 
-    private static void wanderNear(Npc n, int cx, int cz, int radius, float speed, float dt) {
+    private static void wanderNear(Game g, Npc n, int cx, int cz, int radius,
+                                   float speed, float dt) {
         if (!n.hasTarget || n.distSqTo(n.target.x, n.pos.y, n.target.z) < 1.4f) {
-            if (RNG.nextFloat() < 0.02f || !n.hasTarget) {
-                n.target.set(cx + RNG.nextInt(radius * 2 + 1) - radius, n.pos.y,
-                        cz + RNG.nextInt(radius * 2 + 1) - radius);
+            if (g.entities.nextSettledNpcAiFloat() < 0.02f || !n.hasTarget) {
+                n.target.set(cx + g.entities.nextSettledNpcAiInt(radius * 2 + 1) - radius,
+                        n.pos.y,
+                        cz + g.entities.nextSettledNpcAiInt(radius * 2 + 1) - radius);
                 n.hasTarget = true;
             } else {
                 Steering.stop(n);
@@ -882,7 +880,8 @@ public final class SettledNpcAI {
         }
 
         if (n.path == null && n.repathCooldown <= 0) {
-            n.repathCooldown = REPATH_COOLDOWN + RNG.nextFloat() * 0.7f;
+            n.repathCooldown = REPATH_COOLDOWN
+                    + g.entities.nextSettledNpcAiFloat() * 0.7f;
             n.path = Pathfinder.find(g.world,
                     (int) Math.floor(n.pos.x), (int) Math.floor(n.pos.y), (int) Math.floor(n.pos.z),
                     target.x(), target.y(), target.z(), Pathfinder.DEFAULT_BUDGET);

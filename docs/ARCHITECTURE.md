@@ -33,6 +33,11 @@ Main.main
         ├── ui         Hud + one instance per screen, EventLog
         └── collaborators split out of Game (all in com.veylon)
               QaHarness              opt-in benchmark/capture scaffolding
+              AutomatedRunDriver     VEYLON_* sessions and the release smoke gate
+              WorldBootstrap         reset, reseed, construct, spawn, camp
+              FrontendController     title / options / loading, and transitions
+              HotkeyRouter           global keys, screens, quick save/load
+              PlayerEnvironmentSystem shelter, smoke, vents, discovery, stations
               PlayerCombatSystem     melee, bow, firearm, thrown, reload, durability
               PlayerBlockActions     hold-to-mine, break outcomes, placement
               WorldInteractions      F/RMB routing, NPCs, stations, beacon endgame
@@ -46,9 +51,9 @@ Main.main
 Most systems take `Game g` as their first method parameter rather than holding a
 reference. This is a deliberate trade: it keeps every system constructible with
 a no-arg constructor (so tests can build one in isolation), at the cost of
-giving each system reach over the whole object graph. The nine collaborators
-above hold a `Game` field instead, because they are extractions *from* `Game`
-and share its lifetime exactly.
+giving each system reach over the whole object graph. The collaborators above
+hold a `Game` field instead, because they are extractions *from* `Game` and
+share its lifetime exactly.
 
 Each of those keeps its public commands on `Game` as one-line delegates. That
 is not ceremony: native input, the HUD, `EntityManager`, `CrateScreen` and the
@@ -107,8 +112,9 @@ notifications), not for reaching sideways into an unrelated subsystem.
 ### World creation
 
 `newWorld(seed, fresh, generatorVersion)` is the single path that produces a
-playable world, used by New Game, by save loading and by the QA harness. It
-**resets before it constructs**, in this order:
+playable world, used by New Game, by save loading and by the QA harness. The
+rules live in `WorldBootstrap`; `Game.newWorld` is the entry point every caller
+still uses. It **resets before it constructs**, in this order:
 
 1. Release GPU meshes of the outgoing world (`releaseWorldMeshes`).
 2. Reset every cross-world system: scheduler, time, weather, temperature, fire,
@@ -283,13 +289,18 @@ this: append new constants at the end, never reorder or delete. Reordering
 
 ### Where gameplay rules live now
 
-After the 0.4.0 debt work, `Game` is orchestration only — the loop, the app
-state machine, world setup, input routing and tick wiring. It went from 4,381
-lines to 1,462. Every gameplay rule that used to be interleaved with it lives
+`Game` is orchestration only — the loop, the app state machine, world setup,
+input routing and tick wiring. It went from 4,381 lines to 1,462 in 0.4.0, and
+to 886 in 0.5.0. Every gameplay rule that used to be interleaved with it lives
 in a named collaborator:
 
 | Class | Owns |
 |---|---|
+| `WorldBootstrap` | reset, reseed, construct, dry-land spawn, starter camp |
+| `AutomatedRunDriver` | `VEYLON_*` scenes and captures, the smoke script and gate |
+| `FrontendController` | title, graphics options, two-frame loading, return to title |
+| `HotkeyRouter` | global keys: screens, debug toggles, quick save/load, hotbar |
+| `PlayerEnvironmentSystem` | shelter, smoke, fumaroles, POI discovery, station scan, mesh eviction |
 | `PlayerCombatSystem` | all damage the player deals, durability, kill reputation |
 | `PlayerBlockActions` | hold-to-mine, break drops/spill/vandalism, placement |
 | `WorldInteractions` | F and RMB routing, NPC talk/rescue, stations, beacon endgame |
@@ -299,6 +310,13 @@ in a named collaborator:
 | `AmbienceSystem` | ambient particles and the audio mix |
 | `SleepSystem` | sleep eligibility, quality scoring, night effects |
 | `QaHarness` | benchmark scenes, showcases, release smoke gate |
+
+`OrchestratorSizeTest` holds `Game` under 1,000 lines, plus a budget on each of
+the next-largest classes. It drifts in one direction and for one reason: `Game`
+is the only object that can reach everything, so a feature spanning two systems
+is always easiest to write inline in a tick, and each one is individually small.
+The fix when it fails is to extract, keeping the public command on `Game` as a
+one-line delegate — not to raise the ceiling.
 
 Tuning values live in `PlayerConstants` plus one constants class per
 simulation system — `TimeConstants`, `TemperatureConstants`, `WaterConstants`,

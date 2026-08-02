@@ -4,7 +4,7 @@ plugins {
 }
 
 group = 'com.veylon'
-version = '0.4.1'
+version = '0.5.0'
 
 def osName = System.getProperty('os.name').toLowerCase(java.util.Locale.ROOT)
 def osArch = System.getProperty('os.arch').toLowerCase(java.util.Locale.ROOT)
@@ -80,8 +80,24 @@ application {
     applicationDefaultJvmArgs = launcherJvmArgs
 }
 
+tasks.named('wrapper', Wrapper) {
+    gradleVersion = '9.1.0'
+    distributionType = Wrapper.DistributionType.BIN
+    distributionSha256Sum = 'a17ddd85a26b6a7f5ddb71ff8b05fc5104c0202c6e64782429790c933686c806'
+}
+
 tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8'
+}
+
+tasks.withType(Javadoc).configureEach {
+    options.encoding = 'UTF-8'
+    options.charSet = 'UTF-8'
+    options.docEncoding = 'UTF-8'
+    // Internal game APIs are not a published library surface. Keep doclint's
+    // structural/HTML/link checks strict without turning missing prose on every
+    // public member into a hundred-line warning stream.
+    options.addBooleanOption('Xdoclint:all,-missing', true)
 }
 
 tasks.withType(Test).configureEach {
@@ -97,6 +113,13 @@ tasks.named('test', Test) {
     }
 }
 
+// Broken API documentation is a source-quality failure, so the ordinary
+// verification lifecycle must exercise doclint instead of leaving javadoc as
+// an optional task that release packaging never sees.
+tasks.named('check') {
+    dependsOn tasks.named('javadoc')
+}
+
 tasks.register('performanceTest', Test) {
     group = 'verification'
     description = 'Runs the hardware-calibrated simulation and save/load benchmarks.'
@@ -105,6 +128,11 @@ tasks.register('performanceTest', Test) {
     outputs.upToDateWhen { false }
     useJUnitPlatform {
         includeTags 'performance'
+    }
+    // The measured figures are the point of this task, so print them rather
+    // than making every run pass --info to see whether a budget was close.
+    testLogging {
+        showStandardStreams = true
     }
     shouldRunAfter tasks.named('test')
 }

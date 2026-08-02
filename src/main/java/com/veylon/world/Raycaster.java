@@ -2,7 +2,7 @@ package com.veylon.world;
 
 import org.joml.Vector3f;
 
-/** Voxel DDA raycast (Amanatides & Woo). */
+/** Voxel DDA raycast (Amanatides &amp; Woo). */
 public final class Raycaster {
 
     /** Read-only view shared by immutable and caller-owned raycast results. */

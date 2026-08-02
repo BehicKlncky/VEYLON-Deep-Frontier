@@ -4,6 +4,8 @@ import com.veylon.entity.Affliction;
 import com.veylon.entity.Creature;
 import com.veylon.simulation.ShelterSystem;
 
+import java.util.Random;
+
 /**
  * Sleeping: whether the player may, how restful it is, and what wakes them.
  *
@@ -65,8 +67,14 @@ final class SleepSystem {
     private static final float SICKNESS_SECONDS = 150f;
 
     private final Game game;
+    /** The wake-up sickness roll; reseeded per world by {@code Game.reseedSimulation}. */
+    private final Random rng = new Random();
     private float sleepQuality;
     private float sleptMinutes;
+
+    void setRandomSeed(long seed) {
+        rng.setSeed(seed);
+    }
 
     SleepSystem(Game game) {
         this.game = game;
@@ -153,7 +161,7 @@ final class SleepSystem {
         }
         game.log("You wake after " + (int) (sleptMinutes / 60f * 10) / 10f + " hours. Fatigue "
                 + (int) game.player.fatigue + ".");
-        if (sleepQuality < MISERABLE_QUALITY && Math.random() < POOR_SLEEP_SICKNESS_CHANCE) {
+        if (sleepQuality < MISERABLE_QUALITY && rng.nextFloat() < POOR_SLEEP_SICKNESS_CHANCE) {
             game.player.addAffliction(Affliction.SICKNESS, SICKNESS_SECONDS);
             game.log("That miserable night left you SICK. Sleep warm, dry and sheltered.");
         }

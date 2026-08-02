@@ -26,6 +26,9 @@ public class EntityManager {
     /** Footprints and blood marks, oldest first. */
     public final ArrayDeque<Track> tracks = new ArrayDeque<>();
     private final Random rng = new Random();
+    private final Random creatureAiRng = new Random();
+    private final Random npcAiRng = new Random();
+    private final Random settledNpcAiRng = new Random();
 
     public void fastTick(Game g, float dt) {
         for (Iterator<Creature> it = creatures.iterator(); it.hasNext(); ) {
@@ -372,6 +375,41 @@ public class EntityManager {
 
     public void setRandomSeed(long seed) {
         rng.setSeed(seed);
+    }
+
+    /** Seeds the three independent AI decision streams for this game instance. */
+    public void setAiRandomSeed(long worldSeed) {
+        creatureAiRng.setSeed(worldSeed ^ 0x435245415455L);
+        npcAiRng.setSeed(worldSeed ^ 0x4c454741434eL);
+        settledNpcAiRng.setSeed(worldSeed ^ 0x5345544e5043L);
+    }
+
+    public float nextCreatureAiFloat() {
+        return creatureAiRng.nextFloat();
+    }
+
+    public int nextCreatureAiInt(int bound) {
+        return creatureAiRng.nextInt(bound);
+    }
+
+    public float nextNpcAiFloat() {
+        return npcAiRng.nextFloat();
+    }
+
+    public double nextNpcAiDouble() {
+        return npcAiRng.nextDouble();
+    }
+
+    public int nextNpcAiInt(int bound) {
+        return npcAiRng.nextInt(bound);
+    }
+
+    public float nextSettledNpcAiFloat() {
+        return settledNpcAiRng.nextFloat();
+    }
+
+    public int nextSettledNpcAiInt(int bound) {
+        return settledNpcAiRng.nextInt(bound);
     }
 
     private void trySpawn(Game g, Creature.CreatureType type, float px, float pz) {
