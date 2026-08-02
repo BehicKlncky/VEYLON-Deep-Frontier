@@ -136,7 +136,27 @@ Two commits were pushed to `session/003-pr-ci` in quick succession while PR #1 w
 
 Run [`30744839169`](https://github.com/BehicKlncky/VEYLON-Deep-Frontier/actions/runs/30744839169) (head `0f904e3`) was still running when commit `9f6d354` was pushed to the same PR. Its conclusion is **`cancelled`** — superseded, not failed.
 
-Both runs shared concurrency group `PR check-refs/pull/1/merge`, so the older was cancelled by the newer push, which is exactly what `cancel-in-progress: ${{ github.event_name == 'pull_request' }}` is for. `push`-to-`main` runs are excluded by that expression and so each keeps its own recorded result. Later doc-only commits on this branch produce ordinary runs; PR #1's current check conclusion is on the Actions tab and in the PR thread.
+Both runs shared concurrency group `PR check-refs/pull/1/merge`, so the older was cancelled by the newer push, which is exactly what `cancel-in-progress: ${{ github.event_name == 'pull_request' }}` is for. `push`-to-`main` runs are excluded by that expression and so each keeps its own recorded result. A second cancellation was observed the same way on run `30744860266`.
+
+### Dependency caching — verified on a warm run
+Run [`30744899525`](https://github.com/BehicKlncky/VEYLON-Deep-Frontier/actions/runs/30744899525):
+
+```
+Cache hit for: setup-java-Linux-x64-gradle-32adc8d9…   Cache Size: ~6 MB
+Cache hit for: setup-java-Linux-x64-gradle-wrapper-261d031d…   Cache Size: ~128 MB
+Cache restored successfully
+```
+
+The 128 MB entry is the Gradle 9.1.0 distribution, so a warm run skips the `Downloading https://services.gradle.org/distributions/gradle-9.1.0-bin.zip` step the cold run performed. `BUILD SUCCESSFUL in 2m 33s`, job wall time 2m42s versus 3m04s cold.
+
+### Run summary
+| Run | Head | Event | Conclusion | Meaning |
+|---|---|---|---|---|
+| [`30744535202`](https://github.com/BehicKlncky/VEYLON-Deep-Frontier/actions/runs/30744535202) | `4d5b7f6` | `pull_request` | **success** | The green proof — cold cache, 2m47s |
+| [`30744579511`](https://github.com/BehicKlncky/VEYLON-Deep-Frontier/actions/runs/30744579511) | `4b0d184` | `pull_request` | **failure** | The red proof — deliberate test failure, artifact uploaded |
+| [`30744839169`](https://github.com/BehicKlncky/VEYLON-Deep-Frontier/actions/runs/30744839169) | `0f904e3` | `pull_request` | **cancelled** | Concurrency proof |
+| [`30744860266`](https://github.com/BehicKlncky/VEYLON-Deep-Frontier/actions/runs/30744860266) | `9f6d354` | `pull_request` | **cancelled** | Concurrency proof, second occurrence |
+| [`30744899525`](https://github.com/BehicKlncky/VEYLON-Deep-Frontier/actions/runs/30744899525) | `6eb9146` | `pull_request` | **success** | Warm-cache green run |
 
 ### Performance / GL / packaging — NOT RUN
 Out of scope. No production code, benchmark, budget, renderer path or packaging task was touched by this session's commit. SESSION-001's figures remain the reference.
