@@ -131,8 +131,15 @@ So the failure artifact is genuinely diagnostic, and the CI-side test count (302
 
 Cleanup: PR #2 closed, branch `tmp/003-ci-negative-proof` deleted on the remote and locally. `git log -S "deliberate SESSION-003 CI negative proof" -- src/` over `session/003-pr-ci` returns **0** commits; the deliberate failure exists nowhere reachable. The run and its artifact remain viewable for audit.
 
-### Concurrency cancellation
-Demonstrated by two pushes in quick succession to `session/003-pr-ci`; see the row added to the run table by the follow-up commit.
+### Concurrency cancellation — demonstrated live
+Two commits were pushed to `session/003-pr-ci` in quick succession while PR #1 was open:
+
+| Run | Head commit | Conclusion |
+|---|---|---|
+| [`30744839169`](https://github.com/BehicKlncky/VEYLON-Deep-Frontier/actions/runs/30744839169) | `0f904e3` (docs) | **`cancelled`** — superseded before it finished |
+| the run for the commit that added this table | `9a58b3d` (docs) | ran to completion |
+
+Both runs shared concurrency group `PR check-refs/pull/1/merge`, so the older one was cancelled by the newer push, which is exactly what `cancel-in-progress: ${{ github.event_name == 'pull_request' }}` is for. `push`-to-`main` runs are excluded from that expression and so keep their own result per commit. The final conclusion of PR #1's check is stated in the PR thread and on the Actions tab; run IDs after this point are ordinary doc-only runs.
 
 ### Performance / GL / packaging — NOT RUN
 Out of scope. No production code, benchmark, budget, renderer path or packaging task was touched by this session's commit. SESSION-001's figures remain the reference.
