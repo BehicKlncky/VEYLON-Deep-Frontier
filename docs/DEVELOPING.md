@@ -39,6 +39,20 @@ classifier mapping, the natives actually on the resolved runtime classpath, and
 the fact that every distribution-group task is behind that gate. A new packaging
 task that skips the gate fails the build.
 
+### Continuous integration
+
+[`pr-check.yml`](../.github/workflows/pr-check.yml) runs `./gradlew clean check`
+on `ubuntu-latest` with JDK 25 for every pull request against `main` and every
+push to `main`. It is the same command as above, so a failure there reproduces
+locally with no CI-specific setup. The job validates the Gradle wrapper, holds a
+read-only token, cancels superseded pull-request runs, and on failure uploads the
+HTML and JUnit XML test reports as the `portable-check-reports` artifact.
+
+The status check is named **`Portable check`**; that is the string to list under
+branch protection for `main`. [`release-build.yml`](../.github/workflows/release-build.yml)
+is separate and still runs only on `v*` tags and manual dispatch — packaging, GL
+and performance gates are not part of the pull-request check.
+
 ### Running a single test
 
 ```bash

@@ -1,0 +1,83 @@
+name: PR check
+
+# Release packaging only runs on tags, so without this workflow a regression
+# can merge and stay merged until someone cuts a release. This is the portable
+# half of verification: it runs anywhere, needs no window, and is the gate that
+# every change has to clear before it reaches main.
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+
+# Nothing here reads or writes repository state, so the job token stays
+# read-only. This workflow uses the `pull_request` event, never
+# `pull_request_target`, so a fork's code is checked out with a read-only token
+# and no access to repository secrets.
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  # Superseded pull-request pushes are wasted minutes, but every commit that
+  # lands on main keeps its own recorded result.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  portable-check:
+    name: Portable check
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v6
+        with:
+          # No step pushes, tags, or calls the API, so the checkout credential
+          # is not needed and is not left in .git/config for later steps.
+          persist-credentials: false
+
+      - name: Validate Gradle wrapper
+        uses: gradle/actions/wrapper-validation@v6
+
+      - name: Verify wrapper distribution is pinned
+        shell: bash
+        run: |
+          set -euo pipefail
+          properties=gradle/wrapper/gradle-wrapper.properties
+          # Wrapper validation above covers the checked-in JAR. This covers the
+          # other half: the distribution the JAR downloads must stay pinned to a
+          # checksum, and the URL check must stay on.
+          grep -Eq '^distributionSha256Sum=[0-9a-f]{64}$' "$properties"
+          grep -Eq '^validateDistributionUrl=true$' "$properties"
+
+      - name: Set up JDK 25
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "25"
+          cache: gradle
+
+      - name: Run portable verification
+        shell: bash
+        # `check` and not `build`: the application plugin puts distZip/distTar
+        # in `assemble`, and packaging is gated off on Linux by design. `check`
+        # is compile + the deterministic test suite + doclint +
+        # verifyPlatformContract.
+        run: ./gradlew clean check --no-daemon --console=plain
+
+      - name: Upload failure reports
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: portable-check-reports
+          # A failure that never reached the test task leaves some of these
+          # empty, hence if-no-files-found: ignore.
+          path: |
+            build/reports/tests/test/**
+            build/test-results/test/**
+            build/reports/problems/**
+          if-no-files-found: ignore
+          retention-days: 7
