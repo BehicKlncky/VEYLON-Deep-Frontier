@@ -2,6 +2,19 @@
 
 All notable user-facing changes to VEYLON: Deep Frontier are recorded here.
 
+## [0.5.1] - 2026-09-09
+
+### Fixed
+
+- Sounds now retain headroom instead of flattening loud peaks, with softened
+  boundaries and removed DC offset to reduce clicks.
+
+### Quality
+
+- All 48 procedural sounds can be tested without an audio device. The new
+  harness checks durations, amplitude, seams, spectra and silent playback.
+- Recorded the original audio measurements and the Signal & Silence upgrade plan.
+
 ## [0.5.0] - 2026-07-31
 
 A stability and technical-baseline release. No new content; existing saves and

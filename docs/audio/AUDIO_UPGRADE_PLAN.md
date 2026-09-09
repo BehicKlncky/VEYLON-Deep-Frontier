@@ -43,7 +43,7 @@ settlement 0.013/0.52 ms, save 1.469/2.20 ms, load 198.662/240 ms
 
 | Tag | Phase | Dependency | Definition of done | Status |
 | --- | --- | --- | --- | --- |
-| v0.5.1 | Characterize, isolate DSP, guard PCM | baseline | Headless signal checks, negative fixtures, recorded baseline | in progress |
+| v0.5.1 | Characterize, isolate DSP, guard PCM | baseline | Headless signal checks, negative fixtures, recorded baseline | automated checks passed; build gate below |
 | v0.5.2 | 44.1 kHz | 1 | Hz-preserving filters, duration/spectral tests, timing and bytes | pending |
 | v0.5.3 | Layered ambience | 2 | Continuous beds, runtime events/gusts, intensity changes spectrum | pending |
 | v0.5.4 | Spatial ambience | 3 | Decorrelated weather, positioned fire, smooth gains | pending |
@@ -71,3 +71,15 @@ are testable without native initialization. Presentation RNG never enters
 reset with the world; no save-format change. Retain dry playback without EFX.
 
 Document final measured limits, rather than predicting startup or frame costs.
+
+### v0.5.1 evidence
+
+Characterization committed in `debe250` before conditioning. The focused suite
+contains 57 audio cases (including 48 dynamic buffer checks); doclint passes.
+The earlier full extraction build passed in 1m 33s. Final milestone build runs
+after the 0.5.1 version and version assertion change. Original recipe defects
+remain in the historical record; runtime PCM now has zero endpoints and DC
+below 0.00001 with a 0.88 peak ceiling. Internal repeating ambience events are
+addressed in phase 3, after the rate migration.
+
+Final v0.5.1 build: PASS, 359 tests / 63 classes, zero failures; 1m 33s.
