@@ -39,6 +39,37 @@ class AudioCharacterizationTest {
                 "Characterizes the existing upload clipping defect before repairing it");
     }
 
+    @Test void everyBufferRetainsItsDeclaredDuration() {
+        float[] seconds = {0.10f, 0.07f, 0.08f, 0.13f, 0.16f, 0.06f, 0.05f, 0.06f,
+                0.22f, 0.09f, 0.035f, 0.5f, 0.6f, 0.5f, 0.09f, 0.22f, 0.18f, 0.12f,
+                0.14f, 0.2f, 0.35f, 1.46f, 1.54f, 1.4f, 2.4f, 1.9f, 0.9f, 0.45f,
+                0.5f, 0.7f, 0.45f, 0.28f, 0.05f, 0.04f, 1.15f, 0.7f, 0.16f, 0.9f,
+                1.2f, 2.2f, 1.6f, 0.7f, 2.5f, 4f, 3f, 4f, 2f, 2f};
+        int index = 0;
+        for (var entry : baseline().entrySet()) {
+            assertTrue(Math.abs(entry.getValue().length - (int) (seconds[index++] * ProceduralAudio.RATE)) <= 1,
+                    entry.getKey() + " duration changed");
+        }
+        assertEquals(seconds.length, index);
+    }
+
+    @Test void disabledManagerPublicPlaybackNeverTouchesNativeAudio() throws Exception {
+        AudioManager audio = new AudioManager();
+        for (var method : AudioManager.class.getMethods()) {
+            if (!method.getName().startsWith("play")) continue;
+            Object[] args = new Object[method.getParameterCount()];
+            Class<?>[] types = method.getParameterTypes();
+            for (int i = 0; i < args.length; i++) {
+                args[i] = types[i] == float.class ? 0f : types[i] == boolean.class ? false : null;
+            }
+            method.invoke(audio, args);
+        }
+        audio.setAmbience(1, 1, 1, 1, 1, 1);
+        audio.setListener(0, 0, 0, 0);
+        audio.update(1);
+        audio.shutdown();
+    }
+
     @Test void spectralHelperLocatesAKnownTone() {
         float[] tone = new float[22050];
         for (int i = 0; i < tone.length; i++) tone[i] = (float) Math.sin(2 * Math.PI * 1000 * i / 22050);

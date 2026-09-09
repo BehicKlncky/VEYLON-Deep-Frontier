@@ -133,6 +133,7 @@ public class AudioManager {
      */
     public void setAmbience(float rain, float wind, float fire, float cave,
                             float crickets, float beacon) {
+        if (!enabled) return;
         ambTarget[0] = rain;
         ambTarget[1] = wind;
         ambTarget[2] = fire;
@@ -158,6 +159,7 @@ public class AudioManager {
     }
 
     public void playFootstep(BlockType under, boolean inWater) {
+        if (!enabled) return;
         if (inWater) {
             play2d(bFootWater, 0.4f, pitchVar(0.2f));
             return;
@@ -173,6 +175,7 @@ public class AudioManager {
     }
 
     public void playBlockHit(BlockType t, float x, float y, float z) {
+        if (!enabled) return;
         int buf = switch (t.preferredTool) {
             case PICKAXE -> bHitStone;
             case AXE -> bHitWood;
@@ -182,137 +185,170 @@ public class AudioManager {
     }
 
     public void playBlockBreak(float x, float y, float z) {
+        if (!enabled) return;
         playAt(bBreak, x, y, z, 0.7f, pitchVar(0.15f));
     }
 
     public void playBlockPlace(float x, float y, float z) {
+        if (!enabled) return;
         playAt(bPlace, x, y, z, 0.6f, pitchVar(0.15f));
     }
 
     public void playClick() {
+        if (!enabled) return;
         play2d(bClick, 0.5f, 1f);
     }
 
     public void playEat() {
+        if (!enabled) return;
         play2d(bEat, 0.6f, pitchVar(0.1f));
     }
 
     public void playDrink() {
+        if (!enabled) return;
         play2d(bDrink, 0.6f, pitchVar(0.1f));
     }
 
     public void playBoil() {
+        if (!enabled) return;
         play2d(bBoil, 0.55f, 1f);
     }
 
     public void playHit() {
+        if (!enabled) return;
         play2d(bHit, 0.7f, pitchVar(0.15f));
     }
 
     public void playHurt() {
+        if (!enabled) return;
         play2d(bHurt, 0.65f, pitchVar(0.12f));
     }
 
     public void playSwing() {
+        if (!enabled) return;
         play2d(bSwing, 0.35f, pitchVar(0.2f));
     }
 
     public void playCraft() {
+        if (!enabled) return;
         play2d(bCraft, 0.6f, 1f);
     }
 
     public void playEquip() {
+        if (!enabled) return;
         play2d(bEquip, 0.6f, 1f);
     }
 
     public void playToolBreak() {
+        if (!enabled) return;
         play2d(bToolBreak, 0.8f, 1f);
     }
 
     public void playCough() {
+        if (!enabled) return;
         play2d(bCough, 0.6f, pitchVar(0.1f));
     }
 
     public void playSleep() {
+        if (!enabled) return;
         play2d(bSleep, 0.5f, 1f);
     }
 
     public void playDiscover() {
+        if (!enabled) return;
         play2d(bDiscover, 0.7f, 1f);
     }
 
     public void playQuest() {
+        if (!enabled) return;
         play2d(bQuest, 0.7f, 1f);
     }
 
     public void playThunder() {
+        if (!enabled) return;
         play2d(bThunder, 0.9f, pitchVar(0.2f));
     }
 
     public void playHowl(float x, float y, float z) {
+        if (!enabled) return;
         playAt(bHowl, x, y, z, 0.85f, pitchVar(0.1f));
     }
 
     public void playGrowl(float x, float y, float z) {
+        if (!enabled) return;
         playAt(bGrowl, x, y, z, 0.7f, pitchVar(0.15f));
     }
 
     public void playChirp(float x, float y, float z) {
+        if (!enabled) return;
         playAt(bChirp, x, y, z, 0.45f, pitchVar(0.25f));
     }
 
     public void playBirdFlap(float x, float y, float z) {
+        if (!enabled) return;
         playAt(bFlap, x, y, z, 0.45f, pitchVar(0.2f));
     }
 
     public void playDeerCall(float x, float y, float z) {
+        if (!enabled) return;
         playAt(bDeer, x, y, z, 0.6f, pitchVar(0.1f));
     }
 
     // ---- 0.3.0 combat & settlement one-shots ----
 
     public void playBowDraw() {
+        if (!enabled) return;
         play2d(bBowDraw, 0.45f, pitchVar(0.1f));
     }
 
     public void playBowRelease(float x, float y, float z) {
+        if (!enabled) return;
         playAt(bBowRelease, x, y, z, 0.55f, pitchVar(0.12f));
     }
 
     public void playArrowImpact(float x, float y, float z) {
+        if (!enabled) return;
         playAt(bArrowImpact, x, y, z, 0.5f, pitchVar(0.2f));
     }
 
     public void playBulletImpact(float x, float y, float z) {
+        if (!enabled) return;
         playAt(bBulletImpact, x, y, z, 0.5f, pitchVar(0.2f));
     }
 
     /** Gunshots carry much farther than ordinary sounds. */
     public void playGunshot(boolean pistol, float x, float y, float z) {
+        if (!enabled) return;
         playAtFar(pistol ? bPistol : bMusket, x, y, z, 0.95f, pitchVar(0.08f));
     }
 
     public void playDryFire() {
+        if (!enabled) return;
         play2d(bDryFire, 0.5f, pitchVar(0.1f));
     }
 
     public void playReload() {
+        if (!enabled) return;
         play2d(bReload, 0.55f, pitchVar(0.08f));
     }
 
     public void playFuse(float x, float y, float z) {
+        if (!enabled) return;
         playAt(bFuse, x, y, z, 0.6f, pitchVar(0.1f));
     }
 
     public void playExplosion(float x, float y, float z) {
+        if (!enabled) return;
         playAtFar(bExplosion, x, y, z, 1.0f, pitchVar(0.1f));
     }
 
     public void playAlarmBell(float x, float y, float z) {
+        if (!enabled) return;
         playAtFar(bAlarmBell, x, y, z, 0.85f, pitchVar(0.05f));
     }
 
     public void playGate(float x, float y, float z) {
+        if (!enabled) return;
         playAt(bGate, x, y, z, 0.6f, pitchVar(0.12f));
     }
 
@@ -449,6 +485,7 @@ public class AudioManager {
     }
 
     private int upload(float[] samples) {
+        PcmAudio.prepare(samples);
         ShortBuffer buf = BufferUtils.createShortBuffer(samples.length);
         for (float sample : samples) {
             buf.put(PcmAudio.encode(sample));
