@@ -31,10 +31,15 @@ final class AmbienceBeds {
 
     static void synthesize(Random rng, BiConsumer<String, float[]> sink) {
         for (Bed bed : Bed.values()) sink.accept(bed.name(), texture(bed, rng));
+        for (Bed bed : new Bed[]{Bed.Rain, Bed.Wind, Bed.RainHigh, Bed.WindHigh}) {
+            sink.accept(bed.name() + "Left", texture(bed, rng));
+            sink.accept(bed.name() + "Right", texture(bed, rng));
+        }
         for (int i = 0; i < EVENT_NAMES.length; i++) sink.accept(EVENT_NAMES[i], event(i, rng));
     }
 
     static float seconds(String name) {
+        name = name.replace("Left", "").replace("Right", "");
         for (Bed bed : Bed.values()) if (bed.name().equals(name)) return bed.seconds;
         return 0;
     }

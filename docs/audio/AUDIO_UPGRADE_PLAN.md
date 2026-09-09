@@ -46,7 +46,7 @@ settlement 0.013/0.52 ms, save 1.469/2.20 ms, load 198.662/240 ms
 | v0.5.1 | Characterize, isolate DSP, guard PCM | baseline | Headless signal checks, negative fixtures, recorded baseline | automated checks passed; build gate below |
 | v0.5.2 | 44.1 kHz | 1 | Hz-preserving filters, duration/spectral tests, timing and bytes | verified |
 | v0.5.3 | Layered ambience | 2 | Continuous beds, runtime events/gusts, intensity changes spectrum | automated checks verified |
-| v0.5.4 | Spatial ambience | 3 | Decorrelated weather, positioned fire, smooth gains | pending |
+| v0.5.4 | Spatial ambience | 3 | Decorrelated weather, positioned fire, smooth gains | automated checks verified |
 | v0.5.5 | Environment reverb | 4 | Six interpolated presets, detected EFX, dry fallback | pending |
 | v0.5.6 | Occlusion | 5 | Fixed query/update caps, low-pass and air absorption | pending |
 | v0.5.7 | Variants | 6 | Four distinct takes of repeated sounds, non-repeating selection | pending |
@@ -120,3 +120,21 @@ presentation state. Spectral and scheduling tests plus doclint pass. A human
 is inferred from the deterministic schedule.
 
 Final v0.5.3 build: PASS, 374 tests / 65 classes, zero failures; 1m 35s.
+
+### v0.5.4 evidence
+
+`SpatialAmbience.EMITTERS` fixes 16 looping sources. Each weather layer has
+three independent buffers at front/left/right, allocated 1/sqrt(3) gain each;
+correlation tests measure absolute correlation below 0.02. Fire is world-relative
+and both its bed and pops use the nearest audible position. `FireAudioLocator`
+checks at most 2,197 local cell candidates plus 220 burning cells, only when
+audio is enabled and the existing heat gain is audible. It does not generate
+chunks or scan the save-wide campfire map. Tests cover nearest selection,
+positive fuel, negative coordinates, range and unchanged loaded-chunk counts.
+
+62 buffers: 33,412,978 PCM bytes. Warmed synthesis/conditioning/conversion:
+255.480 ms / 1,500 ms; memory remains below 64 MiB. Existing exponential gain
+crossfades apply to all emitters. Spatial listening and source-transition taste
+remain unverified until a real listener pass.
+
+Final v0.5.4 build: PASS, 387 tests / 67 classes, zero failures; 1m 35s.

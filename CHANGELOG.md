@@ -2,6 +2,12 @@
 
 All notable user-facing changes to VEYLON: Deep Frontier are recorded here.
 
+## [0.5.4] - 2026-09-09
+
+### Changed
+
+- Weather surrounds the listener with independent directions, and nearby fueled fires now crackle from their world position.
+
 ## [0.5.3] - 2026-09-09
 
 ### Changed
