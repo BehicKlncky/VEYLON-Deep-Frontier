@@ -50,6 +50,9 @@ public class AudioManager {
     private static final float[] AMBIENCE_LEVELS = {0.65f, 0.5f, 0.55f, 0.4f, 0.3f, 0.35f};
     private final float[] listenerOrientation = new float[6];
 
+    private long pcmBytes;
+    private double synthesisMs;
+
     private int[] pool;
     private int poolNext;
 
@@ -432,6 +435,8 @@ public class AudioManager {
     // ------------------------------------------------------------------
 
     private void synthesizeAll() {
+        long start = System.nanoTime();
+        pcmBytes = 0;
         java.util.Map<String, Integer> bank = new java.util.HashMap<>();
         new ProceduralAudio(rng).synthesize((name, samples) -> bank.put(name, upload(samples)));
         bFootGrass = bank.get("FootGrass");
@@ -482,10 +487,14 @@ public class AudioManager {
         bCave = bank.get("Cave");
         bCrickets = bank.get("Crickets");
         bBeacon = bank.get("Beacon");
+        synthesisMs = (System.nanoTime() - start) / 1e6;
+        System.out.printf("[audio] rate=%d buffers=%d pcmBytes=%d synthesisAndUploadMs=%.3f%n",
+                ProceduralAudio.RATE, bank.size(), pcmBytes, synthesisMs);
     }
 
     private int upload(float[] samples) {
         PcmAudio.prepare(samples);
+        pcmBytes += samples.length * 2L;
         ShortBuffer buf = BufferUtils.createShortBuffer(samples.length);
         for (float sample : samples) {
             buf.put(PcmAudio.encode(sample));

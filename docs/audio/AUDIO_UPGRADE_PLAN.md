@@ -44,7 +44,7 @@ settlement 0.013/0.52 ms, save 1.469/2.20 ms, load 198.662/240 ms
 | Tag | Phase | Dependency | Definition of done | Status |
 | --- | --- | --- | --- | --- |
 | v0.5.1 | Characterize, isolate DSP, guard PCM | baseline | Headless signal checks, negative fixtures, recorded baseline | automated checks passed; build gate below |
-| v0.5.2 | 44.1 kHz | 1 | Hz-preserving filters, duration/spectral tests, timing and bytes | pending |
+| v0.5.2 | 44.1 kHz | 1 | Hz-preserving filters, duration/spectral tests, timing and bytes | verified |
 | v0.5.3 | Layered ambience | 2 | Continuous beds, runtime events/gusts, intensity changes spectrum | pending |
 | v0.5.4 | Spatial ambience | 3 | Decorrelated weather, positioned fire, smooth gains | pending |
 | v0.5.5 | Environment reverb | 4 | Six interpolated presets, detected EFX, dry fallback | pending |
@@ -83,3 +83,22 @@ below 0.00001 with a 0.88 peak ceiling. Internal repeating ambience events are
 addressed in phase 3, after the rate migration.
 
 Final v0.5.1 build: PASS, 359 tests / 63 classes, zero failures; 1m 33s.
+
+### v0.5.2 evidence
+
+`AudioFilters` names 24 migrated cutoffs in Hz. All constant one-poles,
+variable stave/swish poles, event probabilities, fade lengths and gulp modulation
+were audited. Matched-pole conversion preserves time constants; it does not claim
+an exact analog -3 dB point near Nyquist. A 1 kHz response test measures within
+0.01 linear amplitude of half power at both rates. Chirp phase now integrates
+frequency; its 2.4–4.2 kHz band dominates low and near-Nyquist probes by over 100x.
+
+The catalog is 1,858,153 samples / 3,716,306 PCM bytes / 7,432,612 equivalent
+float bytes. Raw synthesis invocation: 62.879 ms (baseline invocation 62.148 ms;
+these are cold observations, not a performance improvement). Warmed synthesis,
+conditioning and PCM conversion: 51.066 ms, budget 1,500 ms. PCM budget: 64 MiB,
+chosen ahead of the long beds, decorrelation, variants and music additions.
+Actual native startup separately logs synthesisAndUploadMs. Listening equivalence
+remains unverified until a device/listener pass.
+
+Final v0.5.2 build: PASS, 363 tests / 64 classes, zero failures; 1m 34s.

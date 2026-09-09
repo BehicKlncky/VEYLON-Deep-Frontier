@@ -1,0 +1,68 @@
+# Signal & Silence — sonic direction
+
+Veylon should sound inhabited before it sounds scored. The player needs to hear
+footing, weather, nearby fire and approaching danger. Music is an occasional
+response to a situation; long gaps are part of its arrangement. Every waveform
+is original project DSP. No recordings, sound fonts or decoding libraries.
+
+## Situations and biomes
+
+| Place / situation | Direction |
+| --- | --- |
+| Meadow | Broad rain when exposed; separate, irregular insect calls after dark; restrained open-air reflections |
+| Pine forest | More absorbed high-frequency reflections and a shorter diffuse tail than stone spaces |
+| Marsh | Rain detail and night insects establish wetness; avoid another permanent tonal drone |
+| Rocky highlands | Air movement has a midrange body and upper hiss; gust changes are independent of loop periods |
+| Cold ridge | Wind carries the scene; snow does not reuse liquid-rain transients |
+| Scrubland | Open, quiet space between events; do not add meadow crickets indiscriminately |
+| Shallow underground | Low ventilation bed, isolated drips and a modest stone decay |
+| Deep caves | Longer dark reverb and sparse low, unresolved musical intervals; world events remain readable |
+| Shelter | Rain loses direct brightness while the enclosure contributes reflections; fire has a physical position |
+| Fortress / ruin | Stone reflections distinguish enclosed scale from open terrain |
+| Threat | Reports, impacts and warning calls lead; the music response remains below those cues |
+| First night | A brief vulnerable phrase, once per world session when the first night is encountered |
+| Repaired beacon | A restrained consonant signal phrase responds to proximity; the audible beacon retains its own identity |
+
+This table records intent, not listening approval. Each implemented phase and
+its available evidence is recorded in [AUDIO_UPGRADE_PLAN.md](AUDIO_UPGRADE_PLAN.md).
+
+## Mix hierarchy and targets
+
+1. Immediate danger, damage and important interface feedback.
+2. Local physical action: weapons, impacts, footing and positioned fire.
+3. Environmental beds and sparse environmental details.
+4. Music, with silence between phrases.
+
+Individual prepared buffers have absolute mean below 0.00001, peak at most
+0.88 full scale, and RMS between 0.001 and 0.5. These are linear PCM engineering
+guards, not LUFS mastering claims. Existing six ambience channel multipliers are
+0.65 / 0.50 / 0.55 / 0.40 / 0.30 / 0.35 for rain / wind / fire / cave /
+insects / beacon; added layers share their parent channel's allocation.
+Decorrelated emitters divide that allocation to avoid gaining loudness merely
+by adding width. Loudness and perceived balance still require listening on the
+target device. OpenAL's output mixer and driver may add their own processing.
+
+Weather intensity should change the ratio of low body to high sizzle, in
+addition to the existing state-driven volume. A heavier storm gains body;
+drizzle leaves more space around pitched droplets. Loops contain continuous
+texture only. Drops, fire pops, cave drips and insect chirps are scheduled by
+the presentation RNG at runtime, with bounded work each frame.
+
+## Silence and transitions
+
+The intended music policy uses short synthesized phrases separated by at least
+45 seconds of silence. A state change fades an active phrase before a new one
+can enter; threat may shorten a long exploration wait but cannot create an
+unbroken score. Muting music disables new phrases. World changes cancel pending
+events and phrases because they describe the outgoing scene, not saved gameplay.
+
+Gain, weather timbre and environment transitions use smoothing on the existing
+frame thread. Environmental parameters interpolate instead of switching preset
+objects abruptly. No background audio thread is introduced.
+
+## Honest limits
+
+Signal and scheduling tests prove waveform properties and policy, not aesthetic
+approval. A listener must still evaluate spatial width, cave scale, indoor rain,
+stealing transitions and the ability to identify a loop period over 60 seconds.
+The release record must distinguish those checks from GPU/audio initialization.

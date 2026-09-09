@@ -20,12 +20,12 @@ class AudioCharacterizationTest {
         first.forEach((name, samples) -> assertArrayEquals(samples, second.get(name), name));
     }
 
-    @Test void recordOriginalBuffersBeforeChangingTheirOutput() {
+    @Test void measureCatalogBeforeNativeUpload() {
         long start = System.nanoTime();
         var bank = baseline();
         double ms = (System.nanoTime() - start) / 1e6;
         long count = bank.values().stream().mapToLong(a -> a.length).sum();
-        System.out.printf("AUDIO_BASELINE rate=%d buffers=%d samples=%d pcmBytes=%d floatBytes=%d synthesisMs=%.3f%n",
+        System.out.printf("AUDIO_CATALOG rate=%d buffers=%d samples=%d pcmBytes=%d floatBytes=%d synthesisMs=%.3f%n",
                 ProceduralAudio.RATE, bank.size(), count, count * 2, count * 4, ms);
         bank.forEach((name, s) -> System.out.printf(
                 "%s samples=%d mean=%.7f peak=%.5f rms=%.5f seam=%.6f hash=%d low=%.9f high=%.9f%n",
@@ -33,10 +33,10 @@ class AudioCharacterizationTest {
                 AudioSignalAssertions.rms(s), Math.abs(s[0] - s[s.length - 1]),
                 java.util.Arrays.hashCode(s), AudioSignalAssertions.band(s, ProceduralAudio.RATE, 100, 1000),
                 AudioSignalAssertions.band(s, ProceduralAudio.RATE, 2000, 10000)));
-        assertEquals(55125, bank.get("Rain").length);
-        assertEquals(88200, bank.get("Wind").length);
-        assertTrue(AudioSignalAssertions.peak(bank.get("Musket")) > 1,
-                "Characterizes the existing upload clipping defect before repairing it");
+        assertEquals((int) (2.5f * ProceduralAudio.RATE), bank.get("Rain").length);
+        assertEquals(4 * ProceduralAudio.RATE, bank.get("Wind").length);
+        bank.forEach((name, samples) -> assertTrue(AudioSignalAssertions.peak(samples) > 0,
+                name + " recipe unexpectedly silent"));
     }
 
     @Test void everyBufferRetainsItsDeclaredDuration() {

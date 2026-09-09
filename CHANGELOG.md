@@ -2,6 +2,12 @@
 
 All notable user-facing changes to VEYLON: Deep Frontier are recorded here.
 
+## [0.5.2] - 2026-09-09
+
+### Changed
+
+- Audio now uses 44.1 kHz synthesis with frequency-calibrated filters and corrected wildlife chirp phase.
+
 ## [0.5.1] - 2026-09-09
 
 ### Fixed

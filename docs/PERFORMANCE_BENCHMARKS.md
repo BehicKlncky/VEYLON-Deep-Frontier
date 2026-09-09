@@ -146,3 +146,22 @@ Update the table and the test constants together when:
 
 Do not re-baseline to make a red build green without first establishing which
 change made it slower.
+
+## Audio startup (introduced in v0.5.2)
+
+`AudioPerformanceTest` is tagged performance and measures the full emitted
+catalog through production conditioning and signed-16 conversion, without a
+sound device. Three warmups, fastest of seven. Startup budget is 1,500 ms;
+PCM payload budget is 64 MiB, chosen before adding the longer beds and banks.
+These do not alter any simulation/save budget above.
+
+| Stage | Raw synthesis observation | PCM bytes | Warmed conditioning + conversion |
+| --- | ---: | ---: | ---: |
+| v0.5.0 / 22.05 kHz, 48 buffers | 62.148 ms | 1,858,142 | not measured |
+| v0.5.2 / 44.1 kHz, 48 buffers | 62.879 ms | 3,716,306 | 51.066 ms |
+
+Raw observations include Java arrays, exclude native upload, and are not paired
+warm benchmark samples. Equivalent float payload doubles from 3,716,284 to
+7,432,612 bytes; runtime streams arrays to OpenAL and does not retain a full
+float catalog. Driver allocation and Java/native overhead are additional.
+Native initialization logs its complete synthesis/upload duration separately.
