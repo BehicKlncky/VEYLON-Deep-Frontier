@@ -11,6 +11,12 @@ final class ProceduralAudio {
     static final int RATE = 44100;
     private final Random rng;
 
+    /** Declared looping durations, separate from the one-shot recipe contracts. */
+    static float loopSeconds(String name) {
+        return AmbienceBeds.seconds(name);
+    }
+
+
     ProceduralAudio(Random rng) {
         this.rng = rng;
     }
@@ -59,12 +65,7 @@ final class ProceduralAudio {
         sink.accept("Explosion", explosionBoom());
         sink.accept("AlarmBell", alarmBell());
         sink.accept("Gate", gateCreak());
-        sink.accept("Rain", rainLoop());
-        sink.accept("Wind", windLoop());
-        sink.accept("Fire", fireLoop());
-        sink.accept("Cave", caveLoop());
-        sink.accept("Crickets", cricketsLoop());
-        sink.accept("Beacon", beaconLoop());
+        AmbienceBeds.synthesize(rng, sink);
     }
 
     // ---- 0.3.0 combat & settlement synthesis ----
@@ -424,103 +425,6 @@ final class ProceduralAudio {
             phase += 2 * Math.PI * f / RATE;
             float env = (float) Math.sin(Math.PI * Math.min(1f, t / 0.7f));
             out[i] = (float) (Math.sin(phase) * 0.5 + Math.sin(phase * 3) * 0.15) * env * 0.7f;
-        }
-        return out;
-    }
-
-    // ---- Loops (seamless via full-length noise / periodic content) ----
-
-    private float[] rainLoop() {
-        int n = len(2.5f);
-        float[] out = new float[n];
-        float y = 0;
-        for (int i = 0; i < n; i++) {
-            float x = (rng.nextFloat() * 2f - 1f) * NOISE_SCALE;
-            y += alpha(WOOD_HZ) * (x - y);
-            out[i] = y * 0.5f;
-            // Occasional droplet plinks.
-            if (rng.nextFloat() < RAIN_EVENTS_PER_SECOND / RATE) {
-                out[i] += 0.3f;
-            }
-        }
-        return fadeEnds(out);
-    }
-
-    private float[] windLoop() {
-        int n = len(4f);
-        float[] out = new float[n];
-        float y = 0;
-        for (int i = 0; i < n; i++) {
-            float t = (float) i / RATE;
-            float x = (rng.nextFloat() * 2f - 1f) * NOISE_SCALE;
-            y += alpha(BOOM_HZ) * (x - y);
-            // Two slow gust cycles that line up with the loop length.
-            float gust = 0.55f + 0.45f * (float) Math.sin(2 * Math.PI * t / 4f)
-                    * (float) Math.sin(2 * Math.PI * t / 2f);
-            out[i] = y * gust * 1.4f;
-        }
-        return fadeEnds(out);
-    }
-
-    private float[] fireLoop() {
-        int n = len(3f);
-        float[] out = new float[n];
-        float y = 0;
-        for (int i = 0; i < n; i++) {
-            float x = (rng.nextFloat() * 2f - 1f) * NOISE_SCALE;
-            y += alpha(SNOW_HZ) * (x - y);
-            out[i] = y * 0.55f;
-        }
-        // Crackle pops.
-        for (int p = 0; p < 26; p++) {
-            int at = rng.nextInt(n - len(0.05f));
-            float amp = 0.25f + rng.nextFloat() * 0.4f;
-            int m = len(0.012f + rng.nextFloat() * 0.02f);
-            for (int i = 0; i < m; i++) {
-                out[at + i] += ((rng.nextFloat() * 2f - 1f) * NOISE_SCALE)
-                        * amp * (float) Math.exp(-12.0 * i / m);
-            }
-        }
-        return fadeEnds(out);
-    }
-
-    private float[] caveLoop() {
-        int n = len(4f);
-        float[] out = new float[n];
-        for (int i = 0; i < n; i++) {
-            float t = (float) i / RATE;
-            out[i] = (float) (Math.sin(2 * Math.PI * 55 * t) * 0.35
-                    + Math.sin(2 * Math.PI * 82.5 * t) * 0.2
-                    + Math.sin(2 * Math.PI * 0.25 * t) * 0.08);
-        }
-        return out; // pure periodic content, already loop-clean at 4 s
-    }
-
-    private float[] cricketsLoop() {
-        int n = len(2f);
-        float[] out = new float[n];
-        for (int burst = 0; burst < 14; burst++) {
-            int at = rng.nextInt(n - len(0.06f));
-            float f = 3800 + rng.nextInt(700);
-            int m = len(0.045f);
-            for (int i = 0; i < m; i++) {
-                float t = (float) i / RATE;
-                out[at + i] += (float) (Math.sin(2 * Math.PI * f * t)
-                        * Math.sin(2 * Math.PI * 60 * t)
-                        * Math.sin(Math.PI * i / (float) m)) * 0.22f;
-            }
-        }
-        return fadeEnds(out);
-    }
-
-    private float[] beaconLoop() {
-        int n = len(2f);
-        float[] out = new float[n];
-        for (int i = 0; i < n; i++) {
-            float t = (float) i / RATE;
-            float pulse = 0.6f + 0.4f * (float) Math.sin(2 * Math.PI * t / 2f);
-            out[i] = (float) (Math.sin(2 * Math.PI * 220 * t) * 0.3
-                    + Math.sin(2 * Math.PI * 331 * t) * 0.18) * pulse;
         }
         return out;
     }

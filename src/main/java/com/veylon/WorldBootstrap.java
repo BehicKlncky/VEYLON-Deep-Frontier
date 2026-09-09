@@ -74,6 +74,7 @@ final class WorldBootstrap {
     private void resetForNewWorld(long seed) {
         game.releaseWorldMeshes();
         game.scheduler.reset();
+        game.audio.resetWorld();
         game.time.reset();
         game.weather.reset();
         game.temperature.reset();

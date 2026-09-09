@@ -45,7 +45,7 @@ settlement 0.013/0.52 ms, save 1.469/2.20 ms, load 198.662/240 ms
 | --- | --- | --- | --- | --- |
 | v0.5.1 | Characterize, isolate DSP, guard PCM | baseline | Headless signal checks, negative fixtures, recorded baseline | automated checks passed; build gate below |
 | v0.5.2 | 44.1 kHz | 1 | Hz-preserving filters, duration/spectral tests, timing and bytes | verified |
-| v0.5.3 | Layered ambience | 2 | Continuous beds, runtime events/gusts, intensity changes spectrum | pending |
+| v0.5.3 | Layered ambience | 2 | Continuous beds, runtime events/gusts, intensity changes spectrum | automated checks verified |
 | v0.5.4 | Spatial ambience | 3 | Decorrelated weather, positioned fire, smooth gains | pending |
 | v0.5.5 | Environment reverb | 4 | Six interpolated presets, detected EFX, dry fallback | pending |
 | v0.5.6 | Occlusion | 5 | Fixed query/update caps, low-pass and air absorption | pending |
@@ -91,7 +91,7 @@ variable stave/swish poles, event probabilities, fade lengths and gulp modulatio
 were audited. Matched-pole conversion preserves time constants; it does not claim
 an exact analog -3 dB point near Nyquist. A 1 kHz response test measures within
 0.01 linear amplitude of half power at both rates. Chirp phase now integrates
-frequency; its 2.4–4.2 kHz band dominates low and near-Nyquist probes by over 100x.
+frequency; its 2.4â€“4.2 kHz band dominates low and near-Nyquist probes by over 100x.
 
 The catalog is 1,858,153 samples / 3,716,306 PCM bytes / 7,432,612 equivalent
 float bytes. Raw synthesis invocation: 62.879 ms (baseline invocation 62.148 ms;
@@ -102,3 +102,21 @@ Actual native startup separately logs synthesisAndUploadMs. Listening equivalenc
 remains unverified until a device/listener pass.
 
 Final v0.5.2 build: PASS, 363 tests / 64 classes, zero failures; 1m 34s.
+
+### v0.5.3 evidence
+
+`AmbienceBeds.Bed` declares eight continuous textures, 17-37 seconds, with Hz
+cutoffs and RMS targets on each enum value. Four separate event recipes have
+finite envelopes; looping textures contain no event envelopes. `AmbientEvents`
+limits scheduling to four events per frame and chooses new gust targets every
+2-7 seconds, independently of buffer duration. A 60-second deterministic test
+finds irregular rain intervals and verifies the event cap. The half-second RMS
+stationarity test rejects baked gusts or event envelopes in every bed.
+
+54 buffers: 19,653,778 PCM bytes. Complete warmed synthesis/conditioning/conversion:
+164.846 ms / 1,500 ms budget. World-reset and return-to-title wiring cancel the
+presentation state. Spectral and scheduling tests plus doclint pass. A human
+60-second loop-identification test remains unperformed; no listening approval
+is inferred from the deterministic schedule.
+
+Final v0.5.3 build: PASS, 374 tests / 65 classes, zero failures; 1m 35s.
