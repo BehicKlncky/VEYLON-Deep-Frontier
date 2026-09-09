@@ -73,6 +73,7 @@ final class AmbienceSystem {
     private static final double BEACON_AUDIO_RANGE = 22.0;
 
     private final Game game;
+    private final Vector3f firePosition = new Vector3f();
     private final Random emitterRng = new Random();
     private float emitterTimer;
     private float breathTimer;
@@ -223,6 +224,15 @@ final class AmbienceSystem {
         float fireHeat = game.player.nearFireHeat(game);
         float fireGain = fireHeat > FIRE_MIN_AUDIBLE_HEAT
                 ? Math.min(1f, fireHeat / FIRE_GAIN_FULL_HEAT) : 0f;
+
+        if (game.audio.isEnabled()) {
+            if (fireGain > 0 && FireAudioLocator.nearest(game.world, game.fire.burningCells(),
+                    game.player.pos.x, game.player.pos.y, game.player.pos.z, firePosition)) {
+                game.audio.setFirePosition(firePosition.x, firePosition.y, firePosition.z);
+            } else {
+                fireGain = 0;
+            }
+        }
 
         int surface = game.world.surfaceHeight((int) game.player.pos.x, (int) game.player.pos.z);
         float caveGain = game.player.pos.y < surface - CAVE_DEPTH ? CAVE_GAIN : 0f;
