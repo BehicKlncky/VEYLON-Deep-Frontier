@@ -11,6 +11,18 @@ final class ProceduralAudio {
     static final int RATE = 44100;
     private final Random rng;
 
+    /** Declared looping durations, separate from the one-shot recipe contracts. */
+    static float loopSeconds(String name) {
+        return switch (name) {
+            case "Rain" -> 2.5f;
+            case "Wind", "Cave" -> 4f;
+            case "Fire" -> 3f;
+            case "Crickets", "Beacon" -> 2f;
+            default -> 0f;
+        };
+    }
+
+
     ProceduralAudio(Random rng) {
         this.rng = rng;
     }
