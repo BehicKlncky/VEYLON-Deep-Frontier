@@ -47,10 +47,12 @@ public class AudioManager {
     private final AmbientEvents ambientEvents = new AmbientEvents(rng);
     private float weatherIntensity, currentIntensity;
     private final java.util.function.IntConsumer detailPlayer = this::playAmbientDetail;
-    private int sRain, sWind, sFire, sCave, sCrickets, sBeacon;
+    private java.util.Map<String, Integer> buffers;
+    private float fireX, fireY, fireZ;
+    private boolean firePositioned;
     private final float[] ambTarget = new float[6];
     private final float[] ambCurrent = new float[6];
-    private final int[] ambSources = new int[8];
+    private final int[] ambSources = new int[SpatialAmbience.EMITTERS.length];
     private static final float[] AMBIENCE_LEVELS = {0.65f, 0.5f, 0.55f, 0.4f, 0.3f, 0.35f};
     private final float[] listenerOrientation = new float[6];
 
@@ -83,20 +85,10 @@ public class AudioManager {
                 alSourcef(pool[i], AL_MAX_DISTANCE, 44f);
                 alSourcef(pool[i], AL_ROLLOFF_FACTOR, 1.1f);
             }
-            sRain = makeLoop(bRain);
-            sWind = makeLoop(bWind);
-            sFire = makeLoop(bFire);
-            sCave = makeLoop(bCave);
-            sCrickets = makeLoop(bCrickets);
-            sBeacon = makeLoop(bBeacon);
-            ambSources[0] = sRain;
-            ambSources[1] = sWind;
-            ambSources[2] = sFire;
-            ambSources[3] = sCave;
-            ambSources[4] = sCrickets;
-            ambSources[5] = sBeacon;
-            ambSources[6] = makeLoop(bRainHigh);
-            ambSources[7] = makeLoop(bWindHigh);
+            for (int i = 0; i < ambSources.length; i++) {
+                var emitter = SpatialAmbience.EMITTERS[i];
+                ambSources[i] = makeLoop(buffers.get(emitter.name()), emitter);
+            }
             enabled = true;
             System.out.println("[audio] OpenAL initialized (" + pool.length + " voices).");
         } catch (Throwable t) {
@@ -105,12 +97,14 @@ public class AudioManager {
         }
     }
 
-    private int makeLoop(int buffer) {
+    private int makeLoop(int buffer, SpatialAmbience.Emitter emitter) {
         int src = alGenSources();
         alSourcei(src, AL_BUFFER, buffer);
         alSourcei(src, AL_LOOPING, AL_TRUE);
-        alSourcei(src, AL_SOURCE_RELATIVE, AL_TRUE);
-        alSource3f(src, AL_POSITION, 0, 0, 0);
+        alSourcei(src, AL_SOURCE_RELATIVE, emitter.relative() ? AL_TRUE : AL_FALSE);
+        alSource3f(src, AL_POSITION, emitter.x(), emitter.y(), emitter.z());
+        alSourcef(src, AL_REFERENCE_DISTANCE, SpatialAmbience.FIRE_REFERENCE_DISTANCE);
+        alSourcef(src, AL_ROLLOFF_FACTOR, 0);
         alSourcef(src, AL_GAIN, 0f);
         alSourcePlay(src);
         return src;
@@ -161,9 +155,10 @@ public class AudioManager {
         for (int i = 0; i < 6; i++) ambCurrent[i] += (ambTarget[i] - ambCurrent[i]) * blend;
         ambientEvents.update(dt, ambCurrent, detailPlayer);
         for (int i = 0; i < ambSources.length; i++) {
-            int channel = i < 6 ? i : i - 6;
+            int layer = SpatialAmbience.EMITTERS[i].layer();
+            int channel = SpatialAmbience.channel(layer);
             float gain = ambCurrent[channel] * AMBIENCE_LEVELS[channel]
-                    * AmbientEvents.layerWeight(i, currentIntensity, ambientEvents.gust());
+                    * AmbientEvents.layerWeight(layer, currentIntensity, ambientEvents.gust()) * SpatialAmbience.allocation(layer);
             alSourcef(ambSources[i], AL_GAIN, gain);
         }
     }
@@ -178,6 +173,7 @@ public class AudioManager {
     public void resetWorld() {
         if (!enabled) return;
         ambientEvents.reset();
+        firePositioned = false;
         java.util.Arrays.fill(ambTarget, 0);
         java.util.Arrays.fill(ambCurrent, 0);
         weatherIntensity = currentIntensity = 0;
@@ -187,7 +183,22 @@ public class AudioManager {
 
     private void playAmbientDetail(int kind) {
         int channel = switch (kind) { case 0 -> 0; case 1 -> 2; case 2 -> 3; default -> 4; };
-        play2d(detailBuffers[kind], ambCurrent[channel] * 0.35f, pitchVar(0.15f));
+        if (kind == 1 && firePositioned) {
+            playAt(detailBuffers[kind], fireX, fireY, fireZ, ambCurrent[channel] * 0.35f, pitchVar(0.15f));
+        } else if (kind != 1) {
+            play2d(detailBuffers[kind], ambCurrent[channel] * 0.35f, pitchVar(0.15f));
+        }
+    }
+
+    /** True only after native initialization completed successfully. */
+    public boolean isEnabled() { return enabled; }
+
+    /** Places fire ambience at the nearest audible heat source in world coordinates. */
+    public void setFirePosition(float x, float y, float z) {
+        if (!enabled) return;
+        fireX = x; fireY = y; fireZ = z;
+        firePositioned = true;
+        alSource3f(ambSources[2], AL_POSITION, x, y, z);
     }
 
     public void playFootstep(BlockType under, boolean inWater) {
@@ -467,6 +478,7 @@ public class AudioManager {
         long start = System.nanoTime();
         pcmBytes = 0;
         java.util.Map<String, Integer> bank = new java.util.HashMap<>();
+        buffers = bank;
         new ProceduralAudio(rng).synthesize((name, samples) -> bank.put(name, upload(samples)));
         bFootGrass = bank.get("FootGrass");
         bFootStone = bank.get("FootStone");
