@@ -1,12 +1,14 @@
 package com.veylon.engine;
 
 import java.util.Random;
+
+import static com.veylon.engine.AudioFilters.*;
 import java.util.function.BiConsumer;
 
 /** Pure procedural PCM recipes, independent of OpenAL and simulation randomness. */
 final class ProceduralAudio {
 
-    static final int RATE = 22050;
+    static final int RATE = 44100;
     private final Random rng;
 
     ProceduralAudio(Random rng) {
@@ -15,26 +17,26 @@ final class ProceduralAudio {
 
     /** Emits each original recipe once, retaining no sample arrays. */
     void synthesize(BiConsumer<String, float[]> sink) {
-        sink.accept("FootGrass", noiseBurst(0.10f, 0.18f, 3.5f, 0.5f));
-        sink.accept("FootStone", noiseBurst(0.07f, 0.55f, 6f, 0.7f));
-        sink.accept("FootWood", mix(noiseBurst(0.08f, 0.35f, 5f, 0.6f), tone(160, 0.08f, 10f, 0.3f)));
-        sink.accept("FootSnow", noiseBurst(0.13f, 0.12f, 3f, 0.45f));
-        sink.accept("FootWater", noiseBurst(0.16f, 0.30f, 2.5f, 0.6f));
-        sink.accept("HitSoft", noiseBurst(0.06f, 0.22f, 8f, 0.6f));
-        sink.accept("HitStone", mix(noiseBurst(0.05f, 0.7f, 12f, 0.8f), tone(900, 0.04f, 25f, 0.25f)));
-        sink.accept("HitWood", mix(noiseBurst(0.06f, 0.4f, 10f, 0.7f), tone(240, 0.06f, 15f, 0.4f)));
-        sink.accept("Break", mix(noiseBurst(0.22f, 0.5f, 4f, 0.9f), tone(110, 0.18f, 7f, 0.4f)));
-        sink.accept("Place", mix(noiseBurst(0.09f, 0.45f, 8f, 0.7f), tone(200, 0.07f, 14f, 0.35f)));
+        sink.accept("FootGrass", noiseBurst(0.10f, GRASS_HZ, 3.5f, 0.5f));
+        sink.accept("FootStone", noiseBurst(0.07f, GRIT_HZ, 6f, 0.7f));
+        sink.accept("FootWood", mix(noiseBurst(0.08f, WOOD_HZ, 5f, 0.6f), tone(160, 0.08f, 10f, 0.3f)));
+        sink.accept("FootSnow", noiseBurst(0.13f, SNOW_HZ, 3f, 0.45f));
+        sink.accept("FootWater", noiseBurst(0.16f, WATER_HZ, 2.5f, 0.6f));
+        sink.accept("HitSoft", noiseBurst(0.06f, SOFT_HIT_HZ, 8f, 0.6f));
+        sink.accept("HitStone", mix(noiseBurst(0.05f, STONE_HZ, 12f, 0.8f), tone(900, 0.04f, 25f, 0.25f)));
+        sink.accept("HitWood", mix(noiseBurst(0.06f, IMPACT_HZ, 10f, 0.7f), tone(240, 0.06f, 15f, 0.4f)));
+        sink.accept("Break", mix(noiseBurst(0.22f, DEBRIS_HZ, 4f, 0.9f), tone(110, 0.18f, 7f, 0.4f)));
+        sink.accept("Place", mix(noiseBurst(0.09f, PLACE_HZ, 8f, 0.7f), tone(200, 0.07f, 14f, 0.35f)));
         sink.accept("Click", tone(1400, 0.035f, 50f, 0.5f));
         sink.accept("Eat", chew());
         sink.accept("Drink", gulp());
-        sink.accept("Boil", noiseBurst(0.5f, 0.25f, 2f, 0.5f));
-        sink.accept("Hit", mix(noiseBurst(0.08f, 0.4f, 9f, 0.9f), tone(120, 0.09f, 12f, 0.6f)));
+        sink.accept("Boil", noiseBurst(0.5f, POUR_HZ, 2f, 0.5f));
+        sink.accept("Hit", mix(noiseBurst(0.08f, IMPACT_HZ, 9f, 0.9f), tone(120, 0.09f, 12f, 0.6f)));
         sink.accept("Hurt", grunt());
         sink.accept("Swing", swish());
         sink.accept("Craft", mix(tone(520, 0.08f, 12f, 0.4f), tone(780, 0.12f, 8f, 0.3f)));
-        sink.accept("Equip", noiseBurst(0.14f, 0.3f, 5f, 0.55f));
-        sink.accept("ToolBreak", mix(tone(620, 0.07f, 22f, 0.6f), noiseBurst(0.2f, 0.6f, 6f, 0.7f)));
+        sink.accept("Equip", noiseBurst(0.14f, WATER_HZ, 5f, 0.55f));
+        sink.accept("ToolBreak", mix(tone(620, 0.07f, 22f, 0.6f), noiseBurst(0.2f, SWISH_HIGH_HZ, 6f, 0.7f)));
         sink.accept("Cough", cough());
         sink.accept("Sleep", chime(new float[]{392, 494, 587}, 0.32f));
         sink.accept("Discover", chime(new float[]{523, 659, 784, 1047}, 0.26f));
@@ -47,8 +49,8 @@ final class ProceduralAudio {
         sink.accept("Deer", deerCall());
         sink.accept("BowDraw", bowDraw());
         sink.accept("BowRelease", bowRelease());
-        sink.accept("ArrowImpact", mix(noiseBurst(0.05f, 0.4f, 16f, 0.6f), tone(300, 0.05f, 30f, 0.35f)));
-        sink.accept("BulletImpact", mix(noiseBurst(0.04f, 0.75f, 22f, 0.7f), tone(1200, 0.03f, 40f, 0.3f)));
+        sink.accept("ArrowImpact", mix(noiseBurst(0.05f, IMPACT_HZ, 16f, 0.6f), tone(300, 0.05f, 30f, 0.35f)));
+        sink.accept("BulletImpact", mix(noiseBurst(0.04f, BULLET_HZ, 22f, 0.7f), tone(1200, 0.03f, 40f, 0.3f)));
         sink.accept("Musket", gunshot(false));
         sink.accept("Pistol", gunshot(true));
         sink.accept("DryFire", dryFireClick());
@@ -74,8 +76,8 @@ final class ProceduralAudio {
         float y = 0;
         for (int i = 0; i < n; i++) {
             float t = (float) i / n;
-            float x = rng.nextFloat() * 2f - 1f;
-            y += (0.04f + t * 0.10f) * (x - y);
+            float x = (rng.nextFloat() * 2f - 1f) * NOISE_SCALE;
+            y += alpha(STAVE_LOW_HZ + t * (STAVE_HIGH_HZ - STAVE_LOW_HZ)) * (x - y);
             float creak = (float) Math.sin(2 * Math.PI * (90 + t * 160) * i / RATE) * 0.14f;
             out[i] = (y * 0.8f + creak) * (0.3f + t * 0.7f) * 0.5f;
         }
@@ -104,12 +106,12 @@ final class ProceduralAudio {
         float y = 0, y2 = 0;
         for (int i = 0; i < n; i++) {
             float t = (float) i / RATE;
-            float x = rng.nextFloat() * 2f - 1f;
+            float x = (rng.nextFloat() * 2f - 1f) * NOISE_SCALE;
             // Crack: bright noise with a very fast decay.
-            y += (pistol ? 0.85f : 0.7f) * (x - y);
+            y += alpha(pistol ? PISTOL_HZ : STONE_HZ) * (x - y);
             float crack = y * (float) Math.exp(-60 * t) * 1.4f;
             // Boom: heavily low-passed noise, slower decay for muskets.
-            y2 += 0.05f * (x - y2);
+            y2 += alpha(BOOM_HZ) * (x - y2);
             float boom = y2 * (float) Math.exp(-(pistol ? 9f : 5.5f) * t) * 2.4f;
             out[i] = crack + boom;
         }
@@ -131,14 +133,14 @@ final class ProceduralAudio {
     /** Powder pour, ball tap, ramrod slide. */
     private float[] reloadRustle() {
         float[] out = new float[len(0.9f)];
-        float[] pour = noiseBurst(0.3f, 0.18f, 6f, 0.4f);
+        float[] pour = noiseBurst(0.3f, GRASS_HZ, 6f, 0.4f);
         System.arraycopy(pour, 0, out, 0, pour.length);
-        float[] tap = mix(tone(700, 0.05f, 30f, 0.4f), noiseBurst(0.04f, 0.5f, 20f, 0.4f));
+        float[] tap = mix(tone(700, 0.05f, 30f, 0.4f), noiseBurst(0.04f, DEBRIS_HZ, 20f, 0.4f));
         int off = len(0.42f);
         for (int i = 0; i < tap.length && off + i < out.length; i++) {
             out[off + i] += tap[i];
         }
-        float[] slide = noiseBurst(0.22f, 0.30f, 8f, 0.35f);
+        float[] slide = noiseBurst(0.22f, WATER_HZ, 8f, 0.35f);
         off = len(0.6f);
         for (int i = 0; i < slide.length && off + i < out.length; i++) {
             out[off + i] += slide[i];
@@ -152,9 +154,9 @@ final class ProceduralAudio {
         float[] out = new float[n];
         float y = 0;
         for (int i = 0; i < n; i++) {
-            float x = rng.nextFloat() * 2f - 1f;
-            y += 0.55f * (x - y);
-            float sputter = rng.nextFloat() < 0.002f ? 0.5f : 0f;
+            float x = (rng.nextFloat() * 2f - 1f) * NOISE_SCALE;
+            y += alpha(GRIT_HZ) * (x - y);
+            float sputter = rng.nextFloat() < FUSE_EVENTS_PER_SECOND / RATE ? 0.5f : 0f;
             out[i] = y * 0.35f + sputter;
         }
         return fadeEnds(out);
@@ -168,13 +170,13 @@ final class ProceduralAudio {
         double phase = 0;
         for (int i = 0; i < n; i++) {
             float t = (float) i / RATE;
-            float x = rng.nextFloat() * 2f - 1f;
-            y += 0.035f * (x - y);
+            float x = (rng.nextFloat() * 2f - 1f) * NOISE_SCALE;
+            y += alpha(DEEP_RUMBLE_HZ) * (x - y);
             float rumble = y * (float) Math.exp(-2.2 * t) * 2.6f;
             float f = 52 - t * 18;
             phase += 2 * Math.PI * Math.max(20, f) / RATE;
             float thump = (float) Math.sin(phase) * (float) Math.exp(-7 * t) * 0.9f;
-            float crack = (rng.nextFloat() * 2f - 1f) * (float) Math.exp(-45 * t) * 0.8f;
+            float crack = ((rng.nextFloat() * 2f - 1f) * NOISE_SCALE) * (float) Math.exp(-45 * t) * 0.8f;
             out[i] = rumble + thump + crack;
         }
         return out;
@@ -192,7 +194,7 @@ final class ProceduralAudio {
                     out[off + i] += ring[i];
                 }
             }
-            float[] clank = noiseBurst(0.03f, 0.6f, 30f, 0.4f);
+            float[] clank = noiseBurst(0.03f, SWISH_HIGH_HZ, 30f, 0.4f);
             for (int i = 0; i < clank.length && off + i < n; i++) {
                 out[off + i] += clank[i];
             }
@@ -207,8 +209,8 @@ final class ProceduralAudio {
         float y = 0;
         for (int i = 0; i < n; i++) {
             float t = (float) i / n;
-            float x = rng.nextFloat() * 2f - 1f;
-            y += 0.06f * (x - y);
+            float x = (rng.nextFloat() * 2f - 1f) * NOISE_SCALE;
+            y += alpha(GROWL_HZ) * (x - y);
             float squeal = (float) Math.sin(2 * Math.PI * (140 + Math.sin(t * 9) * 60) * i / RATE)
                     * 0.16f * (float) Math.sin(Math.PI * t);
             out[i] = y * 1.2f * (float) Math.sin(Math.PI * t) + squeal;
@@ -221,12 +223,13 @@ final class ProceduralAudio {
     }
 
     /** White noise through a one-pole lowpass with an exponential decay envelope. */
-    private float[] noiseBurst(float seconds, float lowpass, float decay, float amp) {
+    private float[] noiseBurst(float seconds, float cutoffHz, float decay, float amp) {
         int n = len(seconds);
+        float lowpass = alpha(cutoffHz);
         float[] out = new float[n];
         float y = 0;
         for (int i = 0; i < n; i++) {
-            float x = rng.nextFloat() * 2f - 1f;
+            float x = (rng.nextFloat() * 2f - 1f) * NOISE_SCALE;
             y += lowpass * (x - y);
             float t = (float) i / RATE;
             out[i] = y * (float) Math.exp(-decay * t) * amp;
@@ -259,7 +262,7 @@ final class ProceduralAudio {
     private float[] chew() {
         float[] out = new float[len(0.5f)];
         for (int c = 0; c < 3; c++) {
-            float[] bite = noiseBurst(0.09f, 0.25f, 9f, 0.55f);
+            float[] bite = noiseBurst(0.09f, POUR_HZ, 9f, 0.55f);
             int off = len(0.16f) * c;
             for (int i = 0; i < bite.length && off + i < out.length; i++) {
                 out[off + i] += bite[i];
@@ -275,7 +278,7 @@ final class ProceduralAudio {
             float f = 300 - c * 50;
             float[] g = tone(f, 0.12f, 14f, 0.5f);
             for (int i = 0; i < g.length && off + i < out.length; i++) {
-                out[off + i] += g[i] * (1 + 0.4f * (float) Math.sin(i * 0.01f));
+                out[off + i] += g[i] * (1 + 0.4f * (float) Math.sin(2 * Math.PI * GULP_MODULATION_HZ * i / RATE));
             }
         }
         return out;
@@ -288,8 +291,8 @@ final class ProceduralAudio {
         for (int i = 0; i < n; i++) {
             float t = (float) i / RATE;
             float f = 130 - t * 120;
-            float x = (float) Math.sin(2 * Math.PI * f * t) * 0.7f + (rng.nextFloat() - 0.5f) * 0.5f;
-            y += 0.3f * (x - y);
+            float x = (float) Math.sin(2 * Math.PI * f * t) * 0.7f + (rng.nextFloat() - 0.5f) * 0.5f * NOISE_SCALE;
+            y += alpha(WATER_HZ) * (x - y);
             out[i] = y * (float) Math.exp(-8 * t);
         }
         return out;
@@ -301,8 +304,8 @@ final class ProceduralAudio {
         float y = 0;
         for (int i = 0; i < n; i++) {
             float t = (float) i / n;
-            float x = rng.nextFloat() * 2f - 1f;
-            float lp = 0.1f + 0.5f * (float) Math.sin(Math.PI * t);
+            float x = (rng.nextFloat() * 2f - 1f) * NOISE_SCALE;
+            float lp = alpha(SWISH_LOW_HZ + (SWISH_HIGH_HZ - SWISH_LOW_HZ) * (float) Math.sin(Math.PI * t));
             y += lp * (x - y);
             out[i] = y * (float) Math.sin(Math.PI * t) * 0.45f;
         }
@@ -310,10 +313,10 @@ final class ProceduralAudio {
     }
 
     private float[] cough() {
-        float[] a = noiseBurst(0.12f, 0.3f, 10f, 0.7f);
+        float[] a = noiseBurst(0.12f, WATER_HZ, 10f, 0.7f);
         float[] out = new float[len(0.35f)];
         System.arraycopy(a, 0, out, 0, a.length);
-        float[] b = noiseBurst(0.10f, 0.28f, 12f, 0.55f);
+        float[] b = noiseBurst(0.10f, COUGH_HZ, 12f, 0.55f);
         int off = len(0.18f);
         for (int i = 0; i < b.length && off + i < out.length; i++) {
             out[off + i] += b[i];
@@ -340,8 +343,8 @@ final class ProceduralAudio {
         float y = 0;
         for (int i = 0; i < n; i++) {
             float t = (float) i / RATE;
-            float x = rng.nextFloat() * 2f - 1f;
-            y += 0.045f * (x - y);
+            float x = (rng.nextFloat() * 2f - 1f) * NOISE_SCALE;
+            y += alpha(THUNDER_HZ) * (x - y);
             float env = (float) (Math.exp(-1.6 * t) * (0.6 + 0.4 * Math.sin(t * 9)));
             out[i] = y * env * 1.6f;
         }
@@ -372,8 +375,8 @@ final class ProceduralAudio {
         float y = 0;
         for (int i = 0; i < n; i++) {
             float t = (float) i / RATE;
-            float x = rng.nextFloat() * 2f - 1f;
-            y += 0.06f * (x - y);
+            float x = (rng.nextFloat() * 2f - 1f) * NOISE_SCALE;
+            y += alpha(GROWL_HZ) * (x - y);
             float am = 0.6f + 0.4f * (float) Math.sin(2 * Math.PI * 28 * t);
             float env = (float) Math.sin(Math.PI * Math.min(1f, t / 0.9f));
             out[i] = y * am * env * 1.8f;
@@ -387,10 +390,12 @@ final class ProceduralAudio {
             int off = len(0.15f * c);
             float base = 2800 + rng.nextInt(800);
             int m = len(0.09f);
+            double phase = 0;
             for (int i = 0; i < m && off + i < out.length; i++) {
                 float t = (float) i / RATE;
                 float f = base + (float) Math.sin(t * 200) * 400;
-                out[off + i] += (float) (Math.sin(2 * Math.PI * f * t)
+                phase += 2 * Math.PI * f / RATE;
+                out[off + i] += (float) (Math.sin(phase)
                         * Math.sin(Math.PI * i / (float) m)) * 0.3f;
             }
         }
@@ -400,7 +405,7 @@ final class ProceduralAudio {
     private float[] flap() {
         float[] out = new float[len(0.5f)];
         for (int c = 0; c < 4; c++) {
-            float[] puff = noiseBurst(0.06f, 0.2f, 14f, 0.4f);
+            float[] puff = noiseBurst(0.06f, WING_HZ, 14f, 0.4f);
             int off = len(0.11f * c);
             for (int i = 0; i < puff.length && off + i < out.length; i++) {
                 out[off + i] += puff[i];
@@ -430,11 +435,11 @@ final class ProceduralAudio {
         float[] out = new float[n];
         float y = 0;
         for (int i = 0; i < n; i++) {
-            float x = rng.nextFloat() * 2f - 1f;
-            y += 0.35f * (x - y);
+            float x = (rng.nextFloat() * 2f - 1f) * NOISE_SCALE;
+            y += alpha(WOOD_HZ) * (x - y);
             out[i] = y * 0.5f;
             // Occasional droplet plinks.
-            if (rng.nextFloat() < 0.0006f) {
+            if (rng.nextFloat() < RAIN_EVENTS_PER_SECOND / RATE) {
                 out[i] += 0.3f;
             }
         }
@@ -447,8 +452,8 @@ final class ProceduralAudio {
         float y = 0;
         for (int i = 0; i < n; i++) {
             float t = (float) i / RATE;
-            float x = rng.nextFloat() * 2f - 1f;
-            y += 0.05f * (x - y);
+            float x = (rng.nextFloat() * 2f - 1f) * NOISE_SCALE;
+            y += alpha(BOOM_HZ) * (x - y);
             // Two slow gust cycles that line up with the loop length.
             float gust = 0.55f + 0.45f * (float) Math.sin(2 * Math.PI * t / 4f)
                     * (float) Math.sin(2 * Math.PI * t / 2f);
@@ -462,8 +467,8 @@ final class ProceduralAudio {
         float[] out = new float[n];
         float y = 0;
         for (int i = 0; i < n; i++) {
-            float x = rng.nextFloat() * 2f - 1f;
-            y += 0.12f * (x - y);
+            float x = (rng.nextFloat() * 2f - 1f) * NOISE_SCALE;
+            y += alpha(SNOW_HZ) * (x - y);
             out[i] = y * 0.55f;
         }
         // Crackle pops.
@@ -472,7 +477,7 @@ final class ProceduralAudio {
             float amp = 0.25f + rng.nextFloat() * 0.4f;
             int m = len(0.012f + rng.nextFloat() * 0.02f);
             for (int i = 0; i < m; i++) {
-                out[at + i] += (rng.nextFloat() * 2f - 1f)
+                out[at + i] += ((rng.nextFloat() * 2f - 1f) * NOISE_SCALE)
                         * amp * (float) Math.exp(-12.0 * i / m);
             }
         }
@@ -521,7 +526,7 @@ final class ProceduralAudio {
     }
 
     private static float[] fadeEnds(float[] s) {
-        int fade = Math.min(s.length / 8, 1400);
+        int fade = Math.min(s.length / 8, len(LEGACY_FADE_SECONDS));
         for (int i = 0; i < fade; i++) {
             float k = (float) i / fade;
             s[i] *= k;
