@@ -241,6 +241,7 @@ final class AmbienceSystem {
                 beaconGain = (float) (1.0 - Math.sqrt(d) / BEACON_AUDIO_RANGE);
             }
         }
+        game.audio.setWeatherIntensity(game.weather.intensity());
         game.audio.setAmbience(rainGain, windGain, fireGain, caveGain, cricketGain, beaconGain);
     }
 }

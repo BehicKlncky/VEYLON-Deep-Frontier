@@ -42,11 +42,15 @@ public class AudioManager {
     private int bDryFire, bReload, bFuse, bExplosion, bAlarmBell, bGate;
 
     // Ambience loops.
-    private int bRain, bWind, bFire, bCave, bCrickets, bBeacon;
+    private int bRain, bWind, bFire, bCave, bCrickets, bBeacon, bRainHigh, bWindHigh;
+    private final int[] detailBuffers = new int[4];
+    private final AmbientEvents ambientEvents = new AmbientEvents(rng);
+    private float weatherIntensity, currentIntensity;
+    private final java.util.function.IntConsumer detailPlayer = this::playAmbientDetail;
     private int sRain, sWind, sFire, sCave, sCrickets, sBeacon;
     private final float[] ambTarget = new float[6];
     private final float[] ambCurrent = new float[6];
-    private final int[] ambSources = new int[6];
+    private final int[] ambSources = new int[8];
     private static final float[] AMBIENCE_LEVELS = {0.65f, 0.5f, 0.55f, 0.4f, 0.3f, 0.35f};
     private final float[] listenerOrientation = new float[6];
 
@@ -91,6 +95,8 @@ public class AudioManager {
             ambSources[3] = sCave;
             ambSources[4] = sCrickets;
             ambSources[5] = sBeacon;
+            ambSources[6] = makeLoop(bRainHigh);
+            ambSources[7] = makeLoop(bWindHigh);
             enabled = true;
             System.out.println("[audio] OpenAL initialized (" + pool.length + " voices).");
         } catch (Throwable t) {
@@ -150,15 +156,38 @@ public class AudioManager {
         if (!enabled) {
             return;
         }
-        for (int i = 0; i < 6; i++) {
-            float cur = ambCurrent[i];
-            float tgt = ambTarget[i];
-            cur += (tgt - cur) * Math.min(1f, dt * 1.5f);
-            if (Math.abs(cur - ambCurrent[i]) > 0.0005f || cur != tgt) {
-                alSourcef(ambSources[i], AL_GAIN, cur * AMBIENCE_LEVELS[i]);
-            }
-            ambCurrent[i] = cur;
+        float blend = (float) -Math.expm1(-Math.max(0, dt) * 1.5f);
+        currentIntensity += (weatherIntensity - currentIntensity) * blend;
+        for (int i = 0; i < 6; i++) ambCurrent[i] += (ambTarget[i] - ambCurrent[i]) * blend;
+        ambientEvents.update(dt, ambCurrent, detailPlayer);
+        for (int i = 0; i < ambSources.length; i++) {
+            int channel = i < 6 ? i : i - 6;
+            float gain = ambCurrent[channel] * AMBIENCE_LEVELS[channel]
+                    * AmbientEvents.layerWeight(i, currentIntensity, ambientEvents.gust());
+            alSourcef(ambSources[i], AL_GAIN, gain);
         }
+    }
+
+    /** Sets weather timbre independently of the already-derived ambience channel gains. */
+    public void setWeatherIntensity(float intensity) {
+        if (!enabled) return;
+        weatherIntensity = Math.max(0, Math.min(1, intensity));
+    }
+
+    /** Cancels scene-local details and mix state before a world is replaced or abandoned. */
+    public void resetWorld() {
+        if (!enabled) return;
+        ambientEvents.reset();
+        java.util.Arrays.fill(ambTarget, 0);
+        java.util.Arrays.fill(ambCurrent, 0);
+        weatherIntensity = currentIntensity = 0;
+        for (int source : ambSources) alSourcef(source, AL_GAIN, 0);
+        for (int source : pool) alSourceStop(source);
+    }
+
+    private void playAmbientDetail(int kind) {
+        int channel = switch (kind) { case 0 -> 0; case 1 -> 2; case 2 -> 3; default -> 4; };
+        play2d(detailBuffers[kind], ambCurrent[channel] * 0.35f, pitchVar(0.15f));
     }
 
     public void playFootstep(BlockType under, boolean inWater) {
@@ -487,6 +516,9 @@ public class AudioManager {
         bCave = bank.get("Cave");
         bCrickets = bank.get("Crickets");
         bBeacon = bank.get("Beacon");
+        bRainHigh = bank.get("RainHigh");
+        bWindHigh = bank.get("WindHigh");
+        for (int i = 0; i < detailBuffers.length; i++) detailBuffers[i] = bank.get(AmbienceBeds.EVENT_NAMES[i]);
         synthesisMs = (System.nanoTime() - start) / 1e6;
         System.out.printf("[audio] rate=%d buffers=%d pcmBytes=%d synthesisAndUploadMs=%.3f%n",
                 ProceduralAudio.RATE, bank.size(), pcmBytes, synthesisMs);

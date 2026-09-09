@@ -151,6 +151,7 @@ final class FrontendController {
 
     /** Abandons the live world and returns to the title screen. */
     void returnToTitle() {
+        game.audio.resetWorld();
         game.releaseWorldMeshes();
         game.world = null;
         game.player = null;
