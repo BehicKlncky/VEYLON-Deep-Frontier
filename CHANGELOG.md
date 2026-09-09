@@ -2,6 +2,12 @@
 
 All notable user-facing changes to VEYLON: Deep Frontier are recorded here.
 
+## [0.5.3] - 2026-09-09
+
+### Changed
+
+- Rain and wind now change texture with weather strength; long continuous beds surround irregular droplets, fire details, cave drips and night insects.
+
 ## [0.5.2] - 2026-09-09
 
 ### Changed
