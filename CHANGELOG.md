@@ -2,6 +2,12 @@
 
 All notable user-facing changes to VEYLON: Deep Frontier are recorded here.
 
+## [0.5.10] - 2026-09-10
+
+### Changed
+
+- Adjust master, sound effects, ambience and music live from title or pause menus, with saved levels and a mute toggle.
+
 ## [0.5.9] - 2026-09-10
 
 ### Changed

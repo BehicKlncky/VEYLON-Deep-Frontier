@@ -203,3 +203,5 @@ W9 full build: PASS in 1m 51s, 460 tests / 73 classes.
 ### W10 evidence
 
 AudioSettings persists all four finite clamped bus levels and mute using the graphics-settings location/convention. Model tests cover defaults, malformed/NaN/infinite inputs, round trip and snapshot restoration. Voice backend tests prove live active/fading bus updates; options tests exercise keyboard steps, pointer drag/clamping and cancel/reopen snapshots. Menu tests prove title is worldless and pause options own Escape/F5 without quick-saving. A native 1280x720 capture (`screenshots/audio_options_2s.png`) was visually inspected: four sliders, mute and both buttons fit the existing cyan/amber panel style, with zero AL/GL/KHR errors. Human mouse interaction in a live world is not claimed from this capture.
+
+W10 full build: PASS in 2m 12s, 469 tests / 76 classes.
