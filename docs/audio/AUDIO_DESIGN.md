@@ -50,11 +50,13 @@ the presentation RNG at runtime, with bounded work each frame.
 
 ## Silence and transitions
 
-The intended music policy uses short synthesized phrases separated by at least
-45 seconds of silence. A state change fades an active phrase before a new one
-can enter; threat may shorten a long exploration wait but cannot create an
-unbroken score. Muting music disables new phrases. World changes cancel pending
-events and phrases because they describe the outgoing scene, not saved gameplay.
+Music uses 12-second synthesized phrases separated by 120-180 seconds of silence.
+The first phrase waits 12 seconds after world entry. A changed mood must remain
+stable for two seconds, then the current phrase releases over two seconds and
+another full silence interval begins. Threat cues from gameplay retain priority;
+music never bypasses the silence interval. Setting music to zero releases the
+current phrase over two seconds and prevents any new one. World changes stop
+and reset the director immediately because it describes the outgoing scene.
 
 Gain, weather timbre and environment transitions use smoothing on the existing
 frame thread. Environmental parameters interpolate instead of switching preset
@@ -104,3 +106,11 @@ Sixteen pending strikes is a hard cap. Overflow keeps nearer events; reset on ne
 ## Player mix controls
 
 The title AUDIO button and pause shortcut V open the same live editor: master 85%, SFX 100%, ambience 100%, music 50%, mute off by default. Four draggable sliders also support arrow keys in 5% steps. Apply/F5 saves `veylon_audio.properties` beside graphics settings through AppPaths; Back/Escape restores the previous mix. Mute preserves levels. Music at zero disables music events; SFX and ambience remain independent, and runtime droplets/crackles belong to ambience. Native source gain and active steal fades respond on the next frame without restarting buffers.
+
+## Adaptive phrase palette
+
+Six original motifs use additive sine partials around D3 (146.832 Hz), a quiet octave pedal, four staggered notes, soft attacks and a 12-second outer envelope. Calm uses open minor intervals; night descends an octave; threat and deep caves use low unresolved intervals; the first night introduces a vulnerable minor phrase; the repaired beacon resolves upward. The source gain is 0.22 before the music slider and master. Music has one dedicated relative source, a dry route and no competition with gameplay voices.
+
+Scene precedence is nearby threat/combat, repaired beacon within 36 blocks, depth at least 18 blocks, first night, later nights, then calm. Threat observation checks at most 64 creatures and 64 NPCs per medium tick, ignores dead/abstract travelers, uses a 24-block proximity radius and 48 blocks for current player combat targets, and never plans a settlement or generates a chunk. First-night ownership is session-local and resets on load; it is not a new save field. No playback or synthesis thread is added.
+
+Six music buffers add 6,350,400 PCM bytes. The final catalog has 122 buffers / 40,824,424 PCM bytes; complete warmed synthesis/conditioning/encoding measured 494.648 ms at W11. The pure director benchmark measured 0.000004 ms/update versus 0.02 ms. The 10,000-second deterministic schedule stays over 90% silent. These establish resource and timing behavior, not listener approval of the composition.

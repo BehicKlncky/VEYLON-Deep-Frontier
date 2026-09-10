@@ -73,4 +73,11 @@ class MusicDirectorTest {
         for (int i = 1; i <= 1200; i++) assertTrue(Math.abs(MusicDirector.envelope(i * 0.01f)
                 - MusicDirector.envelope((i - 1) * 0.01f)) < 0.01f);
     }
+
+    @Test void headlessManagerNeverStartsTheNativeDirector() {
+        var audio = new AudioManager();
+        for (MusicMood mood : MusicMood.values()) { audio.setMusicMood(mood); audio.update(10000); }
+        audio.setMusicMood(null); audio.resetWorld(); audio.shutdown();
+        assertFalse(audio.isEnabled());
+    }
 }

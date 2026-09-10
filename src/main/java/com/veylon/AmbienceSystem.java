@@ -253,6 +253,7 @@ final class AmbienceSystem {
                 beaconGain = (float) (1.0 - Math.sqrt(d) / BEACON_AUDIO_RANGE);
             }
         }
+        if (game.audio.isEnabled()) game.audio.setMusicMood(AudioSceneState.music(game, surface - game.player.pos.y));
         game.audio.setSheltered(!game.player.exposedToSky);
         game.audio.setWeatherIntensity(game.weather.intensity());
         game.audio.setAmbience(rainGain, windGain, fireGain, caveGain, cricketGain, beaconGain);
