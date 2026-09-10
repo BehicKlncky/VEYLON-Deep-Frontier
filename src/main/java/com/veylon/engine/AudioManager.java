@@ -24,7 +24,8 @@ import static org.lwjgl.system.MemoryUtil.NULL;
  */
 public class AudioManager {
 
-    private static final float MASTER = 0.85f;
+    /** Shared live mix edited by both title and pause options. */
+    public final AudioSettings settings = AudioSettings.loadOrDefaults();
 
     private long device;
     private long context;
@@ -85,7 +86,7 @@ public class AudioManager {
             nativeReady = true;
             effects.init(alcCaps.ALC_EXT_EFX && !"1".equals(System.getenv("VEYLON_NO_EFX")));
             alDistanceModel(AL_INVERSE_DISTANCE_CLAMPED);
-            alListenerf(AL_GAIN, MASTER);
+            alListenerf(AL_GAIN, settings.masterGain());
 
             synthesizeAll();
 
@@ -175,6 +176,8 @@ public class AudioManager {
             return;
         }
         long start = System.nanoTime();
+        alListenerf(AL_GAIN, settings.masterGain());
+        voices.mix(settings.level(AudioSettings.Bus.SFX), settings.level(AudioSettings.Bus.AMBIENCE));
         float blend = (float) -Math.expm1(-Math.max(0, dt) * 1.5f);
         currentIntensity += (weatherIntensity - currentIntensity) * blend;
         for (int i = 0; i < 6; i++) ambCurrent[i] += (ambTarget[i] - ambCurrent[i]) * blend;
@@ -188,7 +191,7 @@ public class AudioManager {
             int channel = SpatialAmbience.channel(layer);
             float gain = ambCurrent[channel] * AMBIENCE_LEVELS[channel]
                     * AmbientEvents.layerWeight(layer, currentIntensity, ambientEvents.gust()) * SpatialAmbience.allocation(layer);
-            alSourcef(ambSources[i], AL_GAIN, gain);
+            alSourcef(ambSources[i], AL_GAIN, gain * settings.level(AudioSettings.Bus.AMBIENCE));
         }
         pollErrors();
         long nanos = System.nanoTime() - start;
@@ -569,7 +572,7 @@ public class AudioManager {
         alSource3f(source, AL_POSITION, r.x(), r.y(), r.z());
         acoustics.position(source, r.x(), r.y(), r.z(), r.relative());
         acoustics.tint(source, r.highFrequency(), r.buffer() == detailBuffers[0]);
-        alSourcef(source, AL_GAIN, r.gain());
+        alSourcef(source, AL_GAIN, r.gain() * settings.level(r.ambience() ? AudioSettings.Bus.AMBIENCE : AudioSettings.Bus.SFX));
         alSourcef(source, AL_PITCH, r.pitch());
         alSourcef(source, AL_REFERENCE_DISTANCE, r.reference());
         alSourcef(source, AL_MAX_DISTANCE, r.maximum());
