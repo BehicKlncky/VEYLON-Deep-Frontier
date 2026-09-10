@@ -41,6 +41,9 @@ final class AutomatedRunDriver {
 
     // Session configuration, read once from the environment.
     private boolean smoke;
+    /** Optional device exercise emits sound only; it cannot damage entities or change terrain. */
+    private boolean audioQa;
+    private double nextAudioProbe;
     private String scene;
     private String frontendScreen;
     private boolean frontendQa;
@@ -71,6 +74,7 @@ final class AutomatedRunDriver {
      */
     boolean configure() {
         smoke = System.getenv("VEYLON_SMOKE") != null;
+        audioQa = "1".equals(System.getenv("VEYLON_AUDIO_QA"));
         scene = System.getenv("VEYLON_SCENE");
         String shotEnv = System.getenv("VEYLON_SHOT");
         frontendScreen = System.getenv("VEYLON_FRONTEND");
@@ -165,6 +169,11 @@ final class AutomatedRunDriver {
         double elapsed = now - sessionStart;
         if (!smoke || game.world == null || game.appState != Game.AppState.PLAYING) {
             return;
+        }
+        if (audioQa && elapsed > nextAudioProbe) {
+            nextAudioProbe = elapsed + 1;
+            for (int i = 0; i < 3; i++) game.audio.playGunshot(i == 0,
+                    game.player.pos.x + 12 + i, game.player.pos.y - 3, game.player.pos.z);
         }
         if (smokePhase == 0 && elapsed > 2.5) {
             smokePhase = 1;

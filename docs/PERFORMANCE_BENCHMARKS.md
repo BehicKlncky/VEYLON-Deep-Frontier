@@ -165,3 +165,20 @@ warm benchmark samples. Equivalent float payload doubles from 3,716,284 to
 7,432,612 bytes; runtime streams arrays to OpenAL and does not retain a full
 float catalog. Driver allocation and Java/native overhead are additional.
 Native initialization logs its complete synthesis/upload duration separately.
+
+## Audio occlusion (v0.5.6)
+
+`AudioOcclusionPerformanceTest` measures the full four-ray, 256-probe allowance
+against real `World.getBlock` calls across fifteen loaded chunks. Fixture setup
+is outside timing; three warmups and fastest of seven batches of 10,000 frames.
+Measured 0.002127 ms/frame against 0.10 ms. No gameplay benchmark budget changes.
+Initial playback and later reevaluations share the same frame allowance.
+Long paths coarsen sampling; this bounded approximation can miss thin distant
+walls. Native filter submission is measured separately by the device smoke.
+
+With VEYLON_AUDIO_QA=1, the 30-second smoke emits three presentation-only reports
+per second, without gameplay noise, damage or world edits. It observed 3/4 peak
+rays, 128/256 peak probes, 0.004023 ms mean audio update and 0.398700 ms maximum,
+with zero native errors. A focused test/doclint task ran during part of that
+smoke, so its 841.8 FPS is an execution check rather than a controlled comparison.
+The final release smoke will run without concurrent build work.

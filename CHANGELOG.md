@@ -2,6 +2,12 @@
 
 All notable user-facing changes to VEYLON: Deep Frontier are recorded here.
 
+## [0.5.6] - 2026-09-10
+
+### Changed
+
+- Solid terrain muffles positional sounds through bounded voxel occlusion, while air absorption softens distant reports.
+
 ## [0.5.5] - 2026-09-10
 
 ### Changed
