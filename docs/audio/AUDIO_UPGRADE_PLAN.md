@@ -48,7 +48,7 @@ settlement 0.013/0.52 ms, save 1.469/2.20 ms, load 198.662/240 ms
 | v0.5.3 | Layered ambience | 2 | Continuous beds, runtime events/gusts, intensity changes spectrum | automated checks verified |
 | v0.5.4 | Spatial ambience | 3 | Decorrelated weather, positioned fire, smooth gains | automated checks verified |
 | v0.5.5 | Environment reverb | 4 | Six interpolated presets, detected EFX, dry fallback | automated and native checks verified |
-| v0.5.6 | Occlusion | 5 | Fixed query/update caps, low-pass and air absorption | pending |
+| v0.5.6 | Occlusion | 5 | Fixed query/update caps, low-pass and air absorption | headless and native checks verified |
 | v0.5.7 | Variants | 6 | Four distinct takes of repeated sounds, non-repeating selection | pending |
 | v0.5.8 | Priority voices | 7 | Tested priority/quietness/age ordering, softened stealing | pending |
 | v0.5.9 | Weather realism | 8 | Distance-delay thunder and sheltered filtering, reset safety | pending |
@@ -162,3 +162,22 @@ Logs are local in ignored build/audio-work. Actual acoustic listening remains
 unverified; initialization and error-free submission do not prove aesthetic tuning.
 
 Final v0.5.5 build: PASS, 393 tests / 69 classes, zero failures; 1m 37s.
+
+### v0.5.6 evidence
+
+`AudioOcclusion` caps one segment at 64 probes; `AcousticSources` shares four
+rays between initial submissions and frame reevaluations, with a 0.10-second
+per-source refresh interval. Full occlusion retains 0.45 broadband and 0.08 HF
+gain; interpolation is eight per second. EFX air absorption is 1 for positional
+sources and 0 for relative sources. Missing EFX remains dry. World reset clears
+the query reference, and the listener now updates before frame acoustics.
+
+Tests cover open/blocked segments, negative floor coordinates, zero length and
+100,000-block paths, shared limits and disabled native filters. Real loaded-world
+ray benchmark: 0.002127/0.10 ms. All unchanged simulation/save budgets pass.
+The explicit native audio smoke records 3/4 peak rays, 128/256 probes and zero
+OpenAL/GL/KHR errors, with all hard limits. See PERFORMANCE_BENCHMARKS for timing
+and concurrent-work caveat. Coarse long rays may miss thin barriers; exact
+long-distance diffraction/propagation is outside this bounded approximation.
+
+W6 full build passed in 1m 38s: 396 tests / 70 classes, including doclint.
