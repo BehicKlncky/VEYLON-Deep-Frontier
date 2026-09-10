@@ -65,6 +65,7 @@ public class AudioManager {
 
     private int[] pool;
     private int poolNext;
+    private final java.util.Map<Integer, VariantBank> variants = new java.util.HashMap<>();
 
     public void init() {
         if (enabled) return;
@@ -109,7 +110,7 @@ public class AudioManager {
 
     private int makeLoop(int buffer, SpatialAmbience.Emitter emitter) {
         int src = alGenSources();
-        alSourcei(src, AL_BUFFER, buffer);
+        alSourcei(src, AL_BUFFER, variant(buffer));
         alSourcei(src, AL_LOOPING, AL_TRUE);
         alSourcei(src, AL_SOURCE_RELATIVE, emitter.relative() ? AL_TRUE : AL_FALSE);
         alSource3f(src, AL_POSITION, emitter.x(), emitter.y(), emitter.z());
@@ -249,7 +250,7 @@ public class AudioManager {
             case SNOW -> bFootSnow;
             default -> bFootGrass;
         };
-        play2d(buf, 0.35f, pitchVar(0.25f));
+        play2d(buf, 0.35f, pitchVar(0.08f));
     }
 
     public void playBlockHit(BlockType t, float x, float y, float z) {
@@ -471,6 +472,11 @@ public class AudioManager {
         return 1f + (rng.nextFloat() * 2f - 1f) * spread;
     }
 
+    private int variant(int buffer) {
+        VariantBank bank = variants.get(buffer);
+        return bank == null ? buffer : bank.next();
+    }
+
     private int grabSource() {
         for (int i = 0; i < pool.length; i++) {
             int src = pool[(poolNext + i) % pool.length];
@@ -501,7 +507,7 @@ public class AudioManager {
             return;
         }
         alSourceStop(src);
-        alSourcei(src, AL_BUFFER, buffer);
+        alSourcei(src, AL_BUFFER, variant(buffer));
         alSourcei(src, AL_SOURCE_RELATIVE, AL_FALSE);
         effects.route(src, true);
         alSource3f(src, AL_POSITION, x, y, z);
@@ -522,7 +528,7 @@ public class AudioManager {
             return;
         }
         alSourceStop(src);
-        alSourcei(src, AL_BUFFER, buffer);
+        alSourcei(src, AL_BUFFER, variant(buffer));
         alSourcei(src, AL_SOURCE_RELATIVE, AL_TRUE);
         effects.route(src, buffer != bClick && buffer != bQuest && buffer != bDiscover);
         alSource3f(src, AL_POSITION, 0, 0, 0);
@@ -593,6 +599,12 @@ public class AudioManager {
         bRainHigh = bank.get("RainHigh");
         bWindHigh = bank.get("WindHigh");
         for (int i = 0; i < detailBuffers.length; i++) detailBuffers[i] = bank.get(AmbienceBeds.EVENT_NAMES[i]);
+        variants.clear();
+        for (String name : VariantBank.NAMES) {
+            int[] ids = new int[VariantBank.COUNT];
+            for (int i = 0; i < ids.length; i++) ids[i] = bank.get(VariantBank.key(name, i));
+            variants.put(ids[0], new VariantBank(ids));
+        }
         synthesisMs = (System.nanoTime() - start) / 1e6;
         System.out.printf("[audio] rate=%d buffers=%d pcmBytes=%d synthesisAndUploadMs=%.3f%n",
                 ProceduralAudio.RATE, bank.size(), pcmBytes, synthesisMs);

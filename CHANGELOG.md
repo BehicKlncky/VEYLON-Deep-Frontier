@@ -2,6 +2,12 @@
 
 All notable user-facing changes to VEYLON: Deep Frontier are recorded here.
 
+## [0.5.7] - 2026-09-10
+
+### Changed
+
+- Frequent footsteps, impacts, swings and firearm reports rotate through four independently generated takes.
+
 ## [0.5.6] - 2026-09-10
 
 ### Changed

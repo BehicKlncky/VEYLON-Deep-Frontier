@@ -84,3 +84,7 @@ HF decay ratio, density and diffusion; all except seconds are linear factors.
 `ReverbPresets` is executable authority. Depth above five blocks selects shallow
 underground, at least eighteen selects deep cave; depth takes precedence over
 forest or constructed flooring. Gain and decay converge at 1.2 per second.
+
+## Variant palette
+
+Four independent takes cover 18 frequent sounds (five surfaces, three block hits, break/place, melee hit/swing, bow release, arrow/bullet impacts, flap and two firearms). Every accepted playback advances its own bank; wraparound cannot repeat the previous take. Extra PCM is 1,061,046 bytes, bringing 116 buffers to 34,474,024 bytes. No new asset or decoder is involved. Repetition fatigue still requires human listening acceptance.
