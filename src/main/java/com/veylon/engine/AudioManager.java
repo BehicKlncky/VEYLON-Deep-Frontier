@@ -30,6 +30,7 @@ public class AudioManager {
     private long context;
     private boolean enabled, nativeReady;
     private final EfxProcessor effects = new EfxProcessor();
+    private AcousticSources acoustics;
     private final Random rng = new Random();
 
     // One-shot buffers.
@@ -96,6 +97,7 @@ public class AudioManager {
                 var emitter = SpatialAmbience.EMITTERS[i];
                 ambSources[i] = makeLoop(buffers.get(emitter.name()), emitter);
             }
+            acoustics = new AcousticSources(effects.enabled(), pool, ambSources);
             if (alGetError() != AL_NO_ERROR) throw new IllegalStateException("OpenAL initialization error");
             enabled = true;
             System.out.println("[audio] OpenAL initialized (" + pool.length + " voices).");
@@ -128,6 +130,7 @@ public class AudioManager {
             return;
         }
         alListener3f(AL_POSITION, x, y, z);
+        acoustics.listener(x, y, z);
         float yaw = (float) Math.toRadians(yawDeg);
         float fx = (float) Math.sin(yaw), fz = -(float) Math.cos(yaw);
         listenerOrientation[0] = fx;
@@ -165,6 +168,7 @@ public class AudioManager {
         for (int i = 0; i < 6; i++) ambCurrent[i] += (ambTarget[i] - ambCurrent[i]) * blend;
         ambientEvents.update(dt, ambCurrent, detailPlayer);
         effects.update(dt);
+        acoustics.update(dt);
         for (int i = 0; i < ambSources.length; i++) {
             int layer = SpatialAmbience.EMITTERS[i].layer();
             int channel = SpatialAmbience.channel(layer);
@@ -190,6 +194,7 @@ public class AudioManager {
         if (!enabled) return;
         ambientEvents.reset();
         effects.reset();
+        acoustics.reset();
         firePositioned = false;
         java.util.Arrays.fill(ambTarget, 0);
         java.util.Arrays.fill(ambCurrent, 0);
@@ -222,6 +227,13 @@ public class AudioManager {
         fireX = x; fireY = y; fireZ = z;
         firePositioned = true;
         alSource3f(ambSources[2], AL_POSITION, x, y, z);
+        acoustics.position(ambSources[2], x, y, z, false);
+    }
+
+    /** Associates occlusion queries with the newly constructed world; never generates chunks. */
+    public void bindWorld(com.veylon.world.World world) {
+        if (!enabled) return;
+        acoustics.world(world);
     }
 
     public void playFootstep(BlockType under, boolean inWater) {
@@ -424,6 +436,7 @@ public class AudioManager {
         if (nativeReady) {
             if (pool != null) for (int source : pool) if (source != 0) alDeleteSources(source);
             for (int source : ambSources) if (source != 0) alDeleteSources(source);
+            if (acoustics != null) { acoustics.close(); acoustics = null; }
             effects.close();
             if (buffers != null) for (int buffer : buffers.values()) alDeleteBuffers(buffer);
             pollErrors();
@@ -492,6 +505,7 @@ public class AudioManager {
         alSourcei(src, AL_SOURCE_RELATIVE, AL_FALSE);
         effects.route(src, true);
         alSource3f(src, AL_POSITION, x, y, z);
+        acoustics.position(src, x, y, z, false);
         alSourcef(src, AL_GAIN, gain);
         alSourcef(src, AL_PITCH, pitch);
         alSourcef(src, AL_REFERENCE_DISTANCE, refDist);
@@ -512,6 +526,7 @@ public class AudioManager {
         alSourcei(src, AL_SOURCE_RELATIVE, AL_TRUE);
         effects.route(src, buffer != bClick && buffer != bQuest && buffer != bDiscover);
         alSource3f(src, AL_POSITION, 0, 0, 0);
+        acoustics.position(src, 0, 0, 0, true);
         alSourcef(src, AL_GAIN, gain);
         alSourcef(src, AL_PITCH, pitch);
         alSourcePlay(src);

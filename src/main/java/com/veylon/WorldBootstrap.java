@@ -54,6 +54,7 @@ final class WorldBootstrap {
     void newWorld(long seed, boolean fresh, int generatorVersion) {
         resetForNewWorld(seed);
         game.world = new World(seed, generatorVersion);
+        game.audio.bindWorld(game.world);
         game.world.listener = game;
         game.player = new Player(game.world);
         clearPerWorldState();

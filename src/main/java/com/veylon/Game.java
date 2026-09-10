@@ -456,13 +456,13 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
             noise.update(dt);
             updateEmitters(dt);
         }
-        audio.update(dt);
 
         // Camera follows the player eye.
         camera.position.set(player.pos.x, player.pos.y + player.eyeHeight(), player.pos.z);
         player.yaw = camera.yaw;
         qa.updateMiningShowcase(dt);
         audio.setListener(camera.position.x, camera.position.y, camera.position.z, camera.yaw);
+        audio.update(dt);
 
         if (player.dead && appState == AppState.PLAYING) {
             appState = AppState.DEATH;
