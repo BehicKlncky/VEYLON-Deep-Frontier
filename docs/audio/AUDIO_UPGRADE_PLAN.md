@@ -199,3 +199,9 @@ W8 full build: PASS in 1m 39s, 456 tests / 72 classes.
 Distance-delayed thunder uses a fixed 16-event queue and optional direct-path HF filtering. Four headless tests cover exact delay/position, distance curves, nearest-event overflow, cancellation, smooth indoor/outdoor transitions and no-device calls. Lightning's simulation RNG sequence and loaded-column gameplay actions are unchanged; focused WorldSeedDeterminismTest passes. The native 30-second weather/voice smoke passes at 873.9 FPS (p95/p99 1.44/1.62 ms), all hard limits, 32 thunder events, one cancelled and zero pending at shutdown, with zero AL/GL/KHR errors. Audio update mean/max 0.004051/0.750400 ms. An explicit pre-load pending-strike assertion is included for the final release smoke. Subjective close/far and shelter listening acceptance remains unverified.
 
 W9 full build: PASS in 1m 51s, 460 tests / 73 classes.
+
+### W10 evidence
+
+AudioSettings persists all four finite clamped bus levels and mute using the graphics-settings location/convention. Model tests cover defaults, malformed/NaN/infinite inputs, round trip and snapshot restoration. Voice backend tests prove live active/fading bus updates; options tests exercise keyboard steps, pointer drag/clamping and cancel/reopen snapshots. Menu tests prove title is worldless and pause options own Escape/F5 without quick-saving. A native 1280x720 capture (`screenshots/audio_options_2s.png`) was visually inspected: four sliders, mute and both buttons fit the existing cyan/amber panel style, with zero AL/GL/KHR errors. Human mouse interaction in a live world is not claimed from this capture.
+
+W10 full build: PASS in 2m 12s, 469 tests / 76 classes.

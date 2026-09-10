@@ -5,6 +5,7 @@ release-assets-*/
 saves/
 screenshots/
 veylon_graphics.properties
+veylon_audio.properties
 *.log
 .idea/
 *.iml

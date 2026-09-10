@@ -229,3 +229,5 @@ Tracked honestly so nobody rediscovers them:
   receive `Game` for cross-system coordination. Introducing a service locator
   or one facade per system would add indirection without narrowing that
   dependency and remains intentionally out of scope.
+
+Audio preferences use `veylon_audio.properties` in the same AppPaths directory as graphics preferences. Use V from the title or pause menu, or the title AUDIO button. `VEYLON_FRONTEND=audio` with `VEYLON_SHOT=2` captures the audio editor without a world; Apply saves and Back cancels live edits.

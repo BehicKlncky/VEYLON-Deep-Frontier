@@ -37,13 +37,19 @@ final class VoicePool {
     private final long[] age = new long[CAPACITY];
     private long clock;
     private float listenerX, listenerY, listenerZ;
+    private float sfx = 1, ambience = 1;
     int steals, dropped;
 
     VoicePool(Backend backend) { this.backend = backend; }
 
     void listener(float x, float y, float z) { listenerX = x; listenerY = y; listenerZ = z; }
 
+    void mix(float sfx, float ambience) { this.sfx = sfx; this.ambience = ambience; }
+
+    private float mixedGain(Request request) { return request.gain * (request.ambience ? ambience : sfx); }
+
     boolean play(Request request) {
+        if (mixedGain(request) <= 0) return false;
         int victim = -1;
         for (int i = 0; i < CAPACITY; i++) {
             if (pending[i] == null && !backend.playing(i)) {
@@ -65,20 +71,23 @@ final class VoicePool {
         Request rb = pending[b] == null ? active[b] : pending[b];
         int priority = ra.priority.compareTo(rb.priority);
         if (priority != 0) return priority < 0;
-        int gain = Float.compare(ra.audibility(listenerX, listenerY, listenerZ), rb.audibility(listenerX, listenerY, listenerZ));
+        int gain = Float.compare(ra.audibility(listenerX, listenerY, listenerZ) * (ra.ambience ? ambience : sfx), rb.audibility(listenerX, listenerY, listenerZ) * (rb.ambience ? ambience : sfx));
         return gain != 0 ? gain < 0 : age[a] < age[b];
     }
 
     void update(float dt) {
         for (int i = 0; i < CAPACITY; i++) {
-            if (pending[i] == null) continue;
+            if (pending[i] == null) {
+                if (active[i] != null && backend.playing(i)) backend.gain(i, mixedGain(active[i]));
+                continue;
+            }
             if (fade[i] >= STEAL_SECONDS || !backend.playing(i)) {
                 Request next = pending[i];
                 backend.stop(i);
                 start(i, next);
             } else {
                 fade[i] = Math.min(STEAL_SECONDS, fade[i] + Math.max(0, dt));
-                backend.gain(i, active[i].gain * fadeGain(fade[i]));
+                backend.gain(i, mixedGain(active[i]) * fadeGain(fade[i]));
             }
         }
     }
@@ -92,6 +101,7 @@ final class VoicePool {
         pending[i] = null;
         age[i] = ++clock;
         backend.start(i, request);
+        backend.gain(i, mixedGain(request));
     }
 
     void reset() {

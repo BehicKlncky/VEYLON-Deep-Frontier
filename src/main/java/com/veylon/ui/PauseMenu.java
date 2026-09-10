@@ -19,8 +19,8 @@ public class PauseMenu {
         ui.textCentered(w / 2f, y0 + 48, 1.4f, "- PAUSED -", 0.8f, 0.8f, 0.8f, 1f);
 
         float oy = y0 + 78;
-        ui.textCentered(w / 2f, oy, 1.35f,
-                "[Esc] Resume   [O] Graphics   [F5] Save   [F9] Load   [Q] Quit",
+        ui.textCentered(w / 2f, oy, 1.10f,
+                "[Esc] Resume   [O] Graphics   [V] Audio   [F5] Save   [F9] Load   [Q] Quit",
                 1f, 1f, 1f, 1f);
         oy += 36;
 

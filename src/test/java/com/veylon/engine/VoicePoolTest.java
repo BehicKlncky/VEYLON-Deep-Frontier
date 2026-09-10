@@ -72,4 +72,21 @@ class VoicePoolTest {
         assertEquals(99, backend.buffer[VoicePool.CAPACITY - 1]);
         assertEquals(1, backend.buffer[0]);
     }
+
+    @Test void liveBusChangesReachActiveAndFadingVoicesWithoutRestarting() {
+        var backend = new Fake(); var pool = new VoicePool(backend);
+        pool.play(request(1, ORDINARY, 0.8f));
+        pool.play(new VoicePool.Request(2, 0, 0, 0, 0.5f, 1, 3, 44, true, true, true, BACKGROUND));
+        pool.mix(0.5f, 0.2f); pool.update(0.01f);
+        assertEquals(0.4f, backend.gain[0]); assertEquals(0.1f, backend.gain[1]);
+        assertEquals(2, backend.starts);
+        pool.mix(0, 1); pool.update(0.01f);
+        assertEquals(0, backend.gain[0]); assertEquals(0.5f, backend.gain[1]);
+        assertFalse(pool.play(request(99, CRITICAL, 1)), "A disabled bus consumes no new voice");
+        pool.mix(1, 1);
+        for (int i = 2; i < VoicePool.CAPACITY; i++) pool.play(request(i + 1, IMPORTANT, 1));
+        pool.play(request(99, CRITICAL, 1));
+        pool.mix(1, 0.5f); pool.update(VoicePool.STEAL_SECONDS / 2);
+        assertEquals(0.125f, backend.gain[1], 0.00001f, "Fades retain the live ambience bus");
+    }
 }
