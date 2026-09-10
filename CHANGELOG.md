@@ -2,6 +2,12 @@
 
 All notable user-facing changes to VEYLON: Deep Frontier are recorded here.
 
+## [0.5.8] - 2026-09-10
+
+### Changed
+
+- Explosions, injury and alarms take precedence over footsteps in a larger voice pool, with brief fades before a busy voice is reused.
+
 ## [0.5.7] - 2026-09-10
 
 ### Changed
