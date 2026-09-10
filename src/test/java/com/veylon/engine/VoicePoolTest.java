@@ -62,4 +62,14 @@ class VoicePoolTest {
         assertEquals(VoicePool.CAPACITY, backend.starts);
         for (boolean playing : backend.playing) assertFalse(playing);
     }
+
+    @Test void aDistantLoudSourceYieldsBeforeANearQuietSource() {
+        var backend = new Fake(); var pool = new VoicePool(backend);
+        for (int i = 0; i < VoicePool.CAPACITY - 1; i++) pool.play(request(i + 1, ORDINARY, 0.2f));
+        pool.play(new VoicePool.Request(80, 100, 0, 0, 1, 1, 3, 220, false, true, false, ORDINARY));
+        pool.play(request(99, IMPORTANT, 1));
+        pool.update(1); pool.update(0);
+        assertEquals(99, backend.buffer[VoicePool.CAPACITY - 1]);
+        assertEquals(1, backend.buffer[0]);
+    }
 }

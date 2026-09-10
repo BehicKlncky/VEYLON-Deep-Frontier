@@ -88,3 +88,9 @@ forest or constructed flooring. Gain and decay converge at 1.2 per second.
 ## Variant palette
 
 Four independent takes cover 18 frequent sounds (five surfaces, three block hits, break/place, melee hit/swing, bow release, arrow/bullet impacts, flap and two firearms). Every accepted playback advances its own bank; wraparound cannot repeat the previous take. Extra PCM is 1,061,046 bytes, bringing 116 buffers to 34,474,024 bytes. No new asset or decoder is involved. Repetition fatigue still requires human listening acceptance.
+
+## Voice pressure
+
+Twenty-four one-shot sources allow roughly eight concurrent actors with three overlapping actions each, with only eight additional native sources over the old pool. Sixteen persistent ambience sources are independent. Four classes rank backgrounds/footsteps, ordinary actions, important reports/UI/rewards/predators, then critical explosion/hurt/alarm. Admission and replacement scan exactly 24 entries. When exhausted, the lowest priority, quietest distance-adjusted and oldest voice yields; a lower class never displaces a higher class or its pending replacement.
+
+Reuse follows a 30 ms raised-cosine release and a submitted zero-gain update before stop/rebind. The replacement uses its existing 4 ms PCM attack. One pending request per source caps memory and latency; later equally important events may supersede pending ones during extreme pressure. At low frame rates reuse waits for the next frame. Native execution and envelope tests do not substitute for a listening check for clicks on every driver.
