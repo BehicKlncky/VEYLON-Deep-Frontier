@@ -211,3 +211,5 @@ W10 full build: PASS in 2m 12s, 469 tests / 76 classes.
 Six state-driven 12-second phrases use one dedicated source and 120-180 seconds of silence. The 12-second entry delay allows native smoke coverage without bypassing production policy. Six director tests cover silence fraction, transitions, first-night ownership, disablement and headless safety; two phrase tests cover clean PCM and register/alias-band spectra, and two new synthetic-world cases cover all six moods and combat/abstract/dead entities without world generation.
 
 W11 benchmarks: 494.648/1500 ms synthesis and 40,824,424/67,108,864 PCM bytes; music director 0.000004/0.02 ms. Native 30-second smoke passed at 829.8 FPS, p95/p99 1.58/2.09 ms, all hard limits, one music phrase, 125 voice steals, 32 thunder events, two cancelled and zero pending, with zero AL/GL/KHR errors. The pre-load old-world weather assertion passed. Total audio update mean/max 0.007914/0.818400 ms. No concurrent build ran during this smoke. Musical balance and listening acceptance remain unverified.
+
+W11 full build: PASS in 1m 41s, 485 tests / 78 classes.
