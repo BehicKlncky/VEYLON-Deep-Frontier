@@ -28,7 +28,8 @@ public class AudioManager {
 
     private long device;
     private long context;
-    private boolean enabled;
+    private boolean enabled, nativeReady;
+    private final EfxProcessor effects = new EfxProcessor();
     private final Random rng = new Random();
 
     // One-shot buffers.
@@ -58,11 +59,14 @@ public class AudioManager {
 
     private long pcmBytes;
     private double synthesisMs;
+    private long updateCount, updateNanos, maxUpdateNanos;
+    private int nativeErrors;
 
     private int[] pool;
     private int poolNext;
 
     public void init() {
+        if (enabled) return;
         try {
             device = alcOpenDevice((CharSequence) null);
             if (device == NULL) {
@@ -70,9 +74,11 @@ public class AudioManager {
                 return;
             }
             context = alcCreateContext(device, (int[]) null);
-            alcMakeContextCurrent(context);
+            if (context == NULL || !alcMakeContextCurrent(context)) throw new IllegalStateException("No audio context");
             ALCCapabilities alcCaps = ALC.createCapabilities(device);
             AL.createCapabilities(alcCaps);
+            nativeReady = true;
+            effects.init(alcCaps.ALC_EXT_EFX && !"1".equals(System.getenv("VEYLON_NO_EFX")));
             alDistanceModel(AL_INVERSE_DISTANCE_CLAMPED);
             alListenerf(AL_GAIN, MASTER);
 
@@ -81,6 +87,7 @@ public class AudioManager {
             pool = new int[16];
             for (int i = 0; i < pool.length; i++) {
                 pool[i] = alGenSources();
+                effects.route(pool[i], true);
                 alSourcef(pool[i], AL_REFERENCE_DISTANCE, 3f);
                 alSourcef(pool[i], AL_MAX_DISTANCE, 44f);
                 alSourcef(pool[i], AL_ROLLOFF_FACTOR, 1.1f);
@@ -89,11 +96,12 @@ public class AudioManager {
                 var emitter = SpatialAmbience.EMITTERS[i];
                 ambSources[i] = makeLoop(buffers.get(emitter.name()), emitter);
             }
+            if (alGetError() != AL_NO_ERROR) throw new IllegalStateException("OpenAL initialization error");
             enabled = true;
             System.out.println("[audio] OpenAL initialized (" + pool.length + " voices).");
         } catch (Throwable t) {
             System.out.println("[audio] Init failed (" + t + "); sound disabled.");
-            enabled = false;
+            shutdown();
         }
     }
 
@@ -106,6 +114,7 @@ public class AudioManager {
         alSourcef(src, AL_REFERENCE_DISTANCE, SpatialAmbience.FIRE_REFERENCE_DISTANCE);
         alSourcef(src, AL_ROLLOFF_FACTOR, 0);
         alSourcef(src, AL_GAIN, 0f);
+        effects.route(src, true);
         alSourcePlay(src);
         return src;
     }
@@ -150,10 +159,12 @@ public class AudioManager {
         if (!enabled) {
             return;
         }
+        long start = System.nanoTime();
         float blend = (float) -Math.expm1(-Math.max(0, dt) * 1.5f);
         currentIntensity += (weatherIntensity - currentIntensity) * blend;
         for (int i = 0; i < 6; i++) ambCurrent[i] += (ambTarget[i] - ambCurrent[i]) * blend;
         ambientEvents.update(dt, ambCurrent, detailPlayer);
+        effects.update(dt);
         for (int i = 0; i < ambSources.length; i++) {
             int layer = SpatialAmbience.EMITTERS[i].layer();
             int channel = SpatialAmbience.channel(layer);
@@ -161,6 +172,11 @@ public class AudioManager {
                     * AmbientEvents.layerWeight(layer, currentIntensity, ambientEvents.gust()) * SpatialAmbience.allocation(layer);
             alSourcef(ambSources[i], AL_GAIN, gain);
         }
+        pollErrors();
+        long nanos = System.nanoTime() - start;
+        updateCount++;
+        updateNanos += nanos;
+        maxUpdateNanos = Math.max(maxUpdateNanos, nanos);
     }
 
     /** Sets weather timbre independently of the already-derived ambience channel gains. */
@@ -173,6 +189,7 @@ public class AudioManager {
     public void resetWorld() {
         if (!enabled) return;
         ambientEvents.reset();
+        effects.reset();
         firePositioned = false;
         java.util.Arrays.fill(ambTarget, 0);
         java.util.Arrays.fill(ambCurrent, 0);
@@ -192,6 +209,12 @@ public class AudioManager {
 
     /** True only after native initialization completed successfully. */
     public boolean isEnabled() { return enabled; }
+
+    /** Requests a smoothly interpolated environment preset; dry devices safely ignore it. */
+    public void setEnvironment(AudioEnvironment.Zone zone) {
+        if (!enabled) return;
+        effects.zone(zone);
+    }
 
     /** Places fire ambience at the nearest audible heat source in world coordinates. */
     public void setFirePosition(float x, float y, float z) {
@@ -395,14 +418,36 @@ public class AudioManager {
         playAt(bGate, x, y, z, 0.6f, pitchVar(0.12f));
     }
 
+    /** Releases all native resources, including a partially initialized device. */
     public void shutdown() {
-        if (!enabled) {
-            return;
-        }
         enabled = false;
-        alcMakeContextCurrent(NULL);
-        alcDestroyContext(context);
-        alcCloseDevice(device);
+        if (nativeReady) {
+            if (pool != null) for (int source : pool) if (source != 0) alDeleteSources(source);
+            for (int source : ambSources) if (source != 0) alDeleteSources(source);
+            effects.close();
+            if (buffers != null) for (int buffer : buffers.values()) alDeleteBuffers(buffer);
+            pollErrors();
+            System.out.printf("[audio] updates=%d meanUpdateMs=%.6f maxUpdateMs=%.6f nativeErrors=%d%n",
+                    updateCount, updateCount == 0 ? 0 : updateNanos / (double) updateCount / 1e6,
+                    maxUpdateNanos / 1e6, nativeErrors);
+            java.util.Arrays.fill(ambSources, 0);
+            pool = null;
+            buffers = null;
+            nativeReady = false;
+        }
+        if (context != NULL) {
+            alcMakeContextCurrent(NULL);
+            alcDestroyContext(context);
+            context = NULL;
+        }
+        if (device != NULL) { alcCloseDevice(device); device = NULL; }
+    }
+
+    private void pollErrors() {
+        int error = alGetError();
+        if (error != AL_NO_ERROR && nativeErrors++ == 0) {
+            System.err.println("[audio] OpenAL error 0x" + Integer.toHexString(error));
+        }
     }
 
     // ------------------------------------------------------------------
@@ -445,6 +490,7 @@ public class AudioManager {
         alSourceStop(src);
         alSourcei(src, AL_BUFFER, buffer);
         alSourcei(src, AL_SOURCE_RELATIVE, AL_FALSE);
+        effects.route(src, true);
         alSource3f(src, AL_POSITION, x, y, z);
         alSourcef(src, AL_GAIN, gain);
         alSourcef(src, AL_PITCH, pitch);
@@ -464,6 +510,7 @@ public class AudioManager {
         alSourceStop(src);
         alSourcei(src, AL_BUFFER, buffer);
         alSourcei(src, AL_SOURCE_RELATIVE, AL_TRUE);
+        effects.route(src, buffer != bClick && buffer != bQuest && buffer != bDiscover);
         alSource3f(src, AL_POSITION, 0, 0, 0);
         alSourcef(src, AL_GAIN, gain);
         alSourcef(src, AL_PITCH, pitch);
