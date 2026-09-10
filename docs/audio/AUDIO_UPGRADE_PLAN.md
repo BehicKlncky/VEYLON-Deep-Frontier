@@ -49,11 +49,11 @@ settlement 0.013/0.52 ms, save 1.469/2.20 ms, load 198.662/240 ms
 | v0.5.4 | Spatial ambience | 3 | Decorrelated weather, positioned fire, smooth gains | automated checks verified |
 | v0.5.5 | Environment reverb | 4 | Six interpolated presets, detected EFX, dry fallback | automated and native checks verified |
 | v0.5.6 | Occlusion | 5 | Fixed query/update caps, low-pass and air absorption | headless and native checks verified |
-| v0.5.7 | Variants | 6 | Four distinct takes of repeated sounds, non-repeating selection | pending |
-| v0.5.8 | Priority voices | 7 | Tested priority/quietness/age ordering, softened stealing | pending |
-| v0.5.9 | Weather realism | 8 | Distance-delay thunder and sheltered filtering, reset safety | pending |
-| v0.5.10 | Settings | 9 | Persistent live buses and mute, title/pause editor | pending |
-| v0.5.11 | Sparse music | 10 | State-led synthesized phrases, silence intervals, mute and bounds | pending |
+| v0.5.7 | Variants | 6 | Four distinct takes of repeated sounds, non-repeating selection | automated checks verified; evidence below |
+| v0.5.8 | Priority voices | 7 | Tested priority/quietness/age ordering, softened stealing | automated checks verified; evidence below |
+| v0.5.9 | Weather realism | 8 | Distance-delay thunder and sheltered filtering, reset safety | automated checks verified; evidence below |
+| v0.5.10 | Settings | 9 | Persistent live buses and mute, title/pause editor | automated checks verified; evidence below |
+| v0.5.11 | Sparse music | 10 | State-led synthesized phrases, silence intervals, mute and bounds | automated checks verified; evidence below |
 
 Every phase requires a full passing build before its explicit merge. Final
 validation additionally requires two repeated portable suites, performanceTest,
@@ -205,3 +205,11 @@ W9 full build: PASS in 1m 51s, 460 tests / 73 classes.
 AudioSettings persists all four finite clamped bus levels and mute using the graphics-settings location/convention. Model tests cover defaults, malformed/NaN/infinite inputs, round trip and snapshot restoration. Voice backend tests prove live active/fading bus updates; options tests exercise keyboard steps, pointer drag/clamping and cancel/reopen snapshots. Menu tests prove title is worldless and pause options own Escape/F5 without quick-saving. A native 1280x720 capture (`screenshots/audio_options_2s.png`) was visually inspected: four sliders, mute and both buttons fit the existing cyan/amber panel style, with zero AL/GL/KHR errors. Human mouse interaction in a live world is not claimed from this capture.
 
 W10 full build: PASS in 2m 12s, 469 tests / 76 classes.
+
+### W11 evidence
+
+Six state-driven 12-second phrases use one dedicated source and 120-180 seconds of silence. The 12-second entry delay allows native smoke coverage without bypassing production policy. Six director tests cover silence fraction, transitions, first-night ownership, disablement and headless safety; two phrase tests cover clean PCM and register/alias-band spectra, and two new synthetic-world cases cover all six moods and combat/abstract/dead entities without world generation.
+
+W11 benchmarks: 494.648/1500 ms synthesis and 40,824,424/67,108,864 PCM bytes; music director 0.000004/0.02 ms. Native 30-second smoke passed at 829.8 FPS, p95/p99 1.58/2.09 ms, all hard limits, one music phrase, 125 voice steals, 32 thunder events, two cancelled and zero pending, with zero AL/GL/KHR errors. The pre-load old-world weather assertion passed. Total audio update mean/max 0.007914/0.818400 ms. No concurrent build ran during this smoke. Musical balance and listening acceptance remain unverified.
+
+W11 full build: PASS in 1m 41s, 485 tests / 78 classes.

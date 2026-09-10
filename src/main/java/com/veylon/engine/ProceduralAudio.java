@@ -73,6 +73,7 @@ final class ProceduralAudio {
         for (String name : VariantBank.NAMES) {
             for (int i = 1; i < VariantBank.COUNT; i++) sink.accept(VariantBank.key(name, i), recipes.get(name).get());
         }
+        MusicPhrases.synthesize(rng, sink);
     }
 
     // ---- 0.3.0 combat & settlement synthesis ----

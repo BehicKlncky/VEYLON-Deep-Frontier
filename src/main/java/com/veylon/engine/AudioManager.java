@@ -69,6 +69,8 @@ public class AudioManager {
 
     private int[] pool;
     private VoicePool voices;
+    private MusicDirector music;
+    private int musicSource;
     private final java.util.Map<Integer, VariantBank> variants = new java.util.HashMap<>();
 
     public void init() {
@@ -110,6 +112,21 @@ public class AudioManager {
                 public void gain(int i, float gain) { alSourcef(pool[i], AL_GAIN, gain); }
                 public void stop(int i) { alSourceStop(pool[i]); }
             });
+            musicSource = alGenSources();
+            alSourcei(musicSource, AL_SOURCE_RELATIVE, AL_TRUE);
+            alSourcef(musicSource, AL_ROLLOFF_FACTOR, 0);
+            effects.route(musicSource, false);
+            music = new MusicDirector(rng, new MusicDirector.Backend() {
+                public void start(MusicMood mood) {
+                    alSourceStop(musicSource);
+                    alSourcei(musicSource, AL_BUFFER, buffers.get(MusicPhrases.key(mood)));
+                    alSourcef(musicSource, AL_GAIN, 0);
+                    alSourcePlay(musicSource);
+                }
+                public void gain(float gain) { alSourcef(musicSource, AL_GAIN, gain); }
+                public void stop() { alSourceStop(musicSource); }
+            });
+            if (alGetError() != AL_NO_ERROR) throw new IllegalStateException("OpenAL music initialization error");
             enabled = true;
             System.out.println("[audio] OpenAL initialized (" + pool.length + " voices).");
         } catch (Throwable t) {
@@ -182,6 +199,7 @@ public class AudioManager {
         currentIntensity += (weatherIntensity - currentIntensity) * blend;
         for (int i = 0; i < 6; i++) ambCurrent[i] += (ambTarget[i] - ambCurrent[i]) * blend;
         ambientEvents.update(dt, ambCurrent, detailPlayer);
+        music.update(dt, settings.masterGain() > 0 ? settings.level(AudioSettings.Bus.MUSIC) : 0);
         thunder.update(dt, thunderPlayer);
         voices.update(dt);
         effects.update(dt);
@@ -210,6 +228,7 @@ public class AudioManager {
     public void resetWorld() {
         if (!enabled) return;
         thunder.reset();
+        music.reset();
         ambientEvents.reset();
         effects.reset();
         acoustics.reset();
@@ -252,6 +271,13 @@ public class AudioManager {
     public void bindWorld(com.veylon.world.World world) {
         if (!enabled) return;
         acoustics.world(world);
+        if (world == null) music.reset(); else music.scene(MusicMood.CALM);
+    }
+
+    /** Supplies a read-only world mood to the sparse phrase director. */
+    public void setMusicMood(MusicMood mood) {
+        if (!enabled) return;
+        music.scene(mood);
     }
 
     public void playFootstep(BlockType under, boolean inWater) {
@@ -474,6 +500,12 @@ public class AudioManager {
         enabled = false;
         thunder.reset();
         if (nativeReady) {
+            if (music != null) {
+                music.reset();
+                System.out.printf("[audio] musicPhrases=%d%n", music.phrases);
+                music = null;
+            }
+            if (musicSource != 0) { alDeleteSources(musicSource); musicSource = 0; }
             if (voices != null) {
                 voices.reset();
                 System.out.printf("[audio] voiceSteals=%d droppedLowerPriority=%d%n", voices.steals, voices.dropped);

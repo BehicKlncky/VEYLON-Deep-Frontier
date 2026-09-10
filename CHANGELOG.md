@@ -2,6 +2,12 @@
 
 All notable user-facing changes to VEYLON: Deep Frontier are recorded here.
 
+## [0.5.11] - 2026-09-10
+
+### Changed
+
+- Sparse, fully synthesized musical phrases respond to exploration, night, danger, deep caves and the beacon, with long periods of silence.
+
 ## [0.5.10] - 2026-09-10
 
 ### Changed
