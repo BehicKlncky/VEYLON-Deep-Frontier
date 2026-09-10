@@ -197,3 +197,5 @@ W8 full build: PASS in 1m 39s, 456 tests / 72 classes.
 ### W9 evidence
 
 Distance-delayed thunder uses a fixed 16-event queue and optional direct-path HF filtering. Four headless tests cover exact delay/position, distance curves, nearest-event overflow, cancellation, smooth indoor/outdoor transitions and no-device calls. Lightning's simulation RNG sequence and loaded-column gameplay actions are unchanged; focused WorldSeedDeterminismTest passes. The native 30-second weather/voice smoke passes at 873.9 FPS (p95/p99 1.44/1.62 ms), all hard limits, 32 thunder events, one cancelled and zero pending at shutdown, with zero AL/GL/KHR errors. Audio update mean/max 0.004051/0.750400 ms. An explicit pre-load pending-strike assertion is included for the final release smoke. Subjective close/far and shelter listening acceptance remains unverified.
+
+W9 full build: PASS in 1m 51s, 460 tests / 73 classes.
