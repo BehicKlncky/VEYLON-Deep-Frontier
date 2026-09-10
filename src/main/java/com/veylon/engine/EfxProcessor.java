@@ -73,5 +73,8 @@ final class EfxProcessor {
         enabled = false;
         if (slot != 0) { alDeleteAuxiliaryEffectSlots(slot); slot = 0; }
         if (effect != 0) { alDeleteEffects(effect); effect = 0; }
+        reported = false;
+        zone = AudioEnvironment.Zone.OPEN;
+        submitTimer = 0;
     }
 }

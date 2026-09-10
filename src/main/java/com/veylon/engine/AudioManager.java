@@ -45,7 +45,6 @@ public class AudioManager {
     private int bDryFire, bReload, bFuse, bExplosion, bAlarmBell, bGate;
 
     // Ambience loops.
-    private int bRain, bWind, bFire, bCave, bCrickets, bBeacon, bRainHigh, bWindHigh;
     private final int[] detailBuffers = new int[4];
     private final AmbientEvents ambientEvents = new AmbientEvents(rng);
     private float weatherIntensity, currentIntensity;
@@ -137,7 +136,7 @@ public class AudioManager {
 
     private int makeLoop(int buffer, SpatialAmbience.Emitter emitter) {
         int src = alGenSources();
-        alSourcei(src, AL_BUFFER, variant(buffer));
+        alSourcei(src, AL_BUFFER, buffer);
         alSourcei(src, AL_LOOPING, AL_TRUE);
         alSourcei(src, AL_SOURCE_RELATIVE, emitter.relative() ? AL_TRUE : AL_FALSE);
         alSource3f(src, AL_POSITION, emitter.x(), emitter.y(), emitter.z());
@@ -663,14 +662,6 @@ public class AudioManager {
         bExplosion = bank.get("Explosion");
         bAlarmBell = bank.get("AlarmBell");
         bGate = bank.get("Gate");
-        bRain = bank.get("Rain");
-        bWind = bank.get("Wind");
-        bFire = bank.get("Fire");
-        bCave = bank.get("Cave");
-        bCrickets = bank.get("Crickets");
-        bBeacon = bank.get("Beacon");
-        bRainHigh = bank.get("RainHigh");
-        bWindHigh = bank.get("WindHigh");
         for (int i = 0; i < detailBuffers.length; i++) detailBuffers[i] = bank.get(AmbienceBeds.EVENT_NAMES[i]);
         variants.clear();
         for (String name : VariantBank.NAMES) {

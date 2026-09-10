@@ -55,6 +55,8 @@ final class AcousticSources {
         if (!enabled) return;
         int i = index(source);
         if (i < 0) return;
+        // A stationary fire keeps its smoothed filter even when this frame's ray budget is spent.
+        if (i >= voiceCount && spatial[i] && !relative && x[i] == px && y[i] == py && z[i] == pz) return;
         x[i] = px; y[i] = py; z[i] = pz; spatial[i] = !relative;
         target[i] = current[i] = 0;
         tone[i] = 1;
