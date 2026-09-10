@@ -236,6 +236,8 @@ final class AmbienceSystem {
 
         int surface = game.world.surfaceHeight((int) game.player.pos.x, (int) game.player.pos.z);
         float caveGain = game.player.pos.y < surface - CAVE_DEPTH ? CAVE_GAIN : 0f;
+        if (game.audio.isEnabled()) game.audio.setEnvironment(
+                AudioSceneState.environment(game, surface - game.player.pos.y));
 
         boolean cricketBiome = game.player.biome == Biome.MEADOW
                 || game.player.biome == Biome.PINE_FOREST

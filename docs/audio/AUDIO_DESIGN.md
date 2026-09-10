@@ -66,3 +66,21 @@ Signal and scheduling tests prove waveform properties and policy, not aesthetic
 approval. A listener must still evaluate spatial width, cave scale, indoor rain,
 stealing transitions and the ability to identify a loop period over 60 seconds.
 The release record must distinguish those checks from GPU/audio initialization.
+
+## Reverb parameters now implemented
+
+Standard EFX reverb, one slot. Columns are decay seconds, gain, HF gain,
+HF decay ratio, density and diffusion; all except seconds are linear factors.
+
+| Zone | Decay | Gain | HF gain | HF ratio | Density | Diffusion |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Open | 0.35 | 0.06 | 0.95 | 0.85 | 0.35 | 0.50 |
+| Forest | 0.75 | 0.16 | 0.45 | 0.50 | 0.80 | 0.85 |
+| Shallow underground | 1.65 | 0.28 | 0.60 | 0.65 | 0.85 | 0.90 |
+| Deep cave | 3.80 | 0.40 | 0.50 | 0.55 | 1.00 | 1.00 |
+| Shelter | 0.65 | 0.22 | 0.35 | 0.50 | 0.60 | 0.70 |
+| Large stone structure | 2.60 | 0.35 | 0.70 | 0.80 | 1.00 | 1.00 |
+
+`ReverbPresets` is executable authority. Depth above five blocks selects shallow
+underground, at least eighteen selects deep cave; depth takes precedence over
+forest or constructed flooring. Gain and decay converge at 1.2 per second.

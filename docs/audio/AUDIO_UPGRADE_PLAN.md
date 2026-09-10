@@ -47,7 +47,7 @@ settlement 0.013/0.52 ms, save 1.469/2.20 ms, load 198.662/240 ms
 | v0.5.2 | 44.1 kHz | 1 | Hz-preserving filters, duration/spectral tests, timing and bytes | verified |
 | v0.5.3 | Layered ambience | 2 | Continuous beds, runtime events/gusts, intensity changes spectrum | automated checks verified |
 | v0.5.4 | Spatial ambience | 3 | Decorrelated weather, positioned fire, smooth gains | automated checks verified |
-| v0.5.5 | Environment reverb | 4 | Six interpolated presets, detected EFX, dry fallback | pending |
+| v0.5.5 | Environment reverb | 4 | Six interpolated presets, detected EFX, dry fallback | automated and native checks verified |
 | v0.5.6 | Occlusion | 5 | Fixed query/update caps, low-pass and air absorption | pending |
 | v0.5.7 | Variants | 6 | Four distinct takes of repeated sounds, non-repeating selection | pending |
 | v0.5.8 | Priority voices | 7 | Tested priority/quietness/age ordering, softened stealing | pending |
@@ -138,3 +138,27 @@ crossfades apply to all emitters. Spatial listening and source-transition taste
 remain unverified until a real listener pass.
 
 Final v0.5.4 build: PASS, 387 tests / 67 classes, zero failures; 1m 35s.
+
+### v0.5.5 evidence (2026-09-10)
+
+`EfxProcessor` detects ALC_EXT_EFX before allocating a standard-reverb effect and
+one auxiliary slot. `ReverbPresets` supplies six parameter sets, exponentially
+interpolated and submitted at most every 0.05 seconds. `AudioSceneState` reads
+one registered settlement and one floor block; it never invokes lazy planning.
+Headless tests cover every zone, parameter limits, smooth interpolation,
+no-extension native-free calls and unchanged world registration/loaded chunks.
+
+Two actual 30-second, 1280x720, seed-20260910 smoke runs passed isolated save/load,
+all hard limits and zero GL/KHR errors:
+
+| Run | avg FPS | p95 / p99 ms | synthesis + upload ms | OpenAL |
+| --- | ---: | ---: | ---: | --- |
+| VEYLON_NO_EFX=1 | 876.4 | 1.49 / 1.69 | 377.642 | initialized, dry fallback logged once |
+| EFX detected | 869.1 | 1.51 / 1.69 | 387.267 | initialized, zero native errors |
+
+The EFX run measured 26,074 audio updates: mean 0.003228 ms, max 0.153200 ms.
+Hardware: NVIDIA RTX 1000 Ada Generation Laptop GPU, OpenGL 3.3, driver 595.95.
+Logs are local in ignored build/audio-work. Actual acoustic listening remains
+unverified; initialization and error-free submission do not prove aesthetic tuning.
+
+Final v0.5.5 build: PASS, 393 tests / 69 classes, zero failures; 1m 37s.

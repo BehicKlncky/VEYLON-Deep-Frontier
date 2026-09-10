@@ -2,6 +2,12 @@
 
 All notable user-facing changes to VEYLON: Deep Frontier are recorded here.
 
+## [0.5.5] - 2026-09-10
+
+### Changed
+
+- Forests, shelters, ruins and the cave depths now have distinct smoothly changing reverberation, with automatic dry fallback on devices without EFX.
+
 ## [0.5.4] - 2026-09-09
 
 ### Changed
