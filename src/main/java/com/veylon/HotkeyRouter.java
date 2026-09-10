@@ -32,13 +32,18 @@ final class HotkeyRouter {
     }
 
     void update() {
-        if (game.uiMode == Game.UiMode.OPTIONS) {
-            return; // GraphicsOptionsScreen owns Escape/F5/navigation while open.
+        if (game.uiMode == Game.UiMode.OPTIONS || game.uiMode == Game.UiMode.AUDIO_OPTIONS) {
+            return; // Options screens own Escape/F5/navigation while open.
         }
         if (game.uiMode == Game.UiMode.PAUSE && game.input.wasKeyPressed(GLFW_KEY_O)) {
             game.graphicsOptionsScreen.open(game.renderer.settings,
                     game.window.windowedWidth(), game.window.windowedHeight());
             game.uiMode = Game.UiMode.OPTIONS;
+            return;
+        }
+        if (game.uiMode == Game.UiMode.PAUSE && game.input.wasKeyPressed(GLFW_KEY_V)) {
+            game.audioOptionsScreen.open(game.audio.settings);
+            game.uiMode = Game.UiMode.AUDIO_OPTIONS;
             return;
         }
         handleEscape();

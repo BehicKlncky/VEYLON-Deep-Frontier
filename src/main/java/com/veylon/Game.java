@@ -39,6 +39,7 @@ import com.veylon.ui.CrateScreen;
 import com.veylon.ui.DebugOverlay;
 import com.veylon.ui.EventLog;
 import com.veylon.ui.GraphicsOptionsScreen;
+import com.veylon.ui.AudioOptionsScreen;
 import com.veylon.ui.Hud;
 import com.veylon.ui.InventoryScreen;
 import com.veylon.ui.MapScreen;
@@ -67,7 +68,7 @@ import static org.lwjgl.glfw.GLFW.*;
 public class Game implements SimulationScheduler.Ticks, World.BlockListener {
 
     public enum UiMode {
-        NONE, INVENTORY, CRAFTING, PAUSE, OPTIONS, MAP, CRATE, NPC
+        NONE, INVENTORY, CRAFTING, PAUSE, OPTIONS, MAP, CRATE, NPC, AUDIO_OPTIONS
     }
 
     /** Player-facing NPC action selected by the same path used for prompts and F. */
@@ -87,11 +88,11 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
     }
 
     enum AppState {
-        TITLE, TITLE_OPTIONS, LOADING, PLAYING, DEATH, VICTORY;
+        TITLE, TITLE_OPTIONS, LOADING, PLAYING, DEATH, VICTORY, TITLE_AUDIO_OPTIONS;
 
         /** True while a live world is being drawn, so render stats are meaningful. */
         boolean rendersWorld() {
-            return this != TITLE && this != TITLE_OPTIONS && this != LOADING;
+            return this != TITLE && this != TITLE_OPTIONS && this != TITLE_AUDIO_OPTIONS && this != LOADING;
         }
     }
 
@@ -150,6 +151,7 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
     final DebugOverlay debugOverlay = new DebugOverlay();
     final SimulationPanel simulationPanel = new SimulationPanel();
     final TitleScreen titleScreen = new TitleScreen();
+    final AudioOptionsScreen audioOptionsScreen = new AudioOptionsScreen();
     final GraphicsOptionsScreen graphicsOptionsScreen = new GraphicsOptionsScreen();
 
     /** Visible for testing; public only for gameplay tests outside {@code com.veylon}. */
@@ -422,7 +424,7 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
         window.captureCursor(appState == AppState.PLAYING && uiMode == UiMode.NONE, input);
 
         boolean simulate = appState == AppState.PLAYING
-                && uiMode != UiMode.PAUSE && uiMode != UiMode.OPTIONS && !simPaused;
+                && uiMode != UiMode.PAUSE && uiMode != UiMode.OPTIONS && uiMode != UiMode.AUDIO_OPTIONS && !simPaused;
 
         swingTimer = Math.max(0, swingTimer - dt);
         hitSoundTimer = Math.max(0, hitSoundTimer - dt);
@@ -488,6 +490,7 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
             case MAP -> mapScreen.update(this);
             case PAUSE -> pauseMenu.update(this);
             case OPTIONS -> frontend.handlePauseOptions(graphicsOptionsScreen.update(this));
+            case AUDIO_OPTIONS -> frontend.handlePauseAudio(audioOptionsScreen.update(this));
             case NONE -> {
             }
         }
