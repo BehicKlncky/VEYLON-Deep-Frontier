@@ -193,3 +193,9 @@ W7 full build: PASS in 1m 38s, 452 tests / 71 classes.
 The native pool uses 24 one-shot sources and four priority classes, with a 30 ms cosine release before stealing. Four headless tests exercise ordering, distance, pending protection, fade and reset. Full native pressure smoke (30 seconds, seed 20260910) passes: 126 steals, zero dropped lower-priority requests in this workload, 874.3 FPS, p95/p99 1.48/1.68 ms, all hard limits, zero AL/GL/KHR errors. Audio mean/max update 0.003886/0.807100 ms over 26,230 updates. A preliminary 12-second smoke failed because its fortress approach had not completed; the required 30-second rerun completed it and passed. Audibility of steal transitions on other drivers still needs listening acceptance.
 
 W8 full build: PASS in 1m 39s, 456 tests / 72 classes.
+
+### W9 evidence
+
+Distance-delayed thunder uses a fixed 16-event queue and optional direct-path HF filtering. Four headless tests cover exact delay/position, distance curves, nearest-event overflow, cancellation, smooth indoor/outdoor transitions and no-device calls. Lightning's simulation RNG sequence and loaded-column gameplay actions are unchanged; focused WorldSeedDeterminismTest passes. The native 30-second weather/voice smoke passes at 873.9 FPS (p95/p99 1.44/1.62 ms), all hard limits, 32 thunder events, one cancelled and zero pending at shutdown, with zero AL/GL/KHR errors. Audio update mean/max 0.004051/0.750400 ms. An explicit pre-load pending-strike assertion is included for the final release smoke. Subjective close/far and shelter listening acceptance remains unverified.
+
+W9 full build: PASS in 1m 51s, 460 tests / 73 classes.

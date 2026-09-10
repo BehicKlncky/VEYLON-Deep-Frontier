@@ -121,6 +121,7 @@ final class FrontendController {
             // A failed load has already replaced the previous world, so there is
             // nothing to fall back to; drop to the title rather than to a
             // half-restored game.
+            game.audio.resetWorld();
             game.releaseWorldMeshes();
             game.world = null;
             game.player = null;

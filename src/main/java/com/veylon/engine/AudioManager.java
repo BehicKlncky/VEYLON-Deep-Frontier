@@ -62,6 +62,9 @@ public class AudioManager {
     private double synthesisMs;
     private long updateCount, updateNanos, maxUpdateNanos;
     private int nativeErrors;
+    private float listenerX, listenerY, listenerZ;
+    private final ThunderScheduler thunder = new ThunderScheduler();
+    private final java.util.function.Consumer<ThunderScheduler.Strike> thunderPlayer = this::playScheduledThunder;
 
     private int[] pool;
     private VoicePool voices;
@@ -136,6 +139,7 @@ public class AudioManager {
         if (!enabled) {
             return;
         }
+        listenerX = x; listenerY = y; listenerZ = z;
         alListener3f(AL_POSITION, x, y, z);
         acoustics.listener(x, y, z);
         voices.listener(x, y, z);
@@ -175,6 +179,7 @@ public class AudioManager {
         currentIntensity += (weatherIntensity - currentIntensity) * blend;
         for (int i = 0; i < 6; i++) ambCurrent[i] += (ambTarget[i] - ambCurrent[i]) * blend;
         ambientEvents.update(dt, ambCurrent, detailPlayer);
+        thunder.update(dt, thunderPlayer);
         voices.update(dt);
         effects.update(dt);
         acoustics.update(dt);
@@ -201,6 +206,7 @@ public class AudioManager {
     /** Cancels scene-local details and mix state before a world is replaced or abandoned. */
     public void resetWorld() {
         if (!enabled) return;
+        thunder.reset();
         ambientEvents.reset();
         effects.reset();
         acoustics.reset();
@@ -351,6 +357,27 @@ public class AudioManager {
         play2d(bQuest, 0.7f, 1f);
     }
 
+    /** Schedules a strike in world space; travel time is frozen at the instant of the flash. */
+    public void scheduleThunder(float x, float y, float z) {
+        if (!enabled) return;
+        thunder.schedule(x, y, z, listenerX, listenerY, listenerZ);
+    }
+
+    /** Pending transient weather sounds, exposed for lifecycle diagnostics; zero when disabled. */
+    public int pendingWeatherSounds() { return enabled ? thunder.pending() : 0; }
+
+    /** Applies smoothly filtered rain to sheltered listeners without changing the existing gain mix. */
+    public void setSheltered(boolean sheltered) {
+        if (!enabled) return;
+        acoustics.sheltered(sheltered);
+    }
+
+    private void playScheduledThunder(ThunderScheduler.Strike strike) {
+        voices.play(new VoicePool.Request(bThunder, strike.x(), strike.y(), strike.z(),
+                0.95f * ThunderScheduler.gain(strike.distance()), pitchVar(0.08f), 60, 1000,
+                false, true, false, VoicePool.Priority.IMPORTANT, ThunderScheduler.highFrequency(strike.distance())));
+    }
+
     public void playThunder() {
         if (!enabled) return;
         play2d(bThunder, 0.9f, pitchVar(0.2f));
@@ -442,6 +469,7 @@ public class AudioManager {
     /** Releases all native resources, including a partially initialized device. */
     public void shutdown() {
         enabled = false;
+        thunder.reset();
         if (nativeReady) {
             if (voices != null) {
                 voices.reset();
@@ -453,6 +481,7 @@ public class AudioManager {
             if (acoustics != null) { acoustics.close(); acoustics = null; }
             effects.close();
             if (buffers != null) for (int buffer : buffers.values()) alDeleteBuffers(buffer);
+            System.out.printf("[audio] thunderPlayed=%d cancelled=%d pending=%d%n", thunder.played, thunder.cancelled, thunder.pending());
             pollErrors();
             System.out.printf("[audio] updates=%d meanUpdateMs=%.6f maxUpdateMs=%.6f nativeErrors=%d%n",
                     updateCount, updateCount == 0 ? 0 : updateNanos / (double) updateCount / 1e6,
@@ -539,6 +568,7 @@ public class AudioManager {
         effects.route(source, r.wet());
         alSource3f(source, AL_POSITION, r.x(), r.y(), r.z());
         acoustics.position(source, r.x(), r.y(), r.z(), r.relative());
+        acoustics.tint(source, r.highFrequency(), r.buffer() == detailBuffers[0]);
         alSourcef(source, AL_GAIN, r.gain());
         alSourcef(source, AL_PITCH, r.pitch());
         alSourcef(source, AL_REFERENCE_DISTANCE, r.reference());

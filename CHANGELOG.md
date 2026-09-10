@@ -2,6 +2,12 @@
 
 All notable user-facing changes to VEYLON: Deep Frontier are recorded here.
 
+## [0.5.9] - 2026-09-10
+
+### Changed
+
+- Thunder now arrives from the lightning strike after a distance-based delay; sheltered rain loses its outdoor brightness.
+
 ## [0.5.8] - 2026-09-10
 
 ### Changed
