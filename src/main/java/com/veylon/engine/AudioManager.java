@@ -64,7 +64,7 @@ public class AudioManager {
     private int nativeErrors;
 
     private int[] pool;
-    private int poolNext;
+    private VoicePool voices;
     private final java.util.Map<Integer, VariantBank> variants = new java.util.HashMap<>();
 
     public void init() {
@@ -86,7 +86,7 @@ public class AudioManager {
 
             synthesizeAll();
 
-            pool = new int[16];
+            pool = new int[VoicePool.CAPACITY];
             for (int i = 0; i < pool.length; i++) {
                 pool[i] = alGenSources();
                 effects.route(pool[i], true);
@@ -100,6 +100,12 @@ public class AudioManager {
             }
             acoustics = new AcousticSources(effects.enabled(), pool, ambSources);
             if (alGetError() != AL_NO_ERROR) throw new IllegalStateException("OpenAL initialization error");
+            voices = new VoicePool(new VoicePool.Backend() {
+                public boolean playing(int i) { return alGetSourcei(pool[i], AL_SOURCE_STATE) == AL_PLAYING; }
+                public void start(int i, VoicePool.Request request) { startVoice(pool[i], request); }
+                public void gain(int i, float gain) { alSourcef(pool[i], AL_GAIN, gain); }
+                public void stop(int i) { alSourceStop(pool[i]); }
+            });
             enabled = true;
             System.out.println("[audio] OpenAL initialized (" + pool.length + " voices).");
         } catch (Throwable t) {
@@ -132,6 +138,7 @@ public class AudioManager {
         }
         alListener3f(AL_POSITION, x, y, z);
         acoustics.listener(x, y, z);
+        voices.listener(x, y, z);
         float yaw = (float) Math.toRadians(yawDeg);
         float fx = (float) Math.sin(yaw), fz = -(float) Math.cos(yaw);
         listenerOrientation[0] = fx;
@@ -168,6 +175,7 @@ public class AudioManager {
         currentIntensity += (weatherIntensity - currentIntensity) * blend;
         for (int i = 0; i < 6; i++) ambCurrent[i] += (ambTarget[i] - ambCurrent[i]) * blend;
         ambientEvents.update(dt, ambCurrent, detailPlayer);
+        voices.update(dt);
         effects.update(dt);
         acoustics.update(dt);
         for (int i = 0; i < ambSources.length; i++) {
@@ -201,7 +209,7 @@ public class AudioManager {
         java.util.Arrays.fill(ambCurrent, 0);
         weatherIntensity = currentIntensity = 0;
         for (int source : ambSources) alSourcef(source, AL_GAIN, 0);
-        for (int source : pool) alSourceStop(source);
+        voices.reset();
     }
 
     private void playAmbientDetail(int kind) {
@@ -435,6 +443,11 @@ public class AudioManager {
     public void shutdown() {
         enabled = false;
         if (nativeReady) {
+            if (voices != null) {
+                voices.reset();
+                System.out.printf("[audio] voiceSteals=%d droppedLowerPriority=%d%n", voices.steals, voices.dropped);
+                voices = null;
+            }
             if (pool != null) for (int source : pool) if (source != 0) alDeleteSources(source);
             for (int source : ambSources) if (source != 0) alDeleteSources(source);
             if (acoustics != null) { acoustics.close(); acoustics = null; }
@@ -477,17 +490,6 @@ public class AudioManager {
         return bank == null ? buffer : bank.next();
     }
 
-    private int grabSource() {
-        for (int i = 0; i < pool.length; i++) {
-            int src = pool[(poolNext + i) % pool.length];
-            if (alGetSourcei(src, AL_SOURCE_STATE) != AL_PLAYING) {
-                poolNext = (poolNext + i + 1) % pool.length;
-                return src;
-            }
-        }
-        return -1; // all voices busy; drop the sound
-    }
-
     private void playAt(int buffer, float x, float y, float z, float gain, float pitch) {
         playAt(buffer, x, y, z, gain, pitch, 3f, 44f);
     }
@@ -502,40 +504,46 @@ public class AudioManager {
         if (!enabled) {
             return;
         }
-        int src = grabSource();
-        if (src < 0) {
-            return;
-        }
-        alSourceStop(src);
-        alSourcei(src, AL_BUFFER, variant(buffer));
-        alSourcei(src, AL_SOURCE_RELATIVE, AL_FALSE);
-        effects.route(src, true);
-        alSource3f(src, AL_POSITION, x, y, z);
-        acoustics.position(src, x, y, z, false);
-        alSourcef(src, AL_GAIN, gain);
-        alSourcef(src, AL_PITCH, pitch);
-        alSourcef(src, AL_REFERENCE_DISTANCE, refDist);
-        alSourcef(src, AL_MAX_DISTANCE, maxDist);
-        alSourcePlay(src);
+        submit(buffer, x, y, z, gain, pitch, refDist, maxDist, false);
     }
 
     private void play2d(int buffer, float gain, float pitch) {
-        if (!enabled) {
-            return;
-        }
-        int src = grabSource();
-        if (src < 0) {
-            return;
-        }
-        alSourceStop(src);
-        alSourcei(src, AL_BUFFER, variant(buffer));
-        alSourcei(src, AL_SOURCE_RELATIVE, AL_TRUE);
-        effects.route(src, buffer != bClick && buffer != bQuest && buffer != bDiscover);
-        alSource3f(src, AL_POSITION, 0, 0, 0);
-        acoustics.position(src, 0, 0, 0, true);
-        alSourcef(src, AL_GAIN, gain);
-        alSourcef(src, AL_PITCH, pitch);
-        alSourcePlay(src);
+        if (!enabled) return;
+        submit(buffer, 0, 0, 0, gain, pitch, 3, 44, true);
+    }
+
+    private void submit(int buffer, float x, float y, float z, float gain, float pitch,
+                        float reference, float maximum, boolean relative) {
+        boolean ambience = false;
+        for (int detail : detailBuffers) if (detail == buffer) ambience = true;
+        boolean wet = buffer != bClick && buffer != bQuest && buffer != bDiscover;
+        voices.play(new VoicePool.Request(buffer, x, y, z, gain, pitch, reference, maximum,
+                relative, wet, ambience, priority(buffer, ambience)));
+    }
+
+    private VoicePool.Priority priority(int buffer, boolean ambience) {
+        if (buffer == bExplosion || buffer == bHurt || buffer == bAlarmBell) return VoicePool.Priority.CRITICAL;
+        if (buffer == bMusket || buffer == bPistol || buffer == bHowl || buffer == bGrowl
+                || buffer == bClick || buffer == bDiscover || buffer == bQuest || buffer == bToolBreak)
+            return VoicePool.Priority.IMPORTANT;
+        if (ambience || buffer == bFootGrass || buffer == bFootStone || buffer == bFootWood
+                || buffer == bFootSnow || buffer == bFootWater || buffer == bChirp || buffer == bFlap)
+            return VoicePool.Priority.BACKGROUND;
+        return VoicePool.Priority.ORDINARY;
+    }
+
+    private void startVoice(int source, VoicePool.Request r) {
+        alSourceStop(source);
+        alSourcei(source, AL_BUFFER, variant(r.buffer()));
+        alSourcei(source, AL_SOURCE_RELATIVE, r.relative() ? AL_TRUE : AL_FALSE);
+        effects.route(source, r.wet());
+        alSource3f(source, AL_POSITION, r.x(), r.y(), r.z());
+        acoustics.position(source, r.x(), r.y(), r.z(), r.relative());
+        alSourcef(source, AL_GAIN, r.gain());
+        alSourcef(source, AL_PITCH, r.pitch());
+        alSourcef(source, AL_REFERENCE_DISTANCE, r.reference());
+        alSourcef(source, AL_MAX_DISTANCE, r.maximum());
+        alSourcePlay(source);
     }
 
     // ------------------------------------------------------------------

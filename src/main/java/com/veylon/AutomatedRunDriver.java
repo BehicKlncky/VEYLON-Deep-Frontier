@@ -172,6 +172,8 @@ final class AutomatedRunDriver {
         }
         if (audioQa && elapsed > nextAudioProbe) {
             nextAudioProbe = elapsed + 1;
+            for (int i = 0; i < 24; i++) game.audio.playFootstep(com.veylon.world.BlockType.GRASS, false);
+            game.audio.playExplosion(game.player.pos.x + 12, game.player.pos.y - 3, game.player.pos.z);
             for (int i = 0; i < 3; i++) game.audio.playGunshot(i == 0,
                     game.player.pos.x + 12 + i, game.player.pos.y - 3, game.player.pos.z);
         }
