@@ -172,6 +172,7 @@ final class AutomatedRunDriver {
         }
         if (audioQa && elapsed > nextAudioProbe) {
             nextAudioProbe = elapsed + 1;
+            game.audio.scheduleThunder(game.player.pos.x + 60, game.player.pos.y, game.player.pos.z);
             for (int i = 0; i < 24; i++) game.audio.playFootstep(com.veylon.world.BlockType.GRASS, false);
             game.audio.playExplosion(game.player.pos.x + 12, game.player.pos.y - 3, game.player.pos.z);
             for (int i = 0; i < 3; i++) game.audio.playGunshot(i == 0,
@@ -188,7 +189,11 @@ final class AutomatedRunDriver {
         }
         if (smokePhase == 1 && elapsed > 4.0) {
             smokePhase = 2;
+            if (audioQa) game.audio.scheduleThunder(game.player.pos.x + 500, game.player.pos.y, game.player.pos.z);
             smokeLoadOk = SaveSystem.load(game, smokeSave);
+            if (audioQa && game.audio.pendingWeatherSounds() != 0) {
+                throw new IllegalStateException("Old-world weather audio survived load");
+            }
             System.out.println("[smoke] isolated load=" + smokeLoadOk + " path=" + smokeSave);
         }
         if (smokePhase == 2 && elapsed > 5.0) {

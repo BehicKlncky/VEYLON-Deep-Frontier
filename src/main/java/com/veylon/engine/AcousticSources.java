@@ -18,8 +18,11 @@ final class AcousticSources {
 
     private final boolean enabled;
     private final int[] sources, filters;
-    private final float[] x, y, z, age, current, target;
-    private final boolean[] spatial;
+    private final float[] x, y, z, age, current, target, tone;
+    private final boolean[] spatial, rain;
+    private final int voiceCount;
+    private boolean sheltered;
+    private float shelter = 1;
     private final AudioOcclusion.Budget budget = new AudioOcclusion.Budget();
     private World world;
     private final AudioOcclusion.Voxels voxels = (a, b, c) -> world != null && world.getBlock(a, b, c).solid;
@@ -28,12 +31,15 @@ final class AcousticSources {
 
     AcousticSources(boolean enabled, int[] voices, int[] loops) {
         this.enabled = enabled;
+        voiceCount = voices.length;
         sources = Arrays.copyOf(voices, voices.length + loops.length);
         System.arraycopy(loops, 0, sources, voices.length, loops.length);
         filters = new int[sources.length];
         x = new float[sources.length]; y = new float[sources.length]; z = new float[sources.length];
         age = new float[sources.length]; current = new float[sources.length]; target = new float[sources.length];
-        spatial = new boolean[sources.length];
+        spatial = new boolean[sources.length]; rain = new boolean[sources.length];
+        tone = new float[sources.length]; Arrays.fill(tone, 1);
+        for (int i = 0; i < loops.length; i++) rain[voiceCount + i] = SpatialAmbience.channel(SpatialAmbience.EMITTERS[i].layer()) == 0;
         if (!enabled) return;
         for (int i = 0; i < filters.length; i++) {
             filters[i] = alGenFilters();
@@ -51,14 +57,30 @@ final class AcousticSources {
         if (i < 0) return;
         x[i] = px; y[i] = py; z[i] = pz; spatial[i] = !relative;
         target[i] = current[i] = 0;
+        tone[i] = 1;
+        if (i < voiceCount) rain[i] = false;
         if (!relative && world != null && budget.available()) target[i] = current[i] = sample(i);
         age[i] = RESAMPLE_SECONDS;
         alSourcef(source, AL_AIR_ABSORPTION_FACTOR, relative ? 0 : AIR_ABSORPTION);
         apply(i);
     }
 
+    void sheltered(boolean value) { if (enabled) sheltered = value; }
+
+    void tint(int source, float highFrequency, boolean rainDetail) {
+        if (!enabled) return;
+        int i = index(source);
+        if (i < 0) return;
+        tone[i] = highFrequency;
+        if (i < voiceCount) rain[i] = rainDetail;
+        apply(i);
+    }
+
     void update(float dt) {
         if (!enabled) return;
+        float oldShelter = shelter;
+        shelter = ThunderScheduler.shelterBlend(shelter, sheltered, dt);
+        boolean shelterChanged = oldShelter != shelter;
         float blend = (float) -Math.expm1(-Math.max(0, dt) * FILTER_BLEND_SPEED);
         for (int i = 0; i < sources.length; i++) age[i] -= dt;
         // Examination itself is bounded, even when every voice is idle.
@@ -71,7 +93,7 @@ final class AcousticSources {
             age[i] = RESAMPLE_SECONDS;
         }
         for (int i = 0; i < sources.length; i++) {
-            if (Math.abs(current[i] - target[i]) < 0.0001f) continue;
+            if (Math.abs(current[i] - target[i]) < 0.0001f && !(rain[i] && shelterChanged)) continue;
             current[i] += (target[i] - current[i]) * blend;
             apply(i);
         }
@@ -84,7 +106,7 @@ final class AcousticSources {
 
     private void apply(int i) {
         alFilterf(filters[i], AL_LOWPASS_GAIN, 1 - (1 - OCCLUDED_GAIN) * current[i]);
-        alFilterf(filters[i], AL_LOWPASS_GAINHF, 1 - (1 - OCCLUDED_HF) * current[i]);
+        alFilterf(filters[i], AL_LOWPASS_GAINHF, (1 - (1 - OCCLUDED_HF) * current[i]) * tone[i] * (rain[i] ? shelter : 1));
         alSourcei(sources[i], AL_DIRECT_FILTER, filters[i]);
     }
 
@@ -95,6 +117,9 @@ final class AcousticSources {
 
     void reset() {
         world = null;
+        sheltered = false; shelter = 1;
+        Arrays.fill(tone, 1);
+        Arrays.fill(rain, 0, voiceCount, false);
         Arrays.fill(spatial, false);
         Arrays.fill(current, 0);
         Arrays.fill(target, 0);

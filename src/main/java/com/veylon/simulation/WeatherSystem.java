@@ -161,13 +161,12 @@ public class WeatherSystem implements MediumTickSystem {
     public void strikeLightning(Game g) {
         flashTimer = FLASH_SECONDS;
         lightningStrikes++;
-        g.audio.playThunder();
         int x = (int) (g.player.pos.x + rng.nextInt(LIGHTNING_SPAN) - LIGHTNING_RADIUS);
         int z = (int) (g.player.pos.z + rng.nextInt(LIGHTNING_SPAN) - LIGHTNING_RADIUS);
-        if (g.world.getChunk(Math.floorDiv(x, 16), Math.floorDiv(z, 16)) == null) {
-            return;
-        }
-        int y = g.world.surfaceHeight(x, z);
+        boolean loaded = g.world.getChunk(Math.floorDiv(x, 16), Math.floorDiv(z, 16)) != null;
+        int y = loaded ? g.world.surfaceHeight(x, z) : (int) Math.floor(g.player.pos.y);
+        g.audio.scheduleThunder(x, y, z);
+        if (!loaded) return;
         BlockType t = g.world.getBlock(x, y, z);
         if (t == BlockType.LEAVES || t == BlockType.LOG) {
             g.fire.ignite(g, x, y, z);

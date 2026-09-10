@@ -10,7 +10,12 @@ final class VoicePool {
 
     record Request(int buffer, float x, float y, float z, float gain, float pitch,
                    float reference, float maximum, boolean relative, boolean wet,
-                   boolean ambience, Priority priority) {
+                   boolean ambience, Priority priority, float highFrequency) {
+        Request(int buffer, float x, float y, float z, float gain, float pitch,
+                float reference, float maximum, boolean relative, boolean wet,
+                boolean ambience, Priority priority) {
+            this(buffer, x, y, z, gain, pitch, reference, maximum, relative, wet, ambience, priority, 1);
+        }
         float audibility(float lx, float ly, float lz) {
             if (relative) return gain;
             float dx = x - lx, dy = y - ly, dz = z - lz;

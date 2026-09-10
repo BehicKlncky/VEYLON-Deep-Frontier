@@ -38,4 +38,14 @@ class ThunderSchedulerTest {
         assertTrue(opening > a && opening < 0.23f);
         assertEquals(ThunderScheduler.SHELTER_HF, ThunderScheduler.shelterBlend(1, true, 100), 0.000001f);
     }
+
+    @Test void disabledManagerDoesNotQueueOrTouchNativeFilters() {
+        var audio = new AudioManager();
+        audio.scheduleThunder(100, 100, 100);
+        audio.setSheltered(true);
+        audio.update(100);
+        assertEquals(0, audio.pendingWeatherSounds());
+        var filters = new AcousticSources(false, new int[]{100}, new int[0]);
+        filters.sheltered(true); filters.tint(100, 0.1f, true); filters.update(1); filters.close();
+    }
 }
