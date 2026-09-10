@@ -185,3 +185,5 @@ W6 full build passed in 1m 38s: 396 tests / 70 classes, including doclint.
 ### W7 evidence
 
 Four takes in each of 18 banks add 54 buffers and 1,061,046 PCM bytes. The catalog now contains 116 buffers / 34,474,024 PCM bytes. Independent waveforms, equal durations and 1,000 non-repeating selections pass headless checks. Warmed synthesis/conditioning/encoding measures 275.810 ms against 1,500 ms. Subjective fatigue testing remains unverified.
+
+W7 full build: PASS in 1m 38s, 452 tests / 71 classes.

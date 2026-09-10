@@ -8,6 +8,6 @@ class ReleaseVersionTest {
 
     @Test
     void gradleReleaseVersionIsArchitectureReleaseVersion() {
-        assertEquals("0.5.6", System.getProperty("veylon.version"));
+        assertEquals("0.5.7", System.getProperty("veylon.version"));
     }
 }
