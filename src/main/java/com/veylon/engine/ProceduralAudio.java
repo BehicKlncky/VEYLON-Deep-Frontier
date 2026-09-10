@@ -1,6 +1,8 @@
 package com.veylon.engine;
 
 import java.util.Random;
+import java.util.LinkedHashMap;
+import java.util.function.Supplier;
 
 import static com.veylon.engine.AudioFilters.*;
 import java.util.function.BiConsumer;
@@ -21,51 +23,56 @@ final class ProceduralAudio {
         this.rng = rng;
     }
 
-    /** Emits each original recipe once, retaining no sample arrays. */
+    /** Emits original recipes, beds and independent variant takes without retaining PCM. */
     void synthesize(BiConsumer<String, float[]> sink) {
-        sink.accept("FootGrass", noiseBurst(0.10f, GRASS_HZ, 3.5f, 0.5f));
-        sink.accept("FootStone", noiseBurst(0.07f, GRIT_HZ, 6f, 0.7f));
-        sink.accept("FootWood", mix(noiseBurst(0.08f, WOOD_HZ, 5f, 0.6f), tone(160, 0.08f, 10f, 0.3f)));
-        sink.accept("FootSnow", noiseBurst(0.13f, SNOW_HZ, 3f, 0.45f));
-        sink.accept("FootWater", noiseBurst(0.16f, WATER_HZ, 2.5f, 0.6f));
-        sink.accept("HitSoft", noiseBurst(0.06f, SOFT_HIT_HZ, 8f, 0.6f));
-        sink.accept("HitStone", mix(noiseBurst(0.05f, STONE_HZ, 12f, 0.8f), tone(900, 0.04f, 25f, 0.25f)));
-        sink.accept("HitWood", mix(noiseBurst(0.06f, IMPACT_HZ, 10f, 0.7f), tone(240, 0.06f, 15f, 0.4f)));
-        sink.accept("Break", mix(noiseBurst(0.22f, DEBRIS_HZ, 4f, 0.9f), tone(110, 0.18f, 7f, 0.4f)));
-        sink.accept("Place", mix(noiseBurst(0.09f, PLACE_HZ, 8f, 0.7f), tone(200, 0.07f, 14f, 0.35f)));
-        sink.accept("Click", tone(1400, 0.035f, 50f, 0.5f));
-        sink.accept("Eat", chew());
-        sink.accept("Drink", gulp());
-        sink.accept("Boil", noiseBurst(0.5f, POUR_HZ, 2f, 0.5f));
-        sink.accept("Hit", mix(noiseBurst(0.08f, IMPACT_HZ, 9f, 0.9f), tone(120, 0.09f, 12f, 0.6f)));
-        sink.accept("Hurt", grunt());
-        sink.accept("Swing", swish());
-        sink.accept("Craft", mix(tone(520, 0.08f, 12f, 0.4f), tone(780, 0.12f, 8f, 0.3f)));
-        sink.accept("Equip", noiseBurst(0.14f, WATER_HZ, 5f, 0.55f));
-        sink.accept("ToolBreak", mix(tone(620, 0.07f, 22f, 0.6f), noiseBurst(0.2f, SWISH_HIGH_HZ, 6f, 0.7f)));
-        sink.accept("Cough", cough());
-        sink.accept("Sleep", chime(new float[]{392, 494, 587}, 0.32f));
-        sink.accept("Discover", chime(new float[]{523, 659, 784, 1047}, 0.26f));
-        sink.accept("Quest", chime(new float[]{440, 554, 659}, 0.3f));
-        sink.accept("Thunder", thunder());
-        sink.accept("Howl", howl());
-        sink.accept("Growl", growl());
-        sink.accept("Chirp", chirp());
-        sink.accept("Flap", flap());
-        sink.accept("Deer", deerCall());
-        sink.accept("BowDraw", bowDraw());
-        sink.accept("BowRelease", bowRelease());
-        sink.accept("ArrowImpact", mix(noiseBurst(0.05f, IMPACT_HZ, 16f, 0.6f), tone(300, 0.05f, 30f, 0.35f)));
-        sink.accept("BulletImpact", mix(noiseBurst(0.04f, BULLET_HZ, 22f, 0.7f), tone(1200, 0.03f, 40f, 0.3f)));
-        sink.accept("Musket", gunshot(false));
-        sink.accept("Pistol", gunshot(true));
-        sink.accept("DryFire", dryFireClick());
-        sink.accept("Reload", reloadRustle());
-        sink.accept("Fuse", fuseHiss());
-        sink.accept("Explosion", explosionBoom());
-        sink.accept("AlarmBell", alarmBell());
-        sink.accept("Gate", gateCreak());
+        var recipes = new LinkedHashMap<String, Supplier<float[]>>();
+        recipes.put("FootGrass", () -> noiseBurst(0.10f, GRASS_HZ, 3.5f, 0.5f));
+        recipes.put("FootStone", () -> noiseBurst(0.07f, GRIT_HZ, 6f, 0.7f));
+        recipes.put("FootWood", () -> mix(noiseBurst(0.08f, WOOD_HZ, 5f, 0.6f), tone(160, 0.08f, 10f, 0.3f)));
+        recipes.put("FootSnow", () -> noiseBurst(0.13f, SNOW_HZ, 3f, 0.45f));
+        recipes.put("FootWater", () -> noiseBurst(0.16f, WATER_HZ, 2.5f, 0.6f));
+        recipes.put("HitSoft", () -> noiseBurst(0.06f, SOFT_HIT_HZ, 8f, 0.6f));
+        recipes.put("HitStone", () -> mix(noiseBurst(0.05f, STONE_HZ, 12f, 0.8f), tone(900, 0.04f, 25f, 0.25f)));
+        recipes.put("HitWood", () -> mix(noiseBurst(0.06f, IMPACT_HZ, 10f, 0.7f), tone(240, 0.06f, 15f, 0.4f)));
+        recipes.put("Break", () -> mix(noiseBurst(0.22f, DEBRIS_HZ, 4f, 0.9f), tone(110, 0.18f, 7f, 0.4f)));
+        recipes.put("Place", () -> mix(noiseBurst(0.09f, PLACE_HZ, 8f, 0.7f), tone(200, 0.07f, 14f, 0.35f)));
+        recipes.put("Click", () -> tone(1400, 0.035f, 50f, 0.5f));
+        recipes.put("Eat", () -> chew());
+        recipes.put("Drink", () -> gulp());
+        recipes.put("Boil", () -> noiseBurst(0.5f, POUR_HZ, 2f, 0.5f));
+        recipes.put("Hit", () -> mix(noiseBurst(0.08f, IMPACT_HZ, 9f, 0.9f), tone(120, 0.09f, 12f, 0.6f)));
+        recipes.put("Hurt", () -> grunt());
+        recipes.put("Swing", () -> swish());
+        recipes.put("Craft", () -> mix(tone(520, 0.08f, 12f, 0.4f), tone(780, 0.12f, 8f, 0.3f)));
+        recipes.put("Equip", () -> noiseBurst(0.14f, WATER_HZ, 5f, 0.55f));
+        recipes.put("ToolBreak", () -> mix(tone(620, 0.07f, 22f, 0.6f), noiseBurst(0.2f, SWISH_HIGH_HZ, 6f, 0.7f)));
+        recipes.put("Cough", () -> cough());
+        recipes.put("Sleep", () -> chime(new float[]{392, 494, 587}, 0.32f));
+        recipes.put("Discover", () -> chime(new float[]{523, 659, 784, 1047}, 0.26f));
+        recipes.put("Quest", () -> chime(new float[]{440, 554, 659}, 0.3f));
+        recipes.put("Thunder", () -> thunder());
+        recipes.put("Howl", () -> howl());
+        recipes.put("Growl", () -> growl());
+        recipes.put("Chirp", () -> chirp());
+        recipes.put("Flap", () -> flap());
+        recipes.put("Deer", () -> deerCall());
+        recipes.put("BowDraw", () -> bowDraw());
+        recipes.put("BowRelease", () -> bowRelease());
+        recipes.put("ArrowImpact", () -> mix(noiseBurst(0.05f, IMPACT_HZ, 16f, 0.6f), tone(300, 0.05f, 30f, 0.35f)));
+        recipes.put("BulletImpact", () -> mix(noiseBurst(0.04f, BULLET_HZ, 22f, 0.7f), tone(1200, 0.03f, 40f, 0.3f)));
+        recipes.put("Musket", () -> gunshot(false));
+        recipes.put("Pistol", () -> gunshot(true));
+        recipes.put("DryFire", () -> dryFireClick());
+        recipes.put("Reload", () -> reloadRustle());
+        recipes.put("Fuse", () -> fuseHiss());
+        recipes.put("Explosion", () -> explosionBoom());
+        recipes.put("AlarmBell", () -> alarmBell());
+        recipes.put("Gate", () -> gateCreak());
+        recipes.forEach((name, recipe) -> sink.accept(name, recipe.get()));
         AmbienceBeds.synthesize(rng, sink);
+        for (String name : VariantBank.NAMES) {
+            for (int i = 1; i < VariantBank.COUNT; i++) sink.accept(VariantBank.key(name, i), recipes.get(name).get());
+        }
     }
 
     // ---- 0.3.0 combat & settlement synthesis ----
