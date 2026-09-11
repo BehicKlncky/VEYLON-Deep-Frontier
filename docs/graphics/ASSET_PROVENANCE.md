@@ -9,7 +9,7 @@ whenever an asset is added or replaced.
 | Source Sans 3 Semibold | `src/main/resources/assets/fonts/SourceSans3-Semibold.ttf` | same | SIL OFL 1.1 |
 | All block/terrain textures (incl. 0.3.0 basalt, sulfur/saltpeter ores, glow fungus, ladder, lantern, marker, keg, gate, stone brick, bell, cage tiles) | generated at runtime by `com.veylon.gfx.ProceduralTextures` | original, written for this project | project-owned; no repository-wide redistribution license declared |
 | All UI icons (incl. 0.3.0 bow/firearm/bomb/ammo/powder icons) | generated at runtime by `com.veylon.gfx.IconAtlas` | original | project-owned; no repository-wide redistribution license declared |
-| All sounds (incl. 0.3.0 gunshots, explosions, fuses, bells, bow, reload) | synthesized at startup by `com.veylon.engine.AudioManager` | original DSP code, no samples | project-owned; no repository-wide redistribution license declared |
+| All sound effects, ambience beds/details, four-take banks and six adaptive music phrases (0.6.0) | synthesized at startup by `ProceduralAudio`, `AmbienceBeds` and `MusicPhrases`; conditioned/uploaded by `PcmAudio` and `AudioManager` | original additive/filtered-noise DSP code, no recordings, sound fonts or samples | project-owned; no repository-wide redistribution license declared |
 | All particle sprites | generated at runtime by `com.veylon.gfx.ParticleRenderer` | original | project-owned; no repository-wide redistribution license declared |
 | All entity/prop models | code-defined cuboids in `com.veylon.gfx.model.*` | original | project-owned; no repository-wide redistribution license declared |
 | All shaders | `src/main/resources/assets/shaders/*` | original | project-owned; no repository-wide redistribution license declared |

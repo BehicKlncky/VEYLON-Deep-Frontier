@@ -176,9 +176,44 @@ Initial playback and later reevaluations share the same frame allowance.
 Long paths coarsen sampling; this bounded approximation can miss thin distant
 walls. Native filter submission is measured separately by the device smoke.
 
-With VEYLON_AUDIO_QA=1, the 30-second smoke emits three presentation-only reports
+At v0.5.6, VEYLON_AUDIO_QA=1 made the 30-second smoke emit three presentation-only reports
 per second, without gameplay noise, damage or world edits. It observed 3/4 peak
 rays, 128/256 peak probes, 0.004023 ms mean audio update and 0.398700 ms maximum,
 with zero native errors. A focused test/doclint task ran during part of that
 smoke, so its 841.8 FPS is an execution check rather than a controlled comparison.
 The final release smoke will run without concurrent build work.
+
+## Final audio catalog and music (0.6.0)
+
+A fresh-process comparison uses the same `CatalogMeasure` harness and seed 60600
+for the untouched W1 extraction (`debe250`) and final recipes, JDK 25, 512 MiB heap.
+It times pure synthesis into a map, excluding conditioning, conversion, upload and
+JVM launch; warm results are fastest of seven after three discarded iterations.
+The original measurement before editing was 62.148 ms and remains recorded above.
+
+| Same-harness measurement | Original | 0.6.0 |
+| --- | ---: | ---: |
+| Cold pure synthesis | 70.054 ms | 571.508 ms |
+| Warm pure synthesis | 20.136 ms | 392.042 ms |
+| Mono signed-16 PCM payload | 1,858,142 bytes | 40,824,424 bytes |
+| Equivalent complete float catalog | 3,716,284 bytes | 81,648,848 bytes |
+| Buffers | 48 | 122 |
+
+The rate-only W2 change approximately doubled PCM; most final growth comes from
+17-37-second decorrelated beds, 54 additional variant takes and six 12-second
+phrases. Float totals describe the test catalog, not retained runtime memory.
+Driver storage, mixer state, direct buffers and Java overhead are additional;
+this is a payload measurement, not a process RSS claim.
+
+`MusicPerformanceTest` bounds the allocation-free director at 0.02 ms per frame,
+using three warmups and the fastest of seven 100,000-frame batches. W11 measured
+0.000004 ms. Music uses one source, no streaming thread or runtime synthesis;
+its six precomputed phrases cost 6,350,400 PCM bytes. The 10,000-second policy
+test remains over 90% silent. Full final benchmark and native update figures are
+recorded in [v0.6.0-validation.md](engineering/v0.6.0-validation.md).
+
+Current VEYLON_AUDIO_QA pressure emits 24 footsteps, one explosion, three reports
+and a scheduled thunder per second without adding gameplay noise/damage. It also
+queues distant thunder before isolated load to verify cancellation. Native update
+time includes all audio processing and driver calls; the separate ray/director
+benchmarks isolate CPU policy work. Final smoke runs have no concurrent build.
