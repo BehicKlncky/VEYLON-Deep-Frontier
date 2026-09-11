@@ -213,3 +213,24 @@ Six state-driven 12-second phrases use one dedicated source and 120-180 seconds 
 W11 benchmarks: 494.648/1500 ms synthesis and 40,824,424/67,108,864 PCM bytes; music director 0.000004/0.02 ms. Native 30-second smoke passed at 829.8 FPS, p95/p99 1.58/2.09 ms, all hard limits, one music phrase, 125 voice steals, 32 thunder events, two cancelled and zero pending, with zero AL/GL/KHR errors. The pre-load old-world weather assertion passed. Total audio update mean/max 0.007914/0.818400 ms. No concurrent build ran during this smoke. Musical balance and listening acceptance remain unverified.
 
 W11 full build: PASS in 1m 41s, 485 tests / 78 classes.
+
+### Final integration evidence (2026-09-11)
+
+All eleven ordered milestone branches and annotated tags are retained. The
+release-preparation commit `5fa21eb` passes a complete build rerun (1m 55s) and
+two consecutive test reruns (1m 37s / 1m 38s): 486 tests / 79 classes, zero failures
+or skips, versus the original 302 / 61. JavaDoc doclint passes. All performance
+budgets pass, including synthesis 469.098 / 1,500 ms, PCM 40,824,424 / 67,108,864
+bytes, occlusion 0.002006 / 0.10 ms and music 0.000008 / 0.02 ms per frame.
+
+Local release packaging and archive/manifest/checksum inspection pass. Final
+30-second seed-20260910 native pressure smokes pass with EFX (849.4 FPS, p95/p99
+1.58/1.84 ms) and forced dry playback (858.7 FPS, 1.53/1.74 ms). Both satisfy all
+hard limits, play music and thunder, cancel old-world audio after load, and report
+zero OpenAL/GL/KHR errors. Final evidence edits pass `git diff --check`.
+
+The [complete validation record](../engineering/v0.6.0-validation.md) contains
+all benchmark thresholds, source authorities, artifact SHA-256 hashes, lifecycle
+observations and the remaining human listening checks. The implementation is
+complete; perceptual acceptance and other-platform native execution are not
+inferred from automated results. Publishing remains explicitly user-owned.

@@ -181,7 +181,7 @@ per second, without gameplay noise, damage or world edits. It observed 3/4 peak
 rays, 128/256 peak probes, 0.004023 ms mean audio update and 0.398700 ms maximum,
 with zero native errors. A focused test/doclint task ran during part of that
 smoke, so its 841.8 FPS is an execution check rather than a controlled comparison.
-The final release smoke will run without concurrent build work.
+The final release smokes below ran without concurrent build work.
 
 ## Final audio catalog and music (0.6.0)
 
@@ -217,3 +217,43 @@ and a scheduled thunder per second without adding gameplay noise/damage. It also
 queues distant thunder before isolated load to verify cancellation. Native update
 time includes all audio processing and driver calls; the separate ray/director
 benchmarks isolate CPU policy work. Final smoke runs have no concurrent build.
+
+## Final release measurements (2026-09-11)
+
+Measured against release-preparation commit `5fa21eb`, after the complete build
+and two consecutive portable test reruns. The performance task passed in 10s.
+All original gameplay budgets and the audio budgets introduced during this
+release remain unchanged.
+
+| Benchmark | Measured | Unchanged budget | Result |
+| --- | ---: | ---: | --- |
+| Chunk tick | 0.376 ms | 0.92 ms | PASS |
+| Entity tick | 0.340 ms | 0.95 ms | PASS |
+| Settlement tick | 0.015 ms | 0.52 ms | PASS |
+| Save | 1.657 ms | 2.20 ms | PASS |
+| Load | 194.840 ms | 240.00 ms | PASS |
+| Full audio synthesis, conditioning and encoding | 469.098 ms | 1,500 ms | PASS |
+| Mono signed-16 PCM payload | 40,824,424 bytes | 67,108,864 bytes | PASS |
+| Audio occlusion, four rays / 256 probes | 0.002006 ms/frame | 0.10 ms/frame | PASS |
+| Music director | 0.000008 ms/frame | 0.02 ms/frame | PASS |
+
+The initial chunk/entity/settlement/save/load observations were 0.404 / 0.339 /
+0.013 / 1.469 / 198.662 ms. Final observations meet every existing regression
+budget; they do not establish that every operation became faster. All 19 parts
+of the unchanged TickProfileTest also pass; the full measured/budget table is in
+[the validation record](engineering/v0.6.0-validation.md#every-performance-gate).
+
+Native 30-second audio pressure runs, seed 20260910, 1280x720, VSYNC off:
+
+| Native audio mode | avg FPS | p95 / p99 ms | Synthesis + upload ms | Mean / max audio update ms |
+| --- | ---: | ---: | ---: | ---: |
+| EFX enabled | 849.4 | 1.58 / 1.84 | 655.974 | 0.007531 / 0.814100 |
+| Forced dry | 858.7 | 1.53 / 1.74 | 651.579 | 0.006625 / 0.363000 |
+
+Both pass all graphics/gameplay hard limits with zero OpenAL/GL/KHR errors,
+including isolated save/load and old-world thunder cancellation. EFX reaches the
+four-ray / 256-probe cap. Native timings include all audio and driver submissions;
+these observations have no separate real-time deadline assertion. Pure ray and
+director policy work has the explicit measured budgets above. Neither smoke
+overlapped another build or performance task. Cold native startup is distinct
+from the warmed synthesis/conditioning benchmark and the raw before/after table.
