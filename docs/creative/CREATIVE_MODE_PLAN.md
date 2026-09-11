@@ -76,7 +76,7 @@ wrapper, workflows, existing enum IDs and all budgets remain unchanged.
 
 | Tag | Branch suffix under creative/ | Definition of done | Status |
 | --- | --- | --- | --- |
-| v0.6.1 | 01-plan-and-parity-harness | Baseline, A1-A5, missing Survival parity, design; no production change (R26) | focused tests pass; final build pending |
+| v0.6.1 | 01-plan-and-parity-harness | Baseline, A1-A5, missing Survival parity, design; no production change (R26) | verified |
 | v0.6.2 | 02-mode-model-and-save | Byte-identical save extraction, mode/abilities/reset/restore, strict section, QA parsing (R1, R7, R15) | pending |
 | v0.6.3 | 03-invulnerable-body | All A1 gates, restoration, observations, badge and mode-aware smoke (R4, R6, R8-R10) | pending |
 | v0.6.4 | 04-imperceptible-player | A3 gates and memory clear; preserve D3 consequences (R11-R12) | pending |
@@ -316,4 +316,4 @@ landing stops within one gravity step instead of snapping to an exact Y. The
 fixtures now express those production preconditions, without editing existing
 tests or changing behavior. Human/native checks are not required for milestone 1.
 
-Final v0.6.1 build: pending release preparation.
+Final v0.6.1 build: PASS, 503 tests / 80 classes, zero failures, errors and skips; 2m7s (127.897s wall clock). JavaDoc doclint passed. All six line counts remain at the untouched baseline values. Performance baseline passed unchanged; no production change requires a second performance run. Native runs/captures are not required at this milestone. git diff --check release/0.7.0 passed after removing an extra documentation EOF blank line.

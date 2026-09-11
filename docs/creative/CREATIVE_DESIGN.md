@@ -181,4 +181,3 @@ Lessons applied:
   default UI scale and is captured natively and inspected.
 
 ---
-

@@ -2,6 +2,15 @@
 
 All notable user-facing changes to VEYLON: Deep Frontier are recorded here.
 
+## [0.6.1] - 2026-09-11
+
+### Quality
+
+- Survival behavior that Creative mode will interact with (damage, needs, mining,
+  placement, ammunition, wear and hostile perception) is pinned by deterministic tests
+  before any change.
+- Recorded the Creative mode research, design decisions and milestone plan.
+
 ## [0.6.0] - 2026-09-11
 
 ### Added
