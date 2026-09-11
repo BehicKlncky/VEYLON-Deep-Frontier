@@ -46,6 +46,8 @@ runs. All are inert when unset. Everything below is handled by `QaHarness`;
 | `VEYLON_FRONTEND=<name>` | Pin a front-end screen (`options`, `loading`, `death`, `victory`, `glyphs`) |
 | `VEYLON_RESOLUTION=1920x1080` | Framebuffer override |
 | `VEYLON_UI_SCALE`, `VEYLON_VSYNC`, `VEYLON_FULLSCREEN`, `VEYLON_SHADOWS` | Settings overrides |
+| `VEYLON_AUDIO_QA=1` | Add three positional audio reports per second to the smoke, without gameplay effects |
+| `VEYLON_NO_EFX=1` | Force the documented dry audio fallback for device QA |
 | `VEYLON_MIN_FPS` | Stricter FPS gate layered over the mandatory 60 |
 | `VEYLON_CAPTURE_TAG` | Filename prefix for captures |
 | `VEYLON_QA_SET_OPTIONS="fov=85,bloom=false"` | Mutate and save settings through the real APPLY path, to prove persistence across relaunch |
@@ -227,3 +229,5 @@ Tracked honestly so nobody rediscovers them:
   receive `Game` for cross-system coordination. Introducing a service locator
   or one facade per system would add indirection without narrowing that
   dependency and remains intentionally out of scope.
+
+Audio preferences use `veylon_audio.properties` in the same AppPaths directory as graphics preferences. Use V from the title or pause menu, or the title AUDIO button. `VEYLON_FRONTEND=audio` with `VEYLON_SHOT=2` captures the audio editor without a world; Apply saves and Back cancels live edits.

@@ -41,6 +41,9 @@ final class AutomatedRunDriver {
 
     // Session configuration, read once from the environment.
     private boolean smoke;
+    /** Optional device exercise emits sound only; it cannot damage entities or change terrain. */
+    private boolean audioQa;
+    private double nextAudioProbe;
     private String scene;
     private String frontendScreen;
     private boolean frontendQa;
@@ -71,6 +74,7 @@ final class AutomatedRunDriver {
      */
     boolean configure() {
         smoke = System.getenv("VEYLON_SMOKE") != null;
+        audioQa = "1".equals(System.getenv("VEYLON_AUDIO_QA"));
         scene = System.getenv("VEYLON_SCENE");
         String shotEnv = System.getenv("VEYLON_SHOT");
         frontendScreen = System.getenv("VEYLON_FRONTEND");
@@ -166,6 +170,14 @@ final class AutomatedRunDriver {
         if (!smoke || game.world == null || game.appState != Game.AppState.PLAYING) {
             return;
         }
+        if (audioQa && elapsed > nextAudioProbe) {
+            nextAudioProbe = elapsed + 1;
+            game.audio.scheduleThunder(game.player.pos.x + 60, game.player.pos.y, game.player.pos.z);
+            for (int i = 0; i < 24; i++) game.audio.playFootstep(com.veylon.world.BlockType.GRASS, false);
+            game.audio.playExplosion(game.player.pos.x + 12, game.player.pos.y - 3, game.player.pos.z);
+            for (int i = 0; i < 3; i++) game.audio.playGunshot(i == 0,
+                    game.player.pos.x + 12 + i, game.player.pos.y - 3, game.player.pos.z);
+        }
         if (smokePhase == 0 && elapsed > 2.5) {
             smokePhase = 1;
             game.world.setBlock((int) game.player.pos.x + 2, (int) game.player.pos.y + 1,
@@ -177,7 +189,11 @@ final class AutomatedRunDriver {
         }
         if (smokePhase == 1 && elapsed > 4.0) {
             smokePhase = 2;
+            if (audioQa) game.audio.scheduleThunder(game.player.pos.x + 500, game.player.pos.y, game.player.pos.z);
             smokeLoadOk = SaveSystem.load(game, smokeSave);
+            if (audioQa && game.audio.pendingWeatherSounds() != 0) {
+                throw new IllegalStateException("Old-world weather audio survived load");
+            }
             System.out.println("[smoke] isolated load=" + smokeLoadOk + " path=" + smokeSave);
         }
         if (smokePhase == 2 && elapsed > 5.0) {

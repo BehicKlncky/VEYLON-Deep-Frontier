@@ -2,6 +2,7 @@ package com.veylon;
 
 import com.veylon.save.SaveSystem;
 import com.veylon.ui.GraphicsOptionsScreen;
+import com.veylon.ui.AudioOptionsScreen;
 import com.veylon.ui.PresentationOverlay;
 
 /**
@@ -38,7 +39,7 @@ final class FrontendController {
     /** True while the frontend owns the frame, i.e. no world exists. */
     boolean owns(Game.AppState state) {
         return state == Game.AppState.TITLE || state == Game.AppState.TITLE_OPTIONS
-                || state == Game.AppState.LOADING;
+                || state == Game.AppState.TITLE_AUDIO_OPTIONS || state == Game.AppState.LOADING;
     }
 
     void frame(float dt) {
@@ -48,6 +49,7 @@ final class FrontendController {
         switch (game.appState) {
             case TITLE -> updateTitle();
             case TITLE_OPTIONS -> updateOptions(dt);
+            case TITLE_AUDIO_OPTIONS -> updateAudio();
             default -> presentLoading();
         }
         game.ui.end();
@@ -61,6 +63,10 @@ final class FrontendController {
                 game.graphicsOptionsScreen.open(game.renderer.settings,
                         game.window.windowedWidth(), game.window.windowedHeight());
                 game.appState = Game.AppState.TITLE_OPTIONS;
+            }
+            case AUDIO -> {
+                game.audioOptionsScreen.open(game.audio.settings);
+                game.appState = Game.AppState.TITLE_AUDIO_OPTIONS;
             }
             case QUIT -> game.window.requestClose();
             case NONE -> {
@@ -78,6 +84,22 @@ final class FrontendController {
         } else if (result.action() == GraphicsOptionsScreen.Action.CANCEL) {
             game.appState = Game.AppState.TITLE;
         }
+    }
+
+    private void updateAudio() {
+        AudioOptionsScreen.Action result = game.audioOptionsScreen.update(game);
+        if (result == AudioOptionsScreen.Action.NONE) return;
+        if (result == AudioOptionsScreen.Action.APPLY) {
+            game.audio.settings.save();
+            game.titleScreen.notice("Audio settings applied.");
+        }
+        game.appState = Game.AppState.TITLE;
+    }
+
+    void handlePauseAudio(AudioOptionsScreen.Action result) {
+        if (result == AudioOptionsScreen.Action.NONE) return;
+        if (result == AudioOptionsScreen.Action.APPLY) game.audio.settings.save();
+        game.uiMode = Game.UiMode.PAUSE;
     }
 
     private void presentLoading() {
@@ -121,6 +143,7 @@ final class FrontendController {
             // A failed load has already replaced the previous world, so there is
             // nothing to fall back to; drop to the title rather than to a
             // half-restored game.
+            game.audio.resetWorld();
             game.releaseWorldMeshes();
             game.world = null;
             game.player = null;
@@ -151,6 +174,7 @@ final class FrontendController {
 
     /** Abandons the live world and returns to the title screen. */
     void returnToTitle() {
+        game.audio.resetWorld();
         game.releaseWorldMeshes();
         game.world = null;
         game.player = null;
@@ -168,6 +192,10 @@ final class FrontendController {
     /** Opens the frontend on a specific state, for the VEYLON_FRONTEND QA captures. */
     void openForQa(String screen) {
         switch (screen) {
+            case "audio" -> {
+                game.audioOptionsScreen.open(game.audio.settings);
+                game.appState = Game.AppState.TITLE_AUDIO_OPTIONS;
+            }
             case "options" -> {
                 game.graphicsOptionsScreen.open(game.renderer.settings,
                         game.window.windowedWidth(), game.window.windowedHeight());

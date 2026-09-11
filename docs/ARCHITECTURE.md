@@ -45,6 +45,8 @@ Main.main
               CrateTransactionSystem crate transfers and theft attribution
               InteractPromptBuilder  read-only HUD interaction hint
               AmbienceSystem         ambient particles and audio mix
+              AudioSceneState        bounded read-only environment/music observations
+              FireAudioLocator       nearest loaded audible fire
               SleepSystem            sleep eligibility, quality, night effects
 ```
 
@@ -117,7 +119,7 @@ rules live in `WorldBootstrap`; `Game.newWorld` is the entry point every caller
 still uses. It **resets before it constructs**, in this order:
 
 1. Release GPU meshes of the outgoing world (`releaseWorldMeshes`).
-2. Reset every cross-world system: scheduler, time, weather, temperature, fire,
+2. Reset every cross-world system: scheduler, audio, time, weather, temperature, fire,
    water, events, plants, item conditions, noise, projectiles, explosions and
    settlements.
 3. `reseedSimulation(seed)` — seeds all 15 simulation generators, each with a
@@ -125,7 +127,7 @@ still uses. It **resets before it constructs**, in this order:
    world in the same process inherits RNG state from the first, which is what
    made a settlement test intermittently fail. Presentation-only randomness
    (`AudioManager`, `NpcScreen`) is deliberately excluded.
-4. Construct `World` and `Player`; register `Game` as `world.listener`.
+4. Construct `World`, bind it to audio occlusion, then construct `Player`; register `Game` as `world.listener`.
 5. Clear entities and the event log; reset faction standing and the clock.
 6. Clear player action state: UI mode, mining, bow draw, reload, sleep, theft
    event bookkeeping.
@@ -155,11 +157,11 @@ while (!window.shouldClose())
 
 `frame(dt)`:
 
-1. **Frontend short-circuit** — in `TITLE`, `TITLE_OPTIONS` or `LOADING`, call
+1. **Frontend short-circuit** — in `TITLE`, `TITLE_OPTIONS`, `TITLE_AUDIO_OPTIONS` or `LOADING`, call
    `frameFrontend(dt)` and return. No world exists in these states.
 2. **State machine** — `DEATH`/`VICTORY` handle Esc/Enter; otherwise
    `handleGlobalKeys()` (inventory, crafting, map, pause, debug overlays).
-3. `simulate = appState == PLAYING && uiMode not PAUSE/OPTIONS && !simPaused`.
+3. `simulate = appState == PLAYING && uiMode not PAUSE/OPTIONS/AUDIO_OPTIONS && !simPaused`.
 4. Animation timers decay; sleep advances if sleeping.
 5. **Player input** — when no screen is open and `simulate`: `updateMouseLook`,
    `updateMovement`, `updateActions`. `updateActions` raycasts the target,
@@ -169,7 +171,7 @@ while (!window.shouldClose())
    `scheduler.update(dt, this)` which drives the three tick buckets, then
    per-frame systems (particles, projectiles, explosion fuses, noise decay,
    ambient emitters).
-7. **Camera and audio** follow the player eye.
+7. **Camera and audio** follow the player eye; set the listener before `audio.update(dt)`.
 8. **Streaming** — `world.ensureChunks(...)` around the player, then
    `renderer.buildDirtyMeshes(...)` on a per-frame budget.
 9. **Render** — `renderer.render(...)`, then the UI pass: HUD, the active
@@ -333,3 +335,44 @@ Two conventions worth knowing when you edit them:
   multiplication is not associative, so hoisting a shared subexpression out of
   two probability thresholds can shift them by an ULP. `PlantSystem` carries a
   comment where this bit.
+
+## Audio ownership and frame work (0.6.0)
+
+`AudioManager` owns the device/context, 122 generated PCM buffers, 24 one-shot
+sources, 16 ambience emitters and one music source. `ProceduralAudio`,
+`AudioFilters`, `AmbienceBeds`, `MusicPhrases` and `PcmAudio` are pure DSP; the
+runtime streams one generated array at a time into mono signed-16 OpenAL buffers
+and retains no float catalog. No sample assets, decoder dependency or worker
+thread is involved.
+
+`VoicePool` owns bounded admission, priority/quietness/age ordering and pending
+steal releases; `VariantBank` advances only at actual playback. `AmbientEvents`
+schedules four independent details and irregular gusts. `ThunderScheduler` owns
+at most 16 transient strikes. `MusicDirector` schedules a 12-second phrase with
+120-180 seconds of silence afterward on one independent source. These share the
+presentation-only AudioManager RNG, deliberately excluded from reseedSimulation.
+
+`EfxProcessor` feature-detects ALC_EXT_EFX and owns one reverb effect/slot with six
+smooth presets. `AcousticSources` owns at most 40 direct low-pass filters, shared
+four-ray/256-probe frame accounting and air absorption. Dry devices skip all EFX
+calls; absent audio devices skip all playback/scheduling/native calls. Scene
+classification reads loaded state and never plans a settlement or generates a
+chunk. Music threat queries examine at most 64 entries in each entity list.
+
+The existing six ambience gain calculations remain in AmbienceSystem. They also
+supply weather intensity, nearest fire position, shelter state, environment and
+music mood. The medium tick derives targets; AudioManager.update handles live
+bus gains, smoothing, timers, source filters and native error/timing diagnostics
+on the frame thread. Game is 889 lines, below its 1,000-line gate.
+
+Before a new world is constructed, resetWorld cancels thunder and pending steals,
+stops active one-shots/music, clears the occlusion world reference and reverb tail,
+and silences/resets ambience. Successful loads use that same newWorld path;
+return-to-title and failed frontend loads reset too. The native audio smoke
+explicitly queues distant thunder before load and asserts no event survived.
+Headless policy tests cover queue/director/pool reset without requiring OpenAL.
+Audio schedules and the first-night marker are transient, never save fields.
+
+AudioSettings mirrors graphics properties in AppPaths. Title and pause share
+AudioOptionsScreen; it edits the same mix live, persists on Apply, and restores
+its snapshot on Back. Its input owns Escape/F5 and pause options stop simulation.

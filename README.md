@@ -20,6 +20,12 @@ find blueprints, master the crafting stations and **repair the distress beacon**
 
 ---
 
+Version **0.6.0 — Signal & Silence** adds 44.1 kHz layered weather, wide ambience,
+positioned fire, optional environment reverb and occlusion, distance-delayed
+thunder, four-take sound banks and sparse synthesized music. Open **AUDIO** on the
+title screen or press **V** while paused to adjust master, effects, ambience,
+music and mute. Music at zero disables it; settings persist across launches.
+
 ## Requirements
 
 - Windows 10/11 (x64), or macOS on Apple Silicon (arm64) / Intel (x64)
@@ -46,7 +52,7 @@ find blueprints, master the crafting stations and **repair the distress beacon**
 ./gradlew run
 ```
 
-On Windows, saves go to `saves\veylon.sav`. On macOS, saves and graphics settings
+On Windows, saves go to `saves\veylon.sav`. On macOS, saves, graphics and audio settings
 go under `~/Library/Application Support/VEYLON Deep Frontier/`. The binary format is
 **v3**; **v2 saves (0.1.0–0.2.0) still load** and keep their original legacy terrain.
 Settlements, deep caves and the new underground resources only generate in worlds
@@ -63,9 +69,9 @@ Windows x64 (PowerShell):
 ```powershell
 .\gradlew.bat build             # compile + unit tests + jar
 .\gradlew.bat performanceTest   # opt-in benchmarks calibrated for the reference PC
-.\gradlew.bat fatJar            # build\libs\veylon-0.5.0-all.jar
+.\gradlew.bat fatJar            # build\libs\veylon-0.6.0-all.jar
 .\gradlew.bat jpackage          # build\jpackage\Veylon\Veylon.exe
-.\gradlew.bat appImageZip       # build\distributions\veylon-0.5.0-windows-x64.zip
+.\gradlew.bat appImageZip       # build\distributions\veylon-0.6.0-windows-x64.zip
 .\gradlew.bat releaseArtifacts  # tests + all host-specific release artifacts
 ```
 
@@ -75,7 +81,7 @@ macOS Intel or Apple Silicon (Terminal):
 ./gradlew build
 ./gradlew fatJar
 ./gradlew jpackage          # build/jpackage/Veylon.app
-./gradlew appImageZip       # build/distributions/veylon-0.5.0-macos-{x64|arm64}.zip
+./gradlew appImageZip       # build/distributions/veylon-0.6.0-macos-{x64|arm64}.zip
 ./gradlew releaseArtifacts
 ```
 
@@ -110,7 +116,7 @@ See [CHANGELOG.md](CHANGELOG.md) for release notes.
 Run the fat JAR with the same JVM options used by the packaged launchers:
 
 ```powershell
-java --enable-native-access=ALL-UNNAMED -Xmx2G -jar build\libs\veylon-0.5.0-all.jar
+java --enable-native-access=ALL-UNNAMED -Xmx2G -jar build\libs\veylon-0.6.0-all.jar
 ```
 
 ---
@@ -136,6 +142,7 @@ java --enable-native-access=ALL-UNNAMED -Xmx2G -jar build\libs\veylon-0.5.0-all.
 | `P` | Pause simulation |
 | `Esc` | Pause menu / close screen / wake up early |
 | `O` (paused) | Graphics options |
+| `V` (title or paused) | Audio options: live sliders, Apply/F5 saves, Back/Esc restores |
 | `F3` | Debug overlay |
 | `F5` / `F9` | Save / Load |
 
@@ -246,10 +253,14 @@ java --enable-native-access=ALL-UNNAMED -Xmx2G -jar build\libs\veylon-0.5.0-all.
 - **Events**: storms with lightning fires, cold snaps, heat waves, drought, berry bloom,
   predator migration, **toxic fog (stay indoors), ashfall (kills growth + darkens sky),
   meteor showers, camp illness, raids** — all touching real systems.
-- **Audio**: OpenAL with fully synthesized sound — material footsteps, mining/combat,
-  eating/drinking, wolf howls and growls, bird chirps, deer calls, thunder, tool breaks,
-  plus crossfading ambience loops (rain, wind, fire crackle, cave drone, night crickets,
-  beacon hum).
+- **Audio**: every sound and musical phrase is synthesized by project code at
+  44.1 kHz. Layered weather uses wide decorrelated emitters, fire has a world
+  position, and optional EFX reverb/filtering follows the environment and walls.
+  Thunder arrives after a distance-based delay, frequent sounds rotate through
+  four takes, and a priority pool preserves important cues under load. Sparse
+  music leaves 120-180 seconds of silence between 12-second phrases. Four live
+  volume controls and mute persist beside graphics preferences; missing audio
+  devices remain safe and missing EFX falls back to dry playback.
 - **Visuals**: particles (block dust, smoke, embers, rain splashes, 3D snow and ash,
   blood, cold breath), first-person held item with swing/bob, entity walk-bob and
   stalking postures, bird wing flaps, damage/cold/smoke vignettes, beacon light column,
@@ -267,7 +278,7 @@ java --enable-native-access=ALL-UNNAMED -Xmx2G -jar build\libs\veylon-0.5.0-all.
 com.veylon
   Game / Main                 - loop, high-level orchestration and tick wiring
   engine/                     - Window, Input, Camera, ShaderProgram, Mesh, Renderer,
-                                UiRenderer, AudioManager (OpenAL, synthesized),
+                                UiRenderer, AudioManager (OpenAL, procedural DSP/mix/music),
                                 ParticleSystem
   gfx/                        - materials, procedural textures/icons, fonts, environment,
                                 shadows, sky, particles, post-processing and model builders
@@ -298,7 +309,7 @@ com.veylon
   item/                       - ItemType (+ItemProps), ItemStack, Inventory, Recipe,
                                 CraftingSystem, Station, EquipSlot, FoodGroup, ToolKind
   ui/                         - title/options/presentation, Hud (ammo/draw/reload),
-                                Inventory/Crafting/Crate/Npc/Map screens, PauseMenu,
+                                Inventory/Crafting/Crate/Npc/Map screens, AudioOptionsScreen, PauseMenu,
                                 DebugOverlay, SimulationPanel, EventLog
   save/                       - SaveSystem (binary v3 + explicit v2 migration path)
   util/                       - Noise, Vec3i, FloatList, MathUtil
@@ -353,3 +364,8 @@ saves are rejected with a console message — no migration.
   than remembering exact positions (identity, health and deaths do persist).
 - Fire does not spread to powder kegs at range — only adjacent flames, fuses, and
   other explosions set them off.
+
+Audio design and measured limits: [sonic direction](docs/audio/AUDIO_DESIGN.md),
+[milestone evidence](docs/audio/AUDIO_UPGRADE_PLAN.md),
+[0.6.0 validation](docs/engineering/v0.6.0-validation.md) and
+[release notes](docs/releases/v0.6.0.md).

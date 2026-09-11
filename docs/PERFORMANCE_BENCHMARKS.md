@@ -146,3 +146,114 @@ Update the table and the test constants together when:
 
 Do not re-baseline to make a red build green without first establishing which
 change made it slower.
+
+## Audio startup (introduced in v0.5.2)
+
+`AudioPerformanceTest` is tagged performance and measures the full emitted
+catalog through production conditioning and signed-16 conversion, without a
+sound device. Three warmups, fastest of seven. Startup budget is 1,500 ms;
+PCM payload budget is 64 MiB, chosen before adding the longer beds and banks.
+These do not alter any simulation/save budget above.
+
+| Stage | Raw synthesis observation | PCM bytes | Warmed conditioning + conversion |
+| --- | ---: | ---: | ---: |
+| v0.5.0 / 22.05 kHz, 48 buffers | 62.148 ms | 1,858,142 | not measured |
+| v0.5.2 / 44.1 kHz, 48 buffers | 62.879 ms | 3,716,306 | 51.066 ms |
+
+Raw observations include Java arrays, exclude native upload, and are not paired
+warm benchmark samples. Equivalent float payload doubles from 3,716,284 to
+7,432,612 bytes; runtime streams arrays to OpenAL and does not retain a full
+float catalog. Driver allocation and Java/native overhead are additional.
+Native initialization logs its complete synthesis/upload duration separately.
+
+## Audio occlusion (v0.5.6)
+
+`AudioOcclusionPerformanceTest` measures the full four-ray, 256-probe allowance
+against real `World.getBlock` calls across fifteen loaded chunks. Fixture setup
+is outside timing; three warmups and fastest of seven batches of 10,000 frames.
+Measured 0.002127 ms/frame against 0.10 ms. No gameplay benchmark budget changes.
+Initial playback and later reevaluations share the same frame allowance.
+Long paths coarsen sampling; this bounded approximation can miss thin distant
+walls. Native filter submission is measured separately by the device smoke.
+
+At v0.5.6, VEYLON_AUDIO_QA=1 made the 30-second smoke emit three presentation-only reports
+per second, without gameplay noise, damage or world edits. It observed 3/4 peak
+rays, 128/256 peak probes, 0.004023 ms mean audio update and 0.398700 ms maximum,
+with zero native errors. A focused test/doclint task ran during part of that
+smoke, so its 841.8 FPS is an execution check rather than a controlled comparison.
+The final release smokes below ran without concurrent build work.
+
+## Final audio catalog and music (0.6.0)
+
+A fresh-process comparison uses the same `CatalogMeasure` harness and seed 60600
+for the untouched W1 extraction (`debe250`) and final recipes, JDK 25, 512 MiB heap.
+It times pure synthesis into a map, excluding conditioning, conversion, upload and
+JVM launch; warm results are fastest of seven after three discarded iterations.
+The original measurement before editing was 62.148 ms and remains recorded above.
+
+| Same-harness measurement | Original | 0.6.0 |
+| --- | ---: | ---: |
+| Cold pure synthesis | 70.054 ms | 571.508 ms |
+| Warm pure synthesis | 20.136 ms | 392.042 ms |
+| Mono signed-16 PCM payload | 1,858,142 bytes | 40,824,424 bytes |
+| Equivalent complete float catalog | 3,716,284 bytes | 81,648,848 bytes |
+| Buffers | 48 | 122 |
+
+The rate-only W2 change approximately doubled PCM; most final growth comes from
+17-37-second decorrelated beds, 54 additional variant takes and six 12-second
+phrases. Float totals describe the test catalog, not retained runtime memory.
+Driver storage, mixer state, direct buffers and Java overhead are additional;
+this is a payload measurement, not a process RSS claim.
+
+`MusicPerformanceTest` bounds the allocation-free director at 0.02 ms per frame,
+using three warmups and the fastest of seven 100,000-frame batches. W11 measured
+0.000004 ms. Music uses one source, no streaming thread or runtime synthesis;
+its six precomputed phrases cost 6,350,400 PCM bytes. The 10,000-second policy
+test remains over 90% silent. Full final benchmark and native update figures are
+recorded in [v0.6.0-validation.md](engineering/v0.6.0-validation.md).
+
+Current VEYLON_AUDIO_QA pressure emits 24 footsteps, one explosion, three reports
+and a scheduled thunder per second without adding gameplay noise/damage. It also
+queues distant thunder before isolated load to verify cancellation. Native update
+time includes all audio processing and driver calls; the separate ray/director
+benchmarks isolate CPU policy work. Final smoke runs have no concurrent build.
+
+## Final release measurements (2026-09-11)
+
+Measured against release-preparation commit `5fa21eb`, after the complete build
+and two consecutive portable test reruns. The performance task passed in 10s.
+All original gameplay budgets and the audio budgets introduced during this
+release remain unchanged.
+
+| Benchmark | Measured | Unchanged budget | Result |
+| --- | ---: | ---: | --- |
+| Chunk tick | 0.376 ms | 0.92 ms | PASS |
+| Entity tick | 0.340 ms | 0.95 ms | PASS |
+| Settlement tick | 0.015 ms | 0.52 ms | PASS |
+| Save | 1.657 ms | 2.20 ms | PASS |
+| Load | 194.840 ms | 240.00 ms | PASS |
+| Full audio synthesis, conditioning and encoding | 469.098 ms | 1,500 ms | PASS |
+| Mono signed-16 PCM payload | 40,824,424 bytes | 67,108,864 bytes | PASS |
+| Audio occlusion, four rays / 256 probes | 0.002006 ms/frame | 0.10 ms/frame | PASS |
+| Music director | 0.000008 ms/frame | 0.02 ms/frame | PASS |
+
+The initial chunk/entity/settlement/save/load observations were 0.404 / 0.339 /
+0.013 / 1.469 / 198.662 ms. Final observations meet every existing regression
+budget; they do not establish that every operation became faster. All 19 parts
+of the unchanged TickProfileTest also pass; the full measured/budget table is in
+[the validation record](engineering/v0.6.0-validation.md#every-performance-gate).
+
+Native 30-second audio pressure runs, seed 20260910, 1280x720, VSYNC off:
+
+| Native audio mode | avg FPS | p95 / p99 ms | Synthesis + upload ms | Mean / max audio update ms |
+| --- | ---: | ---: | ---: | ---: |
+| EFX enabled | 849.4 | 1.58 / 1.84 | 655.974 | 0.007531 / 0.814100 |
+| Forced dry | 858.7 | 1.53 / 1.74 | 651.579 | 0.006625 / 0.363000 |
+
+Both pass all graphics/gameplay hard limits with zero OpenAL/GL/KHR errors,
+including isolated save/load and old-world thunder cancellation. EFX reaches the
+four-ray / 256-probe cap. Native timings include all audio and driver submissions;
+these observations have no separate real-time deadline assertion. Pure ray and
+director policy work has the explicit measured budgets above. Neither smoke
+overlapped another build or performance task. Cold native startup is distinct
+from the warmed synthesis/conditioning benchmark and the raw before/after table.
