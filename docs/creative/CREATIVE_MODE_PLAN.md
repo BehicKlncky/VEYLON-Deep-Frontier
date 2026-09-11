@@ -317,3 +317,24 @@ fixtures now express those production preconditions, without editing existing
 tests or changing behavior. Human/native checks are not required for milestone 1.
 
 Final v0.6.1 build: PASS, 503 tests / 80 classes, zero failures, errors and skips; 2m7s (127.897s wall clock). JavaDoc doclint passed. All six line counts remain at the untouched baseline values. Performance baseline passed unchanged; no production change requires a second performance run. Native runs/captures are not required at this milestone. git diff --check release/0.7.0 passed after removing an extra documentation EOF blank line.
+
+### v0.6.2 evidence
+
+First extraction moves the existing stable-ID envelope and seven section codecs
+to V3ExtensionSections. SaveSystem drops from 1,785 to 1,109 lines, with the
+1,800-line ceiling unchanged. Only shared package-private byte validators and
+vector helpers cross the boundary. Core v3 and extension-v1 layouts are untouched.
+
+The identical SaveByteProbe creates seed 20260910, carries three bombs, throws
+one, and records a player-attributed powder-keg fuse. Before/after saves are
+both 7,057 bytes, with the same SHA-256:
+
+| Writer | SHA-256 |
+| --- | --- |
+| Before extraction | 981c4a6b277e11185897f40efe354d31694bcf78c87630f52fa1940d09b3974c |
+| After extraction | 981c4a6b277e11185897f40efe354d31694bcf78c87630f52fa1940d09b3974c |
+
+Existing save-package tests and doclint: PASS in 31s, 22 tests / 5 classes,
+zero failures, errors and skips. The local probe and saves remain ignored in
+build/creative-work. An initial sandbox javac attempt reported archive access
+errors; authorized local execution compiled and ran without those errors.
