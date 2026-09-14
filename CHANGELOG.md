@@ -2,6 +2,13 @@
 
 All notable user-facing changes to VEYLON: Deep Frontier are recorded here.
 
+## [0.6.2] - 2026-09-14
+
+### Quality
+
+- Worlds now record a game mode in an optional save section. Existing saves load
+  unchanged as Survival worlds.
+
 ## [0.6.1] - 2026-09-11
 
 ### Quality

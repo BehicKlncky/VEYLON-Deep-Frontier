@@ -77,7 +77,7 @@ wrapper, workflows, existing enum IDs and all budgets remain unchanged.
 | Tag | Branch suffix under creative/ | Definition of done | Status |
 | --- | --- | --- | --- |
 | v0.6.1 | 01-plan-and-parity-harness | Baseline, A1-A5, missing Survival parity, design; no production change (R26) | verified |
-| v0.6.2 | 02-mode-model-and-save | Byte-identical save extraction, mode/abilities/reset/restore, strict section, QA parsing (R1, R7, R15) | pending |
+| v0.6.2 | 02-mode-model-and-save | Byte-identical save extraction, mode/abilities/reset/restore, strict section, QA parsing (R1, R7, R15) | verified |
 | v0.6.3 | 03-invulnerable-body | All A1 gates, restoration, observations, badge and mode-aware smoke (R4, R6, R8-R10) | pending |
 | v0.6.4 | 04-imperceptible-player | A3 gates and memory clear; preserve D3 consequences (R11-R12) | pending |
 | v0.6.5 | 05-mode-selection | Worldless mode choice, explicit confirmation, permanent mark, key ownership (R2-R7) | pending |
@@ -338,3 +338,20 @@ Existing save-package tests and doclint: PASS in 31s, 22 tests / 5 classes,
 zero failures, errors and skips. The local probe and saves remain ignored in
 build/creative-work. An initial sandbox javac attempt reported archive access
 errors; authorized local execution compiled and ran without those errors.
+
+Mode derivation, switch/restore separation, same-seed terrain/camp/kit/wildlife
+and RNG parity, all mode/mark/flight combinations, absence, historical v2 and
+malformed live-load cases passed. Focused model/save/lifecycle/determinism tests
+and doclint: PASS in 34s (35.068s wall), 45 tests / 9 classes, zero failures,
+errors and skips. Gameplay gates begin in milestone 3; mode selection remains
+automated-only until milestone 5.
+
+Final v0.6.2 build: PASS, 512 tests / 82 classes, zero failures, errors and skips;
+1m43s (103.813s wall). JavaDoc doclint and unchanged line budgets passed.
+Real lines: Game 902/1000, QaHarness 1409/1500, SaveSystem 1109/1800,
+SettlementManager 1392/1500, FactionSystem 1265/1400, WorldGenerator 1178/1300.
+Performance: PASS in 10s (10.414s wall), all budgets unchanged. Chunk 0.372 ms,
+entity 0.335 ms, settlement 0.024 ms, save 1.588 ms, load 189.905 ms, audio
+478.004 ms, PCM 40,824,424 bytes, occlusion 0.001923 ms, music 0.000006 ms.
+All 19 tick-profile budgets passed (whole cycle 0.0848 ms). Native runs and
+captures are not required at this milestone. No deviation from the brief.
