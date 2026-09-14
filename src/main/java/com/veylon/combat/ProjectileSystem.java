@@ -291,6 +291,7 @@ public class ProjectileSystem {
             return false;
         }
         if (victim instanceof com.veylon.entity.Player player) {
+            if (player.abilities.invulnerable()) return true;
             player.hurtPhysical(g, p.damage, true);
             g.audio.playHurt();
             g.log("You are hit by " + (p.kind == Kind.ARROW ? "an arrow!" : "a shot!"));

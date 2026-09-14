@@ -70,7 +70,7 @@ public final class NpcAI {
             if (d < 1.8) {
                 Steering.stop(n);
                 faceEntity(n, g.player.pos.x, g.player.pos.z);
-                if (n.attackCooldown <= 0) {
+                if (n.attackCooldown <= 0 && !g.player.abilities.invulnerable()) {
                     n.attackCooldown = 1.4f;
                     g.player.hurtPhysical(g, 5, true);
                     g.player.knockback(n.pos.x, n.pos.z, 3f);
@@ -370,7 +370,7 @@ public final class NpcAI {
             if (d < 1.8) {
                 Steering.stop(n);
                 faceEntity(n, g.player.pos.x, g.player.pos.z);
-                if (n.attackCooldown <= 0) {
+                if (n.attackCooldown <= 0 && !g.player.abilities.invulnerable()) {
                     n.attackCooldown = 1.3f;
                     g.player.hurtPhysical(g, 6, true);
                     g.player.knockback(n.pos.x, n.pos.z, 3f);

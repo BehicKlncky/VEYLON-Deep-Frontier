@@ -2,6 +2,14 @@
 
 All notable user-facing changes to VEYLON: Deep Frontier are recorded here.
 
+## [0.6.3] - 2026-09-14
+
+### Added
+
+- Creative worlds: the player cannot be hurt or killed and has no hunger,
+  thirst, temperature, fatigue, carry-weight or medical pressure. The HUD
+  shows a Creative badge instead of survival bars.
+
 ## [0.6.2] - 2026-09-14
 
 ### Quality

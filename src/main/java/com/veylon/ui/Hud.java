@@ -93,6 +93,90 @@ public class Hud {
 
         renderWeaponStatus(g, ui, w, h, weapon, heldStack);
 
+        if (p.abilities.invulnerable()) renderCreativeStatus(g, ui, h);
+        else renderSurvivalStatus(g, ui, w, h);
+
+        renderHotbar(g, ui, w, h);
+
+        // Top-left info.
+        ui.textShadow(12, 12, 1.5f, g.time.timeString(), 1f, 1f, 0.9f, 1f);
+        var season = g.seasons.current(g.time);
+        ui.textShadow(12, 32, 1.4f, season.displayName + " (" + g.seasons.daysLeft(g.time)
+                + "d left)", 0.95f, 0.85f, 0.6f, 1f);
+        ui.textShadow(12, 50, 1.4f, "Weather: " + g.weather.effective().displayName, 0.85f, 0.9f, 1f, 1f);
+        ui.textShadow(12, 68, 1.4f, "Biome: " + p.biome.displayName, 0.8f, 1f, 0.8f, 1f);
+
+        // Top-right: events + camp standing + quest.
+        String ev = "Events: " + g.events.summary();
+        ui.textShadow(w - ui.textWidth(ev, 1.3f) - 12, 12, 1.3f, ev, 1f, 0.85f, 0.6f, 1f);
+        String camp = "Camp: " + g.faction.standing() + " (" + (int) g.faction.trust + ")";
+        ui.textShadow(w - ui.textWidth(camp, 1.3f) - 12, 30, 1.3f, camp,
+                g.faction.hostile ? 1f : 0.7f, g.faction.hostile ? 0.3f : 0.9f, 0.4f, 1f);
+        if (g.faction.quest != null) {
+            String q = "Request: " + g.faction.quest.describe();
+            ui.textShadow(w - ui.textWidth(q, 1.25f) - 12, 48, 1.25f, q, 0.7f, 0.85f, 1f, 1f);
+            String navigation = QuestObjectiveView.navigationLabel(g);
+            if (!navigation.isEmpty()) {
+                boolean returning = g.faction.quest.status
+                        == com.veylon.ai.Quest.Status.READY_TO_TURN_IN;
+                ui.textShadow(w - ui.textWidth(navigation, 1.2f) - 12, 66, 1.2f,
+                        navigation, returning ? 0.45f : 1f,
+                        returning ? 0.9f : 0.78f, returning ? 1f : 0.25f, 1f);
+            }
+        }
+
+        // Targeted block label + mining progress.
+        if (g.targetHit != null) {
+            String name = g.targetHit.type().displayName;
+            ui.textCentered(w / 2f, h / 2f + 18, 1.3f, name, 1f, 1f, 1f, 0.9f);
+            if (g.miningProgress > 0) {
+                float mw = 80;
+                ui.rect(w / 2f - mw / 2, h / 2f + 34, mw, 6, 0, 0, 0, 0.6f);
+                ui.rect(w / 2f - mw / 2, h / 2f + 34, mw * Math.min(1, g.miningProgress), 6,
+                        1f, 0.85f, 0.3f, 0.95f);
+            }
+        }
+
+        // Interaction prompt.
+        if (g.interactPrompt != null && !g.interactPrompt.isEmpty()) {
+            ui.textCentered(w / 2f, h / 2f + 52, 1.5f, g.interactPrompt, 1f, 1f, 0.7f, 1f);
+        }
+
+        // Event log (last 6 lines, bottom-left above bars/chips).
+        var lines = g.eventLog.recent(6);
+        float ly = h - 248 - lines.size() * 15;
+        for (String line : lines) {
+            ui.textShadow(16, ly, 1.2f, line, 0.92f, 0.92f, 0.85f, 0.85f);
+            ly += 15;
+        }
+
+        if (g.simPaused) {
+            ui.textCentered(w / 2f, 70, 2f, "SIMULATION PAUSED (P)", 1f, 0.8f, 0.3f, 1f);
+        }
+
+        // Sleep fade overlay.
+        if (g.sleepFade > 0.01f) {
+            ui.rect(0, 0, w, h, 0, 0, 0, Math.min(0.92f, g.sleepFade));
+            if (g.sleeping) {
+                ui.textCentered(w / 2f, h / 2f - 10, 2f, "Sleeping... (Esc to wake)",
+                        0.85f, 0.85f, 0.95f, 0.9f);
+            }
+        }
+    }
+
+    /** Preserve environment readouts while replacing medical pressure with the mode badge. */
+    private void renderCreativeStatus(Game g, UiRenderer ui, int h) {
+        ui.rect(12, h - 76, 200, 64, 0.035f, 0.07f, 0.09f, 0.8f);
+        ui.rect(12, h - 76, 3, 64, 0.25f, 0.85f, 0.9f, 1f);
+        ui.textShadow(23, h - 67, 1.6f, "CREATIVE", 1f, 0.8f, 0.4f, 1f);
+        ui.textShadow(23, h - 45, 1.3f,
+                String.format(java.util.Locale.ROOT, "Env %.1f C", g.player.envTemp),
+                0.85f, 0.95f, 1f, 1f);
+        ui.textShadow(23, h - 28, 1.3f, g.player.shelter.label(), 0.7f, 0.9f, 0.8f, 1f);
+    }
+
+    private void renderSurvivalStatus(Game g, UiRenderer ui, int w, int h) {
+        Player p = g.player;
         // Survival bars (bottom-left).
         float bx = 16, bw = 190, bh = 13;
         float by = h - 30;
@@ -165,77 +249,12 @@ public class Hud {
                     1f, 0.75f, 0.4f, 1f);
         }
 
-        renderHotbar(g, ui, w, h);
-
-        // Top-left info.
-        ui.textShadow(12, 12, 1.5f, g.time.timeString(), 1f, 1f, 0.9f, 1f);
-        var season = g.seasons.current(g.time);
-        ui.textShadow(12, 32, 1.4f, season.displayName + " (" + g.seasons.daysLeft(g.time)
-                + "d left)", 0.95f, 0.85f, 0.6f, 1f);
-        ui.textShadow(12, 50, 1.4f, "Weather: " + g.weather.effective().displayName, 0.85f, 0.9f, 1f, 1f);
-        ui.textShadow(12, 68, 1.4f, "Biome: " + p.biome.displayName, 0.8f, 1f, 0.8f, 1f);
-
-        // Top-right: events + camp standing + quest.
-        String ev = "Events: " + g.events.summary();
-        ui.textShadow(w - ui.textWidth(ev, 1.3f) - 12, 12, 1.3f, ev, 1f, 0.85f, 0.6f, 1f);
-        String camp = "Camp: " + g.faction.standing() + " (" + (int) g.faction.trust + ")";
-        ui.textShadow(w - ui.textWidth(camp, 1.3f) - 12, 30, 1.3f, camp,
-                g.faction.hostile ? 1f : 0.7f, g.faction.hostile ? 0.3f : 0.9f, 0.4f, 1f);
-        if (g.faction.quest != null) {
-            String q = "Request: " + g.faction.quest.describe();
-            ui.textShadow(w - ui.textWidth(q, 1.25f) - 12, 48, 1.25f, q, 0.7f, 0.85f, 1f, 1f);
-            String navigation = QuestObjectiveView.navigationLabel(g);
-            if (!navigation.isEmpty()) {
-                boolean returning = g.faction.quest.status
-                        == com.veylon.ai.Quest.Status.READY_TO_TURN_IN;
-                ui.textShadow(w - ui.textWidth(navigation, 1.2f) - 12, 66, 1.2f,
-                        navigation, returning ? 0.45f : 1f,
-                        returning ? 0.9f : 0.78f, returning ? 1f : 0.25f, 1f);
-            }
-        }
-
-        // Targeted block label + mining progress.
-        if (g.targetHit != null) {
-            String name = g.targetHit.type().displayName;
-            ui.textCentered(w / 2f, h / 2f + 18, 1.3f, name, 1f, 1f, 1f, 0.9f);
-            if (g.miningProgress > 0) {
-                float mw = 80;
-                ui.rect(w / 2f - mw / 2, h / 2f + 34, mw, 6, 0, 0, 0, 0.6f);
-                ui.rect(w / 2f - mw / 2, h / 2f + 34, mw * Math.min(1, g.miningProgress), 6,
-                        1f, 0.85f, 0.3f, 0.95f);
-            }
-        }
-
-        // Interaction prompt.
-        if (g.interactPrompt != null && !g.interactPrompt.isEmpty()) {
-            ui.textCentered(w / 2f, h / 2f + 52, 1.5f, g.interactPrompt, 1f, 1f, 0.7f, 1f);
-        }
-
-        // Event log (last 6 lines, bottom-left above bars/chips).
-        var lines = g.eventLog.recent(6);
-        float ly = h - 248 - lines.size() * 15;
-        for (String line : lines) {
-            ui.textShadow(16, ly, 1.2f, line, 0.92f, 0.92f, 0.85f, 0.85f);
-            ly += 15;
-        }
-
-        if (g.simPaused) {
-            ui.textCentered(w / 2f, 70, 2f, "SIMULATION PAUSED (P)", 1f, 0.8f, 0.3f, 1f);
-        }
-
-        // Sleep fade overlay.
-        if (g.sleepFade > 0.01f) {
-            ui.rect(0, 0, w, h, 0, 0, 0, Math.min(0.92f, g.sleepFade));
-            if (g.sleeping) {
-                ui.textCentered(w / 2f, h / 2f - 10, 2f, "Sleeping... (Esc to wake)",
-                        0.85f, 0.85f, 0.95f, 0.9f);
-            }
-        }
     }
 
     /** Damage flash, low-health pulse and cold edges. */
     private void renderVignettes(Game g, UiRenderer ui, int w, int h) {
         Player p = g.player;
+        if (p.abilities.invulnerable()) return;
         float red = p.damageFlash * 0.45f;
         if (p.health < 25) {
             red = Math.max(red, (0.5f + 0.5f * (float) Math.sin(g.totalTime * 4))

@@ -134,7 +134,7 @@ public class FireSystem implements MediumTickSystem {
 
     private void damageNear(Game g, Vec3i p, float dt) {
         float cx = p.x() + 0.5f, cy = p.y() + 0.5f, cz = p.z() + 0.5f;
-        if (g.player.distSqTo(cx, cy, cz) < CONTACT_RANGE_SQ) {
+        if (!g.player.abilities.invulnerable() && g.player.distSqTo(cx, cy, cz) < CONTACT_RANGE_SQ) {
             g.player.hurt(PLAYER_BURN_DPS * dt, false);
             g.player.damageFlash = 1f;
             if (!g.player.has(com.veylon.entity.Affliction.BURN)

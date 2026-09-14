@@ -564,7 +564,7 @@ public final class SettledNpcAI {
         if (dist < 1.9) {
             Steering.stop(n);
             faceToward(n, p.pos.x, p.pos.z);
-            if (n.attackCooldown <= 0) {
+            if (n.attackCooldown <= 0 && !p.abilities.invulnerable()) {
                 n.attackCooldown = a == NpcArchetype.BRUTE ? 1.8f : 1.2f;
                 p.hurtPhysical(g, a.meleeDamage, true);
                 p.knockback(n.pos.x, n.pos.z, a == NpcArchetype.BRUTE ? 5f : 3f);

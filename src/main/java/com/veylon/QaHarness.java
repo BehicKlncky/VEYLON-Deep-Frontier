@@ -308,6 +308,7 @@ final class QaHarness {
 
     /** Clears smoke-run accumulators before the loop starts sampling. */
     void resetSmokeRun() {
+        game.creativeQa.beginSession();
         fortressApproachProfiler.reset();
         smokeFortress = null;
         fortressApproaching = false;
@@ -396,6 +397,7 @@ final class QaHarness {
                 game.world.loadedCount() - fortressApproachChunkStart, fortressApproachOk);
 
         StringBuilder failure = new StringBuilder();
+        game.creativeQa.appendSmokeFailure(failure);
         if (!saveOk) failure.append("isolated save failed; ");
         if (!loadOk) failure.append("isolated load failed; ");
         if (!materialsOk) failure.append("material validation failed; ");

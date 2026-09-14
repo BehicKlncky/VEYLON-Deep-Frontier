@@ -179,6 +179,7 @@ final class AutomatedRunDriver {
     /** Advances the scripted smoke session; inert outside a smoke run. */
     void advanceSmokeRun(double now) {
         double elapsed = now - sessionStart;
+        if (smoke) game.creativeQa.sampleBody();
         if (!smoke || game.world == null || game.appState != Game.AppState.PLAYING) {
             return;
         }
@@ -196,6 +197,7 @@ final class AutomatedRunDriver {
                     (int) game.player.pos.z + 2, BlockType.TORCH, true);
             game.player.inventory.add(ItemType.HIDE_COAT, 1);
             game.qa.equipFromInventoryFirst(ItemType.HIDE_COAT);
+            game.creativeQa.beforeSave();
             smokeSaveOk = SaveSystem.save(game, smokeSave);
             System.out.println("[smoke] isolated save=" + smokeSaveOk + " path=" + smokeSave);
         }
@@ -203,6 +205,7 @@ final class AutomatedRunDriver {
             smokePhase = 2;
             if (audioQa) game.audio.scheduleThunder(game.player.pos.x + 500, game.player.pos.y, game.player.pos.z);
             smokeLoadOk = SaveSystem.load(game, smokeSave);
+            game.creativeQa.afterLoad(smokeLoadOk);
             if (audioQa && game.audio.pendingWeatherSounds() != 0) {
                 throw new IllegalStateException("Old-world weather audio survived load");
             }

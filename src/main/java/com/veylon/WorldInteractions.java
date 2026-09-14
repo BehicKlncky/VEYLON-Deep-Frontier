@@ -397,7 +397,7 @@ final class WorldInteractions {
         }
         game.player.thirst = Math.min(MAX_NEED, game.player.thirst + WATER_THIRST);
         game.audio.playDrink();
-        if (rng.nextFloat() < WATER_POISON_CHANCE) {
+        if (!game.player.abilities.invulnerable() && rng.nextFloat() < WATER_POISON_CHANCE) {
             game.player.addAffliction(Affliction.FOOD_POISONING,
                     PlayerConsumables.rollPoisonDuration(rng));
             game.log("You drank dirty water and feel ill...");

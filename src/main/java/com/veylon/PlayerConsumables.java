@@ -84,7 +84,7 @@ final class PlayerConsumables {
         }
 
         float poisonChance = poisonChanceFor(t, freshness);
-        if (poisonChance > 0 && rng.nextFloat() < poisonChance) {
+        if (!game.player.abilities.invulnerable() && poisonChance > 0 && rng.nextFloat() < poisonChance) {
             p.addAffliction(Affliction.FOOD_POISONING, rollPoisonDuration(rng));
             game.log("That food didn't sit well... FOOD POISONING sets in.");
         }
@@ -123,7 +123,7 @@ final class PlayerConsumables {
         game.audio.playDrink();
         if (clean) {
             game.log("You drink clean water (+" + (int) CLEAN_WATER_THIRST + " thirst).");
-        } else if (rng.nextFloat() < DIRTY_WATER_POISON_CHANCE) {
+        } else if (!game.player.abilities.invulnerable() && rng.nextFloat() < DIRTY_WATER_POISON_CHANCE) {
             p.addAffliction(Affliction.FOOD_POISONING, rollPoisonDuration(rng));
             game.log("The dirty water churns in your gut... FOOD POISONING.");
         } else {

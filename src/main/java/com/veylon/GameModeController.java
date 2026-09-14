@@ -35,6 +35,8 @@ final class GameModeController {
         mode = target;
         creativeMarked |= target == GameMode.CREATIVE;
         applyToPlayer();
+        game.player.resetFallState();
+        if (game.player.abilities.invulnerable()) game.player.restoreCreativeBody();
         game.log("Game mode: " + target.id + (creativeMarked ? " (Creative world)." : "."));
         return true;
     }
