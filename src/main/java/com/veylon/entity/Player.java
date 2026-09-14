@@ -64,6 +64,12 @@ public class Player extends Entity {
     public boolean woundClean;
 
     private float pendingFallDamage;
+    /**
+     * Seconds since the last Space press that did not toggle flight (R13).
+     * Transient input state owned by PlayerMovementSystem: a new world builds a
+     * new Player, so it never crosses worlds, and it is never saved.
+     */
+    float secondsSinceJumpTap = Float.POSITIVE_INFINITY;
 
     /**
      * Every roll that decides whether the player is wounded, sprained,

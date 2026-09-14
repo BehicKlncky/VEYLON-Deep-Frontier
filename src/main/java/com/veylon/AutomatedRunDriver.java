@@ -183,6 +183,7 @@ final class AutomatedRunDriver {
         if (!smoke || game.world == null || game.appState != Game.AppState.PLAYING) {
             return;
         }
+        game.creativeQa.updateSmokeFlight(elapsed);
         if (audioQa && elapsed > nextAudioProbe) {
             nextAudioProbe = elapsed + 1;
             game.audio.scheduleThunder(game.player.pos.x + 60, game.player.pos.y, game.player.pos.z);

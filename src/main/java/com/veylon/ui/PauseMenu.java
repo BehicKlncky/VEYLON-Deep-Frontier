@@ -45,6 +45,8 @@ public class PauseMenu {
         String[] controls = {
                 "WASD          Move              Space  Jump / swim up",
                 "Left Shift    Sprint            Left Ctrl  Crouch (stealth, read tracks)",
+                "Space twice   Creative: start or stop flying",
+                "(flying)      Space rise   Left Ctrl descend   Left Shift faster",
                 "LMB           Mine / attack     RMB  Place / eat / drink / treat / equip",
                 "F             Interact: talk, harvest, carcass, campfire, rack,",
                 "              collector, bedroll (sleep), beacon, fill waterskin",

@@ -28,7 +28,8 @@ public final class GameModeScreen {
             "Switch back to Creative mode?"
     };
     private static final String[] TO_SURVIVAL = {
-            "Hunger, injuries and hostile creatures return."
+            "Hunger, injuries and hostile creatures return.",
+            "Flight ends, and falls hurt again."
     };
     private static final float PANEL_MAX_W = 760;
     private static final float PANEL_H = 320;

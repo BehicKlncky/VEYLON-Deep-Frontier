@@ -65,6 +65,74 @@ final class VoxelPhysics {
         }
     }
 
+    /**
+     * Creative flight (R13, R14): no gravity or step-up and the same voxel
+     * collision, plus two walls. A chunk column that is not loaded reads as air,
+     * so entering it would skip terrain that has not streamed in; the altitude
+     * ceiling blocks only upward movement, so a body above it can still descend.
+     *
+     * @return true when a descending body touched the ground
+     */
+    static boolean integrateFlight(Entity entity, float dt, float ceilingY) {
+        refreshEnvironment(entity);
+        boolean hitX = moveFlightAxis(entity, 0, entity.vel.x * dt, ceilingY);
+        boolean hitZ = moveFlightAxis(entity, 2, entity.vel.z * dt, ceilingY);
+        entity.horizontalCollision = hitX || hitZ;
+        boolean hitY = moveFlightAxis(entity, 1, entity.vel.y * dt, ceilingY);
+        boolean landed = hitY && entity.vel.y < 0;
+        if (hitY) {
+            entity.vel.y = 0;
+        }
+        entity.onGround = landed;
+        entity.fallDist = 0;
+        return landed;
+    }
+
+    private static boolean moveFlightAxis(Entity entity, int axis, float distance, float ceilingY) {
+        if (distance == 0) {
+            return false;
+        }
+        float remaining = distance;
+        float sign = Math.signum(distance);
+        while (Math.abs(remaining) > MIN_REMAINING_MOVE) {
+            float step = sign * Math.min(MAX_AXIS_SUBSTEP, Math.abs(remaining));
+            remaining -= step;
+            offset(entity, axis, step);
+            if (entity.collidesAt(entity.pos.x, entity.pos.y, entity.pos.z)
+                    || flightBoundary(entity, axis, step, ceilingY)) {
+                offset(entity, axis, -step);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static void offset(Entity entity, int axis, float step) {
+        switch (axis) {
+            case 0 -> entity.pos.x += step;
+            case 1 -> entity.pos.y += step;
+            default -> entity.pos.z += step;
+        }
+    }
+
+    /** The ceiling stops rising; an unloaded column under any body corner stops horizontal moves. */
+    private static boolean flightBoundary(Entity entity, int axis, float step, float ceilingY) {
+        if (axis == 1) {
+            return step > 0 && entity.pos.y > ceilingY;
+        }
+        float hw = entity.width / 2f;
+        return !columnLoaded(entity, entity.pos.x - hw, entity.pos.z - hw)
+                || !columnLoaded(entity, entity.pos.x + hw, entity.pos.z - hw)
+                || !columnLoaded(entity, entity.pos.x - hw, entity.pos.z + hw)
+                || !columnLoaded(entity, entity.pos.x + hw, entity.pos.z + hw);
+    }
+
+    private static boolean columnLoaded(Entity entity, float x, float z) {
+        return entity.world.getChunk(
+                Math.floorDiv((int) Math.floor(x), com.veylon.world.Chunk.SX),
+                Math.floorDiv((int) Math.floor(z), com.veylon.world.Chunk.SZ)) != null;
+    }
+
     private static void refreshEnvironment(Entity entity) {
         int ex = (int) Math.floor(entity.pos.x);
         int ey = (int) Math.floor(entity.pos.y + entity.height * 0.5f);

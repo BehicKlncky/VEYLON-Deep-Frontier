@@ -26,7 +26,7 @@ public final class NewFrontierScreen {
     private static final String[] TITLES = {"SURVIVAL", "CREATIVE"};
     private static final String[][] DESCRIPTIONS = {
             {"Hunger, weather, wounds and wildlife.", "The frontier fights back."},
-            {"No damage or needs. Wildlife and", "settlers ignore you. Build freely."}
+            {"Fly, with no damage or needs.", "Wildlife and settlers ignore you."}
     };
     private static final String MARK_NOTE =
             "A Creative world stays marked as Creative, even after switching to Survival.";
