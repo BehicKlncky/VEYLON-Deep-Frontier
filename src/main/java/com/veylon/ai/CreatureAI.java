@@ -91,7 +91,7 @@ public final class CreatureAI {
         if (wolf != null) {
             c.state = CreatureState.FLEE;
             fleeFrom(c, wolf.pos.x, wolf.pos.z);
-        } else if (playerDist < panicRange) {
+        } else if (p.isPerceivableByAi() && playerDist < panicRange) {
             if (c.state != CreatureState.FLEE) {
                 g.audio.playDeerCall(c.pos.x, c.pos.y, c.pos.z);
             }
@@ -165,7 +165,7 @@ public final class CreatureAI {
             Steering.moveToward(c, c.target.x, c.target.z, c.type.speed * 1.6f);
             return;
         }
-        if (playerDist < spook + p.noise * 5f) {
+        if (p.isPerceivableByAi() && playerDist < spook + p.noise * 5f) {
             c.state = CreatureState.FLEE;
             fleeFrom(c, p.pos.x, p.pos.z);
             Steering.moveToward(c, c.target.x, c.target.z, c.type.speed * 1.5f);
@@ -196,12 +196,14 @@ public final class CreatureAI {
         Player p = g.player;
         double playerDist = Math.sqrt(c.distSqTo(p));
 
-        // A wounded thornhorn charges its attacker instead of fleeing.
-        if (c.health < c.maxHealth && c.fear > 0.4f && playerDist < 16 && !p.dead) {
+        // A wounded thornhorn charges its attacker instead of fleeing, but only
+        // an attacker it can perceive (R11); an unperceived one ends the charge.
+        boolean perceived = p.isPerceivableByAi();
+        if (perceived && c.health < c.maxHealth && c.fear > 0.4f && playerDist < 16 && !p.dead) {
             c.state = CreatureState.CHARGE;
         }
         if (c.state == CreatureState.CHARGE) {
-            if (playerDist < 1.9) {
+            if (perceived && playerDist < 1.9) {
                 Steering.stop(c);
                 if (c.attackCooldown <= 0 && !p.abilities.invulnerable()) {
                     c.attackCooldown = 1.6f;
@@ -212,7 +214,7 @@ public final class CreatureAI {
                             24f, 0.7f, "creature-attack", false, c);
                     g.log("The Thornhorn gores you! (-9 HP)");
                 }
-            } else if (playerDist > 20 || p.dead) {
+            } else if (!perceived || playerDist > 20 || p.dead) {
                 c.state = CreatureState.WANDER;
                 c.fear = 0;
             } else {
@@ -261,7 +263,8 @@ public final class CreatureAI {
             return;
         }
 
-        if (c.health < c.maxHealth * 0.3f) {
+        // Fleeing the player needs a perceived player (R11).
+        if (c.health < c.maxHealth * 0.3f && p.isPerceivableByAi()) {
             c.state = CreatureState.FLEE_HURT;
             fleeFrom(c, p.pos.x, p.pos.z);
             Steering.moveToward(c, c.target.x, c.target.z, c.type.speed * 1.5f);
@@ -292,7 +295,8 @@ public final class CreatureAI {
         }
 
         float baseRange = g.time.isNight() ? 15 : 9;
-        boolean stalkPlayer = hungry && playerDist < detectionRange(g, baseRange) && !p.dead;
+        boolean stalkPlayer = hungry && p.isPerceivableByAi()
+                && playerDist < detectionRange(g, baseRange) && !p.dead;
 
         Creature prey = g.entities.nearestCreature(c.pos.x, c.pos.y, c.pos.z, 26,
                 x -> x.type == CreatureType.DEER || x.type == CreatureType.HARE);
@@ -420,7 +424,8 @@ public final class CreatureAI {
             return;
         }
 
-        if (c.health < c.maxHealth * 0.25f) {
+        boolean perceived = p.isPerceivableByAi();
+        if (perceived && c.health < c.maxHealth * 0.25f) {
             c.state = CreatureState.FLEE_HURT;
             fleeFrom(c, p.pos.x, p.pos.z);
             Steering.moveToward(c, c.target.x, c.target.z, c.type.speed * 1.5f);
@@ -428,7 +433,7 @@ public final class CreatureAI {
         }
 
         float range = detectionRange(g, 18);
-        if (playerDist < range && !p.dead) {
+        if (perceived && playerDist < range && !p.dead) {
             // Gloomstalkers do not convert every detection into a straight-line
             // chase. Illumination around the prey makes them give ground and
             // wait for darkness instead.
@@ -513,10 +518,14 @@ public final class CreatureAI {
         float lengthSq = gx * gx + gz * gz;
         if (lengthSq > 0.0001f) {
             fleeFrom(c, c.pos.x + gx, c.pos.z + gz);
-        } else {
+        } else if (p.isPerceivableByAi()) {
             // A perfectly even source (or broad daylight) has no useful local
             // gradient; the player is the safest deterministic fallback.
             fleeFrom(c, p.pos.x, p.pos.z);
+        } else {
+            // An imperceptible player is no reference (R11): retreat along the
+            // fixed axis fleeFrom chooses for a zero-length direction.
+            fleeFrom(c, c.pos.x, c.pos.z);
         }
     }
 
@@ -555,7 +564,7 @@ public final class CreatureAI {
 
     private static void updateBird(Game g, Creature c, float dt) {
         double playerDist = Math.sqrt(c.distSqTo(g.player));
-        if (playerDist < 6) {
+        if (g.player.isPerceivableByAi() && playerDist < 6) {
             // Startled: fly up and away.
             float fx = c.pos.x + (c.pos.x - g.player.pos.x);
             float fz = c.pos.z + (c.pos.z - g.player.pos.z);

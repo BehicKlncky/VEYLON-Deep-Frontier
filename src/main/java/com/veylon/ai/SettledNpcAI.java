@@ -43,7 +43,7 @@ public final class SettledNpcAI {
         // Captives wait in their cage until rescued via interaction.
         if (a == NpcArchetype.CAPTIVE) {
             Steering.stop(n);
-            if (g.player != null && n.distSqTo(g.player) < 6 * 6) {
+            if (g.player != null && g.player.isPerceivableByAi() && n.distSqTo(g.player) < 6 * 6) {
                 faceToward(n, g.player.pos.x, g.player.pos.z);
             }
             n.state = NpcState.IDLE;
@@ -53,8 +53,9 @@ public final class SettledNpcAI {
         boolean hostileToPlayer = n.hostileToPlayer();
         perceive(g, n, s, hostileToPlayer, dt);
 
-        // Threat responses.
-        if (hostileToPlayer && n.lastKnownAge < 14f && !g.player.dead) {
+        // Threat responses need a perceivable player (R11).
+        if (hostileToPlayer && n.lastKnownAge < 14f && !g.player.dead
+                && g.player.isPerceivableByAi()) {
             combat(g, n, s, a, dt);
             return;
         }
@@ -123,9 +124,12 @@ public final class SettledNpcAI {
         if (p == null || p.dead) {
             return;
         }
+        // R11: sight and trace reading need a perceivable player. Hearing stays
+        // live; WorldNoise never queues player-attributed events for such a player.
+        boolean perceivable = p.isPerceivableByAi();
 
         // Sight: range scaled by crouch + darkness, 220-degree cone, occluded.
-        if (hostile || (s != null && s.alertLevel > 60)) {
+        if (perceivable && (hostile || (s != null && s.alertLevel > 60))) {
             float range = n.archetype.viewRange;
             if (p.crouching) {
                 range *= 0.5f;
@@ -177,7 +181,7 @@ public final class SettledNpcAI {
         }
 
         // Trackers read the player's traces: tracks, blood, carcasses.
-        if (hostile && n.archetype == NpcArchetype.TRACKER && n.lastKnownAge > 10f) {
+        if (perceivable && hostile && n.archetype == NpcArchetype.TRACKER && n.lastKnownAge > 10f) {
             var track = g.entities.nearestTrack(n.pos.x, n.pos.y, n.pos.z, 14f);
             if (track != null) {
                 n.lastKnown.set(track.x, track.y, track.z);

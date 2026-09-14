@@ -319,8 +319,10 @@ public class ProjectileSystem {
         if (p.fromPlayer) {
             g.settlementManager.onNpcAttackedByPlayer(g, n);
         }
-        // Being shot reveals roughly where the shooter stood.
-        if (p.owner != null) {
+        // Being shot reveals roughly where the shooter stood, unless the shooter
+        // is a player no one can perceive (R11); reputation above still applies.
+        if (p.owner != null && !(p.owner instanceof com.veylon.entity.Player shooter
+                && !shooter.isPerceivableByAi())) {
             n.lastKnown.set(p.owner.pos);
             n.lastKnownAge = 0f;
             n.searchTimer = 12f;

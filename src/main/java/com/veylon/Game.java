@@ -624,10 +624,9 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
             return false;
         }
         player.noise = Math.min(1f, player.noise + (sprinting ? 0.12f : 0.05f));
-        noise.emit(this, player.pos.x, player.pos.y, player.pos.z,
+        return noise.emit(this, player.pos.x, player.pos.y, player.pos.z,
                 sprinting ? 22f : 10f, sprinting ? 0.38f : 0.15f,
                 sprinting ? "sprint" : "footstep", true, player);
-        return true;
     }
 
     // ------------------------------------------------------------------

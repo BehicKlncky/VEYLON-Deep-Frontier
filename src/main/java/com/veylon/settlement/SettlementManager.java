@@ -308,6 +308,9 @@ public class SettlementManager
         } else if (!s.hostile()) {
             addLocalReputation(g, s, -18, "You attacked " + n.name + "!");
         }
+        if (!playerPerceivable(g)) {
+            return; // R12: the reputation above applies; nobody perceived the attacker
+        }
         s.alertLevel = Math.min(100, s.alertLevel + 40);
         n.lastKnown.set(g.player.pos);
         n.lastKnownAge = 0;
@@ -342,7 +345,7 @@ public class SettlementManager
         } else {
             addLocalReputation(g, s, -35, "You killed " + n.name + "!");
         }
-        s.alertLevel = Math.min(100, s.alertLevel + 50);
+        raisePlayerAlert(g, s, 50);
     }
 
     /** Theft from settlement crates. */
@@ -392,9 +395,10 @@ public class SettlementManager
             removeSupplyStock(s, type, count);
         }
         if (s != null && !hasSettlementAccess(s) && !activeTheftPenaltyApplied) {
-            addLocalReputation(g, s, -Math.min(15, 4 + count),
-                    "They saw you stealing from their stores!");
-            s.alertLevel = Math.min(100, s.alertLevel + 15);
+            addLocalReputation(g, s, -Math.min(15, 4 + count), playerPerceivable(g)
+                    ? "They saw you stealing from their stores!"
+                    : "Stolen stores are traced back to you.");
+            raisePlayerAlert(g, s, 15);
             activeTheftPenaltyApplied = true;
         }
     }
@@ -423,7 +427,7 @@ public class SettlementManager
         }
         s.restrictedStorageCooldown = RESTRICTED_STORAGE_INTERVAL;
         addLocalReputation(g, s, -4f, "You entered restricted settlement storage");
-        s.alertLevel = Math.min(100, s.alertLevel + 8);
+        raisePlayerAlert(g, s, 8);
         return true;
     }
 
@@ -434,7 +438,7 @@ public class SettlementManager
         }
         addLocalReputation(g, s, -Math.min(20f, 10f + Math.max(0, contents)),
                 "You smashed a settlement container and took its contents!");
-        s.alertLevel = Math.min(100, s.alertLevel + 25);
+        raisePlayerAlert(g, s, 25);
     }
 
     /** Player mined/blasted a settlement structure block. */
@@ -447,7 +451,7 @@ public class SettlementManager
                 || t == BlockType.PLANK || t == BlockType.LOG || t == BlockType.TORCH
                 || t == BlockType.WORKBENCH || t == BlockType.FURNACE || t == BlockType.ANVIL) {
             addLocalReputation(g, s, -8, "You wrecked settlement property!");
-            s.alertLevel = Math.min(100, s.alertLevel + 10);
+            raisePlayerAlert(g, s, 10);
         }
     }
 
@@ -461,7 +465,23 @@ public class SettlementManager
                 + (containerDestroyed ? 5f : 0f));
         addLocalReputation(g, s, -penalty,
                 "Your explosion damaged settlement property!");
-        s.alertLevel = Math.min(100, s.alertLevel + 35);
+        raisePlayerAlert(g, s, 35);
+    }
+
+    /**
+     * Player-caused alarms need residents who can perceive the player (R11).
+     * The reputation, stock and ownership consequence beside each call applies
+     * in every mode (D3); only the alarm is withheld.
+     */
+    private static void raisePlayerAlert(Game g, Settlement s, float amount) {
+        if (playerPerceivable(g)) {
+            s.alertLevel = Math.min(100, s.alertLevel + amount);
+        }
+    }
+
+    /** Consequences reached without a player keep their Survival behavior. */
+    private static boolean playerPerceivable(Game g) {
+        return g.player == null || g.player.isPerceivableByAi();
     }
 
     /** Supplying an innately hostile faction costs Frontier standing. */
@@ -577,9 +597,10 @@ public class SettlementManager
         if (current != null && current.trespassCooldown <= 0
                 && isRestrictedArea(g, current, g.player.pos.x, g.player.pos.z)) {
             current.trespassCooldown = TRESPASS_INTERVAL;
-            addLocalReputation(g, current, -5f,
-                    "Residents warn you out of a restricted area");
-            current.alertLevel = Math.min(100f, current.alertLevel + 10f);
+            addLocalReputation(g, current, -5f, playerPerceivable(g)
+                    ? "Residents warn you out of a restricted area"
+                    : "You trespassed in a restricted area");
+            raisePlayerAlert(g, current, 10f);
         }
     }
 
@@ -1220,7 +1241,8 @@ public class SettlementManager
                 bestDist = d;
             }
         }
-        if (origin != null) {
+        // R11: the bounty stands, but hunters cannot pick up an imperceptible trail.
+        if (origin != null && g.player.isPerceivableByAi()) {
             int size = 2 + (int) (bounty / 40f);
             g.log("You feel watched... a hunting party has picked up your trail.");
             spawnParty(g, origin, size, HumanFaction.HEADHUNTERS,
