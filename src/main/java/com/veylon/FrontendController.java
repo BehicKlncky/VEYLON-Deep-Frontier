@@ -1,13 +1,19 @@
 package com.veylon;
 
+import com.veylon.entity.GameMode;
 import com.veylon.save.SaveSystem;
 import com.veylon.ui.GraphicsOptionsScreen;
 import com.veylon.ui.AudioOptionsScreen;
+import com.veylon.ui.NewFrontierScreen;
 import com.veylon.ui.PresentationOverlay;
+import com.veylon.ui.TitleScreen;
+
+import java.nio.file.Files;
+import java.nio.file.Path;
 
 /**
- * The states with no world in them: title, graphics options and loading, plus
- * the transitions in and out of a live game.
+ * The states with no world in them: title, new-frontier mode choice, graphics
+ * and audio options, and loading, plus the transitions in and out of a live game.
  *
  * <p>These share one property that makes them worth separating from the play
  * loop: {@code world} and {@code player} are null throughout, so nothing here
@@ -31,6 +37,10 @@ final class FrontendController {
     private LoadRequest loadRequest;
     /** True once a loading frame has actually reached the screen. */
     private boolean loadingPresented;
+    /** The mode chosen on the new-frontier screen; transient, consumed by one load. */
+    private GameMode newWorldMode = GameMode.SURVIVAL;
+    /** The single save slot. Visible for testing so routing tests use an isolated file. */
+    Path savePath = SaveSystem.SAVE_PATH;
 
     FrontendController(Game game) {
         this.game = game;
@@ -39,7 +49,8 @@ final class FrontendController {
     /** True while the frontend owns the frame, i.e. no world exists. */
     boolean owns(Game.AppState state) {
         return state == Game.AppState.TITLE || state == Game.AppState.TITLE_OPTIONS
-                || state == Game.AppState.TITLE_AUDIO_OPTIONS || state == Game.AppState.LOADING;
+                || state == Game.AppState.TITLE_AUDIO_OPTIONS || state == Game.AppState.LOADING
+                || state == Game.AppState.TITLE_NEW_WORLD;
     }
 
     void frame(float dt) {
@@ -47,7 +58,8 @@ final class FrontendController {
         game.audio.update(dt);
         game.beginUiFrame();
         switch (game.appState) {
-            case TITLE -> updateTitle();
+            case TITLE -> applyTitle(game.titleScreen.update(game));
+            case TITLE_NEW_WORLD -> applyNewFrontier(game.newFrontierScreen.update(game));
             case TITLE_OPTIONS -> updateOptions(dt);
             case TITLE_AUDIO_OPTIONS -> updateAudio();
             default -> presentLoading();
@@ -55,9 +67,10 @@ final class FrontendController {
         game.ui.end();
     }
 
-    private void updateTitle() {
-        switch (game.titleScreen.update(game)) {
-            case NEW_GAME -> beginLoading(LoadRequest.NEW_GAME);
+    /** Applies a title action; NEW FRONTIER opens the mode choice instead of loading (R2). */
+    void applyTitle(TitleScreen.Action action) {
+        switch (action) {
+            case NEW_GAME -> openNewFrontier(Files.exists(savePath));
             case LOAD_GAME -> beginLoading(LoadRequest.LOAD_GAME);
             case OPTIONS -> {
                 game.graphicsOptionsScreen.open(game.renderer.settings,
@@ -69,6 +82,25 @@ final class FrontendController {
                 game.appState = Game.AppState.TITLE_AUDIO_OPTIONS;
             }
             case QUIT -> game.window.requestClose();
+            case NONE -> {
+            }
+        }
+    }
+
+    /** Opens the worldless mode choice; the save check happens once, not every frame. */
+    void openNewFrontier(boolean saveExists) {
+        game.newFrontierScreen.open(saveExists);
+        game.appState = Game.AppState.TITLE_NEW_WORLD;
+    }
+
+    /** START carries the chosen mode into the two-frame loading; BACK creates nothing. */
+    void applyNewFrontier(NewFrontierScreen.Action action) {
+        switch (action) {
+            case START -> {
+                newWorldMode = game.newFrontierScreen.selectedMode();
+                beginLoading(LoadRequest.NEW_GAME);
+            }
+            case BACK -> game.appState = Game.AppState.TITLE;
             case NONE -> {
             }
         }
@@ -126,19 +158,31 @@ final class FrontendController {
      * it happens rather than at a frozen menu.
      */
     void completeLoading() {
+        if (performLoad()) {
+            game.window.captureCursor(true, game.input);
+        }
+    }
+
+    /**
+     * The synchronous load and its state transition without the native cursor
+     * capture, so headless routing tests exercise the production path.
+     *
+     * @return true when a playable world is now live
+     */
+    boolean performLoad() {
         loadingPresented = false;
         boolean loaded;
         if (loadRequest == LoadRequest.LOAD_GAME) {
-            loaded = SaveSystem.load(game);
+            loaded = SaveSystem.load(game, savePath);
         } else {
-            game.newWorld(game.sessionSeed, true);
+            game.newWorld(game.sessionSeed, true, newWorldMode);
             loaded = true;
         }
         loadRequest = null;
+        newWorldMode = GameMode.SURVIVAL;
         if (loaded) {
             game.appState = Game.AppState.PLAYING;
             game.closeScreens();
-            game.window.captureCursor(true, game.input);
         } else {
             // A failed load has already replaced the previous world, so there is
             // nothing to fall back to; drop to the title rather than to a
@@ -150,6 +194,7 @@ final class FrontendController {
             game.titleScreen.notice("No compatible save was found.");
             game.appState = Game.AppState.TITLE;
         }
+        return loaded;
     }
 
     /** The in-game pause menu's options screen, which returns to PAUSE, not TITLE. */
@@ -189,8 +234,13 @@ final class FrontendController {
         game.titleScreen.notice("");
     }
 
-    /** Opens the frontend on a specific state, for the VEYLON_FRONTEND QA captures. */
+    /**
+     * Opens a specific screen for the VEYLON_FRONTEND QA captures. A
+     * {@code -creative} suffix stages the world in Creative; {@code newworld-save}
+     * shows the replace notice without writing a save file.
+     */
     void openForQa(String screen) {
+        GameMode qaMode = screen.endsWith("-creative") ? GameMode.CREATIVE : GameMode.SURVIVAL;
         switch (screen) {
             case "audio" -> {
                 game.audioOptionsScreen.open(game.audio.settings);
@@ -205,8 +255,18 @@ final class FrontendController {
                 game.appState = Game.AppState.LOADING;
                 game.qa.setStaticLoadingQa(true);
             }
-            case "death", "victory" -> {
-                game.newWorld(game.sessionSeed, true);
+            case "newworld" -> openNewFrontier(Files.exists(savePath));
+            case "newworld-save" -> openNewFrontier(true);
+            case "pause", "pause-creative", "gamemode", "gamemode-creative" -> {
+                game.newWorld(game.sessionSeed, true, qaMode);
+                game.appState = Game.AppState.PLAYING;
+                game.uiMode = Game.UiMode.PAUSE;
+                if (screen.startsWith("gamemode")) {
+                    game.gameModes.openScreen();
+                }
+            }
+            case "death", "victory", "victory-creative" -> {
+                game.newWorld(game.sessionSeed, true, qaMode);
                 game.appState = "death".equals(screen)
                         ? Game.AppState.DEATH : Game.AppState.VICTORY;
                 game.deathTimer = 30f;

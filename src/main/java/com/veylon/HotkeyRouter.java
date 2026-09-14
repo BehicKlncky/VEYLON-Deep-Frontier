@@ -13,9 +13,9 @@ import static org.lwjgl.glfw.GLFW.*;
  * the three rules the sequence encodes:
  *
  * <ol>
- *   <li><b>The graphics options screen owns every key while it is open.</b> It
- *       binds Escape and F5 itself, so routing them here would both close the
- *       screen and quick-save.</li>
+ *   <li><b>The options screens and the game-mode confirmation own every key
+ *       while open.</b> They bind Escape, Enter or F5 themselves, so routing
+ *       them here would both close the screen and quick-save or quit.</li>
  *   <li><b>Escape is contextual</b>: it wakes a sleeper, opens the pause menu
  *       from gameplay, and otherwise closes whatever screen is open.</li>
  *   <li><b>Sleeping consumes everything except Escape.</b> A player cannot open
@@ -32,8 +32,13 @@ final class HotkeyRouter {
     }
 
     void update() {
-        if (game.uiMode == Game.UiMode.OPTIONS || game.uiMode == Game.UiMode.AUDIO_OPTIONS) {
-            return; // Options screens own Escape/F5/navigation while open.
+        if (game.uiMode == Game.UiMode.OPTIONS || game.uiMode == Game.UiMode.AUDIO_OPTIONS
+                || game.uiMode == Game.UiMode.GAME_MODE) {
+            return; // Options and the mode confirmation own Escape/F5/navigation while open.
+        }
+        if (game.uiMode == Game.UiMode.PAUSE && game.input.wasKeyPressed(GLFW_KEY_G)) {
+            game.gameModes.openScreen();
+            return;
         }
         if (game.uiMode == Game.UiMode.PAUSE && game.input.wasKeyPressed(GLFW_KEY_O)) {
             game.graphicsOptionsScreen.open(game.renderer.settings,

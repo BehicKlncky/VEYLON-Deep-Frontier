@@ -2,9 +2,22 @@ package com.veylon.ui;
 
 import com.veylon.Game;
 import com.veylon.engine.UiRenderer;
+import com.veylon.entity.GameMode;
 
-/** Escape menu with controls reference. */
+/** Escape menu with the world's game mode and a controls reference. */
 public class PauseMenu {
+
+    private static final String SURVIVAL_LABEL = "SURVIVAL";
+    private static final String SURVIVAL_MARKED_LABEL = "SURVIVAL  /  Creative world";
+    private static final String CREATIVE_LABEL = "CREATIVE  /  Creative world";
+
+    /** R6: the mode plus the permanent mark. A Creative world is always marked. */
+    public static String modeLabel(GameMode mode, boolean marked) {
+        if (mode == GameMode.CREATIVE) {
+            return CREATIVE_LABEL;
+        }
+        return marked ? SURVIVAL_MARKED_LABEL : SURVIVAL_LABEL;
+    }
 
     public void update(Game g) {
         UiRenderer ui = g.ui;
@@ -17,12 +30,17 @@ public class PauseMenu {
 
         ui.textCentered(w / 2f, y0 + 16, 2.6f, "VEYLON: DEEP FRONTIER", 1f, 0.95f, 0.8f, 1f);
         ui.textCentered(w / 2f, y0 + 48, 1.4f, "- PAUSED -", 0.8f, 0.8f, 0.8f, 1f);
+        boolean creative = g.gameMode() == GameMode.CREATIVE;
+        ui.textCentered(w / 2f, y0 + 72, 1.2f, modeLabel(g.gameMode(), g.creativeMarked()),
+                creative ? 1f : 0.55f, creative ? 0.8f : 0.88f, creative ? 0.4f : 0.9f, 1f);
 
-        float oy = y0 + 78;
+        float oy = y0 + 102;
         ui.textCentered(w / 2f, oy, 1.10f,
-                "[Esc] Resume   [O] Graphics   [V] Audio   [F5] Save   [F9] Load   [Q] Quit",
+                "[Esc] Resume   [G] Game mode   [O] Graphics   [V] Audio",
                 1f, 1f, 1f, 1f);
-        oy += 36;
+        oy += 22;
+        ui.textCentered(w / 2f, oy, 1.10f, "[F5] Save   [F9] Load   [Q] Quit", 1f, 1f, 1f, 1f);
+        oy += 34;
 
         String[] controls = {
                 "WASD          Move              Space  Jump / swim up",

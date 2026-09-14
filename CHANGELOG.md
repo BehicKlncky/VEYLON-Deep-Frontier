@@ -2,6 +2,14 @@
 
 All notable user-facing changes to VEYLON: Deep Frontier are recorded here.
 
+## [0.6.5] - 2026-09-14
+
+### Added
+
+- Choose Survival or Creative when starting a new frontier.
+- Switch an existing world from the pause menu with G. The first switch to Creative
+  asks for confirmation and permanently marks the world.
+
 ## [0.6.4] - 2026-09-14
 
 ### Added
