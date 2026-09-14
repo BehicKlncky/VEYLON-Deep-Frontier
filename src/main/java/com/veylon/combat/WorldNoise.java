@@ -53,9 +53,26 @@ public class WorldNoise {
         events.clear();
     }
 
-    /** Emits a positioned sound; wildlife reacts immediately (one-shot). */
-    public void emit(Game g, float x, float y, float z, float radius, float intensity,
-                     String category, boolean playerSource, Entity source) {
+    /** Drops queued player-attributed events once the player stops being perceivable. */
+    public void forgetPlayerSources() {
+        events.removeIf(event -> event.playerSource);
+    }
+
+    /**
+     * Emits a positioned sound; wildlife reacts immediately (one-shot).
+     *
+     * <p>This is the one gate for player-attributed perception events (R11):
+     * while the player is not perceivable nothing is queued and no wildlife
+     * reacts. Callers keep their physical effects -- audio, particles, damage
+     * and reputation never pass through here.
+     *
+     * @return true when the event was queued
+     */
+    public boolean emit(Game g, float x, float y, float z, float radius, float intensity,
+                        String category, boolean playerSource, Entity source) {
+        if (playerSource && g != null && g.player != null && !g.player.isPerceivableByAi()) {
+            return false;
+        }
         NoiseEvent e = new NoiseEvent(x, y, z, radius, intensity, category,
                 playerSource, source, EVENT_LIFE);
         events.addLast(e);
@@ -82,6 +99,7 @@ public class WorldNoise {
                 }
             }
         }
+        return true;
     }
 
     public void update(float dt) {

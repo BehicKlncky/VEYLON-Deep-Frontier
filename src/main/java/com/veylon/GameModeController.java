@@ -1,5 +1,6 @@
 package com.veylon;
 
+import com.veylon.ai.PlayerAwareness;
 import com.veylon.entity.GameMode;
 
 import java.util.Objects;
@@ -37,6 +38,8 @@ final class GameModeController {
         applyToPlayer();
         game.player.resetFallState();
         if (game.player.abilities.invulnerable()) game.player.restoreCreativeBody();
+        // R4: perception gates stop new observations; this retires the old ones.
+        if (!game.player.isPerceivableByAi()) PlayerAwareness.forgetPlayer(game);
         game.log("Game mode: " + target.id + (creativeMarked ? " (Creative world)." : "."));
         return true;
     }

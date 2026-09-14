@@ -79,7 +79,7 @@ wrapper, workflows, existing enum IDs and all budgets remain unchanged.
 | v0.6.1 | 01-plan-and-parity-harness | Baseline, A1-A5, missing Survival parity, design; no production change (R26) | verified |
 | v0.6.2 | 02-mode-model-and-save | Byte-identical save extraction, mode/abilities/reset/restore, strict section, QA parsing (R1, R7, R15) | verified |
 | v0.6.3 | 03-invulnerable-body | All A1 gates, restoration, observations, badge and mode-aware smoke (R4, R6, R8-R10) | verified; save gate is a recorded host deviation |
-| v0.6.4 | 04-imperceptible-player | A3 gates and memory clear; preserve D3 consequences (R11-R12) | pending |
+| v0.6.4 | 04-imperceptible-player | A3 gates and memory clear; preserve D3 consequences (R11-R12) | verified; save gate is a recorded host deviation |
 | v0.6.5 | 05-mode-selection | Worldless mode choice, explicit confirmation, permanent mark, key ownership (R2-R7) | pending |
 | v0.6.6 | 06-flight | Double tap, collision, loaded columns, measured speeds/ceiling, reset and restore (R5, R13-R15) | pending |
 | v0.6.7 | 07-catalog | Character input, categories, AND search, grants/trash, all key ownership (R16-R18) | pending |
@@ -225,7 +225,7 @@ explicit friendly interaction (keep). Ownership predicates such as
 | SettlementPlanner:235 | seed-derived starter region protection / S | unchanged | 2, 4 | SettlementPlannerTest; planned same-seed test |
 | EntityManager:61,63,105-118,144,155 | loot, knife availability, kill feedback / C | unchanged | 4 | BowHuntProgressionIntegrationTest |
 | EntityManager:232,269-273,288,351 | natural spawn location, cave band, exclusion / S | unchanged until explicit spawn control | 4, 11 | EntityEcologyTest; planned controls tests |
-| ProjectileSystem:265-267 | incidental player hit candidate | exclude imperceptible player from hostile projectile collision | 4 | planned projectile/body twin |
+| ProjectileSystem:265-267 | incidental player hit candidate / physical | keep physical collision without injury (milestone 3 body gate); aiming is gated at SettledNpcAI combat entry | 3, 4 | CreativeHazardsTest ARROW/BULLET; CreativePerceptionTest |
 | ProjectileSystem:293,392 | player injury and recovered item | body gate; recovery unchanged | 3, 4 | CombatSystemsTest; BowGameplayWorkflowTest |
 | ExplosionSystem:158-159,178,263 | physical blast victims and player-attributed noise | body gate and common noise gate; world blast unchanged | 3, 4 | CombatSystemsTest; planned noise twin |
 | WorldNoise.emit / NoiseEvent.playerSource:35 | all positioned perception events | one emit boundary suppresses player source; unrelated events stay | 4 | HumanPerceptionGameplayTest; planned Creative noise tests |
@@ -503,3 +503,62 @@ milestone advances only when every other budget passes, the probe's load stays
 under 240 ms and the milestone's save figure is at most 10% above the paired
 reference run. The final release record must list the save gate as not met on
 this host. Real line counts equal the build record above.
+
+### v0.6.4 evidence
+
+Every A3 perception or targeting row now reads `Player.isPerceivableByAi()`.
+CreatureAI: deer, hare and bird flight; thornhorn charge and charge exit; wolf
+and stalker wounded flight; wolf player stalking; stalker detection and its
+flat-gradient retreat fallback. SettledNpcAI: captive facing, sight, tracker
+traces and combat entry. NpcAI: camp hostility, wounded flight (which now
+shelters at the camp fire when nothing is perceived) and raider targeting.
+SettlementManager: player-caused alerts for attack, kill, theft, restricted
+storage, containers, structures, explosion property and trespass; victim
+memory; bounty-hunter dispatch. ProjectileSystem: the shooter reveal.
+`WorldNoise.emit` is the one gate for player-attributed events, and
+`Player.tickNeeds` holds noise and scent at zero while imperceptible.
+`PlayerAwareness.forgetPlayer` is the one memory clear on entering Creative:
+sightings, searches, combat intent, alarm-bell runs, player-directed creature
+states, bounty and contact pursuit, and queued player events.
+
+Kept unchanged (D3, R12): reputation, theft stock ledger, morale, dead
+residents, bounty accrual and earlier scout contact reports; settlement
+discovery, activation, dormant simulation and counterattack missions; party
+travel distance thresholds; spawning around the player; EntityManager loot
+and kill feedback; FactionSystem quests, gifts and camp-relative fallbacks;
+trader following and escort; talk facing; medic treatment; gate collision.
+Stray hostile projectiles still collide physically without injury (milestone
+3 body gate), because aiming is gated at combat entry. Theft and trespass
+keep their reputation cost with wording that no longer claims a witness. No
+Random, thread, save field or enum constant was added. Survival predicates
+keep their arithmetic and draw order; in Creative, gated branches fall
+through to ordinary wander and work decisions on the existing AI streams.
+
+CreativePerceptionTest adds 15 cases with Survival twins (6.264s). Focused
+perception, AI, settlement, parity, body, hazard, firearm, determinism and
+lifecycle suites plus doclint: PASS in 1m08s (68.316s wall), 176 tests / 22
+classes, zero failures, errors and skips. No existing test changed.
+
+Final v0.6.4 build: PASS, 561 tests / 85 classes, zero failures, errors and
+skips; 2m1s (121.094s wall), including JavaDoc doclint and line budgets.
+Real lines: Game 911/1000, QaHarness 1411/1500, SaveSystem 1109/1800,
+SettlementManager 1414/1500, FactionSystem 1265/1400, WorldGenerator 1178/1300.
+
+Performance (unchanged budgets, 7.799s wall): save 2.738 ms against 2.20 ms
+remains the recorded host deviation; the paired untouched v0.6.2 run measured
+2.859 ms (7.869s wall), so this milestone is below its reference. Chunk
+0.349 ms, entity 0.318 ms, settlement 0.012 ms, audio 454.423 ms, PCM
+40,824,424 bytes, occlusion 0.001679 ms/frame and music 0.000008 ms/frame
+pass; TickProfileTest passes (whole cycle 0.0854 ms). PerfSaveLoadProbe: save
+2.936 ms, load 176.847 ms against 240 ms.
+
+Native 30s smokes, seed 20260910, VSync off, minimum 60 FPS, 1280x720, same
+NVIDIA RTX 1000 Ada / OpenGL 3.3 / driver 595.95 host, run one at a time with
+no concurrent build. Creative: PASS, 919.8 FPS, p95 1.43 ms, p99 1.62 ms,
+27,597 body samples without damage or death, mode/mark/flight restored.
+Survival: PASS, 898.9 FPS, p95 1.44 ms, p99 1.73 ms. Both completed isolated
+save/load and the fortress approach within every runtime hard limit, with
+zero GL, KHR-debug and OpenAL errors. No player-visible screen or string
+changed except two Creative-only reputation log lines, which appear in the
+existing event log; captures are therefore not required here. Human
+playtesting is unverified.

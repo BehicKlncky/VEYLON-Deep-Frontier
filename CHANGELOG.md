@@ -2,6 +2,14 @@
 
 All notable user-facing changes to VEYLON: Deep Frontier are recorded here.
 
+## [0.6.4] - 2026-09-14
+
+### Added
+
+- Wildlife and settlement residents ignore Creative players: no detection, pursuit,
+  alarms or attacks, while the frontier keeps living around you. Reputation and
+  ownership rules still apply.
+
 ## [0.6.3] - 2026-09-14
 
 ### Added

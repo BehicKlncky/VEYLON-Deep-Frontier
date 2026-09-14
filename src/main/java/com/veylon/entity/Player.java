@@ -259,6 +259,15 @@ public class Player extends Entity {
         resetFallState();
     }
 
+    /**
+     * R11: the single predicate every AI perception and targeting site reads.
+     * An imperceptible player still exists physically: collision, gates, chunk
+     * streaming, settlement activation and reputation never consult it.
+     */
+    public boolean isPerceivableByAi() {
+        return abilities.perceivableByAi();
+    }
+
     // ------------------------------------------------------------------
     // Needs tick (20 Hz)
     // ------------------------------------------------------------------
@@ -277,6 +286,11 @@ public class Player extends Entity {
 
         damageFlash = Math.max(0, damageFlash - DAMAGE_FLASH_DECAY_PER_SECOND * dt);
         noise = Math.max(0, noise - NOISE_DECAY_PER_SECOND * dt);
+        if (!isPerceivableByAi()) {
+            // R11: recent actions, carried meat and blood leave no trace to sense.
+            noise = 0;
+            scent = 0;
+        }
 
         if (abilities.invulnerable()) {
             restoreCreativeBody();
