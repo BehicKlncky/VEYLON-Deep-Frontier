@@ -51,6 +51,7 @@ public class PauseMenu {
                 "F             Interact: talk, harvest, carcass, campfire, rack,",
                 "              collector, bedroll (sleep), beacon, fill waterskin",
                 "E             Inventory + gear  C   Crafting (Q/R station tabs)",
+                "E (Creative)  Catalog: browse, search and take any item",
                 "1-9 / scroll  Hotbar            Tab  Simulation panel",
                 "M             Map (POIs)        F3   Debug overlay",
                 "P             Pause simulation  F5/F9  Save / Load",

@@ -265,6 +265,11 @@ final class FrontendController {
                     game.gameModes.openScreen();
                 }
             }
+            case "catalog", "catalog-tools", "catalog-search", "catalog-inventory" -> {
+                game.newWorld(game.sessionSeed, true, GameMode.CREATIVE);
+                game.appState = Game.AppState.PLAYING;
+                game.creativeQa.openCatalogForQa(screen);
+            }
             case "death", "victory", "victory-creative" -> {
                 game.newWorld(game.sessionSeed, true, qaMode);
                 game.appState = "death".equals(screen)

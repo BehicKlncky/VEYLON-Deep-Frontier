@@ -182,7 +182,13 @@ class GameLoopIntegrationTest {
         game.restoreGameMode(com.veylon.entity.GameMode.CREATIVE, true, true);
         assertTrue(game.creativeMarked() && game.player.abilities.flying(),
                 "precondition: outgoing world has persisted Creative state");
+        game.creativeCatalogScreen.search("iron");
+        game.creativeCatalogScreen.showInventory();
         game.newWorld(4242L, true);
+        assertEquals("", game.creativeCatalogScreen.query(),
+                "R16: the catalog query does not survive into a new world");
+        assertFalse(game.creativeCatalogScreen.inventoryTab() || game.creativeCatalogScreen.searchFocused(),
+                "R16: the catalog tab and search focus reset with the world");
 
         assertFalse(game.world == previousWorld, "a new World instance replaces the old one");
         assertFalse(game.player == previousPlayer, "a new Player replaces the old one");

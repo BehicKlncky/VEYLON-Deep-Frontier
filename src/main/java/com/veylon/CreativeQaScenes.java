@@ -140,6 +140,20 @@ final class CreativeQaScenes {
         fly(flightStep(elapsed));
     }
 
+    /** VEYLON_FRONTEND catalog captures: the first tab, a category, a live search or the inventory tab. */
+    void openCatalogForQa(String variant) {
+        com.veylon.ui.CreativeCatalogScreen screen = game.creativeCatalogScreen;
+        screen.reset();
+        switch (variant) {
+            case "catalog-tools" -> screen.selectCategory(com.veylon.item.CreativeCatalog.Category.TOOLS);
+            case "catalog-search" -> screen.search("iron");
+            case "catalog-inventory" -> screen.showInventory();
+            default -> {
+            }
+        }
+        game.uiMode = Game.UiMode.CREATIVE_CATALOG;
+    }
+
     void appendSmokeFailure(StringBuilder failure) {
         if (!creative) return;
         System.out.println("[smoke] creative={mode=" + game.gameMode().id
