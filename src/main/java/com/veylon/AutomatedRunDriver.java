@@ -1,6 +1,7 @@
 package com.veylon;
 
 import com.veylon.gfx.ScreenshotUtil;
+import com.veylon.entity.GameMode;
 import com.veylon.item.ItemType;
 import com.veylon.save.SaveSystem;
 import com.veylon.simulation.WeatherSystem;
@@ -83,7 +84,7 @@ final class AutomatedRunDriver {
                 || (shotEnv != null && !shotEnv.isBlank()) || frontendQa;
 
         if (automated && !frontendQa) {
-            game.newWorld(game.sessionSeed, true);
+            game.newWorld(game.sessionSeed, true, configuredGameMode(System.getenv("VEYLON_GAME_MODE")));
             game.qa.applyBenchmarkScene(scene);
             game.appState = Game.AppState.PLAYING;
             game.window.captureCursor(true, game.input);
@@ -106,6 +107,17 @@ final class AutomatedRunDriver {
         shotMarks = parseShotMarks(shotEnv);
         capturePrefix = resolveCapturePrefix();
         return automated;
+    }
+
+    /** Strict, locale-independent parsing is only invoked for automated worlds. */
+    static GameMode configuredGameMode(String configured) {
+        if (configured == null) return GameMode.SURVIVAL;
+        try {
+            return GameMode.fromId(configured.trim().toLowerCase(Locale.ROOT));
+        } catch (IllegalArgumentException invalid) {
+            throw new IllegalArgumentException("VEYLON_GAME_MODE must be survival or creative: " + configured,
+                    invalid);
+        }
     }
 
     /** {@code VEYLON_SHOT="5,10"} captures the framebuffer at those elapsed seconds. */

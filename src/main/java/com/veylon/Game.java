@@ -12,6 +12,7 @@ import com.veylon.engine.Window;
 import com.veylon.entity.Creature;
 import com.veylon.entity.Entity;
 import com.veylon.entity.EntityManager;
+import com.veylon.entity.GameMode;
 import com.veylon.entity.Npc;
 import com.veylon.entity.Player;
 import com.veylon.entity.PlayerMovementSystem;
@@ -188,6 +189,7 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
 
     /** Reset, reseed, construct and camp placement for every new or loaded world. */
     private final WorldBootstrap bootstrap = new WorldBootstrap(this);
+    final GameModeController gameModes = new GameModeController(this);
 
     /** Title, graphics options and loading -- the states with no world in them. */
     final FrontendController frontend = new FrontendController(this);
@@ -376,6 +378,17 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
      */
     public void newWorld(long seed, boolean fresh, int generatorVersion) {
         bootstrap.newWorld(seed, fresh, generatorVersion);
+    }
+
+    public void newWorld(long seed, boolean fresh, GameMode mode) {
+        bootstrap.newWorld(seed, fresh, World.CURRENT_GENERATOR, mode);
+    }
+
+    public GameMode gameMode() { return gameModes.mode(); }
+    public boolean creativeMarked() { return gameModes.creativeMarked(); }
+    public boolean switchGameMode(GameMode mode) { return gameModes.switchTo(mode); }
+    public void restoreGameMode(GameMode mode, boolean marked, boolean flying) {
+        gameModes.restore(mode, marked, flying);
     }
 
     void releaseWorldMeshes() {

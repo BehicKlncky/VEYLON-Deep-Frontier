@@ -21,6 +21,8 @@ import static com.veylon.entity.PlayerConstants.*;
 /** The player: physics body plus the full survival-needs simulation. */
 public class Player extends Entity {
 
+    public final PlayerAbilities abilities = new PlayerAbilities();
+
     public final Inventory inventory = new Inventory(INVENTORY_SLOTS);
     /** Worn gear, indexed by {@link EquipSlot#ordinal()}. */
     public final ItemStack[] equipment = new ItemStack[EquipSlot.values().length];
