@@ -40,6 +40,7 @@ runs. All are inert when unset. Everything below is handled by `QaHarness`;
 | Variable | Effect |
 |---|---|
 | `VEYLON_SEED` | Fixed world seed (a non-numeric value is hashed) |
+| `VEYLON_GAME_MODE=survival\|creative` | Initial mode for automated world runs only; absent means Survival. Invalid values fail explicitly. Ignored for normal title sessions and frontend-only captures. |
 | `VEYLON_SMOKE=<seconds>` | Release smoke gate: save/load, fire, storm, a fortress approach, then a pass/fail report. Throws on failure |
 | `VEYLON_SCENE=<name>` | Stage a deterministic benchmark scene (`day`, `pinefog`, `nightfire`, `ruin`, `toxic`, `ao_shadow`, `phase4`, `ashwolf`, `silhouette30`, `vfx_blood`, `vfx_mining`, `vfx_beacon`, `movement`, `inventory`, `ui_cycle`, `held_*`) |
 | `VEYLON_SHOT="5,10"` | Capture screenshots at those elapsed seconds |

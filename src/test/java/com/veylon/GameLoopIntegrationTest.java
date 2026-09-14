@@ -179,10 +179,17 @@ class GameLoopIntegrationTest {
 
         var previousWorld = game.world;
         var previousPlayer = game.player;
+        game.restoreGameMode(com.veylon.entity.GameMode.CREATIVE, true, true);
+        assertTrue(game.creativeMarked() && game.player.abilities.flying(),
+                "precondition: outgoing world has persisted Creative state");
         game.newWorld(4242L, true);
 
         assertFalse(game.world == previousWorld, "a new World instance replaces the old one");
         assertFalse(game.player == previousPlayer, "a new Player replaces the old one");
+        assertEquals(com.veylon.entity.GameMode.SURVIVAL, game.gameMode(),
+                "R1: existing newWorld callers always start Survival");
+        assertFalse(game.creativeMarked(), "R1: the old world's permanent mark cannot leak");
+        assertFalse(game.player.abilities.flying(), "R15: new worlds cannot inherit flight");
         assertSame(game, game.world.listener, "the new world reports block changes to Game");
         assertEquals(0, game.fire.count(), "burning blocks do not survive into a new world");
         assertEquals(0, game.projectiles.liveCount(), "projectiles do not survive");

@@ -2,6 +2,7 @@ package com.veylon;
 
 import com.veylon.entity.Npc;
 import com.veylon.entity.Player;
+import com.veylon.entity.GameMode;
 import com.veylon.item.Inventory;
 import com.veylon.item.ItemType;
 import com.veylon.util.Vec3i;
@@ -52,11 +53,18 @@ final class WorldBootstrap {
     }
 
     void newWorld(long seed, boolean fresh, int generatorVersion) {
+        newWorld(seed, fresh, generatorVersion, GameMode.SURVIVAL);
+    }
+
+    void newWorld(long seed, boolean fresh, int generatorVersion, GameMode initialMode) {
+        java.util.Objects.requireNonNull(initialMode, "initialMode");
         resetForNewWorld(seed);
+        game.gameModes.reset(initialMode);
         game.world = new World(seed, generatorVersion);
         game.audio.bindWorld(game.world);
         game.world.listener = game;
         game.player = new Player(game.world);
+        game.gameModes.applyToPlayer();
         clearPerWorldState();
 
         placePlayerOnDryLand();

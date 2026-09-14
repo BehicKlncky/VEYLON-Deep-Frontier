@@ -74,6 +74,7 @@ final class V3ExtensionSections {
         sections.add(writeReputationActionsSection(g));
         sections.add(writeActiveExplosivesSection(g));
         sections.add(writeKegFuseAttributionSection(g));
+        sections.add(new V3Section(GameModeSection.ID, GameModeSection.write(g)));
         out.writeInt(V3_SECTION_ENVELOPE_MAGIC);
         out.writeInt(sections.size());
         for (V3Section section : sections) {
@@ -297,6 +298,8 @@ final class V3ExtensionSections {
                 readActiveExplosivesSection(payload, g);
             } else if (V3_SECTION_KEG_FUSE_ATTRIBUTION.equals(id)) {
                 readKegFuseAttributionSection(payload, g);
+            } else if (GameModeSection.ID.equals(id)) {
+                GameModeSection.read(payload, g);
             }
             // Unknown stable IDs are intentionally skipped using their bounded length.
         }
