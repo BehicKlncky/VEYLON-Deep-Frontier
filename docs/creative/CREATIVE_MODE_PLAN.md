@@ -81,7 +81,7 @@ wrapper, workflows, existing enum IDs and all budgets remain unchanged.
 | v0.6.3 | 03-invulnerable-body | All A1 gates, restoration, observations, badge and mode-aware smoke (R4, R6, R8-R10) | verified; save gate is a recorded host deviation |
 | v0.6.4 | 04-imperceptible-player | A3 gates and memory clear; preserve D3 consequences (R11-R12) | verified; save gate is a recorded host deviation |
 | v0.6.5 | 05-mode-selection | Worldless mode choice, explicit confirmation, permanent mark, key ownership (R2-R7) | verified |
-| v0.6.6 | 06-flight | Double tap, collision, loaded columns, measured speeds/ceiling, reset and restore (R5, R13-R15) | pending |
+| v0.6.6 | 06-flight | Double tap, collision, loaded columns, measured speeds/ceiling, reset and restore (R5, R13-R15) | verified; save gate is a recorded host deviation |
 | v0.6.7 | 07-catalog | Character input, categories, AND search, grants/trash, all key ownership (R16-R18) | pending |
 | v0.6.8 | 08-instant-building | Repeat timer, cleanup without drops/wear, free placement, pick mapping (R19-R21) | pending |
 | v0.6.9 | 09-unlimited-use | A2 use-up gates, ammunition HUD, unchanged transform/transfer/trade (R22-R23) | pending |
@@ -624,3 +624,89 @@ hints. The bracket-glyph softness and proportional column drift in the pause
 controls list are unchanged from v0.6.0. The HUD event log beneath the dimmed
 modal is partially covered by the panel, as other modal screens already do.
 Human acceptance of the wording and layout is unverified.
+
+### v0.6.6 evidence
+
+A separate `test(creative)` commit first narrowed one milestone-5 assertion:
+the whole Creative-to-Survival confirmation text becomes obsolete once the
+brief's flight line is added, so the test now pins its first line to the
+same sentence. It passed unchanged against the milestone-5 screen (7 cases).
+
+`PlayerMovementSystem` measures time since the last Space press on a transient
+`Player.secondsSinceJumpTap` field and toggles flight on a second press
+within `FLIGHT_TOGGLE_WINDOW_SECONDS = 0.30`. A body that may not fly only
+resets that field, so the Survival walking path is unchanged; its WASD block
+moved into `applyHorizontalIntent` with identical arithmetic and order. While
+flying: Space rises and Left Ctrl descends at 7.5 blocks/s, no vertical input
+hovers, cruise is 10.9 and Left Shift 21.6 blocks/s, crouching and sprinting
+stay off (no stamina, sprint noise, footsteps or view bob), and descending
+onto the ground lands. `VoxelPhysics.integrateFlight` keeps voxel collision
+without gravity or step-up; unloaded chunk columns and the altitude ceiling
+`Chunk.SY + 32 = 128` act as walls, the ceiling only upward. Leaving Creative
+already ends flight and restarts fall accounting (milestone 3), and the
+milestone-2 section already restores flight only in Creative. The HUD shows
+FLYING beside the Creative badge; the pause controls, the Creative-to-Survival
+confirmation, the Creative welcome hint and the new-frontier card mention
+flight. `CreativeQaScenes` adds a smoke flight (5.2-6.8 s, after the isolated
+load, before the fortress route) and the `creative_flight` measurement scene.
+
+CreativeFlightTest adds 10 cases. The first focused run exposed one fixture
+error: after flying into the test wall the player stood at x = 314.7, outside
+the ceiling slab at x 309-312, so the ceiling assertion could not hold. The
+slab now surrounds the player's actual block; production code did not change.
+Focused flight, movement, parity, body, hazard, perception, routing, save,
+lifecycle and QA suites plus doclint: PASS in 1m (60.932s wall), 156 tests / 21
+classes, zero failures, errors and skips. Real lines: Game 924/1000, QaHarness
+1413/1500.
+
+R14 measurement, native `creative_flight` scene (seed 20260910, 1280x720,
+render distance 6, streaming budgets unchanged at `ensureChunks(..., 2)` and
+`buildDirtyMeshes(..., 3)`), a 28 s straight flight east at Left Shift speed
+with a 10-block terrain clearance; "hole" means a missing or unmeshed chunk
+within four chunks of the player in the frame just rendered:
+
+| Run | Distance | Speed | Chunks crossed | Unloaded entered | Hole frames | Longest run | FPS | p95 / p99 / max ms |
+| --- | ---: | ---: | ---: | --- | --- | --- | ---: | --- |
+| VSync off | 604.8 | 21.60 b/s | 38 | no | 15 of 25,195 | 12 frames from 20.01 s | 882.0 | 1.52 / 6.01 / 29.67 |
+| VSync on | 604.8 | 21.59 b/s | 38 | no | 15 of 2,790 | 12 frames from 20.02 s | 99.3 | 10.45 / 11.64 / 79.94 |
+
+Both runs reported zero GL, KHR-debug and OpenAL errors. The identical frame
+counts at 882 and 99 FPS show the one burst is bounded by the per-frame mesh
+budget, not by flight speed; at display refresh it lasts about 0.12 s once in
+28 s. Its cause was not isolated. An earlier pair of the same runs without the
+start-time field gave the same distances, chunk and hole counts. The inspected
+VSync-on 30 s capture shows continuous terrain, trees and water ahead to the
+fog, with the CREATIVE and FLYING badge. These results justify keeping 10.9
+and 21.6 blocks/s and the 128-block ceiling without raising any streaming
+budget. Human evaluation of flight feel is unverified.
+
+Final v0.6.6 build: PASS, 578 tests / 87 classes, zero failures, errors and
+skips; 2m5s (125.740s wall), including JavaDoc doclint and line budgets. Real
+lines: Game 924/1000, QaHarness 1413/1500, SaveSystem 1109/1800,
+SettlementManager 1414/1500, FactionSystem 1265/1400, WorldGenerator 1178/1300.
+
+Performance (unchanged budgets, 7.824s wall): save 2.902 ms against 2.20 ms
+remains the recorded host deviation; the paired untouched v0.6.2 run measured
+2.806 ms (7.872s wall), so this milestone is 3.4% above its reference, inside
+the 10% rule. Chunk 0.378 ms, entity 0.314 ms, settlement 0.012 ms, audio
+444.961 ms, PCM 40,824,424 bytes, occlusion 0.001763 ms/frame and music
+0.000004 ms/frame pass; TickProfileTest passes (whole cycle 0.0860 ms).
+PerfSaveLoadProbe: save 2.898 ms, load 187.599 ms against 240 ms.
+
+Native 30s smokes, seed 20260910, VSync off, minimum 60 FPS, 1280x720, NVIDIA
+RTX 1000 Ada / OpenGL 3.3 / driver 595.95, one at a time with no concurrent
+build. Creative: PASS, 904.3 FPS, p95 1.42 ms, p99 1.63 ms, 27,131 body
+samples without damage or death, mode/mark/flight restored, and the scripted
+smoke flight ran 1,465 frames across 2 chunks without entering an unloaded
+column. Survival: PASS, 913.0 FPS, p95 1.39 ms, p99 1.61 ms. Both completed
+isolated save/load and the fortress approach within every runtime hard limit,
+with zero GL, KHR-debug and OpenAL errors.
+
+Native captures, inspected, each with zero GL, KHR-debug and OpenAL errors,
+at 1280x720 windowed and 1920x1080 fullscreen (8 PNGs, prefix `v066-`):
+`creative_flight` at 6 s shows the CREATIVE badge with FLYING, continuous
+terrain ahead and the new flight hint in the event log; `pause-creative` fits
+the two new flight lines inside the panel; `gamemode-creative` shows both
+confirmation lines above the buttons; `newworld` shows the updated Creative
+card text inside its card. Nothing clips or overlaps. Human evaluation of
+flight feel and wording is unverified.

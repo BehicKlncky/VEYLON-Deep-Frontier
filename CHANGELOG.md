@@ -2,6 +2,13 @@
 
 All notable user-facing changes to VEYLON: Deep Frontier are recorded here.
 
+## [0.6.6] - 2026-09-14
+
+### Added
+
+- Creative flight: double-tap Space to take off or land, hold Space to rise, Ctrl
+  to descend and Shift to fly faster.
+
 ## [0.6.5] - 2026-09-14
 
 ### Added
