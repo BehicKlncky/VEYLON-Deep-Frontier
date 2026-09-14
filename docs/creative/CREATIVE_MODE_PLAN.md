@@ -80,7 +80,7 @@ wrapper, workflows, existing enum IDs and all budgets remain unchanged.
 | v0.6.2 | 02-mode-model-and-save | Byte-identical save extraction, mode/abilities/reset/restore, strict section, QA parsing (R1, R7, R15) | verified |
 | v0.6.3 | 03-invulnerable-body | All A1 gates, restoration, observations, badge and mode-aware smoke (R4, R6, R8-R10) | verified; save gate is a recorded host deviation |
 | v0.6.4 | 04-imperceptible-player | A3 gates and memory clear; preserve D3 consequences (R11-R12) | verified; save gate is a recorded host deviation |
-| v0.6.5 | 05-mode-selection | Worldless mode choice, explicit confirmation, permanent mark, key ownership (R2-R7) | pending |
+| v0.6.5 | 05-mode-selection | Worldless mode choice, explicit confirmation, permanent mark, key ownership (R2-R7) | verified |
 | v0.6.6 | 06-flight | Double tap, collision, loaded columns, measured speeds/ceiling, reset and restore (R5, R13-R15) | pending |
 | v0.6.7 | 07-catalog | Character input, categories, AND search, grants/trash, all key ownership (R16-R18) | pending |
 | v0.6.8 | 08-instant-building | Repeat timer, cleanup without drops/wear, free placement, pick mapping (R19-R21) | pending |
@@ -562,3 +562,65 @@ zero GL, KHR-debug and OpenAL errors. No player-visible screen or string
 changed except two Creative-only reputation log lines, which appear in the
 existing event log; captures are therefore not required here. Human
 playtesting is unverified.
+
+### v0.6.5 evidence
+
+NEW FRONTIER and N open the worldless NewFrontierScreen (appended
+`AppState.TITLE_NEW_WORLD`). Survival is the default on every opening; S/C,
+arrows or Tab choose; Enter starts through the unchanged two-frame loading;
+Escape returns to the title without a world. The replace-save notice follows
+`Files.exists` on the save slot, checked once per opening. Pause [G] opens
+GameModeScreen (appended `UiMode.GAME_MODE`), which pauses the simulation
+through `UiMode.pausesSimulation()` and joins the options screens in
+HotkeyRouter's early return, so Escape, F5, F9, Q, O and V cannot reach the
+router. Only Survival to Creative on an unmarked world shows the permanent-mark
+warning, and Escape or N is checked before Enter or Y. The pause header shows
+the mode and mark, the controls reference lists [G], the victory card adds
+"Creative world", and a Creative new world logs three truthful hints
+(invulnerable, imperceptible, [G]) instead of "Survive." with the same kit.
+`FrontendController.performLoad` separates the load from native cursor capture
+so the production load path runs headless; `savePath` is the test seam. No
+gameplay hotkey switches modes (D1).
+
+ModeSelectionRoutingTest adds 7 cases. Focused routing, lifecycle, save, body,
+perception, parity and QA suites plus doclint: PASS in 48s (48.592s wall), 111
+tests / 18 classes, zero failures, errors and skips. No existing test changed.
+
+The first 1920x1080 fullscreen new-frontier capture showed a 19-pixel black
+band and every element shifted and scaled by 1061/1080. The unchanged title
+screen reproduced it: only PostProcessor and ShadowMap set `glViewport`, so
+worldless frames kept the desktop-capped 1920x1061 window viewport after the
+fullscreen switch. A separate `fix(ui)` commit resets the viewport in
+`UiRenderer.end`; native title and new-frontier captures after it show no band
+and the divider at exactly 24% of the height. The earlier build, smokes and
+captures ran before that fix and are superseded; every gate below reran on the
+committed fix.
+
+Final v0.6.5 build: PASS, 568 tests / 86 classes, zero failures, errors and
+skips; 2m2s (122.229s wall), including JavaDoc doclint and line budgets. Real
+lines: Game 919/1000, QaHarness 1411/1500, SaveSystem 1109/1800,
+SettlementManager 1414/1500, FactionSystem 1265/1400, WorldGenerator 1178/1300.
+The performance task is not required here: no simulation, movement, AI, item
+or save code changed.
+
+Native 30s smokes on the committed fix, seed 20260910, VSync off, minimum 60
+FPS, 1280x720, NVIDIA RTX 1000 Ada / OpenGL 3.3 / driver 595.95, one at a
+time with no concurrent build. Creative: PASS, 907.7 FPS, p95 1.43 ms, p99
+1.64 ms, 27,232 body samples without damage or death, mode/mark/flight
+restored. Survival: PASS, 913.2 FPS, p95 1.40 ms, p99 1.62 ms. Both completed
+isolated save/load and the fortress approach within every runtime hard limit,
+with zero GL, KHR-debug and OpenAL errors.
+
+Native captures on the committed fix, inspected, each with zero GL, KHR-debug
+and OpenAL errors: `newworld`, `newworld-save`, `gamemode` (the permanent-mark
+warning), `gamemode-creative`, `pause-creative` and `victory-creative`, at
+1280x720 windowed and 1920x1080 fullscreen (12 PNGs, prefix `v065f-`). Cards,
+descriptions, the mark note, the amber replace notice, buttons and key hints
+fit without clipping or overlap at both sizes. The confirmation panel keeps
+both warning lines inside its margins with the current mode and mark above
+them; the pause header reads "CREATIVE  /  Creative world" and the controls
+list [G]; the victory card shows the amber "Creative world" note below its
+hints. The bracket-glyph softness and proportional column drift in the pause
+controls list are unchanged from v0.6.0. The HUD event log beneath the dimmed
+modal is partially covered by the panel, as other modal screens already do.
+Human acceptance of the wording and layout is unverified.
