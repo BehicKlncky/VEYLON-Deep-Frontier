@@ -73,7 +73,8 @@ final class PlayerEnvironmentSystem {
         var player = game.player;
         player.shelter = ShelterSystem.evaluate(game.world,
                 player.pos.x, player.pos.y, player.pos.z);
-        if (player.shelter.indoor() && player.nearFireHeat(game) > INDOOR_FIRE_HEAT_THRESHOLD) {
+        if (!player.abilities.invulnerable() && player.shelter.indoor()
+                && player.nearFireHeat(game) > INDOOR_FIRE_HEAT_THRESHOLD) {
             player.smokeExposure += INDOOR_SMOKE_PER_SECOND * dt;
             if (player.smokeExposure > VISIBLE_SMOKE_EXPOSURE) {
                 game.particles.smoke(player.pos.x, player.pos.y + 1.9f, player.pos.z, 0.4f);
@@ -82,7 +83,7 @@ final class PlayerEnvironmentSystem {
         Vec3i fumarole = game.world.nearestBasaltFumarole(player.pos.x,
                 player.pos.y + 0.5f, player.pos.z, FUMAROLE_SEARCH_RADIUS);
         if (fumarole != null) {
-            player.smokeExposure += FUMAROLE_SMOKE_PER_SECOND * dt;
+            if (!player.abilities.invulnerable()) player.smokeExposure += FUMAROLE_SMOKE_PER_SECOND * dt;
             game.particles.smoke(fumarole.x() + 0.5f, fumarole.y() + 0.35f,
                     fumarole.z() + 0.5f, 0.75f);
         }

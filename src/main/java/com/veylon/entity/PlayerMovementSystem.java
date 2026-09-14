@@ -100,7 +100,9 @@ public final class PlayerMovementSystem {
         }
 
         if (player.sprinting) {
-            player.stamina = Math.max(0, player.stamina - 9f * dt);
+            if (!player.abilities.invulnerable()) {
+                player.stamina = Math.max(0, player.stamina - 9f * dt);
+            }
             player.noise = Math.min(1f, player.noise + 0.8f * dt);
         }
 
@@ -108,9 +110,10 @@ public final class PlayerMovementSystem {
             if (player.inWater) {
                 player.vel.y = Math.max(player.vel.y, SWIM_ASCEND_SPEED);
             } else if (!applyClimbCommand(player, true, command.forward)
-                    && player.onGround && player.stamina >= 3 && command.jumpPressed) {
-                player.vel.y = player.has(Affliction.SPRAIN) ? 6.2f : 8.2f;
-                player.stamina -= 3;
+                    && player.onGround && (player.abilities.invulnerable() || player.stamina >= 3)
+                    && command.jumpPressed) {
+                player.vel.y = !player.abilities.invulnerable() && player.has(Affliction.SPRAIN) ? 6.2f : 8.2f;
+                if (!player.abilities.invulnerable()) player.stamina -= 3;
                 player.onGround = false;
             }
         } else {

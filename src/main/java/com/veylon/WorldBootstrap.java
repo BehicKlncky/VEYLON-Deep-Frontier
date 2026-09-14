@@ -65,6 +65,7 @@ final class WorldBootstrap {
         game.world.listener = game;
         game.player = new Player(game.world);
         game.gameModes.applyToPlayer();
+        if (game.player.abilities.invulnerable()) game.player.restoreCreativeBody();
         clearPerWorldState();
 
         placePlayerOnDryLand();

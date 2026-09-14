@@ -132,15 +132,19 @@ final class SleepSystem {
         game.time.totalMinutes += minutes;
         sleptMinutes += minutes;
 
-        // Reduced needs while asleep, faster fatigue recovery with quality.
-        game.player.fatigue = Math.max(0,
-                game.player.fatigue - dt * FATIGUE_RECOVERY_PER_SECOND * sleepQuality);
-        game.player.hunger = Math.max(0,
-                game.player.hunger - dt * SLEEP_HUNGER_DRAIN_PER_SECOND);
-        game.player.thirst = Math.max(0,
-                game.player.thirst - dt * SLEEP_THIRST_DRAIN_PER_SECOND);
-        if (sleepQuality < MISERABLE_QUALITY) {
-            game.player.bodyTemp -= dt * POOR_SLEEP_TEMP_LOSS_PER_SECOND;
+        if (game.player.abilities.invulnerable()) {
+            game.player.restoreCreativeBody();
+        } else {
+            // Reduced needs while asleep, faster fatigue recovery with quality.
+            game.player.fatigue = Math.max(0,
+                    game.player.fatigue - dt * FATIGUE_RECOVERY_PER_SECOND * sleepQuality);
+            game.player.hunger = Math.max(0,
+                    game.player.hunger - dt * SLEEP_HUNGER_DRAIN_PER_SECOND);
+            game.player.thirst = Math.max(0,
+                    game.player.thirst - dt * SLEEP_THIRST_DRAIN_PER_SECOND);
+            if (sleepQuality < MISERABLE_QUALITY) {
+                game.player.bodyTemp -= dt * POOR_SLEEP_TEMP_LOSS_PER_SECOND;
+            }
         }
 
         boolean morning = game.time.hourF() >= WAKE_HOUR_MIN && game.time.hourF() < WAKE_HOUR_MAX
@@ -161,7 +165,8 @@ final class SleepSystem {
         }
         game.log("You wake after " + (int) (sleptMinutes / 60f * 10) / 10f + " hours. Fatigue "
                 + (int) game.player.fatigue + ".");
-        if (sleepQuality < MISERABLE_QUALITY && rng.nextFloat() < POOR_SLEEP_SICKNESS_CHANCE) {
+        if (!game.player.abilities.invulnerable() && sleepQuality < MISERABLE_QUALITY
+                && rng.nextFloat() < POOR_SLEEP_SICKNESS_CHANCE) {
             game.player.addAffliction(Affliction.SICKNESS, SICKNESS_SECONDS);
             game.log("That miserable night left you SICK. Sleep warm, dry and sheltered.");
         }

@@ -203,7 +203,7 @@ public final class CreatureAI {
         if (c.state == CreatureState.CHARGE) {
             if (playerDist < 1.9) {
                 Steering.stop(c);
-                if (c.attackCooldown <= 0) {
+                if (c.attackCooldown <= 0 && !p.abilities.invulnerable()) {
                     c.attackCooldown = 1.6f;
                     p.hurtPhysical(g, 9, false);
                     p.knockback(c.pos.x, c.pos.z, 6.5f);
@@ -307,7 +307,7 @@ public final class CreatureAI {
             c.targetEntity = null;
             if (c.state == CreatureState.ATTACK) {
                 Steering.stop(c);
-                if (c.attackCooldown <= 0) {
+                if (c.attackCooldown <= 0 && !p.abilities.invulnerable()) {
                     c.attackCooldown = 1.3f;
                     p.hurtPhysical(g, 6, true);
                     p.knockback(c.pos.x, c.pos.z, 3.5f);
@@ -443,7 +443,7 @@ public final class CreatureAI {
             if (playerDist < 2.0) {
                 c.state = CreatureState.ATTACK;
                 Steering.stop(c);
-                if (c.attackCooldown <= 0) {
+                if (c.attackCooldown <= 0 && !p.abilities.invulnerable()) {
                     c.attackCooldown = 1.2f;
                     p.hurtPhysical(g, 8, true);
                     p.knockback(c.pos.x, c.pos.z, 3f);

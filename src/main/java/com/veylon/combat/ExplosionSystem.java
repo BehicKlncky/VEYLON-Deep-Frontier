@@ -4,6 +4,7 @@ import com.veylon.Game;
 import com.veylon.entity.Creature;
 import com.veylon.entity.Entity;
 import com.veylon.entity.Npc;
+import com.veylon.entity.Player;
 import com.veylon.settlement.Settlement;
 import com.veylon.util.Vec3i;
 import com.veylon.world.BlockType;
@@ -160,7 +161,7 @@ public class ExplosionSystem {
         }
         float entityRange = power * 2.4f;
         for (Entity e : victims) {
-            if (e.dead) {
+            if (e.dead || e instanceof Player p && p.abilities.invulnerable()) {
                 continue;
             }
             double d = Math.sqrt(e.distSqTo(x, y, z));
@@ -175,7 +176,7 @@ public class ExplosionSystem {
             if (dmg < 0.5f) {
                 continue;
             }
-            if (e instanceof com.veylon.entity.Player p) {
+            if (e instanceof Player p) {
                 p.hurtPhysical(g, dmg, true);
                 g.renderer.addShake(Math.min(1f, falloff));
             } else {

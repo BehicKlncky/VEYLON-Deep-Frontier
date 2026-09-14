@@ -103,7 +103,7 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
     public final Camera camera = new Camera();
     public final Renderer renderer = new Renderer();
     public final UiRenderer ui = new UiRenderer();
-    public final AudioManager audio = new AudioManager();
+    public final AudioManager audio;
     public final ParticleSystem particles = new ParticleSystem();
     private final PlayerMovementSystem playerMovement = new PlayerMovementSystem();
     private final PlayerMovementSystem.Command movementCommand = new PlayerMovementSystem.Command();
@@ -196,6 +196,7 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
 
     /** VEYLON_* benchmark scenes, timed captures and the release smoke gate. */
     private final AutomatedRunDriver automation = new AutomatedRunDriver(this);
+    final CreativeQaScenes creativeQa = new CreativeQaScenes(this);
 
     /** Global keys: screens, debug overlays, quick save/load, hotbar. */
     private final HotkeyRouter hotkeys = new HotkeyRouter(this);
@@ -295,6 +296,11 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
             };
 
     final Vector3f spawnPos = new Vector3f();
+
+    public Game() { this(new AudioManager()); }
+
+    /** Allows headless command tests to observe sound requests without a native device. */
+    Game(AudioManager audio) { this.audio = java.util.Objects.requireNonNull(audio, "audio"); }
 
     public void run() {
         qa.applyResolutionOverride();
@@ -479,7 +485,7 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
         audio.setListener(camera.position.x, camera.position.y, camera.position.z, camera.yaw);
         audio.update(dt);
 
-        if (player.dead && appState == AppState.PLAYING) {
+        if (player.dead && !player.abilities.invulnerable() && appState == AppState.PLAYING) {
             appState = AppState.DEATH;
             deathTimer = 3f;
             closeScreens();
@@ -838,6 +844,10 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
     }
 
     private void respawn() {
+        if (player.abilities.invulnerable()) {
+            player.restoreCreativeBody();
+            return;
+        }
         log("You died. The frontier reclaims you... (respawned at the crash site)");
         player.dead = false;
         player.health = 55;
