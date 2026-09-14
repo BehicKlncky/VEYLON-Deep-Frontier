@@ -2,6 +2,7 @@ package com.veylon;
 
 import com.veylon.ai.PlayerAwareness;
 import com.veylon.entity.GameMode;
+import com.veylon.ui.GameModeScreen;
 
 import java.util.Objects;
 
@@ -50,5 +51,18 @@ final class GameModeController {
         creativeMarked = marked || mode == GameMode.CREATIVE;
         applyToPlayer();
         game.player.abilities.setFlying(flying);
+    }
+
+    /** Pause [G] (R3): the paused confirmation for switching to the other mode. */
+    void openScreen() {
+        game.gameModeScreen.open(mode, creativeMarked);
+        game.uiMode = Game.UiMode.GAME_MODE;
+    }
+
+    /** Applies the confirmation's answer; either answer returns to the pause menu. */
+    void handleScreen(GameModeScreen.Action action) {
+        if (action == GameModeScreen.Action.NONE) return;
+        if (action == GameModeScreen.Action.CONFIRM) switchTo(GameModeScreen.target(mode));
+        game.uiMode = Game.UiMode.PAUSE;
     }
 }

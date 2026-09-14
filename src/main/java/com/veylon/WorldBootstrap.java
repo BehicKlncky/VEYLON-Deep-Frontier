@@ -309,8 +309,15 @@ final class WorldBootstrap {
         game.player.inventory.add(ItemType.TORCH, 2);
         game.player.inventory.add(ItemType.BANDAGE, 1);
         game.player.inventory.add(ItemType.WATERSKIN_EMPTY, 1);
-        game.log("You crash-landed on Veylon. Survive.");
-        game.log("Gather wood and berries; craft tools with [C]. Watch your wounds.");
+        if (game.gameMode() == GameMode.CREATIVE) {
+            // Creative hints name only abilities that exist; the kit stays identical (R7).
+            game.log("You crash-landed on Veylon in Creative mode.");
+            game.log("Nothing here can hurt you, and wildlife and settlers ignore you.");
+            game.log("Press Esc, then [G], to switch this world's game mode.");
+        } else {
+            game.log("You crash-landed on Veylon. Survive.");
+            game.log("Gather wood and berries; craft tools with [C]. Watch your wounds.");
+        }
         game.log("An NPC camp lies somewhere nearby - and stranger things besides...");
         // Populate the world with wildlife before the player sees the first frame.
         for (int i = 0; i < INITIAL_WILDLIFE_TICKS; i++) {

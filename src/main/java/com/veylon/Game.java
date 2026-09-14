@@ -69,7 +69,12 @@ import static org.lwjgl.glfw.GLFW.*;
 public class Game implements SimulationScheduler.Ticks, World.BlockListener {
 
     public enum UiMode {
-        NONE, INVENTORY, CRAFTING, PAUSE, OPTIONS, MAP, CRATE, NPC, AUDIO_OPTIONS
+        NONE, INVENTORY, CRAFTING, PAUSE, OPTIONS, MAP, CRATE, NPC, AUDIO_OPTIONS, GAME_MODE;
+
+        /** The pause menu and the screens opened from it freeze the world. */
+        public boolean pausesSimulation() {
+            return this == PAUSE || this == OPTIONS || this == AUDIO_OPTIONS || this == GAME_MODE;
+        }
     }
 
     /** Player-facing NPC action selected by the same path used for prompts and F. */
@@ -89,11 +94,12 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
     }
 
     enum AppState {
-        TITLE, TITLE_OPTIONS, LOADING, PLAYING, DEATH, VICTORY, TITLE_AUDIO_OPTIONS;
+        TITLE, TITLE_OPTIONS, LOADING, PLAYING, DEATH, VICTORY, TITLE_AUDIO_OPTIONS, TITLE_NEW_WORLD;
 
         /** True while a live world is being drawn, so render stats are meaningful. */
         boolean rendersWorld() {
-            return this != TITLE && this != TITLE_OPTIONS && this != TITLE_AUDIO_OPTIONS && this != LOADING;
+            return this != TITLE && this != TITLE_OPTIONS && this != TITLE_AUDIO_OPTIONS && this != LOADING
+                    && this != TITLE_NEW_WORLD;
         }
     }
 
@@ -154,6 +160,8 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
     final TitleScreen titleScreen = new TitleScreen();
     final AudioOptionsScreen audioOptionsScreen = new AudioOptionsScreen();
     final GraphicsOptionsScreen graphicsOptionsScreen = new GraphicsOptionsScreen();
+    final com.veylon.ui.NewFrontierScreen newFrontierScreen = new com.veylon.ui.NewFrontierScreen();
+    final com.veylon.ui.GameModeScreen gameModeScreen = new com.veylon.ui.GameModeScreen();
 
     /** Visible for testing; public only for gameplay tests outside {@code com.veylon}. */
     public UiMode uiMode = UiMode.NONE;
@@ -442,8 +450,7 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
         }
         window.captureCursor(appState == AppState.PLAYING && uiMode == UiMode.NONE, input);
 
-        boolean simulate = appState == AppState.PLAYING
-                && uiMode != UiMode.PAUSE && uiMode != UiMode.OPTIONS && uiMode != UiMode.AUDIO_OPTIONS && !simPaused;
+        boolean simulate = appState == AppState.PLAYING && !uiMode.pausesSimulation() && !simPaused;
 
         swingTimer = Math.max(0, swingTimer - dt);
         hitSoundTimer = Math.max(0, hitSoundTimer - dt);
@@ -510,6 +517,7 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
             case PAUSE -> pauseMenu.update(this);
             case OPTIONS -> frontend.handlePauseOptions(graphicsOptionsScreen.update(this));
             case AUDIO_OPTIONS -> frontend.handlePauseAudio(audioOptionsScreen.update(this));
+            case GAME_MODE -> gameModes.handleScreen(gameModeScreen.update(this));
             case NONE -> {
             }
         }
@@ -522,7 +530,7 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
         if (appState == AppState.DEATH) {
             PresentationOverlay.death(ui, deathTimer);
         } else if (appState == AppState.VICTORY) {
-            PresentationOverlay.victory(ui, totalTime);
+            PresentationOverlay.victory(ui, totalTime, creativeMarked());
         }
         ui.end();
     }

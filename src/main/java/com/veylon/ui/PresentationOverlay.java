@@ -37,7 +37,8 @@ public final class PresentationOverlay {
                 0.62f, 0.64f, 0.68f, 1f);
     }
 
-    public static void victory(UiRenderer ui, double time) {
+    /** The ending card; {@code creativeWorld} adds the permanent-mark note (R6). */
+    public static void victory(UiRenderer ui, double time, boolean creativeWorld) {
         int w = ui.screenW(), h = ui.screenH();
         ui.rect(0, 0, w, h, 0.005f, 0.035f, 0.045f, 0.88f);
         float beam = 0.72f + 0.18f * (float) Math.sin(time * 2.4);
@@ -50,5 +51,9 @@ public final class PresentationOverlay {
         ui.textCentered(w / 2f, h / 2f + 42, 1.12f,
                 "Enter: continue surviving     Esc: return to title",
                 0.52f, 0.64f, 0.68f, 1f);
+        if (creativeWorld) {
+            ui.textCentered(w / 2f, h / 2f + 74, 1.12f, "Creative world",
+                    1f, 0.8f, 0.4f, 1f);
+        }
     }
 }
