@@ -253,6 +253,7 @@ final class QaHarness {
         if (uiCycleShowcase) {
             updateUiCycle(elapsed);
         }
+        game.creativeQa.updateFlightScene(elapsed);
     }
 
     /**
@@ -696,6 +697,7 @@ final class QaHarness {
                 uiCycleShowcase = true;
                 updateUiCycle(0);
             }
+            case "creative_flight" -> game.creativeQa.stageFlightScene();
             default -> System.out.println("[scene] unknown VEYLON_SCENE '" + scene + "'");
         }
         System.out.println("[scene] applied benchmark scene '" + scene + "'");

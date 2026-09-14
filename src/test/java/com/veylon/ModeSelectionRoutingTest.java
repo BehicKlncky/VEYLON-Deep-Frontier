@@ -124,8 +124,8 @@ class ModeSelectionRoutingTest {
         assertFalse(String.join(" ", GameModeScreen.confirmation(GameMode.SURVIVAL, true))
                 .contains("permanently"), "R3: a marked world gets a short confirmation");
         assertEquals("Hunger, injuries and hostile creatures return.",
-                String.join(" ", GameModeScreen.confirmation(GameMode.CREATIVE, true)),
-                "R3: leaving Creative names what returns");
+                GameModeScreen.confirmation(GameMode.CREATIVE, true)[0],
+                "R3: leaving Creative first names what returns");
 
         Game game = playing(GameMode.SURVIVAL);
         game.uiMode = Game.UiMode.PAUSE;

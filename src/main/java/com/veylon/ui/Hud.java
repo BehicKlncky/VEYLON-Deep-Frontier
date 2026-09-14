@@ -169,6 +169,9 @@ public class Hud {
         ui.rect(12, h - 76, 200, 64, 0.035f, 0.07f, 0.09f, 0.8f);
         ui.rect(12, h - 76, 3, 64, 0.25f, 0.85f, 0.9f, 1f);
         ui.textShadow(23, h - 67, 1.6f, "CREATIVE", 1f, 0.8f, 0.4f, 1f);
+        if (g.player.abilities.flying()) {
+            ui.textShadow(128, h - 65, 1.3f, "FLYING", 0.45f, 0.95f, 1f, 1f);
+        }
         ui.textShadow(23, h - 45, 1.3f,
                 String.format(java.util.Locale.ROOT, "Env %.1f C", g.player.envTemp),
                 0.85f, 0.95f, 1f, 1f);

@@ -622,6 +622,11 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
         return playerMovement.applyClimbCommand(player, ascendHeld, forwardHeld);
     }
 
+    /** Runs one command through the production movement system for scripted QA flights. */
+    void applyMovementCommand(PlayerMovementSystem.Command command, float dt) {
+        playerMovement.update(player, world, command, dt, movementResult);
+    }
+
     /**
      * Emits the same positioned footstep perception event used by native
      * movement. Exposed as a small command seam so input-independent gameplay

@@ -313,6 +313,7 @@ final class WorldBootstrap {
             // Creative hints name only abilities that exist; the kit stays identical (R7).
             game.log("You crash-landed on Veylon in Creative mode.");
             game.log("Nothing here can hurt you, and wildlife and settlers ignore you.");
+            game.log("Double-tap Space to fly; Space rises and Ctrl descends.");
             game.log("Press Esc, then [G], to switch this world's game mode.");
         } else {
             game.log("You crash-landed on Veylon. Survive.");
