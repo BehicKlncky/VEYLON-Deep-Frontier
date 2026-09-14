@@ -78,7 +78,7 @@ wrapper, workflows, existing enum IDs and all budgets remain unchanged.
 | --- | --- | --- | --- |
 | v0.6.1 | 01-plan-and-parity-harness | Baseline, A1-A5, missing Survival parity, design; no production change (R26) | verified |
 | v0.6.2 | 02-mode-model-and-save | Byte-identical save extraction, mode/abilities/reset/restore, strict section, QA parsing (R1, R7, R15) | verified |
-| v0.6.3 | 03-invulnerable-body | All A1 gates, restoration, observations, badge and mode-aware smoke (R4, R6, R8-R10) | pending |
+| v0.6.3 | 03-invulnerable-body | All A1 gates, restoration, observations, badge and mode-aware smoke (R4, R6, R8-R10) | blocked: save performance |
 | v0.6.4 | 04-imperceptible-player | A3 gates and memory clear; preserve D3 consequences (R11-R12) | pending |
 | v0.6.5 | 05-mode-selection | Worldless mode choice, explicit confirmation, permanent mark, key ownership (R2-R7) | pending |
 | v0.6.6 | 06-flight | Double tap, collision, loaded columns, measured speeds/ceiling, reset and restore (R5, R13-R15) | pending |
@@ -355,3 +355,128 @@ entity 0.335 ms, settlement 0.024 ms, save 1.588 ms, load 189.905 ms, audio
 478.004 ms, PCM 40,824,424 bytes, occlusion 0.001923 ms, music 0.000006 ms.
 All 19 tick-profile budgets passed (whole cycle 0.0848 ms). Native runs and
 captures are not required at this milestone. No deviation from the brief.
+
+### v0.6.3 evidence
+
+The implementation description and measurements through the native capture
+paragraph below were inherited from the previous agent. The resumed session
+reviewed the complete diff and all four new files before adopting the work.
+
+Player owns invulnerability at both direct/physical damage boundaries, knockback,
+affliction admission and fall accounting. Creative body restoration is explicit
+on new-world entry and switching; loading still restores without switch healing.
+Needs refresh biome, environment temperature and sky exposure before holding the
+full body. Shelter scans and visible world/fumarole smoke remain active. The HUD
+keeps environment temperature, shelter, biome, weather and time; the cyan/amber
+badge replaces medical bars, warnings and body/wetness/fatigue/load readouts.
+
+Creative skips bleed, sprain, infection, toxic-fog, fire-affliction, food/water
+poisoning and poor-sleep sickness rolls. Survival predicate order, arithmetic and
+draw order are unchanged. Every external caller is gated before injury sounds,
+logs, flash, blood or armor wear. A package-private Game audio constructor permits
+headless sound-request probes; normal construction still creates AudioManager.
+No new outcome RNG or simulated cross-world state was added. CreativeQaScenes
+records automated-session observations; beginSession resets them, while the
+scripted save/load deliberately retains them to detect failures across loading.
+
+Focused body/hazard/Survival parity/model/save tests plus doclint: PASS in 46s
+(46.913s wall), 82 tests / 10 classes, zero failures, errors and skips. This
+includes 34 new body/hazard cases and harmful Survival twins for every external
+damage source, including enclosed fire, fumaroles, both projectile types, all
+three creature attackers and all three human melee brains. Initial fixture
+failures were corrected by disabling healing in low-DPS damage fixtures, allowing
+the arrow to reach its target, fixing camera direction and setting a live raider
+mission duration. No existing test or expectation was weakened.
+
+Native 30s smokes, seed 20260910, VSync off, minimum 60 FPS: both PASS on
+NVIDIA RTX 1000 Ada Generation Laptop GPU / OpenGL 3.3 / driver 595.95.
+Creative 883.2 FPS, p95 1.49 ms, p99 1.76 ms; Survival 888.7 FPS, p95 1.50 ms,
+p99 1.75 ms. Both recorded zero GL, KHR-debug and OpenAL errors, successful
+save/load, completed fortress approach and all runtime hard limits. Creative
+recorded 26,499 body samples, no damage/death, and restored mode/mark/flight.
+The first Survival runner attempt accidentally supplied an empty mode variable;
+the strict parser correctly refused it. Removing the variable, as required by
+the brief, produced the passing Survival twin. Production parsing was unchanged.
+
+Inspected native day-scene captures v063-hud-720_6s.png (1280x720) and
+v063-hud-1080-fullscreen_6s.png (1920x1080): badge, environment and shelter
+labels fit with clear margins; hotbar, crosshair, time/weather/biome and event
+readouts remain visible; no medical bars or vignettes. The first windowed 1080p
+attempt was capped by the desktop at 1920x1061, so it is not counted as 1080p
+evidence. Existing VEYLON_FULLSCREEN=1 produced the exact required framebuffer.
+All captures reported zero GL/KHR/OpenAL errors. Default welcome-log text still
+mentions Survival needs; update it when mode selection becomes player-facing.
+No human playtest claim is made. Logs and PNGs remain ignored.
+
+Resumed review on 2026-09-14: all Section 0.5 checks matched exactly, including
+the 23 paths, base refs, tags and +234/-98 tracked diff. The only production
+edit after that review normalizes both Player references in ExplosionSystem
+to an explicit entity import; behavior is unchanged. Body, tests and smoke
+wiring land together so the command seams and their regression coverage are
+reviewable in one commit, followed by the independent HUD commit.
+
+Resumed focused suite and doclint: PASS, 132 tests / 17 classes, zero failures,
+errors and skips; 1m03s (63.466s wall). The final import normalization then
+passed CreativeHazardsTest in 10s (10.505s wall), with doclint up to date.
+The sandbox cannot create the Gradle wrapper lock; approved execution uses
+the existing local cache with --offline. No remote command was run.
+
+Resumed native 30s smokes: both PASS, seed 20260910, VSync off, minimum 60 FPS,
+1280x720 on the same NVIDIA RTX 1000 Ada / OpenGL 3.3 / driver 595.95 host.
+Creative: 899.1 FPS, p95 1.52 ms, p99 1.80 ms, 26,977 body samples with no
+damage/death and mode/mark/flight restored. Survival: 898.9 FPS, p95 1.54 ms,
+p99 1.75 ms. Both completed isolated save/load and fortress approach, with all
+runtime hard limits met and zero GL/KHR/OpenAL errors. These are new runs,
+separate from the inherited observations above; neither overlapped other builds.
+
+Resumed captures inspected: v063-resume-hud-720_6s.png (1280x720) and
+v063-resume-hud-1080_6s.png (1920x1080, fullscreen). Creative badge, environment
+temperature and shelter fit inside the panel; hotbar, crosshair, time, biome,
+weather and camp/event labels remain visible without clipping or overlap.
+Medical readouts and vignettes are absent. Both captures have zero native
+errors. Welcome text remains the documented milestone-5 follow-up. Human
+acceptance is unverified. Logs and captures remain ignored.
+
+Final v0.6.3 build: PASS, 546 tests / 84 classes, zero failures, errors and
+skips; 1m58s (118.956s wall), including JavaDoc doclint and line budgets.
+Real lines: Game 912/1000, QaHarness 1411/1500, SaveSystem 1109/1800,
+SettlementManager 1392/1500, FactionSystem 1265/1400, WorldGenerator 1178/1300.
+The version, release assertion and changelog are prepared for 0.6.3, but the
+milestone is not verified, merged or tagged because the next gate fails.
+
+Performance: FAIL in 7s (8.096s wall), save 3.085 ms against the unchanged
+2.20 ms budget. A repeat with no code changes also fails in 7s (8.182s wall),
+save 2.971 ms. Load timing is not reached because the save assertion fails
+first. Other headline budgets pass: first-run chunk 0.382 ms, entity 0.301 ms,
+settlement 0.023 ms, audio 455.535 ms, PCM 40,824,424 bytes, occlusion
+0.001882 ms/frame, music 0.000004 ms/frame. All 19 tick-profile gates pass;
+whole cycle 0.0863 ms. Second-run whole cycle is 0.0827 ms. These save times
+cannot be reported as meeting the gate or substituted for the earlier
+v0.6.2 plan figure of 1.588 ms.
+
+To distinguish a change regression from current host behavior, an ignored,
+detached worktree at the immutable v0.6.2 tag was created under
+build/creative-work/v062-save-baseline. Its unmodified performanceTest also
+fails: save 3.074 ms / 2.20 ms; 10s (10.575s wall), all other reached budgets
+pass. The v0.6.3 diff is empty for the entire save package. This comparison
+points to the execution/storage environment rather than the body changes;
+the underlying host cause is not established.
+
+An ignored Java diagnostic reads the actual 11,789-byte benchmark payload
+before timing and performs the same directory/temp creation, buffered write,
+force(true), close and atomic replacement operations. It does no serialization.
+In the same approved execution context, fastest of seven after three warmups:
+total 2.551 ms (create 0.308, open/write 0.096, force 1.822, close 0.030,
+atomic move 0.295 ms). Thus file publication alone currently exceeds the
+entire save budget. This is diagnostic evidence, not a replacement benchmark.
+The earlier sandbox diagnostic was 2.562 ms. The active host power scheme
+reads Balanced; no power, filesystem, security or Git setting was changed.
+
+Stopped under resume-brief Section 1.4 with work committed on
+creative/03-invulnerable-body. No budget, test, durable-save operation or
+baseline was weakened. Release/main refs and all existing tags remain
+untouched; no v0.6.3 tag exists and milestone 4 has not begun. Resume by
+resolving the host save-latency blocker and rerunning the unchanged performance
+task, then record its passing figures, prepare/merge/tag milestone 3 and
+continue in order. All diagnostic files and the detached worktree remain
+ignored. git diff --check release/0.7.0 passes.
