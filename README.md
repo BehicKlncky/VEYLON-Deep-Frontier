@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/images/veylon-banner.png" alt="VEYLON: Deep Frontier" width="100%">
+</p>
+
 # VEYLON: Deep Frontier
 
 A first-person 3D voxel survival simulation for Windows and macOS, built with
