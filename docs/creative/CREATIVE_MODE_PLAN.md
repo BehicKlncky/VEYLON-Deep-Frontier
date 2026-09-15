@@ -85,7 +85,7 @@ wrapper, workflows, existing enum IDs and all budgets remain unchanged.
 | v0.6.7 | 07-catalog | Character input, categories, AND search, grants/trash, all key ownership (R16-R18) | verified |
 | v0.6.8 | 08-instant-building | Repeat timer, cleanup without drops/wear, free placement, pick mapping (R19-R21) | verified |
 | v0.6.9 | 09-unlimited-use | A2 use-up gates, ammunition HUD, unchanged transform/transfer/trade (R22-R23) | verified |
-| v0.6.10 | 10-building-palette | Per-block inclusion audit, appended items/icons, mappings and compatibility (R24) | pending |
+| v0.6.10 | 10-building-palette | Per-block inclusion audit, appended items/icons, mappings and compatibility (R24) | verified; gates ran on a second host (see the v0.6.10 host deviation) |
 | v0.6.11 | 11-world-controls | Forward time, freeze, weather lock, spawn gate, strict section and release on exit (R25) | pending |
 | v0.7.0 | release/0.7.0 | Whole-diff audit, all final gates, both-resolution captures, artifacts/checksums, local main merge | pending |
 
@@ -276,9 +276,11 @@ and digits never reach gameplay; F5/F9 must be inert on every new owning screen.
 
 Missing mode means Survival/unmarked/not flying. Older v0.6.0 skips the new
 sections and loads non-palette Creative saves as Survival; saving there discards
-the mark, flight and controls. Appended palette items cause a clean old-reader
-failure. v2 fixtures retain legacy terrain. Verify the entire compatibility
-matrix before release; these are requirements, not completed compatibility claims.
+the mark, flight and controls. Appended palette items were expected to cause a
+clean old-reader failure; measurement at v0.6.10 disproved that, and the
+measured behavior is recorded in the v0.6.10 evidence. v2 fixtures retain
+legacy terrain. Verify the entire compatibility matrix before release; these are
+requirements, not completed compatibility claims.
 
 ## State ownership and implementation rules
 
@@ -962,3 +964,160 @@ clearly above the held-item label without clipping or overlap. The scenes pause
 the simulation for capture, so the bow draw meter and reload bar were not
 captured in motion; they use the same lifted rows. Human evaluation of the
 wording and of unlimited-use play is unverified.
+
+### v0.6.10 evidence
+
+R24: `CreativePalette` is the single audit record. Every `BlockType` is now
+either buildable or carries a written exclusion reason, and
+`CreativePaletteTest.everyBlockIsEitherBuildableOrCarriesAWrittenExclusionReason`
+fails if a future block is neither, so the audit cannot silently go stale.
+
+Included (19). Each gains an appended `ItemType` with a `_BLOCK` suffix, so the
+new `COPPER_ORE_BLOCK` vein never collides with the existing `COPPER_ORE`
+smelter input, and each display name is unique across all 110 items.
+
+| Block | Item | Display name | Why it is inert |
+| --- | --- | --- | --- |
+| GRASS | GRASS_BLOCK | Grass Block | surface material; PlantSystem only reads it |
+| ICE | ICE_BLOCK | Ice Block | frozen surface with no melt simulation |
+| LEAVES | LEAVES_BLOCK | Leaf Block | canopy material; read by fire and sapling seeding |
+| BUSH | BUSH_BLOCK | Bush | cover only; CreatureAI reads it for concealment |
+| TALL_GRASS | TALL_GRASS_BLOCK | Tall Grass | cover only; also replaceable, like AIR and water |
+| COAL_ORE | COAL_ORE_BLOCK | Coal Ore Block | tool-gated terrain; drop table unchanged |
+| COPPER_ORE | COPPER_ORE_BLOCK | Copper Ore Block | same |
+| IRON_ORE | IRON_ORE_BLOCK | Iron Ore Block | same |
+| ASH | ASH_BLOCK | Charred Block | fire residue; only read as a fumarole rim |
+| SCRAP_BLOCK | WRECKAGE_BLOCK | Wreckage | crash-site material |
+| POD_HULL | POD_HULL_BLOCK | Pod Hull | crash-site material |
+| RUIN_STONE | RUIN_STONE_BLOCK | Ruin Stone | ruin masonry; only the core carries progression |
+| BONE_PILE | BONE_PILE_BLOCK | Bone Pile | decoration placed by SettlementBuilder |
+| BASALT | BASALT_BLOCK | Basalt | cave stone |
+| SULFUR_ORE | SULFUR_ORE_BLOCK | Sulfur Vein Block | terrain; the fumarole predicate is a pure query |
+| SALTPETER_ORE | SALTPETER_ORE_BLOCK | Saltpeter Crust Block | terrain |
+| GLOW_FUNGUS | GLOW_FUNGUS_BLOCK | Glow Fungus | light-emitting decoration |
+| STONE_BRICK | STONE_BRICK_BLOCK | Stone Brick | settlement masonry; vandalism attribution unchanged |
+| CAGE_BARS | CAGE_BARS_BLOCK | Cage Bars | prison wall; the captive is an NPC, not the block |
+
+Excluded (12), with the reason each one stays unbuildable. The shared criterion
+is that `placeSelectedBlockAt` writes a block and runs a small per-block
+initialization, so a block whose meaning lives elsewhere would be placed as a
+broken copy of the real thing.
+
+| Block | Reason |
+| --- | --- |
+| AIR | absence of a block; breaking already removes one |
+| WATER | liquid: immersion and the shoreline mesh assume generated water, and a placed source has no flow simulation |
+| BERRY_BUSH | harvest state paired with BERRY_BUSH_EMPTY and ripened by PlantSystem |
+| BERRY_BUSH_EMPTY | the spent half of that pair |
+| HERB_PLANT | harvestable resource grown by PlantSystem in damp biomes |
+| SAPLING | PlantSystem grows it into a whole runtime tree |
+| CAMP_BED | sleep anchor for WorldInteractions.sleepInBed and the camp radius |
+| GATE | opened by SettlementManager, which writes GATE_OPEN and a World.gateTimers entry |
+| GATE_OPEN | the transient half of that pair; it closes itself from a gate timer |
+| ALARM_BELL | addressed by Settlement.alarmBell; a placed bell belongs to no settlement |
+| RUIN_CORE | relic progression: the tool-gated source of signal crystals |
+| BEACON_LIT | endgame state written by beacon installation; unbreakable by design |
+
+The feature reuses existing seams rather than adding gates. `BlockItemForms`
+already derives pick block from `places()`, so all 19 blocks became pickable
+with no change there, and its duplicate check proves the mapping stays
+one-to-one. `IconAtlas` already projects a placeable item's own material tile,
+so each palette item has a distinct icon; only the three cutout plants needed a
+new path, because projecting a mostly transparent tile onto the isometric cube
+leaves scattered fragments that read as a rendering fault. `drawCutoutSprite`
+draws their tile flat instead, limited to palette items so no shipped icon
+changes - `ROPE_LADDER` keeps its cube. `CreativeCatalog.classify` sends palette
+items to Building; the generic `places()` rule would have filed them under
+Stations.
+
+Survival parity: no recipe, drop table, loot table, trade, quest or archetype
+can reach a palette item.
+`CreativePaletteTest.noLootTradeOrGameplayCodeNamesAPaletteConstant` proves this
+structurally by scanning every file under `src/main/java` for the 19 constant
+names and allowing only `ItemType.java` and `CreativePalette.java` to mention
+them; everything else reaches items generically through `ItemType.values()`,
+`places()` or `BlockItemForms`. Drop tables are asserted unchanged (grass still
+drops dirt, leaves a stick, ruin stone stone). Both enums are append-only and
+`SerializedEnumOrderTest` gained the 19 names in order; no existing test changed.
+No Random, save field, section, thread or per-frame allocation was added.
+
+A palette stack carried into Survival after a mode switch is spent like any
+other block item; `placeSelectedBlockAt` gates only the `shrink` on
+`unlimitedItems()`. That crossover is pinned rather than prevented, because it
+follows R5: leaving Creative keeps what the player holds.
+
+9 new cases across `CreativePaletteTest` (5) and `CreativePaletteWorldTest` (4):
+audit completeness, one-to-one mapping with the `_BLOCK` suffix, category, icon
+id, display-name uniqueness and inert properties, drop-table and recipe
+isolation, the source scan, placement of all 19 blocks from a full stack without
+spending it, pick block for all 19, a save round trip of placed blocks and
+carried stacks, and Survival drop parity plus the carried-stack crossover.
+
+Final v0.6.10 build: PASS, 624 tests / 95 classes, zero failures, errors and
+skips; 2m19s (140.025s wall) on the committed tree, including JavaDoc doclint
+and line budgets. The build before the version bump read 2m17s (137.330s). Real
+lines: Game 939/1000, QaHarness 1417/1500, SaveSystem 1109/1800,
+SettlementManager 1414/1500, FactionSystem 1265/1400, WorldGenerator 1178/1300 -
+all unchanged, since the milestone added no line to any budgeted file.
+
+Performance on the same tree (unchanged budgets): every budget passes. Save
+1.058 ms (budget 2.20), load 190.759 ms (240.00), chunk tick 0.492 ms (0.92),
+entity tick 0.441 ms (0.95), settlement tick 0.016 ms (0.52), audio synthesis
+385.776 ms (1500), PCM 40,824,424 bytes (67,108,864), occlusion 0.002238
+ms/frame (0.10), music director 0.000004 ms (0.02); TickProfileTest whole cycle
+0.0920 / 0.1027 ms. These figures come from a different host than milestones 1-9
+(see the host deviation below), so compare them with each other, not with the
+earlier rows.
+
+Old-reader compatibility was measured, not predicted, and the prediction was
+wrong. The brief expected a save containing palette items to fail cleanly on
+v0.6.0. It does not: `readStack` returns an empty slot for an out-of-range
+ordinal and the stack payload is fixed width, so the stream stays aligned. A
+0.7.0 Creative save carrying six palette stacks and two placed palette blocks
+was written with this tree, then loaded with a compiled v0.6.0 worktree
+(`ItemType.values().length` = 91). Result: `load=true`, the six palette stacks
+are gone, the unrelated `STONE x9` stack survived in slot 8, and both placed
+blocks came back as `BASALT` and `STONE_BRICK` because `BlockType` is unchanged.
+The honest statement for the release matrix is therefore **silent loss of
+palette item stacks**, not a clean load failure; world geometry survives. D5 in
+the design document is corrected to match. Forcing a failure would mean adding a
+new failure mode to a format that deliberately tolerates unknown values, so it
+was not done.
+
+Native evidence, seed 20260910, VSync off, minimum 60 FPS, 1280x720, one run at
+a time with no concurrent build, on NVIDIA GeForce RTX 3060 Ti / OpenGL 3.3.0 /
+driver 580.173.02. Creative 30 s smoke: PASS, 1257.9 FPS, p95 0.92 ms, p99 1.08
+ms, 37,739 body samples without damage or death, mode/mark/flight restored, and
+the scripted flight ran 2,011 frames across 2 chunks without entering an
+unloaded column. Survival 30 s smoke: PASS, 1276.7 FPS, p95 0.91 ms, p99 1.03
+ms. Both completed the isolated save/load and the fortress approach within every
+runtime hard limit, with **110/110 item icons** and zero GL, KHR-debug and
+OpenAL errors - the icon count is the runtime proof that all 19 appended items
+registered a distinct, non-empty icon.
+
+Captures, inspected (prefix `v0610-`): the Building tab at 1280x720 and
+1920x1080, and the `catalog-search` view at 1280x720. The Building tab now holds
+30 entries in two rows with no clipping, overlap or scrollbar at either
+resolution, and every palette icon is distinguishable from its neighbours. The
+three cutout plants render as flat sprites; `GLOW_FUNGUS_BLOCK` reads as small
+teal mushrooms rather than the scattered fragments the cube projection produced.
+Searching "iron" returns 10 entries, `IRON_ORE_BLOCK` first because the search
+walks categories in order and Building is first. One pre-existing cosmetic
+observation: two solid cyan rectangles flank the catalog title. A capture of the
+same screen taken from a compiled v0.6.9 worktree shows them unchanged, so they
+predate this milestone and are left for the release audit. Human judgement of
+palette ergonomics, naming and icon legibility in play is unverified.
+
+Host deviation. These gates ran on a Linux host, not the Windows host of
+milestones 1-9. `build.gradle` throws "Unsupported release platform" for
+linux/amd64, so every Gradle invocation passed `-Dos.name=Windows 10` to get
+past the configuration gate; no file in the repository was changed for it, and
+the flag reaches only the Gradle JVM, not the compiled code or the tests.
+`gradlew run` is unavailable for the same reason, so native runs used
+`build/creative-work/run-native.sh`, which puts the cached Linux LWJGL natives
+on a hand-assembled classpath and launches `com.veylon.Main` with the same
+`--enable-native-access=ALL-UNNAMED -Xmx2G` the application plugin uses. That
+script is generated into the ignored work directory and is not committed.
+Consequences: `releaseArtifacts` and jpackage were not exercised, the smoke and
+performance figures are not comparable with the earlier milestones' Windows
+numbers, and the final v0.7.0 gates still need the Windows host.

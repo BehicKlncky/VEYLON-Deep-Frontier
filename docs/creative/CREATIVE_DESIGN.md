@@ -60,8 +60,12 @@ Lessons applied:
 - **D5 Persistence and compatibility.** Mode, permanent mark and flight state live in a new
   extension section; a missing section means Survival and unmarked. v0.6.0 skips unknown
   sections, so it loads a Creative save as Survival (document; cannot be fixed
-  retroactively). Saves that contain palette items (v0.6.10) cannot be opened by older builds
-  (clean load failure; document).
+  retroactively). Saves that contain palette items (v0.6.10) were expected to be unopenable by
+  older builds. Measuring it at v0.6.10 showed otherwise: `readStack` in every shipped version
+  treats an out-of-range ordinal as an empty slot and the stack payload is fixed width, so
+  v0.6.0 loads such a save successfully and silently drops the palette stacks while placed
+  palette blocks survive (`BlockType` is unchanged). The honest statement is silent item loss,
+  not a clean failure, and it is not worth a new failure mode to change that.
 - **D6 Flight keeps collision.** No noclip or spectator mode.
 - **D7 One save slot remains.** A new world of either mode replaces the single slot on its
   next save; the new-frontier screen says so when a save exists.
