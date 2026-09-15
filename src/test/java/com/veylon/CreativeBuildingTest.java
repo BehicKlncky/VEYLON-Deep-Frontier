@@ -12,11 +12,16 @@ import com.veylon.world.Raycaster;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 /** R19-R21 exercise the production mining, placement, cleanup and pick commands. */
 class CreativeBuildingTest {
     private static final Vec3i POS = new Vec3i(312, 40, 310);
+    /** The reach {@code Game.updateActions} casts each native frame. */
+    private static final double NATIVE_REACH = 5.2;
     private Game game;
 
     @BeforeEach
@@ -47,12 +52,33 @@ class CreativeBuildingTest {
         assertEquals(BlockType.AIR, block(), "R19: a new press has no inherited delay");
         Vec3i next = new Vec3i(313, 40, 310);
         target(BlockType.LOG, next);
-        game.mine(0.01f);
+        for (int i = 0; i < 5; i++) game.mine(0.05f);
+        assertEquals(BlockType.LOG, game.world.getBlock(next.x(), next.y(), next.z()),
+                "R19: a held button that reaches another block restarts the repeat interval");
+        game.mine(0.05f);
         assertEquals(BlockType.AIR, game.world.getBlock(next.x(), next.y(), next.z()),
-                "R19: a changed target restarts immediate breaking");
+                "R19: the new target breaks when the restarted interval completes");
         assertTrue(game.blockActions.creativeBreakRemaining() > 0, "precondition: timer is active");
         game.switchGameMode(GameMode.SURVIVAL);
         assertEquals(0, game.blockActions.creativeBreakRemaining(), "R19: switching ends Creative action state");
+    }
+
+    @Test
+    void heldButtonDigsRetargetedBlocksOncePerRepeatIntervalInsteadOfEveryFrame() {
+        // Mirror the native frame: recast the target, then route the held primary button.
+        game.camera.pitch = 89.5f;
+        Raycaster.MutableHit buffer = new Raycaster.MutableHit();
+        List<Integer> breakFrames = new ArrayList<>();
+        for (int frame = 0; frame < 13; frame++) {
+            game.targetHit = Raycaster.castInto(game.world, game.camera.position, game.camera.front(),
+                    NATIVE_REACH, false, buffer) ? buffer : null;
+            assertNotNull(game.targetHit, "precondition: the dug column stays within reach");
+            int before = solidColumnBelowPlayer();
+            game.combat.updatePrimaryAction(0.05f, game.camera.front(), frame == 0);
+            if (solidColumnBelowPlayer() < before) breakFrames.add(frame);
+        }
+        assertEquals(List.of(0, 6, 12), breakFrames,
+                "R19: the block behind each break waits 0.30s instead of breaking on the next frame");
     }
 
     @Test
@@ -166,6 +192,14 @@ class CreativeBuildingTest {
     }
 
     private BlockType block() { return game.world.getBlock(POS.x(), POS.y(), POS.z()); }
+
+    private int solidColumnBelowPlayer() {
+        int solid = 0;
+        for (int y = 30; y < 40; y++) {
+            if (game.world.getBlock(310, y, 310) != BlockType.AIR) solid++;
+        }
+        return solid;
+    }
 
     private void target(BlockType type, Vec3i pos) {
         game.world.setBlock(pos.x(), pos.y(), pos.z(), type, false);

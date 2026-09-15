@@ -3,13 +3,13 @@ package com.veylon;
 import com.veylon.entity.Creature;
 import com.veylon.entity.Entity;
 import com.veylon.entity.Npc;
+import com.veylon.entity.PlayerConstants;
+import com.veylon.item.BlockItemForms;
+import com.veylon.item.CreativeGrants;
 import com.veylon.item.Inventory;
 import com.veylon.item.ItemStack;
 import com.veylon.item.ItemType;
 import com.veylon.item.ToolKind;
-import com.veylon.item.BlockItemForms;
-import com.veylon.item.CreativeGrants;
-import com.veylon.entity.PlayerConstants;
 import com.veylon.util.Vec3i;
 import com.veylon.world.BlockType;
 import com.veylon.world.RackBatch;
@@ -63,12 +63,20 @@ final class PlayerBlockActions {
     private static final float CAMPFIRE_INITIAL_FUEL = 300f;
     private static final int CRATE_SLOTS = 12;
     private static final int PLACE_DUST_PARTICLES = 5;
+
+    // Creative building.
+    /** R19: seconds between breaks while the Creative primary button stays held. */
     static final float CREATIVE_BREAK_REPEAT_SECONDS = 0.30f;
+    /** Absorbs float drift from summing frame times against the repeat interval. */
+    private static final float CREATIVE_BREAK_EPSILON = 0.000001f;
 
     private final Game game;
     /** Break-outcome rolls; reseeded per world by {@code Game.reseedSimulation}. */
     private final Random rng = new Random();
-    /** Transient; release, target changes, mode switches and world replacement reset it. */
+    /**
+     * Seconds until a held Creative break repeats. Transient: release, melee or
+     * ranged routing, mode switches, screen close and world replacement clear it.
+     */
     private float creativeBreakRemaining;
 
     PlayerBlockActions(Game game) {
@@ -125,28 +133,40 @@ final class PlayerBlockActions {
         }
     }
 
-    /** Shares the existing target state while keeping Survival's mining arithmetic unchanged. */
+    /**
+     * R19: a press breaks at once, and a held button repeats every
+     * {@code CREATIVE_BREAK_REPEAT_SECONDS}. Reaching another block while held
+     * restarts that interval rather than breaking at once: the raycast retargets
+     * the block behind every broken one on the next frame, so an immediate break
+     * there would tunnel one block per frame. Survival arithmetic is untouched.
+     */
     private void mineCreative(float dt) {
         var hit = game.targetHit;
+        game.miningProgress = 0;
         if (hit == null || hit.type().hardness < 0) {
             reset();
             return;
         }
         Vec3i pos = game.miningTarget;
-        if (pos == null || pos.x() != hit.x() || pos.y() != hit.y() || pos.z() != hit.z()) {
+        if (pos == null) {
             pos = new Vec3i(hit.x(), hit.y(), hit.z());
             game.miningTarget = pos;
             creativeBreakRemaining = 0;
         } else {
+            if (pos.x() != hit.x() || pos.y() != hit.y() || pos.z() != hit.z()) {
+                pos = new Vec3i(hit.x(), hit.y(), hit.z());
+                game.miningTarget = pos;
+                creativeBreakRemaining = CREATIVE_BREAK_REPEAT_SECONDS;
+            }
             creativeBreakRemaining = Math.max(0, creativeBreakRemaining - Math.max(0, dt));
         }
-        game.miningProgress = 0;
-        if (creativeBreakRemaining <= 0.000001f) {
+        if (creativeBreakRemaining <= CREATIVE_BREAK_EPSILON) {
             if (completePlayerBlockBreak(pos)) game.swingTimer = MINE_SWING_SECONDS;
             creativeBreakRemaining = CREATIVE_BREAK_REPEAT_SECONDS;
         }
     }
 
+    /** Clears mining progress, target and the Creative repeat timer; the next press breaks at once. */
     void reset() {
         creativeBreakRemaining = 0;
         game.miningProgress = 0;
