@@ -2,6 +2,13 @@
 
 All notable user-facing changes to VEYLON: Deep Frontier are recorded here.
 
+## [0.6.8] - 2026-09-15
+
+### Added
+
+- Creative building: blocks break instantly without drops or tool wear, placing never
+  uses up the held stack, and the middle mouse button picks the block you are looking at.
+
 ## [0.6.7] - 2026-09-15
 
 ### Added

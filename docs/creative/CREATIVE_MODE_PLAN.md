@@ -83,7 +83,7 @@ wrapper, workflows, existing enum IDs and all budgets remain unchanged.
 | v0.6.5 | 05-mode-selection | Worldless mode choice, explicit confirmation, permanent mark, key ownership (R2-R7) | verified |
 | v0.6.6 | 06-flight | Double tap, collision, loaded columns, measured speeds/ceiling, reset and restore (R5, R13-R15) | verified; save gate is a recorded host deviation |
 | v0.6.7 | 07-catalog | Character input, categories, AND search, grants/trash, all key ownership (R16-R18) | verified |
-| v0.6.8 | 08-instant-building | Repeat timer, cleanup without drops/wear, free placement, pick mapping (R19-R21) | pending |
+| v0.6.8 | 08-instant-building | Repeat timer, cleanup without drops/wear, free placement, pick mapping (R19-R21) | verified |
 | v0.6.9 | 09-unlimited-use | A2 use-up gates, ammunition HUD, unchanged transform/transfer/trade (R22-R23) | pending |
 | v0.6.10 | 10-building-palette | Per-block inclusion audit, appended items/icons, mappings and compatibility (R24) | pending |
 | v0.6.11 | 11-world-controls | Forward time, freeze, weather lock, spawn gate, strict section and release on exit (R25) | pending |
@@ -787,3 +787,94 @@ instructions, gear slots and trash fit without clipping or overlap. The trash
 label and hint remain readable over snow. Native runs report 91/91 icons and
 zero GL/KHR/OpenAL errors. The default font is small as elsewhere in the UI;
 human catalog ergonomics and non-Latin/IME input remain unverified.
+
+### v0.6.8 evidence
+
+R19-R21: PlayerBlockActions gates Creative mining before Survival arithmetic.
+A press breaks immediately, ignoring tool requirements; a held button repeats
+every 0.30s, and reaching another block while held restarts that interval.
+Release, melee/ranged routing, mode switches, screen close and world
+replacement clear the transient timer, so the next press breaks at once.
+Drops (including berry fiber and leaf RNG) and tool wear are skipped;
+crate/rack spills, campfire/collector/lantern/beacon/keg cleanup and
+non-perception vandalism consequences keep their normal paths. Placement skips
+only the stack cost and retains collision and initialization. BlockItemForms
+derives a unique mapping from places(), including BEACON to BEACON_FRAME.
+Middle mouse selects an existing hotbar item, grants into the first empty
+hotbar slot, or replaces the selected slot; missing forms log a notice. The
+Creative welcome log and the pause controls reference name these controls.
+
+Pre-fix focused production-command tests: PASS, 38 tests / 4 classes, zero
+failures, errors or skips, with doclint in 13s (13.919s wall). Seven new
+building cases cover cadence, resets, tool-only ore, unbreakable blocks, no
+drops/wear/noise, all stored block state, repeated placement and pick
+precedence. Input gains one additive routing case; lifecycle gains an additive
+timer reset assertion. An initial test compilation failed because the new
+fixture accidentally replaced an existing helper. The original helper was
+restored byte-for-byte; new tests now reuse it.
+
+Resumed 2026-09-15 before the milestone gates. Review of the feature commit
+found a cadence defect: `Game.updateActions` recasts the target before routing
+every frame, so the block behind a broken one becomes a new target on the next
+frame, and the first implementation broke changed targets at once. Holding LMB
+therefore dug through the whole 5.2-block reach one block per frame instead of
+once every 0.30s. A separate `fix(creative)` commit reads the brief's timer
+reset on target change as restarting the interval; only a press after release
+breaks at once. The first building case had asserted the defective immediate
+retarget; the fix commit explains why that expectation is obsolete. A new case
+recasts through `Raycaster` and routes `PlayerCombatSystem.updatePrimaryAction`
+in 50 ms frames, with breaks on frames 0, 6 and 12. Swapping in the unfixed
+class fails both cases (all four blocks in reach gone after four consecutive
+frames); the fix was then restored byte-identically. Focused building, parity,
+input and lifecycle suites with doclint: PASS, 39 tests / 4 classes, zero
+failures, errors and skips, in 13s (13.574s wall). An earlier full build and
+performance run on the unfixed tree are superseded and not counted below.
+
+The first changed-hint captures (prefix `v068-final-`, 1280x720 and 1920x1080)
+showed the new building hint fitting, but it was the sixth Creative welcome
+line before the shared camp line, while the HUD draws only six event log
+lines: "You crash-landed on Veylon in Creative mode." had scrolled out on the
+first frame. A separate `fix(creative)` commit merges the catalog and building
+hints into one line and records the six-line limit beside the hints. Only log
+text changed; no test pins the merged strings. Focused mode selection, catalog
+routing, mode model, body, building and lifecycle suites with doclint: PASS,
+55 tests / 6 classes, in 18s (18.791s wall). The build, performance run, smokes
+and captures made between the two fixes are superseded by the reruns below.
+
+Final v0.6.8 build: PASS, 609 tests / 92 classes, zero failures, errors and
+skips; 2m6s (126.895s wall), including JavaDoc doclint and line budgets. Real
+lines: Game 939/1000, QaHarness 1413/1500, SaveSystem 1109/1800,
+SettlementManager 1414/1500, FactionSystem 1265/1400, WorldGenerator 1178/1300.
+
+Performance on the same tree (unchanged budgets, 9.689s wall): every budget
+passes, including save at 1.501 ms against 2.20 ms, so this milestone records
+no host save deviation. Load 172.745 ms, chunk 0.482 ms, entity 0.336 ms,
+settlement 0.011 ms, audio 441.727 ms, PCM 40,824,424 bytes, occlusion
+0.001847 ms/frame and music 0.000008 ms/frame pass; TickProfileTest passes
+(whole cycle 0.0811 ms). Earlier in the same session, after the cadence fix
+and before the log-text fix, the task measured save 1.440 ms and the paired
+untouched v0.6.2 worktree measured save 1.455 ms (9.969s wall), with every
+other budget passing in both. PerfSaveLoadProbe was not needed because the
+benchmark itself reached and passed load.
+
+Native 30s smokes on the final tree, seed 20260910, VSync off, minimum 60 FPS,
+1280x720, NVIDIA RTX 1000 Ada / OpenGL 3.3 / driver 595.95, one at a time with
+no concurrent build. Creative: PASS, 904.5 FPS, p95 1.40 ms, p99 1.62 ms,
+27,138 body samples without damage or death, mode/mark/flight restored, and
+the scripted flight ran 1,399 frames across 2 chunks without entering an
+unloaded column. Survival: PASS, 897.4 FPS, p95 1.43 ms, p99 1.69 ms. Both
+completed isolated save/load and the fortress approach within every runtime
+hard limit, with 91/91 icons and zero GL, KHR-debug and OpenAL errors. The
+smoke does not script Creative building; R19-R21 evidence is the headless
+production-command suite above.
+
+Final captures on the same tree, inspected, each with zero GL, KHR-debug and
+OpenAL errors, at 1280x720 windowed and 1920x1080 fullscreen (4 PNGs, prefix
+`v068-final2-`). `welcome` (Creative day scene at 6 s) shows all five Creative
+hints and the camp line, the merged catalog and building hint on one line
+without truncation over bright grass. `pause-creative` fits the Creative
+controls line (E catalog, instant LMB, free RMB, middle mouse picks) inside the
+panel under the "CREATIVE  /  Creative world" header. That line does not follow
+the two-column key layout of its neighbours; bracket-glyph softness and the
+modal covering the event log are unchanged from earlier milestones. Human
+evaluation of building feel, pick ergonomics and wording is unverified.
