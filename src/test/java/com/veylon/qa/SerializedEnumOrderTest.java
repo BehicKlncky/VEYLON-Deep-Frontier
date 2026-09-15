@@ -44,7 +44,13 @@ class SerializedEnumOrderTest {
             "PRIMITIVE_BOW", "ARROW", "IRON_ARROW", "MUSKET", "FLINTLOCK_PISTOL",
             "BLUNDERBUSS", "POWDER_KEG", "SCRAP_BOMB", "FIRE_BOMB", "ROPE_LADDER",
             "LANTERN", "TRAIL_MARKER", "RELIC_CARBINE", "RELIC_RIFLE", "RIFLE_CARTRIDGE",
-            "RELIC_PARTS");
+            "RELIC_PARTS",
+            // 0.7.0 Creative building palette — appended, never reordered.
+            "GRASS_BLOCK", "ICE_BLOCK", "LEAVES_BLOCK", "BUSH_BLOCK", "TALL_GRASS_BLOCK",
+            "COAL_ORE_BLOCK", "COPPER_ORE_BLOCK", "IRON_ORE_BLOCK", "ASH_BLOCK",
+            "WRECKAGE_BLOCK", "POD_HULL_BLOCK", "RUIN_STONE_BLOCK", "BONE_PILE_BLOCK",
+            "BASALT_BLOCK", "SULFUR_ORE_BLOCK", "SALTPETER_ORE_BLOCK", "GLOW_FUNGUS_BLOCK",
+            "STONE_BRICK_BLOCK", "CAGE_BARS_BLOCK");
 
     private static final List<String> QUEST_TYPE_ORDER = List.of(
             "FETCH", "HUNT_PREDATOR", "INVESTIGATE",
