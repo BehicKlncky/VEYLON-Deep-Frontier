@@ -19,16 +19,24 @@ public final class PlayerInteractionSystem {
         public boolean secondaryPressed;
         public boolean interactPressed;
         public boolean reloadPressed;
+        public boolean pickPressed;
 
         public FrameInput set(float dt, boolean primaryHeld, boolean primaryPressed,
                               boolean secondaryPressed, boolean interactPressed,
                               boolean reloadPressed) {
+            return set(dt, primaryHeld, primaryPressed, secondaryPressed, interactPressed, reloadPressed, false);
+        }
+
+        public FrameInput set(float dt, boolean primaryHeld, boolean primaryPressed,
+                              boolean secondaryPressed, boolean interactPressed,
+                              boolean reloadPressed, boolean pickPressed) {
             this.dt = dt;
             this.primaryHeld = primaryHeld;
             this.primaryPressed = primaryPressed;
             this.secondaryPressed = secondaryPressed;
             this.interactPressed = interactPressed;
             this.reloadPressed = reloadPressed;
+            this.pickPressed = pickPressed;
             return this;
         }
     }
@@ -49,11 +57,14 @@ public final class PlayerInteractionSystem {
         void useSecondary();
 
         void interact();
+
+        void pickBlock();
     }
 
     /** Routes one gameplay frame while preserving ranged action precedence. */
     public void update(FrameInput input, ItemStack held, WeaponDefinition weapon,
                        Vector3f direction, Commands commands) {
+        if (input.pickPressed) commands.pickBlock();
         if (weapon != null) {
             commands.updateRanged(input.dt, held, weapon, direction, input);
             if (input.secondaryPressed) {

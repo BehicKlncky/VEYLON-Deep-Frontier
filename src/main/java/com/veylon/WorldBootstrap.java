@@ -178,6 +178,7 @@ final class WorldBootstrap {
         game.drawingBow = false;
         game.bowDraw = 0;
         game.combat.reset();
+        game.blockActions.reset();
         game.crates.reset();
         game.creativeCatalogScreen.reset();
     }
@@ -316,6 +317,7 @@ final class WorldBootstrap {
             game.log("Nothing here can hurt you, and wildlife and settlers ignore you.");
             game.log("Double-tap Space to fly; Space rises and Ctrl descends.");
             game.log("Press E to open the Creative catalog.");
+            game.log("Break instantly with LMB; place freely with RMB; middle mouse picks a block.");
             game.log("Press Esc, then [G], to switch this world's game mode.");
         } else {
             game.log("You crash-landed on Veylon. Survive.");

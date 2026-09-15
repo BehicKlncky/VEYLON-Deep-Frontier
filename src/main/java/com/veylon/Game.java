@@ -290,8 +290,7 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
 
                 @Override
                 public void resetPrimary() {
-                    miningProgress = 0;
-                    miningTarget = null;
+                    blockActions.reset();
                 }
 
                 @Override
@@ -303,6 +302,9 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
                 public void interact() {
                     interactions.interact();
                 }
+
+                @Override
+                public void pickBlock() { Game.this.pickBlock(); }
             };
 
     final Vector3f spawnPos = new Vector3f();
@@ -568,6 +570,7 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
 
 
     public void closeScreens() {
+        if (player != null && player.abilities.instantBuild()) blockActions.reset();
         uiMode = UiMode.NONE;
         openCrate = null;
         openCratePos = null;
@@ -670,7 +673,8 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
                 input.isMouseDown(GLFW_MOUSE_BUTTON_LEFT),
                 input.wasMousePressed(GLFW_MOUSE_BUTTON_LEFT),
                 input.wasMousePressed(GLFW_MOUSE_BUTTON_RIGHT),
-                input.wasKeyPressed(GLFW_KEY_F), input.wasKeyPressed(GLFW_KEY_R));
+                input.wasKeyPressed(GLFW_KEY_F), input.wasKeyPressed(GLFW_KEY_R),
+                input.wasMousePressed(GLFW_MOUSE_BUTTON_MIDDLE));
         playerInteractions.update(interactionInput, heldItem, weapon, dir, interactionCommands);
     }
 
@@ -769,6 +773,9 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
     public boolean completePlayerBlockBreak(Vec3i pos) {
         return blockActions.completePlayerBlockBreak(pos);
     }
+
+    /** Creative middle-button command, shared by native input and headless tests. */
+    public boolean pickBlock() { return blockActions.pickBlock(); }
 
     /** Gameplay placement command shared by RMB and integration tests. */
     public boolean placeSelectedBlockAt(int px, int py, int pz) {
