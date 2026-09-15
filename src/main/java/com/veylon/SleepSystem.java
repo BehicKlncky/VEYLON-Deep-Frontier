@@ -82,6 +82,11 @@ final class SleepSystem {
 
     /** Attempts to begin sleeping; logs the reason and does nothing when refused. */
     void startSleep(boolean campBed) {
+        if (game.daylightFrozen()) {
+            // Sleeping fast-forwards the very clock the control is holding (R25).
+            game.log("The daylight cycle is frozen - unfreeze it in [T] World controls to sleep.");
+            return;
+        }
         Creature threat = game.entities.nearestCreature(game.player.pos.x, game.player.pos.y,
                 game.player.pos.z, PREDATOR_WATCH_RADIUS, c -> c.type.predator);
         if (threat != null) {

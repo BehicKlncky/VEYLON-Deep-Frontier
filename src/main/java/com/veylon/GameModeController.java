@@ -25,6 +25,7 @@ final class GameModeController {
     void reset(GameMode initialMode) {
         mode = Objects.requireNonNull(initialMode, "initialMode");
         creativeMarked = mode == GameMode.CREATIVE;
+        game.creativeControls.clear();
     }
 
     void applyToPlayer() {
@@ -39,6 +40,9 @@ final class GameModeController {
         applyToPlayer();
         game.player.resetFallState();
         game.blockActions.reset();
+        // R25: leaving Creative releases every world control, and entering it
+        // starts from none. One unconditional call covers both directions.
+        game.creativeControls.clear();
         if (game.player.abilities.invulnerable()) game.player.restoreCreativeBody();
         // R4: perception gates stop new observations; this retires the old ones.
         if (!game.player.isPerceivableByAi()) PlayerAwareness.forgetPlayer(game);
@@ -52,6 +56,8 @@ final class GameModeController {
         creativeMarked = marked || mode == GameMode.CREATIVE;
         applyToPlayer();
         game.player.abilities.setFlying(flying);
+        // A Survival world holds no world controls, whatever a save claims.
+        if (mode != GameMode.CREATIVE) game.creativeControls.clear();
     }
 
     /** Pause [G] (R3): the paused confirmation for switching to the other mode. */

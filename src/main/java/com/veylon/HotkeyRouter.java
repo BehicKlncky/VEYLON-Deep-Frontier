@@ -33,11 +33,17 @@ final class HotkeyRouter {
 
     void update() {
         if (game.uiMode == Game.UiMode.OPTIONS || game.uiMode == Game.UiMode.AUDIO_OPTIONS
-                || game.uiMode == Game.UiMode.GAME_MODE || game.uiMode == Game.UiMode.CREATIVE_CATALOG) {
+                || game.uiMode == Game.UiMode.GAME_MODE || game.uiMode == Game.UiMode.CREATIVE_CATALOG
+                || game.uiMode == Game.UiMode.WORLD_CONTROLS) {
             return; // These screens own Escape, F5, typed text and navigation while open.
         }
         if (game.uiMode == Game.UiMode.PAUSE && game.input.wasKeyPressed(GLFW_KEY_G)) {
             game.gameModes.openScreen();
+            return;
+        }
+        if (game.uiMode == Game.UiMode.PAUSE && game.input.wasKeyPressed(GLFW_KEY_T)
+                && game.player != null && game.player.abilities.mayFly()) {
+            game.creativeControls.openScreen(); // R25; Survival has nothing to control
             return;
         }
         if (game.uiMode == Game.UiMode.PAUSE && game.input.wasKeyPressed(GLFW_KEY_O)) {

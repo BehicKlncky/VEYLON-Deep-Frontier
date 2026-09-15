@@ -25,6 +25,23 @@ public class TimeSystem implements SimulationSystem {
         totalMinutes += realSeconds * MINUTES_PER_REAL_SECOND;
     }
 
+    /**
+     * Jumps forward to the next time the clock reads {@code hourOfDay} (R25).
+     *
+     * <p>Day counters, seasons, spoilage and every timer in the game assume the
+     * clock only moves forward, so this never rewinds. Asking for the hour it
+     * already is therefore lands on that hour tomorrow rather than standing
+     * still, which is the only monotonic answer.
+     */
+    public void advanceToNextHour(double hourOfDay) {
+        double dayStart = Math.floor(totalMinutes / MINUTES_PER_DAY) * MINUTES_PER_DAY;
+        double target = dayStart + hourOfDay * MINUTES_PER_HOUR;
+        if (target <= totalMinutes) {
+            target += MINUTES_PER_DAY;
+        }
+        totalMinutes = target;
+    }
+
     public int day() {
         return (int) (totalMinutes / MINUTES_PER_DAY) + 1;
     }

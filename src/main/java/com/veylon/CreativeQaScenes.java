@@ -3,6 +3,8 @@ package com.veylon;
 import com.veylon.entity.GameMode;
 import com.veylon.entity.PlayerMovementSystem;
 import com.veylon.gfx.FrameProfiler;
+import com.veylon.simulation.TimePreset;
+import com.veylon.simulation.WeatherSystem;
 import com.veylon.world.Chunk;
 
 import java.util.Locale;
@@ -152,6 +154,22 @@ final class CreativeQaScenes {
             }
         }
         game.uiMode = Game.UiMode.CREATIVE_CATALOG;
+    }
+
+    /**
+     * VEYLON_FRONTEND world-control captures: the screen as it opens, or with
+     * every control engaged so the ON states and the log lines are visible.
+     */
+    void openWorldControlsForQa(String variant) {
+        game.uiMode = Game.UiMode.PAUSE;
+        game.creativeControls.openScreen();
+        if ("worldcontrols-held".equals(variant)) {
+            game.creativeControls.setTime(TimePreset.DUSK);
+            game.creativeControls.toggleDaylightFreeze();
+            game.creativeControls.setWeather(WeatherSystem.Weather.STORM);
+            game.creativeControls.toggleWeatherLock();
+            game.creativeControls.toggleSpawning();
+        }
     }
 
     void appendSmokeFailure(StringBuilder failure) {

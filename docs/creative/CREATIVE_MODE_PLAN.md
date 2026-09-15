@@ -86,7 +86,7 @@ wrapper, workflows, existing enum IDs and all budgets remain unchanged.
 | v0.6.8 | 08-instant-building | Repeat timer, cleanup without drops/wear, free placement, pick mapping (R19-R21) | verified |
 | v0.6.9 | 09-unlimited-use | A2 use-up gates, ammunition HUD, unchanged transform/transfer/trade (R22-R23) | verified |
 | v0.6.10 | 10-building-palette | Per-block inclusion audit, appended items/icons, mappings and compatibility (R24) | verified; gates ran on a second host (see the v0.6.10 host deviation) |
-| v0.6.11 | 11-world-controls | Forward time, freeze, weather lock, spawn gate, strict section and release on exit (R25) | pending |
+| v0.6.11 | 11-world-controls | Forward time, freeze, weather lock, spawn gate, strict section and release on exit (R25) | verified; gates ran on the second host (see the v0.6.10 host deviation) |
 | v0.7.0 | release/0.7.0 | Whole-diff audit, all final gates, both-resolution captures, artifacts/checksums, local main merge | pending |
 
 R26 applies to every milestone. R27 requires inspected 1280x720 and 1920x1080
@@ -1121,3 +1121,109 @@ script is generated into the ignored work directory and is not committed.
 Consequences: `releaseArtifacts` and jpackage were not exercised, the smoke and
 performance figures are not comparable with the earlier milestones' Windows
 numbers, and the final v0.7.0 gates still need the Windows host.
+### v0.6.11 evidence
+
+R25: `CreativeWorldControls` holds three flags (`daylightFrozen`,
+`weatherLocked`, `spawningPaused`) and two immediate commands, and is the only
+object that knows the feature exists as a whole. Each gate is one boolean
+question at its own site: `Game.advanceClock` is the single place the frame's
+clock step happens, so freezing stops the clock and nothing else;
+`WeatherSystem.mediumTick` skips the `changeTimer` countdown and the `pickNext`
+roll while locked, but keeps the flash timer, lets an in-flight blend finish and
+announce itself, and still rolls lightning for a locked storm;
+`EntityManager.slowTick` returns right after its despawn pass, so the creatures
+already present stay and still despawn; `SleepSystem.startSleep` refuses first
+of all reasons, because `tickSleep` fast-forwards the very clock the freeze is
+holding.
+
+`TimeSystem.advanceToNextHour` is the new production seam.
+`simulation/TimePreset` names the four hours (Dawn and Dusk reuse the phase
+boundaries from `TimeConstants`), so the screen does no clock arithmetic and the
+controller hard-codes no hour. The clock never rewinds: asking for the hour it
+already is lands on that hour tomorrow, which is the only monotonic answer for
+day counters, seasons and every timer. Crossing midnight carries the day
+counter, which the tests walk across four consecutive presets.
+
+Mode is never tested at a gate. `clear()` runs on `GameModeController.reset`
+(every new world) and unconditionally inside `switchTo` (both directions), and
+`CreativeWorldControls.restore` applies loaded flags only into a Creative world.
+A flag can therefore be true only while the world is Creative, and a
+hand-forged Survival save is released on load rather than handing a Survival
+player a frozen clock with no screen to unfreeze it - pinned by
+`aSurvivalSaveCannotSmuggleInAFrozenClock`.
+
+`save/CreativeControlsSection`, id `world.creative-controls`, version 1, three
+booleans, written after `player.game-mode` so the mode is already restored. An
+unsupported version, a truncated payload, an empty payload and trailing bytes
+each throw `IOException`, so the whole load fails with the live world, player
+and its own controls intact. An absent section means every control off, which
+is what every save written before 0.6.11 means; older builds skip the unknown
+id, so a Creative save opened on v0.6.0 simply has no controls.
+
+Scope note, following the brief: only `EntityManager.slowTick` natural spawning
+is gated. The scripted wolf-migration and camp-attack events in `EventSystem`
+still spawn, exactly as world-creation wildlife is unaffected. The spawn test
+drives `entities.slowTick` directly rather than the whole slow bucket so it
+measures the gate and not the event. Freezing the clock also freezes seasons and
+every other clock-derived reading, which is what "freeze the daylight cycle"
+means here.
+
+Parity with every control off: a Survival and a Creative world of seed
+20260910, driven through 40 identical clock steps, medium ticks and entity slow
+ticks, end with the same `totalMinutes`, the same current/next weather, the same
+blend, the same `changeTimer` (so the same weather RNG draws happened) and the
+same creature count. Skipped Creative draws are confined to the locked-weather
+branch and the paused-spawn branch, both of which require a control to be on.
+
+14 new cases: `CreativeWorldControlsTest` (10) covers key ownership from pause
+in Creative only, forward-only presets across midnight, the frozen clock across
+200 steps while medium ticks keep running, the sleep refusal and its recovery,
+a locked storm across 600 medium ticks with its lightning intact, paused
+spawning that adds none and removes none, the release on leaving Creative and on
+`newWorld`, the save round trip, the key-to-command table and the no-control
+parity. `CreativeControlsSectionTest` (4) covers all eight flag combinations,
+absence, four malformed payloads against a live world, and the forged Survival
+save. `GameLoopIntegrationTest` gains one additive assertion that the controls
+do not survive `newWorld`. No existing expectation changed.
+
+Final v0.6.11 build: PASS, 638 tests / 97 classes, zero failures, errors and
+skips; 2m30s (150.239s wall) on the committed tree, including JavaDoc doclint
+and line budgets. Real
+lines: Game 959/1000, QaHarness 1417/1500, SaveSystem 1109/1800,
+SettlementManager 1414/1500, FactionSystem 1265/1400, WorldGenerator 1178/1300.
+Game grew by 20 lines for the ui mode, the screen and controls fields, the
+clock seam and four one-line delegates.
+
+Performance on the same tree (unchanged budgets): every budget passes. Save
+1.132 ms (budget 2.20), load 194.183 ms (240.00), chunk tick 0.526 ms (0.92),
+entity tick 0.460 ms (0.95), settlement tick 0.048 ms (0.52), audio synthesis
+387.474 ms (1500), PCM 40,824,424 bytes (67,108,864), occlusion 0.002237
+ms/frame (0.10), music director 0.000004 ms (0.02); TickProfileTest whole cycle
+0.0995 / 0.1027 ms. Same host as v0.6.10, so these compare with those figures
+and not with milestones 1-9.
+
+Native 30 s smokes, seed 20260910, VSync off, minimum 60 FPS, 1280x720, one at a
+time, NVIDIA GeForce RTX 3060 Ti / OpenGL 3.3.0 / driver 580.173.02. Creative:
+PASS, 1260.3 FPS, p95 0.91 ms, p99 1.03 ms, 37,812 body samples without damage
+or death, mode/mark/flight restored, 2,009 flight frames across 2 chunks with no
+unloaded column entered. Survival: PASS, 1267.2 FPS, p95 0.92 ms, p99 1.04 ms.
+Both completed the isolated save/load and the fortress approach within every
+runtime hard limit, with 110/110 item icons and zero GL, KHR-debug and OpenAL
+errors.
+
+Captures, inspected. `VEYLON_FRONTEND` gains `worldcontrols` and
+`worldcontrols-held`, the second applying Dusk, the freeze, a locked storm and
+paused spawning first, so one shot shows every ON state and the five log lines
+the commands write. Both at 1280x720 and 1920x1080 (prefix `v0611-`): three
+sections, four time buttons, six weather buttons with the active one
+highlighted, three toggles reading their state, and the footer, all inside the
+panel with no clipping at either resolution. The first Creative pause capture
+showed the cost of the new `[T] World controls` line: the reference list had
+been sitting on the panel border, and one more row put the last line on the
+edge. The panel grew from 520 to 548 units and both pause captures were retaken
+(prefix `v0611b-`); the Survival header correctly omits the `[T]` entry while
+the reference still lists the Creative keys, as it has since milestone 5. The
+two solid cyan rectangles flanking every panel title appear here too, which
+confirms they belong to the shared panel skin rather than to any one screen;
+they are left for the release audit. Human judgement of how the controls feel in
+play is unverified.

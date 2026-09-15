@@ -265,6 +265,11 @@ final class FrontendController {
                     game.gameModes.openScreen();
                 }
             }
+            case "worldcontrols", "worldcontrols-held" -> {
+                game.newWorld(game.sessionSeed, true, GameMode.CREATIVE);
+                game.appState = Game.AppState.PLAYING;
+                game.creativeQa.openWorldControlsForQa(screen);
+            }
             case "catalog", "catalog-tools", "catalog-search", "catalog-inventory" -> {
                 game.newWorld(game.sessionSeed, true, GameMode.CREATIVE);
                 game.appState = Game.AppState.PLAYING;
