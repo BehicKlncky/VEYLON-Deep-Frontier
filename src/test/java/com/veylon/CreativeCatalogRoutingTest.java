@@ -1,6 +1,5 @@
 package com.veylon;
 
-import com.veylon.engine.Input;
 import com.veylon.entity.GameMode;
 import com.veylon.item.ItemStack;
 import com.veylon.item.ItemType;
@@ -43,6 +42,56 @@ class CreativeCatalogRoutingTest {
         assertEquals(logLines, game.eventLog.recent(200).size(), "R18: F5 never saves and F9 never loads");
         assertFalse(game.simPaused || game.simPanelShown || game.debugShown, "R18: P, Tab and F3 stay inert");
         assertEquals(0, game.player.hotbarSel, "R18: digits do not change the hotbar selection");
+    }
+
+    @Test
+    void openingEIsConsumedBeforeTheCatalogHandlesTheSameFrame() {
+        Game game = playing(GameMode.CREATIVE);
+        HotkeyRouter router = new HotkeyRouter(game);
+        game.input.onKey(GLFW_KEY_E, GLFW_PRESS);
+        router.update();
+        assertEquals(Game.UiMode.CREATIVE_CATALOG, game.uiMode, "R16: E opens the catalog");
+        assertEquals(CreativeCatalogScreen.Action.NONE,
+                game.creativeCatalogScreen.handleKeys(game, ItemType.TORCH, DRAWABLE),
+                "R16: the opening E cannot immediately close the catalog in the same frame");
+        game.input.endFrame();
+        game.input.onKey(GLFW_KEY_E, GLFW_RELEASE);
+        game.input.onKey(GLFW_KEY_E, GLFW_PRESS);
+        router.update();
+        assertEquals(CreativeCatalogScreen.Action.CLOSE,
+                game.creativeCatalogScreen.handleKeys(game, null, DRAWABLE),
+                "R18: a later E still closes the unfocused catalog");
+    }
+
+    @Test
+    void openingTheCatalogOwnsAllOtherKeysInThatSameFrame() {
+        Game game = playing(GameMode.CREATIVE);
+        HotkeyRouter router = new HotkeyRouter(game);
+        var world = game.world;
+        ItemStack firstSlot = game.player.inventory.get(0);
+        int logLines = game.eventLog.recent(200).size();
+        for (int key : new int[]{GLFW_KEY_E, GLFW_KEY_C, GLFW_KEY_M, GLFW_KEY_F5, GLFW_KEY_F9,
+                GLFW_KEY_TAB, GLFW_KEY_F3, GLFW_KEY_F2, GLFW_KEY_P, GLFW_KEY_1, GLFW_KEY_SLASH}) {
+            game.input.onKey(key, GLFW_PRESS);
+        }
+        game.input.onTyped('e');
+        router.update();
+        assertEquals(Game.UiMode.CREATIVE_CATALOG, game.uiMode,
+                "R18: simultaneous C or M cannot replace the newly opened catalog");
+        assertEquals(CreativeCatalogScreen.Action.NONE,
+                game.creativeCatalogScreen.handleKeys(game, ItemType.TORCH, DRAWABLE),
+                "R18: opening-frame keys are consumed before catalog actions");
+        assertSame(world, game.world, "R18: simultaneous F9 cannot load another world");
+        assertEquals(logLines, game.eventLog.recent(200).size(),
+                "R18: simultaneous F5/F9 cannot save or load");
+        assertFalse(game.simPaused || game.simPanelShown || game.debugShown || game.pendingScreenshot,
+                "R18: debug, pause and screenshot keys cannot leak on opening");
+        assertSame(firstSlot, game.player.inventory.get(0),
+                "R18: the opening frame cannot overwrite a hotbar stack");
+        assertFalse(game.creativeCatalogScreen.searchFocused(),
+                "R18: the opening frame cannot focus search with another key");
+        assertEquals("", game.creativeCatalogScreen.query(),
+                "R18: the opening key's typed character is discarded");
     }
 
     @Test
@@ -130,25 +179,20 @@ class CreativeCatalogRoutingTest {
         return game;
     }
 
-    private static boolean[] pressed(Game game) throws ReflectiveOperationException {
-        var field = Input.class.getDeclaredField("keyPressed");
-        field.setAccessible(true);
-        return (boolean[]) field.get(game.input);
-    }
-
-    private static void route(Game game, HotkeyRouter router, int... keys) throws ReflectiveOperationException {
-        for (int key : keys) pressed(game)[key] = true;
+    private static void route(Game game, HotkeyRouter router, int... keys) {
+        for (int key : keys) game.input.onKey(key, GLFW_PRESS);
         router.update();
         game.input.endFrame();
+        for (int key : keys) game.input.onKey(key, GLFW_RELEASE);
     }
 
     private static CreativeCatalogScreen.Action keys(Game game, CreativeCatalogScreen screen, ItemType hovered,
-                                                      String typed, int... keyCodes)
-            throws ReflectiveOperationException {
-        for (int key : keyCodes) pressed(game)[key] = true;
+                                                      String typed, int... keyCodes) {
+        for (int key : keyCodes) game.input.onKey(key, GLFW_PRESS);
         typed.codePoints().forEach(game.input::onTyped);
         CreativeCatalogScreen.Action action = screen.handleKeys(game, hovered, DRAWABLE);
         game.input.endFrame();
+        for (int key : keyCodes) game.input.onKey(key, GLFW_RELEASE);
         return action;
     }
 }

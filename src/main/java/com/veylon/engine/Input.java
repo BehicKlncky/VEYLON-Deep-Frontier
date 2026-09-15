@@ -21,7 +21,8 @@ public class Input {
     private double scrollY;
     private boolean firstMouse = true;
 
-    void onKey(int key, int action) {
+    /** GLFW key events; also the production input seam for deterministic routing tests. */
+    public void onKey(int key, int action) {
         if (key < 0 || key > GLFW_KEY_LAST) {
             return;
         }

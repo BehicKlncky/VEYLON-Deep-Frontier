@@ -56,6 +56,9 @@ final class HotkeyRouter {
             return;
         }
         handleScreenToggles();
+        if (game.uiMode == Game.UiMode.CREATIVE_CATALOG) {
+            return; // Ownership starts in the opening frame, including simultaneous F5/F9.
+        }
         handleDebugToggles();
         handleQuickSaveLoad();
         handleContextualKeys();
@@ -81,7 +84,9 @@ final class HotkeyRouter {
     private void handleScreenToggles() {
         if (game.input.wasKeyPressed(GLFW_KEY_E)) {
             if (game.player.abilities.unlimitedItems()) {
+                game.creativeCatalogScreen.open();
                 toggle(Game.UiMode.CREATIVE_CATALOG); // R16; the open catalog handles its own E
+                return;
             } else {
                 toggle(Game.UiMode.INVENTORY);
                 game.inventoryScreen.reset();

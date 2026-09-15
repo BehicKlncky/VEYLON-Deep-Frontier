@@ -11,6 +11,7 @@ import com.veylon.item.ItemType;
 
 import java.util.List;
 import java.util.function.IntPredicate;
+import java.util.function.ToDoubleFunction;
 
 import static org.lwjgl.glfw.GLFW.*;
 
@@ -51,19 +52,28 @@ public final class CreativeCatalogScreen {
     private static final float TAB_SCALE = 1.05f;
     private static final float SEARCH_W = 320;
     private static final float SEARCH_H = 28;
+    private static final float SEARCH_SCALE = 1.15f;
+    private static final float SEARCH_TEXT_SPACE = SEARCH_W - 24;
     private static final float NOTICE_SECONDS = 2f;
+    private static final float LABEL_PAD = 12;
+    private static final float LABEL_BACKING_H = 22;
 
     private final CreativeCatalog catalog = new CreativeCatalog();
     private final StringBuilder queryText = new StringBuilder();
     private String queryDisplay = "";
+    private String queryTail = "";
+    private float queryTailWidth;
+    private boolean queryLayoutDirty = true;
     private boolean inventoryTab;
     private boolean searchFocused;
+    private boolean openingFrame;
     private int scrollRows;
     private float noticeSeconds;
     private double lastFrameTime = -1;
     private ItemType tooltipType;
     private String tooltipLine = "";
     private IntPredicate drawable;
+    private ToDoubleFunction<String> queryWidth;
     private final InventoryScreen inventoryScreen;
 
     /** The INVENTORY tab draws this screen, so selection, moves and gear behave as in Survival. */
@@ -76,13 +86,24 @@ public final class CreativeCatalogScreen {
         catalog.setCategory(CATEGORIES[0]);
         queryText.setLength(0);
         queryDisplay = "";
+        queryTail = "";
+        queryTailWidth = 0;
+        queryLayoutDirty = true;
         catalog.setQuery("");
         inventoryTab = false;
         searchFocused = false;
+        openingFrame = false;
         scrollRows = 0;
         noticeSeconds = 0;
         tooltipType = null;
         tooltipLine = "";
+        lastFrameTime = -1;
+    }
+
+    /** The opening key belongs to the router; the first screen frame must not act on it again. */
+    public void open() {
+        reset();
+        openingFrame = true;
     }
 
     public String query() {
@@ -145,6 +166,10 @@ public final class CreativeCatalogScreen {
      * @param drawable whether the font can draw a typed code point
      */
     public Action handleKeys(Game g, ItemType hovered, IntPredicate drawable) {
+        if (openingFrame) {
+            openingFrame = false;
+            return Action.NONE;
+        }
         Input input = g.input;
         if (searchFocused) {
             if (input.wasKeyPressed(GLFW_KEY_ESCAPE) || input.wasKeyPressed(GLFW_KEY_ENTER)) {
@@ -193,6 +218,8 @@ public final class CreativeCatalogScreen {
         if (drawable == null) {
             FontRenderer font = g.ui.fontRenderer();
             drawable = codePoint -> font.hasGlyph(codePoint, FontRenderer.Weight.REGULAR);
+            queryWidth = text -> font.textWidth(text, SEARCH_SCALE);
+            queryLayoutDirty = true;
         }
         float dt = lastFrameTime < 0 ? 0f : (float) Math.max(0, Math.min(0.1, g.totalTime - lastFrameTime));
         lastFrameTime = g.totalTime;
@@ -227,11 +254,16 @@ public final class CreativeCatalogScreen {
         ui.rectOutline(searchX, searchY, SEARCH_W, SEARCH_H, searchFocused ? 2 : 1,
                 0.28f, searchFocused ? 0.9f : 0.5f, searchFocused ? 0.95f : 0.55f, 0.9f);
         if (queryText.length() == 0 && !searchFocused) {
-            ui.text(searchX + 10, searchY + 6, 1.15f, PLACEHOLDER, 0.5f, 0.58f, 0.62f, 1f);
+            ui.text(searchX + 10, searchY + 6, SEARCH_SCALE, PLACEHOLDER, 0.5f, 0.58f, 0.62f, 1f);
         } else {
-            ui.text(searchX + 10, searchY + 6, 1.15f, queryDisplay, 0.92f, 0.97f, 0.98f, 1f);
+            if (queryLayoutDirty) {
+                queryTail = fittedQueryTail(queryDisplay, queryWidth);
+                queryTailWidth = (float) queryWidth.applyAsDouble(queryTail);
+                queryLayoutDirty = false;
+            }
+            ui.text(searchX + 10, searchY + 6, SEARCH_SCALE, queryTail, 0.92f, 0.97f, 0.98f, 1f);
             if (searchFocused && ((int) (g.totalTime * 2) & 1) == 0) {
-                float caretX = searchX + 11 + ui.textWidth(queryDisplay, 1.15f);
+                float caretX = searchX + 11 + queryTailWidth;
                 ui.rect(caretX, searchY + 6, 2, SEARCH_H - 12, 0.9f, 0.95f, 1f, 1f);
             }
         }
@@ -308,9 +340,16 @@ public final class CreativeCatalogScreen {
         boolean hover = inside(mx, my, tx, ty, SLOT, SLOT);
         ui.slot(tx, ty, SLOT, hover, false);
         ui.rect(tx + 12, ty + SLOT / 2f - 2, SLOT - 24, 4, 0.9f, 0.35f, 0.3f, 1f);
+        // This tab draws over the live world without a dimmed backdrop, so its
+        // own labels sit on dark backing to stay readable against bright terrain.
+        float labelW = ui.textWidth(TRASH_LABEL, 1.05f) + LABEL_PAD;
+        ui.rect(tx + SLOT / 2f - labelW / 2f, ty + SLOT + 3, labelW, LABEL_BACKING_H,
+                0.02f, 0.03f, 0.04f, 0.78f);
         ui.textCentered(tx + SLOT / 2f, ty + SLOT + 6, 1.05f, TRASH_LABEL, 1f, 0.55f, 0.45f, 1f);
-        ui.textCentered(w / 2f, InventoryScreen.panelBottom(h) + 10, 1.1f, INVENTORY_HINT,
-                0.58f, 0.7f, 0.73f, 1f);
+        float hintY = InventoryScreen.panelBottom(h) + 10;
+        float hintW = ui.textWidth(INVENTORY_HINT, 1.1f) + 2 * LABEL_PAD;
+        ui.rect(w / 2f - hintW / 2f, hintY - 3, hintW, LABEL_BACKING_H + 2, 0.02f, 0.03f, 0.04f, 0.78f);
+        ui.textCentered(w / 2f, hintY, 1.1f, INVENTORY_HINT, 0.72f, 0.84f, 0.88f, 1f);
         if (click && hover && trash(g, inventoryScreen.selectedSlot())) {
             inventoryScreen.reset();
             g.audio.playClick();
@@ -348,8 +387,20 @@ public final class CreativeCatalogScreen {
 
     private void queryChanged() {
         queryDisplay = queryText.toString();
+        queryLayoutDirty = true;
         catalog.setQuery(queryDisplay);
         scrollRows = 0;
+    }
+
+    /** Keep the edited end visible without changing the query or splitting a Unicode code point. */
+    static String fittedQueryTail(String text, ToDoubleFunction<String> width) {
+        String tail = text;
+        int offset = 0;
+        while (offset < text.length() && width.applyAsDouble(tail) > SEARCH_TEXT_SPACE) {
+            offset = text.offsetByCodePoints(offset, 1);
+            tail = text.substring(offset);
+        }
+        return tail;
     }
 
     private static String tabLabel(int index) {
