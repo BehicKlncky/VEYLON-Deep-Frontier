@@ -38,6 +38,7 @@ final class GameModeController {
         creativeMarked |= target == GameMode.CREATIVE;
         applyToPlayer();
         game.player.resetFallState();
+        game.blockActions.reset();
         if (game.player.abilities.invulnerable()) game.player.restoreCreativeBody();
         // R4: perception gates stop new observations; this retires the old ones.
         if (!game.player.isPerceivableByAi()) PlayerAwareness.forgetPlayer(game);

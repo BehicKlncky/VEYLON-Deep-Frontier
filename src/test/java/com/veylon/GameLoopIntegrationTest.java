@@ -184,7 +184,11 @@ class GameLoopIntegrationTest {
                 "precondition: outgoing world has persisted Creative state");
         game.creativeCatalogScreen.search("iron");
         game.creativeCatalogScreen.showInventory();
+        game.targetHit = new com.veylon.world.Raycaster.Hit(fx, fy, fz, 0, 1, 0, 1, BlockType.LOG);
+        game.mine(0.01f);
+        assertTrue(game.blockActions.creativeBreakRemaining() > 0, "precondition: Creative break timer is active");
         game.newWorld(4242L, true);
+        assertEquals(0, game.blockActions.creativeBreakRemaining(), "R19: Creative break timing resets with the world");
         assertEquals("", game.creativeCatalogScreen.query(),
                 "R16: the catalog query does not survive into a new world");
         assertFalse(game.creativeCatalogScreen.inventoryTab() || game.creativeCatalogScreen.searchFocused(),

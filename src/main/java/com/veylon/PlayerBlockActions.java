@@ -3,6 +3,9 @@ package com.veylon;
 import com.veylon.entity.Creature;
 import com.veylon.entity.Entity;
 import com.veylon.entity.Npc;
+import com.veylon.entity.PlayerConstants;
+import com.veylon.item.BlockItemForms;
+import com.veylon.item.CreativeGrants;
 import com.veylon.item.Inventory;
 import com.veylon.item.ItemStack;
 import com.veylon.item.ItemType;
@@ -61,9 +64,20 @@ final class PlayerBlockActions {
     private static final int CRATE_SLOTS = 12;
     private static final int PLACE_DUST_PARTICLES = 5;
 
+    // Creative building.
+    /** R19: seconds between breaks while the Creative primary button stays held. */
+    static final float CREATIVE_BREAK_REPEAT_SECONDS = 0.30f;
+    /** Absorbs float drift from summing frame times against the repeat interval. */
+    private static final float CREATIVE_BREAK_EPSILON = 0.000001f;
+
     private final Game game;
     /** Break-outcome rolls; reseeded per world by {@code Game.reseedSimulation}. */
     private final Random rng = new Random();
+    /**
+     * Seconds until a held Creative break repeats. Transient: release, melee or
+     * ranged routing, mode switches, screen close and world replacement clear it.
+     */
+    private float creativeBreakRemaining;
 
     PlayerBlockActions(Game game) {
         this.game = game;
@@ -79,6 +93,10 @@ final class PlayerBlockActions {
 
     /** Advances the hold-to-mine timer against the currently targeted block. */
     void mine(float dt) {
+        if (game.player.abilities.instantBuild()) {
+            mineCreative(dt);
+            return;
+        }
         BlockType t = game.targetHit.type();
         if (t.hardness < 0) {
             return; // indestructible
@@ -116,6 +134,72 @@ final class PlayerBlockActions {
     }
 
     /**
+     * R19: a press breaks at once, and a held button repeats every
+     * {@code CREATIVE_BREAK_REPEAT_SECONDS}. Reaching another block while held
+     * restarts that interval rather than breaking at once: the raycast retargets
+     * the block behind every broken one on the next frame, so an immediate break
+     * there would tunnel one block per frame. Survival arithmetic is untouched.
+     */
+    private void mineCreative(float dt) {
+        var hit = game.targetHit;
+        game.miningProgress = 0;
+        if (hit == null || hit.type().hardness < 0) {
+            reset();
+            return;
+        }
+        Vec3i pos = game.miningTarget;
+        if (pos == null) {
+            pos = new Vec3i(hit.x(), hit.y(), hit.z());
+            game.miningTarget = pos;
+            creativeBreakRemaining = 0;
+        } else {
+            if (pos.x() != hit.x() || pos.y() != hit.y() || pos.z() != hit.z()) {
+                pos = new Vec3i(hit.x(), hit.y(), hit.z());
+                game.miningTarget = pos;
+                creativeBreakRemaining = CREATIVE_BREAK_REPEAT_SECONDS;
+            }
+            creativeBreakRemaining = Math.max(0, creativeBreakRemaining - Math.max(0, dt));
+        }
+        if (creativeBreakRemaining <= CREATIVE_BREAK_EPSILON) {
+            if (completePlayerBlockBreak(pos)) game.swingTimer = MINE_SWING_SECONDS;
+            creativeBreakRemaining = CREATIVE_BREAK_REPEAT_SECONDS;
+        }
+    }
+
+    /** Clears mining progress, target and the Creative repeat timer; the next press breaks at once. */
+    void reset() {
+        creativeBreakRemaining = 0;
+        game.miningProgress = 0;
+        game.miningTarget = null;
+    }
+
+    float creativeBreakRemaining() { return creativeBreakRemaining; }
+
+    /** R21: prefer an existing hotbar stack, then an empty slot, then the selected slot. */
+    boolean pickBlock() {
+        if (!game.player.abilities.instantBuild() || game.targetHit == null) return false;
+        ItemType item = BlockItemForms.of(game.targetHit.type());
+        if (item == null) {
+            game.log("This block has no item form.");
+            return false;
+        }
+        Inventory inventory = game.player.inventory;
+        int empty = -1;
+        for (int i = 0; i < PlayerConstants.HOTBAR_SLOTS; i++) {
+            ItemStack stack = inventory.get(i);
+            if (stack != null && stack.type == item) {
+                game.player.hotbarSel = i;
+                return true;
+            }
+            if (stack == null && empty < 0) empty = i;
+        }
+        int slot = empty >= 0 ? empty : game.player.hotbarSel;
+        inventory.set(slot, CreativeGrants.fresh(item, true));
+        game.player.hotbarSel = slot;
+        return true;
+    }
+
+    /**
      * Completes a player mining action after the hold-to-mine timer succeeds.
      * Keeping the block outcome in this command lets gameplay integration tests
      * exercise real drops, durability, changed-block persistence and hooks.
@@ -127,7 +211,8 @@ final class PlayerBlockActions {
         BlockType type = game.world.getBlock(pos.x(), pos.y(), pos.z());
         ItemStack held = game.player.selected();
         if (type.hardness < 0
-                || (type.requiresTool && (held == null || held.type.tool != type.preferredTool))) {
+                || (!game.player.abilities.instantBuild() && type.requiresTool
+                && (held == null || held.type.tool != type.preferredTool))) {
             return false;
         }
         breakBlock(pos, type, held);
@@ -136,14 +221,16 @@ final class PlayerBlockActions {
 
     private void breakBlock(Vec3i pos, BlockType t, ItemStack held) {
         int brokenCrateContents = spillContainerContents(pos, t);
-        awardDrops(t, held);
+        if (!game.player.abilities.instantBuild()) awardDrops(t, held);
 
         game.world.setBlock(pos.x(), pos.y(), pos.z(), BlockType.AIR, true);
         game.audio.playBlockBreak(pos.x() + 0.5f, pos.y() + 0.5f, pos.z() + 0.5f);
         game.particles.blockDust(t, pos.x() + 0.5f, pos.y() + 0.5f, pos.z() + 0.5f,
                 BREAK_DUST_PARTICLES);
-        game.combat.consumeDurability(held, BREAK_DURABILITY_COST);
-        game.player.noise = Math.min(1f, game.player.noise + BREAK_NOISE_SELF);
+        if (!game.player.abilities.instantBuild()) game.combat.consumeDurability(held, BREAK_DURABILITY_COST);
+        if (game.player.isPerceivableByAi()) {
+            game.player.noise = Math.min(1f, game.player.noise + BREAK_NOISE_SELF);
+        }
 
         boolean structure = isBuiltStructure(t);
         game.noise.emit(game, pos.x() + 0.5f, pos.y() + 0.5f, pos.z() + 0.5f,
@@ -286,7 +373,7 @@ final class PlayerBlockActions {
             default -> {
             }
         }
-        game.player.inventory.shrink(game.player.hotbarSel, 1);
+        if (!game.player.abilities.unlimitedItems()) game.player.inventory.shrink(game.player.hotbarSel, 1);
         game.audio.playBlockPlace(px + 0.5f, py + 0.5f, pz + 0.5f);
         game.particles.blockDust(place, px + 0.5f, py + 0.8f, pz + 0.5f, PLACE_DUST_PARTICLES);
         return true;

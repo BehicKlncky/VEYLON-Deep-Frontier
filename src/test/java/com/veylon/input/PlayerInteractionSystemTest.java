@@ -49,6 +49,21 @@ class PlayerInteractionSystemTest {
         assertEquals("cooldown,cancel,reset,secondary,interact", recorder.calls.toString());
     }
 
+    @Test
+    void middleButtonRoutesPickForBothRangedAndOrdinaryHands() {
+        for (ItemType type : new ItemType[]{ItemType.PLANK, ItemType.PRIMITIVE_BOW}) {
+            Recorder recorder = new Recorder();
+            ItemStack held = new ItemStack(type, 1);
+            var input = new PlayerInteractionSystem.FrameInput().set(0.05f, false, false,
+                    false, false, false, true);
+            system.update(input, held, WeaponRegistry.of(type), direction, recorder);
+            assertEquals(type == ItemType.PLANK ? "pick,cooldown,cancel,reset" : "pick,ranged",
+                    recorder.calls.toString(), "R21: the middle button has a production route regardless of weapon");
+            input.set(0.05f, false, false, false, false, false);
+            assertEquals(false, input.pickPressed, "R21: reused input cannot retain a previous pick edge");
+        }
+    }
+
     private static final class Recorder implements PlayerInteractionSystem.Commands {
         private final StringJoiner calls = new StringJoiner();
 
@@ -88,6 +103,9 @@ class PlayerInteractionSystemTest {
         public void interact() {
             calls.add("interact");
         }
+
+        @Override
+        public void pickBlock() { calls.add("pick"); }
     }
 
     private static final class StringJoiner {

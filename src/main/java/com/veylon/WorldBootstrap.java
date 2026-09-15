@@ -178,6 +178,7 @@ final class WorldBootstrap {
         game.drawingBow = false;
         game.bowDraw = 0;
         game.combat.reset();
+        game.blockActions.reset();
         game.crates.reset();
         game.creativeCatalogScreen.reset();
     }
@@ -312,10 +313,11 @@ final class WorldBootstrap {
         game.player.inventory.add(ItemType.WATERSKIN_EMPTY, 1);
         if (game.gameMode() == GameMode.CREATIVE) {
             // Creative hints name only abilities that exist; the kit stays identical (R7).
+            // The HUD shows six log lines, so five hints plus the camp line stay visible.
             game.log("You crash-landed on Veylon in Creative mode.");
             game.log("Nothing here can hurt you, and wildlife and settlers ignore you.");
             game.log("Double-tap Space to fly; Space rises and Ctrl descends.");
-            game.log("Press E to open the Creative catalog.");
+            game.log("Press E for the catalog; LMB breaks instantly, RMB places freely, middle mouse picks.");
             game.log("Press Esc, then [G], to switch this world's game mode.");
         } else {
             game.log("You crash-landed on Veylon. Survive.");

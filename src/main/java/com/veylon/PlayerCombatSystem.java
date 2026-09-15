@@ -119,8 +119,7 @@ final class PlayerCombatSystem {
     void updatePrimaryAction(float dt, Vector3f dir, boolean primaryPressed) {
         Entity victim = findAttackTarget(dir);
         if (victim != null) {
-            game.miningProgress = 0;
-            game.miningTarget = null;
+            game.blockActions.reset();
             performPlayerAttack(victim);
         } else if (game.targetHit != null) {
             game.mine(dt);
@@ -129,8 +128,7 @@ final class PlayerCombatSystem {
                 game.swingTimer = SWING_WHIFF;
                 game.audio.playSwing();
             }
-            game.miningProgress = 0;
-            game.miningTarget = null;
+            game.blockActions.reset();
         }
     }
 
@@ -230,8 +228,7 @@ final class PlayerCombatSystem {
     /** Routes a held ranged weapon to the command for its category. */
     void updateRangedWeapon(float dt, ItemStack held, WeaponDefinition weapon, Vector3f dir,
                             PlayerInteractionSystem.FrameInput frameInput) {
-        game.miningProgress = 0;
-        game.miningTarget = null;
+        game.blockActions.reset();
 
         switch (weapon.category) {
             case BOW -> {
