@@ -15,6 +15,13 @@ import com.veylon.util.Noise;
  */
 public class Hud {
 
+    /**
+     * Distance from the bottom edge to the weapon status block. Its three rows
+     * (readout, reload hint or meter, reloading text) end above the held-item
+     * label that the hotbar draws 70 units from the bottom.
+     */
+    private static final float WEAPON_STATUS_TOP = 120f;
+
     /** Exact player-facing bow ammo readout used by rendering and workflow tests. */
     public static String bowAmmoLabel(Game g) {
         if (g.player.abilities.unlimitedItems()) {
@@ -55,7 +62,7 @@ public class Hud {
             return;
         }
         float cx = w / 2f;
-        float y = h - 96;
+        float y = h - WEAPON_STATUS_TOP;
         switch (weapon.category) {
             case BOW -> {
                 int basic = g.player.inventory.count(com.veylon.item.ItemType.ARROW);
