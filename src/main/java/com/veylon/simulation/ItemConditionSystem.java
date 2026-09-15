@@ -26,9 +26,12 @@ public class ItemConditionSystem implements SlowTickSystem {
 
     @Override
     public void slowTick(Game g, float dt) {
-        // Cold air preserves food; heat spoils it faster.
-        float envRate = spoilRate(g.player.envTemp);
-        tickInventory(g, g.player.inventory, envRate * dt, true);
+        // Cold air preserves food; heat spoils it faster. R22: stacks carried with
+        // unlimited items keep their freshness; crates, racks and collectors still tick.
+        if (!g.player.abilities.unlimitedItems()) {
+            float envRate = spoilRate(g.player.envTemp);
+            tickInventory(g, g.player.inventory, envRate * dt, true);
+        }
 
         for (Map.Entry<Vec3i, Inventory> e : g.world.crateContents.entrySet()) {
             Vec3i p = e.getKey();

@@ -15,12 +15,43 @@ import com.veylon.util.Noise;
  */
 public class Hud {
 
+    /**
+     * Distance from the bottom edge to the weapon status block. Its three rows
+     * (readout, reload hint or meter, reloading text) end above the held-item
+     * label that the hotbar draws 70 units from the bottom.
+     */
+    private static final float WEAPON_STATUS_TOP = 120f;
+
     /** Exact player-facing bow ammo readout used by rendering and workflow tests. */
     public static String bowAmmoLabel(Game g) {
+        if (g.player.abilities.unlimitedItems()) {
+            return "Selected " + g.selectedBowAmmo().displayName + " [R]   unlimited arrows";
+        }
         int basic = g.player.inventory.count(com.veylon.item.ItemType.ARROW);
         int iron = g.player.inventory.count(com.veylon.item.ItemType.IRON_ARROW);
         return "Selected " + g.selectedBowAmmo().displayName + " [R]"
                 + "   Basic " + basic + "   Iron " + iron;
+    }
+
+    /** R23: the magazine stays visible while an unlimited reserve reads as ASCII text. */
+    public static String firearmAmmoLabel(Game g, ItemStack held,
+                                          com.veylon.combat.WeaponDefinition weapon) {
+        String reserve = g.player.abilities.unlimitedItems() ? "unlimited"
+                : Integer.toString(g.player.inventory.count(weapon.ammo));
+        return held.charge + "/" + weapon.magazine + "   " + reserve + " " + weapon.ammo.displayName;
+    }
+
+    /** R23: an empty magazine offers a reload whenever one can start. */
+    public static boolean showReloadHint(Game g, ItemStack held,
+                                         com.veylon.combat.WeaponDefinition weapon) {
+        return held.charge <= 0 && (g.player.abilities.unlimitedItems()
+                || g.player.inventory.count(weapon.ammo) > 0);
+    }
+
+    /** R23: thrown-weapon readout; an unlimited stack shows no count. */
+    public static String thrownAmmoLabel(Game g, ItemStack held) {
+        return (g.player.abilities.unlimitedItems() ? "unlimited " : held.count + "x ")
+                + held.type.displayName + " — LMB to throw";
     }
 
     /** Ammo counter, reload bar and bow-draw meter above the hotbar. */
@@ -31,14 +62,15 @@ public class Hud {
             return;
         }
         float cx = w / 2f;
-        float y = h - 96;
+        float y = h - WEAPON_STATUS_TOP;
         switch (weapon.category) {
             case BOW -> {
                 int basic = g.player.inventory.count(com.veylon.item.ItemType.ARROW);
                 int iron = g.player.inventory.count(com.veylon.item.ItemType.IRON_ARROW);
                 String label = bowAmmoLabel(g);
+                boolean available = g.player.abilities.unlimitedItems() || basic + iron > 0;
                 ui.textCentered(cx, y, 1.4f, label,
-                        basic + iron > 0 ? 0.9f : 1f, basic + iron > 0 ? 0.9f : 0.4f, 0.7f, 1f);
+                        available ? 0.9f : 1f, available ? 0.9f : 0.4f, 0.7f, 1f);
                 if (g.drawingBow) {
                     float bw = 120;
                     ui.rect(cx - bw / 2, y + 18, bw, 7, 0.08f, 0.08f, 0.08f, 0.8f);
@@ -48,9 +80,7 @@ public class Hud {
                 }
             }
             case FIREARM -> {
-                int reserve = g.player.inventory.count(weapon.ammo);
-                String label = held.charge + "/" + weapon.magazine + "   " + reserve
-                        + " " + weapon.ammo.displayName;
+                String label = firearmAmmoLabel(g, held, weapon);
                 ui.textCentered(cx, y, 1.4f, label,
                         held.charge > 0 ? 0.9f : 1f, held.charge > 0 ? 0.9f : 0.45f, 0.7f, 1f);
                 if (g.reloadTimer > 0 && g.reloadTotal > 0) {
@@ -59,12 +89,12 @@ public class Hud {
                     ui.rect(cx - bw / 2, y + 18, bw, 7, 0.08f, 0.08f, 0.08f, 0.8f);
                     ui.rect(cx - bw / 2 + 1, y + 19, (bw - 2) * frac, 5, 0.85f, 0.65f, 0.3f, 0.95f);
                     ui.textCentered(cx, y + 30, 1.15f, "Reloading...", 0.85f, 0.8f, 0.7f, 1f);
-                } else if (held.charge <= 0 && reserve > 0) {
+                } else if (showReloadHint(g, held, weapon)) {
                     ui.textCentered(cx, y + 18, 1.15f, "[R] Reload", 0.9f, 0.8f, 0.5f, 1f);
                 }
             }
             case THROWN -> ui.textCentered(cx, y, 1.4f,
-                    held.count + "x " + held.type.displayName + " — LMB to throw",
+                    thrownAmmoLabel(g, held),
                     0.9f, 0.85f, 0.7f, 1f);
         }
     }

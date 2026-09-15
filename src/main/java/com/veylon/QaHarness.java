@@ -648,7 +648,8 @@ final class QaHarness {
                 setupSilhouette30mShowcase(site);
             }
             case "held_pickaxe", "held_axe", "held_spear", "held_knife", "held_torch",
-                    "held_food", "held_berry", "held_medicine", "held_building" -> {
+                    "held_food", "held_berry", "held_medicine", "held_building",
+                    "held_bow", "held_musket", "held_bomb" -> {
                 site = moveBenchmarkToBiome(Biome.MEADOW);
                 clearBenchmarkStage(site, 11, 22);
                 setupPhase4Showcase(site.x(), site.z());
@@ -977,6 +978,9 @@ final class QaHarness {
             case "held_berry" -> ItemType.BERRY;
             case "held_medicine" -> ItemType.MEDICINE;
             case "held_building" -> ItemType.WORKBENCH;
+            case "held_bow" -> ItemType.PRIMITIVE_BOW;
+            case "held_musket" -> ItemType.MUSKET;
+            case "held_bomb" -> ItemType.SCRAP_BOMB;
             default -> ItemType.IRON_PICKAXE;
         };
         game.player.inventory.set(0, new ItemStack(item, 1));
