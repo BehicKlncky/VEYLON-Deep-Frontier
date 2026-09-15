@@ -2,6 +2,13 @@
 
 All notable user-facing changes to VEYLON: Deep Frontier are recorded here.
 
+## [0.6.10] - 2026-09-15
+
+### Added
+
+- The Creative catalog now includes natural and structural blocks such as grass,
+  leaves, ice, basalt, stone brick, ruin stone, ores and wreckage.
+
 ## [0.6.9] - 2026-09-15
 
 ### Added

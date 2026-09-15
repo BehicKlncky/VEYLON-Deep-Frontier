@@ -144,6 +144,11 @@ public final class CreativeCatalog {
 
     /** One place decides membership: explicit ammunition first, then item properties. */
     private static Category classify(ItemType type) {
+        if (CreativePalette.isPaletteItem(type)) {
+            // R24: the appended block forms are building material, not stations,
+            // which is where the places() rule at the bottom would otherwise put them.
+            return Category.BUILDING;
+        }
         switch (type) {
             case MUSKET_BALL, SCRAP_SHOT, ARROW, IRON_ARROW, RIFLE_CARTRIDGE -> {
                 return Category.WEAPONS;

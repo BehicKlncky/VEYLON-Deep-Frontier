@@ -154,7 +154,34 @@ public enum ItemType {
     RELIC_RIFLE("Scavenged Auto-Rifle", p().tool(ToolKind.FIREARM, 1f).damage(4).durability(140)
             .weight(4.6f).color(0.34f, 0.36f, 0.32f)),
     RIFLE_CARTRIDGE("Relic Cartridge", p().stack(48).weight(0.03f).color(0.78f, 0.62f, 0.30f)),
-    RELIC_PARTS("Relic Components", p().stack(8).weight(0.6f).color(0.60f, 0.66f, 0.72f));
+    RELIC_PARTS("Relic Components", p().stack(8).weight(0.6f).color(0.60f, 0.66f, 0.72f)),
+
+    // ---- Creative building palette (append-only; ordinals are save IDs) ----
+    // Item forms for inert blocks that the Survival economy never produced. The
+    // _BLOCK suffix keeps them apart from the material items of the same name:
+    // COPPER_ORE is smelter input, COPPER_ORE_BLOCK is the vein you place. No
+    // recipe, drop table, loot table or trader stocks them; the Creative catalog
+    // and pick block are the only sources (R24). See CreativePalette.
+    GRASS_BLOCK("Grass Block", p().places("GRASS").weight(1.2f).color(0.32f, 0.55f, 0.24f)),
+    ICE_BLOCK("Ice Block", p().places("ICE").weight(1.0f).color(0.62f, 0.76f, 0.90f)),
+    LEAVES_BLOCK("Leaf Block", p().places("LEAVES").weight(0.3f).color(0.20f, 0.42f, 0.16f)),
+    BUSH_BLOCK("Bush", p().places("BUSH").weight(0.3f).color(0.18f, 0.40f, 0.16f)),
+    TALL_GRASS_BLOCK("Tall Grass", p().places("TALL_GRASS").weight(0.1f).color(0.34f, 0.52f, 0.24f)),
+    COAL_ORE_BLOCK("Coal Ore Block", p().places("COAL_ORE").weight(1.8f).color(0.32f, 0.32f, 0.34f)),
+    COPPER_ORE_BLOCK("Copper Ore Block", p().places("COPPER_ORE").weight(1.8f).color(0.55f, 0.36f, 0.25f)),
+    IRON_ORE_BLOCK("Iron Ore Block", p().places("IRON_ORE").weight(1.9f).color(0.60f, 0.52f, 0.46f)),
+    ASH_BLOCK("Charred Block", p().places("ASH").weight(0.9f).color(0.22f, 0.21f, 0.20f)),
+    WRECKAGE_BLOCK("Wreckage", p().places("SCRAP_BLOCK").weight(1.4f).color(0.38f, 0.40f, 0.44f)),
+    POD_HULL_BLOCK("Pod Hull", p().places("POD_HULL").weight(2.0f).color(0.78f, 0.80f, 0.84f)),
+    RUIN_STONE_BLOCK("Ruin Stone", p().places("RUIN_STONE").weight(1.9f).color(0.30f, 0.32f, 0.40f)),
+    BONE_PILE_BLOCK("Bone Pile", p().places("BONE_PILE").weight(0.8f).color(0.82f, 0.79f, 0.70f)),
+    BASALT_BLOCK("Basalt", p().places("BASALT").weight(1.8f).color(0.24f, 0.24f, 0.28f)),
+    SULFUR_ORE_BLOCK("Sulfur Vein Block", p().places("SULFUR_ORE").weight(1.7f).color(0.72f, 0.68f, 0.22f)),
+    SALTPETER_ORE_BLOCK("Saltpeter Crust Block", p().places("SALTPETER_ORE").weight(1.6f)
+            .color(0.78f, 0.76f, 0.66f)),
+    GLOW_FUNGUS_BLOCK("Glow Fungus", p().places("GLOW_FUNGUS").weight(0.2f).color(0.42f, 0.78f, 0.62f)),
+    STONE_BRICK_BLOCK("Stone Brick", p().places("STONE_BRICK").weight(1.7f).color(0.44f, 0.44f, 0.48f)),
+    CAGE_BARS_BLOCK("Cage Bars", p().places("CAGE_BARS").weight(1.5f).color(0.36f, 0.38f, 0.42f));
 
     public final String displayName;
     public final int maxStack;
