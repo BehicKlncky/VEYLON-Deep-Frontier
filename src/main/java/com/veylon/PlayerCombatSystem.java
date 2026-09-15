@@ -289,7 +289,8 @@ final class PlayerCombatSystem {
             } else {
                 game.audio.playDryFire();
                 rangedCooldown = DRY_FIRE_COOLDOWN;
-                if (game.player.inventory.count(weapon.ammo) >= weapon.ammoPerShot) {
+                if (game.player.abilities.unlimitedItems()
+                        || game.player.inventory.count(weapon.ammo) >= weapon.ammoPerShot) {
                     game.log("Not loaded — press [R] to reload.");
                 } else {
                     game.log("Out of " + weapon.ammo.displayName + ".");
@@ -314,7 +315,9 @@ final class PlayerCombatSystem {
      * choice while both basic and iron arrows are present.
      */
     ItemType selectedBowAmmo() {
-        if (game.player != null && game.player.inventory.count(selectedBowAmmo) <= 0) {
+        // R22: unlimited arrows keep the deliberate choice instead of following carried stock.
+        if (game.player != null && !game.player.abilities.unlimitedItems()
+                && game.player.inventory.count(selectedBowAmmo) <= 0) {
             ItemType fallback = selectedBowAmmo == ItemType.ARROW
                     ? ItemType.IRON_ARROW : ItemType.ARROW;
             if (game.player.inventory.count(fallback) > 0) {
@@ -331,7 +334,7 @@ final class PlayerCombatSystem {
         }
         boolean basic = game.player.inventory.count(ItemType.ARROW) > 0;
         boolean iron = game.player.inventory.count(ItemType.IRON_ARROW) > 0;
-        if (basic && iron) {
+        if (game.player.abilities.unlimitedItems() || (basic && iron)) {
             selectedBowAmmo = selectedBowAmmo == ItemType.ARROW
                     ? ItemType.IRON_ARROW : ItemType.ARROW;
         } else if (iron) {
@@ -349,10 +352,11 @@ final class PlayerCombatSystem {
         return selectedBowAmmo;
     }
 
-    /** The selected arrow type, or null when none of it remains. */
+    /** The selected arrow type, or null when none of it remains and arrows are not unlimited. */
     private ItemType bowAmmo() {
         ItemType selected = selectedBowAmmo();
-        return game.player.inventory.count(selected) > 0 ? selected : null;
+        return game.player.abilities.unlimitedItems() || game.player.inventory.count(selected) > 0
+                ? selected : null;
     }
 
     /**
@@ -408,7 +412,9 @@ final class PlayerCombatSystem {
     }
 
     private void fireBow(ItemStack held, WeaponDefinition weapon, ItemType arrow, Vector3f dir) {
-        game.player.inventory.remove(arrow, 1);
+        if (!game.player.abilities.unlimitedItems()) {
+            game.player.inventory.remove(arrow, 1);
+        }
         float power = BOW_MIN_POWER + BOW_POWER_RANGE * game.bowDraw;
         Vector3f o = game.camera.position;
         // Under-drawn arrows fly slower, so the shot is retro-scaled after it
@@ -457,7 +463,8 @@ final class PlayerCombatSystem {
                 || held.charge >= weapon.magazine) {
             return false;
         }
-        if (game.player.inventory.count(weapon.ammo) < weapon.ammoPerShot) {
+        if (!game.player.abilities.unlimitedItems()
+                && game.player.inventory.count(weapon.ammo) < weapon.ammoPerShot) {
             game.log("No " + weapon.ammo.displayName + " to reload with.");
             game.audio.playDryFire();
             return false;
@@ -477,10 +484,15 @@ final class PlayerCombatSystem {
             return; // weapon switched away mid-reload
         }
         int roomRounds = weapon.magazine - held.charge;
-        int haveRounds = game.player.inventory.count(weapon.ammo) / weapon.ammoPerShot;
+        // R22: an unlimited reserve fills the magazine after the same reload time.
+        boolean unlimited = game.player.abilities.unlimitedItems();
+        int haveRounds = unlimited ? roomRounds
+                : game.player.inventory.count(weapon.ammo) / weapon.ammoPerShot;
         int loaded = Math.min(roomRounds, haveRounds);
         if (loaded > 0) {
-            game.player.inventory.remove(weapon.ammo, loaded * weapon.ammoPerShot);
+            if (!unlimited) {
+                game.player.inventory.remove(weapon.ammo, loaded * weapon.ammoPerShot);
+            }
             held.charge += loaded;
             game.log(held.type.displayName + " loaded ("
                     + held.charge + "/" + weapon.magazine + ").");
@@ -558,7 +570,9 @@ final class PlayerCombatSystem {
         Vector3f o = game.camera.position;
         game.projectiles.fire(game, game.player, true, o.x, o.y, o.z,
                 dir.x, dir.y + 0.18f, dir.z, weapon, null);
-        game.player.inventory.shrink(game.player.hotbarSel, 1);
+        if (!game.player.abilities.unlimitedItems()) {
+            game.player.inventory.shrink(game.player.hotbarSel, 1);
+        }
         game.audio.playFuse(o.x, o.y, o.z);
         game.audio.playSwing();
         rangedCooldown = weapon.attackInterval;
@@ -570,9 +584,10 @@ final class PlayerCombatSystem {
     // Tools and kill consequences
     // ------------------------------------------------------------------
 
-    /** Wears the held item; breaks it when durability runs out. */
+    /** Wears the held item and breaks it at zero; unlimited use keeps its condition (R22). */
     void consumeDurability(ItemStack held, float amount) {
-        if (held == null || !held.type.hasDurability()) {
+        if (held == null || !held.type.hasDurability()
+                || game.player.abilities.unlimitedItems()) {
             return;
         }
         held.durability -= amount;
@@ -588,8 +603,11 @@ final class PlayerCombatSystem {
                 || game.player.inventory.count(ItemType.IRON_KNIFE) > 0;
     }
 
-    /** Wears down the first knife in the inventory; used when skinning. */
+    /** Wears down the first knife in the inventory when skinning; unlimited use skips wear (R22). */
     void useKnife() {
+        if (game.player.abilities.unlimitedItems()) {
+            return;
+        }
         for (int i = 0; i < game.player.inventory.size(); i++) {
             ItemStack s = game.player.inventory.get(i);
             if (s != null && (s.type == ItemType.BONE_KNIFE || s.type == ItemType.IRON_KNIFE)) {

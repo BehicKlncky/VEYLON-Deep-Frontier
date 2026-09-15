@@ -88,7 +88,9 @@ final class PlayerConsumables {
             p.addAffliction(Affliction.FOOD_POISONING, rollPoisonDuration(rng));
             game.log("That food didn't sit well... FOOD POISONING sets in.");
         }
-        p.inventory.shrink(p.hotbarSel, 1);
+        if (!p.abilities.unlimitedItems()) {
+            p.inventory.shrink(p.hotbarSel, 1);
+        }
         game.audio.playEat();
         game.log("Ate " + t.displayName + " (+" + t.food + " food"
                 + (freshness < GOING_OFF_FRESHNESS && t.spoils() ? ", going off" : "") + ")");
@@ -118,8 +120,11 @@ final class PlayerConsumables {
         boolean clean = held.type == ItemType.WATERSKIN_CLEAN;
         p.thirst = Math.min(MAX_NEED,
                 p.thirst + (clean ? CLEAN_WATER_THIRST : DIRTY_WATER_THIRST));
-        p.inventory.shrink(p.hotbarSel, 1);
-        p.inventory.add(ItemType.WATERSKIN_EMPTY, 1);
+        // R22: a free drink keeps the filled skin and returns no extra empty one.
+        if (!p.abilities.unlimitedItems()) {
+            p.inventory.shrink(p.hotbarSel, 1);
+            p.inventory.add(ItemType.WATERSKIN_EMPTY, 1);
+        }
         game.audio.playDrink();
         if (clean) {
             game.log("You drink clean water (+" + (int) CLEAN_WATER_THIRST + " thirst).");
@@ -138,7 +143,9 @@ final class PlayerConsumables {
             game.log(result.message());
         }
         if (result.used()) {
-            game.player.inventory.shrink(game.player.hotbarSel, 1);
+            if (!game.player.abilities.unlimitedItems()) {
+                game.player.inventory.shrink(game.player.hotbarSel, 1);
+            }
             game.audio.playEquip();
         }
     }
