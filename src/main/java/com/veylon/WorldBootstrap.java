@@ -179,6 +179,7 @@ final class WorldBootstrap {
         game.bowDraw = 0;
         game.combat.reset();
         game.crates.reset();
+        game.creativeCatalogScreen.reset();
     }
 
     /** Generates around spawn and walks outward until the crash site is not a lake. */
@@ -314,6 +315,7 @@ final class WorldBootstrap {
             game.log("You crash-landed on Veylon in Creative mode.");
             game.log("Nothing here can hurt you, and wildlife and settlers ignore you.");
             game.log("Double-tap Space to fly; Space rises and Ctrl descends.");
+            game.log("Press E to open the Creative catalog.");
             game.log("Press Esc, then [G], to switch this world's game mode.");
         } else {
             game.log("You crash-landed on Veylon. Survive.");

@@ -2,6 +2,13 @@
 
 All notable user-facing changes to VEYLON: Deep Frontier are recorded here.
 
+## [0.6.7] - 2026-09-15
+
+### Added
+
+- Creative catalog: press E in Creative to browse every item by category or search by
+  name, take full stacks or single items, and delete unwanted stacks.
+
 ## [0.6.6] - 2026-09-14
 
 ### Added

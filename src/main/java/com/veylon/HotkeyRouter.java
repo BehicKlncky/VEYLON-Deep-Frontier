@@ -33,8 +33,8 @@ final class HotkeyRouter {
 
     void update() {
         if (game.uiMode == Game.UiMode.OPTIONS || game.uiMode == Game.UiMode.AUDIO_OPTIONS
-                || game.uiMode == Game.UiMode.GAME_MODE) {
-            return; // Options and the mode confirmation own Escape/F5/navigation while open.
+                || game.uiMode == Game.UiMode.GAME_MODE || game.uiMode == Game.UiMode.CREATIVE_CATALOG) {
+            return; // These screens own Escape, F5, typed text and navigation while open.
         }
         if (game.uiMode == Game.UiMode.PAUSE && game.input.wasKeyPressed(GLFW_KEY_G)) {
             game.gameModes.openScreen();
@@ -56,6 +56,9 @@ final class HotkeyRouter {
             return;
         }
         handleScreenToggles();
+        if (game.uiMode == Game.UiMode.CREATIVE_CATALOG) {
+            return; // Ownership starts in the opening frame, including simultaneous F5/F9.
+        }
         handleDebugToggles();
         handleQuickSaveLoad();
         handleContextualKeys();
@@ -80,8 +83,14 @@ final class HotkeyRouter {
 
     private void handleScreenToggles() {
         if (game.input.wasKeyPressed(GLFW_KEY_E)) {
-            toggle(Game.UiMode.INVENTORY);
-            game.inventoryScreen.reset();
+            if (game.player.abilities.unlimitedItems()) {
+                game.creativeCatalogScreen.open();
+                toggle(Game.UiMode.CREATIVE_CATALOG); // R16; the open catalog handles its own E
+                return;
+            } else {
+                toggle(Game.UiMode.INVENTORY);
+                game.inventoryScreen.reset();
+            }
         }
         if (game.input.wasKeyPressed(GLFW_KEY_C)) {
             toggle(Game.UiMode.CRAFTING);

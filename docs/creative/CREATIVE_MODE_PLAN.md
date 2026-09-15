@@ -82,7 +82,7 @@ wrapper, workflows, existing enum IDs and all budgets remain unchanged.
 | v0.6.4 | 04-imperceptible-player | A3 gates and memory clear; preserve D3 consequences (R11-R12) | verified; save gate is a recorded host deviation |
 | v0.6.5 | 05-mode-selection | Worldless mode choice, explicit confirmation, permanent mark, key ownership (R2-R7) | verified |
 | v0.6.6 | 06-flight | Double tap, collision, loaded columns, measured speeds/ceiling, reset and restore (R5, R13-R15) | verified; save gate is a recorded host deviation |
-| v0.6.7 | 07-catalog | Character input, categories, AND search, grants/trash, all key ownership (R16-R18) | pending |
+| v0.6.7 | 07-catalog | Character input, categories, AND search, grants/trash, all key ownership (R16-R18) | verified |
 | v0.6.8 | 08-instant-building | Repeat timer, cleanup without drops/wear, free placement, pick mapping (R19-R21) | pending |
 | v0.6.9 | 09-unlimited-use | A2 use-up gates, ammunition HUD, unchanged transform/transfer/trade (R22-R23) | pending |
 | v0.6.10 | 10-building-palette | Per-block inclusion audit, appended items/icons, mappings and compatibility (R24) | pending |
@@ -710,3 +710,80 @@ the two new flight lines inside the panel; `gamemode-creative` shows both
 confirmation lines above the buttons; `newworld` shows the updated Creative
 card text inside its card. Nothing clips or overlaps. Human evaluation of
 flight feel and wording is unverified.
+
+### v0.6.7 evidence
+
+`item/CreativeCatalog` is the headless model: every `ItemType` belongs to
+exactly one of eight categories (Building, Stations, Materials, Food & water,
+Medical, Tools, Weapons & ammo, Gear) through property rules plus explicit
+ammunition and building overrides, each category keeps declaration order, and
+search lowercases display names and enum ids once with `Locale.ROOT` and
+requires every whitespace-separated term. A non-empty query searches every
+category; an empty one lists the selected category; the view is rebuilt only
+when the query or category changes. `item/CreativeGrants` builds grants with
+the ordinary `ItemStack` constructor (full durability and freshness, empty
+magazine): left click a full stack, right click one item, into the empty
+selected hotbar slot, else the first empty slot, else an "Inventory full"
+notice; a hovered entry plus 1-9 replaces that hotbar slot.
+
+`ui/CreativeCatalogScreen` (appended `UiMode.CREATIVE_CATALOG`, not pausing)
+draws category tabs, a search field with caret, a scrolling icon grid and a
+tooltip through the shared `ui/ItemDetails` line extracted from
+InventoryScreen with identical output. Its INVENTORY tab draws the existing
+inventory screen, whose layout helpers keep the original arithmetic, and adds
+a trash slot that deletes only for a player with unlimited items. `Window`
+registers `glfwSetCharCallback`; `Input` keeps up to 32 typed code points per
+frame, cleared in `endFrame`, behind the public `onTyped` seam. The field
+accepts only printable code points the font reports with `hasGlyph`. The
+catalog joins HotkeyRouter's early return (R18): typed text reaches only the
+focused field, E closes only when unfocused, Escape unfocuses then closes,
+and F5/F9 are inert. Query, tab, scroll and focus reset on close and in
+`WorldBootstrap`, with an additive GameLoopIntegrationTest assertion. In
+Creative, E opens the catalog; Survival E still opens the inventory. The
+pause controls and Creative welcome hints mention the catalog, and
+VEYLON_FRONTEND gains `catalog`, `catalog-tools`, `catalog-search` and
+`catalog-inventory`.
+
+CreativeCatalogTest (6), CreativeGrantsTest (5) and CreativeCatalogRoutingTest
+(7) add 18 cases, including search under a Turkish default locale and typed
+e/p/m/1 changing only the focused query. Focused item, catalog routing,
+lifecycle, audio and mode routing and QA suites plus doclint: PASS in 12s
+(12.536s wall), 52 tests / 12 classes, zero failures, errors and skips; the
+rerun after the hint lines and version change passed identically (12.722s
+wall). No existing expectation changed except the additive reset assertion.
+
+Pre-resume v0.6.7 build: PASS, 596 tests / 90 classes, zero failures, errors and
+skips; 2m5s (125.971s wall), including JavaDoc doclint and line budgets. Real
+lines: Game 932/1000, QaHarness 1413/1500, SaveSystem 1109/1800,
+SettlementManager 1414/1500, FactionSystem 1265/1400, WorldGenerator 1178/1300.
+The performance task is not required here: the catalog changes no simulation,
+movement, AI, item-use or save code.
+
+Resumed 2026-09-15 from the existing catalog branch. The original starting-state
+checks do not apply to this explicitly requested continuation. Opening-frame
+ownership now consumes E before the screen can close itself, and simultaneous
+C/M/F5/F9/debug keys cannot leak. Long queries keep their edited tail inside
+the field, with caret space and complete Unicode code points. The inventory
+trash label and hint have dark backing for contrast against bright terrain.
+Focused catalog/routing tests and doclint pass: 22 tests / 4 classes in 14s.
+
+Final v0.6.7 build: PASS, 600 tests / 91 classes, zero failures, errors and
+skips; 2m08s (128.656s wall). JavaDoc and unchanged line budgets pass: Game
+932/1000, QaHarness 1413/1500, SaveSystem 1109/1800, SettlementManager
+1414/1500, FactionSystem 1265/1400, WorldGenerator 1178/1300.
+
+Fresh native 30-second smokes, seed 20260910, VSync off, minimum 60 FPS,
+1280x720 on the same NVIDIA host, run sequentially without concurrent builds:
+Creative PASS at 883.2 FPS, p95/p99 1.45/1.66 ms; Survival PASS at 851.8 FPS,
+p95/p99 1.66/2.39 ms. Both complete isolated save/load and fortress approach,
+with zero GL/KHR/OpenAL errors. Creative restores mode/mark/flight, takes no
+damage in 26,499 body samples and flies 1,448 frames across two chunks without
+entering unloaded columns.
+
+All twelve fresh PNGs with prefix `v067-final-` were opened and inspected:
+default catalog, Tools, focused search for iron, and Inventory at 1280x720,
+1920x1080 fullscreen and 1920x1080 at UI scale 1.5. Tabs, search/caret, icons,
+instructions, gear slots and trash fit without clipping or overlap. The trash
+label and hint remain readable over snow. Native runs report 91/91 icons and
+zero GL/KHR/OpenAL errors. The default font is small as elsewhere in the UI;
+human catalog ergonomics and non-Latin/IME input remain unverified.

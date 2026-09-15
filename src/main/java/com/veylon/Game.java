@@ -69,7 +69,7 @@ import static org.lwjgl.glfw.GLFW.*;
 public class Game implements SimulationScheduler.Ticks, World.BlockListener {
 
     public enum UiMode {
-        NONE, INVENTORY, CRAFTING, PAUSE, OPTIONS, MAP, CRATE, NPC, AUDIO_OPTIONS, GAME_MODE;
+        NONE, INVENTORY, CRAFTING, PAUSE, OPTIONS, MAP, CRATE, NPC, AUDIO_OPTIONS, GAME_MODE, CREATIVE_CATALOG;
 
         /** The pause menu and the screens opened from it freeze the world. */
         public boolean pausesSimulation() {
@@ -162,6 +162,8 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
     final GraphicsOptionsScreen graphicsOptionsScreen = new GraphicsOptionsScreen();
     final com.veylon.ui.NewFrontierScreen newFrontierScreen = new com.veylon.ui.NewFrontierScreen();
     final com.veylon.ui.GameModeScreen gameModeScreen = new com.veylon.ui.GameModeScreen();
+    final com.veylon.ui.CreativeCatalogScreen creativeCatalogScreen =
+            new com.veylon.ui.CreativeCatalogScreen(inventoryScreen);
 
     /** Visible for testing; public only for gameplay tests outside {@code com.veylon}. */
     public UiMode uiMode = UiMode.NONE;
@@ -518,6 +520,11 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
             case OPTIONS -> frontend.handlePauseOptions(graphicsOptionsScreen.update(this));
             case AUDIO_OPTIONS -> frontend.handlePauseAudio(audioOptionsScreen.update(this));
             case GAME_MODE -> gameModes.handleScreen(gameModeScreen.update(this));
+            case CREATIVE_CATALOG -> {
+                if (creativeCatalogScreen.update(this) == com.veylon.ui.CreativeCatalogScreen.Action.CLOSE) {
+                    closeScreens();
+                }
+            }
             case NONE -> {
             }
         }
@@ -566,6 +573,7 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
         openCratePos = null;
         activeNpc = null;
         inventoryScreen.reset();
+        creativeCatalogScreen.reset();
     }
 
     // ------------------------------------------------------------------

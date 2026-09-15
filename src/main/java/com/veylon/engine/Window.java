@@ -97,6 +97,7 @@ public class Window {
         glfwSetMouseButtonCallback(handle, (win, button, action, mods) -> input.onMouseButton(button, action));
         glfwSetCursorPosCallback(handle, (win, x, y) -> input.onCursorPos(x, y));
         glfwSetScrollCallback(handle, (win, dx, dy) -> input.onScroll(dy));
+        glfwSetCharCallback(handle, (win, codePoint) -> input.onTyped(codePoint));
 
         refreshSizes();
 
