@@ -257,3 +257,38 @@ these observations have no separate real-time deadline assertion. Pure ray and
 director policy work has the explicit measured budgets above. Neither smoke
 overlapped another build or performance task. Cold native startup is distinct
 from the warmed synthesis/conditioning benchmark and the raw before/after table.
+
+## v0.7.0 rerun (Creative mode)
+
+**Every budget is unchanged.** Creative adds boolean reads to hot paths and one
+early return each to `Game.advanceClock`, `WeatherSystem.mediumTick` and
+`EntityManager.slowTick`; it adds no allocation per frame, no thread and no
+outcome-affecting RNG. The catalog recomputes its filtered view only when the
+query or the category changes.
+
+These figures come from a **second machine**, not the reference machine above:
+an NVIDIA GeForce RTX 3060 Ti / OpenGL 3.3.0 / driver 580.173.02 Linux host,
+because `build.gradle` refuses to configure for linux and the release host was
+unavailable. They therefore show that every budget passes with margin; they are
+**not** comparable with the v0.5.0 baselines or the v0.6.0 row, and they do not
+re-baseline anything.
+
+| Benchmark | Observed | Budget | Result |
+| --- | ---: | ---: | --- |
+| `chunk tick` | 0.526 ms | 0.92 ms | PASS |
+| `entity tick` | 0.460 ms | 0.95 ms | PASS |
+| `settlement tick` | 0.048 ms | 0.52 ms | PASS |
+| `save` | 1.132 ms | 2.20 ms | PASS |
+| `load` | 194.183 ms | 240 ms | PASS |
+| Full audio synthesis, conditioning and encoding | 387.474 ms | 1,500 ms | PASS |
+| Mono signed-16 PCM payload | 40,824,424 bytes | 67,108,864 bytes | PASS |
+| Audio occlusion, four rays / 256 probes | 0.002237 ms/frame | 0.10 ms/frame | PASS |
+| Music director | 0.000004 ms/frame | 0.02 ms/frame | PASS |
+
+`TickProfileTest` passes unchanged; the whole cycle measured 0.0995 ms against
+its 0.1027 ms allowance. Native 30-second smokes on the same host, seed
+20260910, 1280x720, VSync off, minimum 60 FPS: Creative 1260.3 FPS (p95 0.91 ms,
+p99 1.03 ms) and Survival 1267.2 FPS (p95 0.92 ms, p99 1.04 ms), both with zero
+GL, KHR-debug and OpenAL errors. The Creative smoke additionally flew 2,009
+scripted frames across two chunk columns without entering an unloaded one, and
+recorded 37,812 body samples with no damage and no death.

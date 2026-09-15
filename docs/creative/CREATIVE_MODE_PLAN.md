@@ -87,7 +87,7 @@ wrapper, workflows, existing enum IDs and all budgets remain unchanged.
 | v0.6.9 | 09-unlimited-use | A2 use-up gates, ammunition HUD, unchanged transform/transfer/trade (R22-R23) | verified |
 | v0.6.10 | 10-building-palette | Per-block inclusion audit, appended items/icons, mappings and compatibility (R24) | verified; gates ran on a second host (see the v0.6.10 host deviation) |
 | v0.6.11 | 11-world-controls | Forward time, freeze, weather lock, spawn gate, strict section and release on exit (R25) | verified; gates ran on the second host (see the v0.6.10 host deviation) |
-| v0.7.0 | release/0.7.0 | Whole-diff audit, all final gates, both-resolution captures, artifacts/checksums, local main merge | pending |
+| v0.7.0 | release/0.7.0 | Whole-diff audit, all final gates, both-resolution captures, artifacts/checksums, local main merge | complete except artifacts and checksums, which need the Windows host; see the v0.7.0 validation record |
 
 R26 applies to every milestone. R27 requires inspected 1280x720 and 1920x1080
 captures of changed screens. Simulation/save/movement/item milestones run the

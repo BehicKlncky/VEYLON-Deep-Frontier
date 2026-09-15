@@ -20,11 +20,38 @@ find blueprints, master the crafting stations and **repair the distress beacon**
 
 ---
 
-Version **0.6.0 — Signal & Silence** adds 44.1 kHz layered weather, wide ambience,
+Version **0.7.0 — Stone & Sky** adds a **Creative mode**: an invulnerable body with no
+needs, flight, instant building, a searchable catalog of every item, wildlife and
+settlers that ignore you, and builder's controls over time, weather and spawning.
+Survival plays exactly as it did in 0.6.0.
+
+Version 0.6.0 — Signal & Silence added 44.1 kHz layered weather, wide ambience,
 positioned fire, optional environment reverb and occlusion, distance-delayed
 thunder, four-take sound banks and sparse synthesized music. Open **AUDIO** on the
 title screen or press **V** while paused to adjust master, effects, ambience,
 music and mute. Music at zero disables it; settings persist across launches.
+
+## Game modes
+
+Every world is **Survival** or **Creative**, chosen on the **NEW FRONTIER** screen and
+changeable later from the pause menu with **G**. Terrain, the camp, the starter kit and
+the first wildlife are identical for the same seed in either mode.
+
+**Survival** is the game as it has always been: you can be hurt and killed, needs drain,
+predators hunt you and everything costs what it costs.
+
+**Creative** is for building and exploring. You cannot be harmed and have no hunger,
+thirst, temperature, fatigue, carry weight or injuries. Nothing detects, hunts or attacks
+you, though reputation, ownership, theft and vandalism still count — only the
+consequences that need someone to notice you are gone. You fly, break any block
+instantly without drops or tool wear, place without spending the stack, and take
+anything from the catalog. Crafting, cooking, drying, smelting, fuelling, trade, gifts
+and quest deliveries still cost their normal inputs; only using an item up for its own
+effect is free.
+
+The first switch to Creative **permanently marks that world as a Creative world**. You
+can return to Survival whenever you like, but the mark stays and is shown in the pause
+menu and on the victory screen. There is one save slot, shared by both modes.
 
 ## Requirements
 
@@ -69,9 +96,9 @@ Windows x64 (PowerShell):
 ```powershell
 .\gradlew.bat build             # compile + unit tests + jar
 .\gradlew.bat performanceTest   # opt-in benchmarks calibrated for the reference PC
-.\gradlew.bat fatJar            # build\libs\veylon-0.6.0-all.jar
+.\gradlew.bat fatJar            # build\libs\veylon-0.7.0-all.jar
 .\gradlew.bat jpackage          # build\jpackage\Veylon\Veylon.exe
-.\gradlew.bat appImageZip       # build\distributions\veylon-0.6.0-windows-x64.zip
+.\gradlew.bat appImageZip       # build\distributions\veylon-0.7.0-windows-x64.zip
 .\gradlew.bat releaseArtifacts  # tests + all host-specific release artifacts
 ```
 
@@ -81,7 +108,7 @@ macOS Intel or Apple Silicon (Terminal):
 ./gradlew build
 ./gradlew fatJar
 ./gradlew jpackage          # build/jpackage/Veylon.app
-./gradlew appImageZip       # build/distributions/veylon-0.6.0-macos-{x64|arm64}.zip
+./gradlew appImageZip       # build/distributions/veylon-0.7.0-macos-{x64|arm64}.zip
 ./gradlew releaseArtifacts
 ```
 
@@ -116,7 +143,7 @@ See [CHANGELOG.md](CHANGELOG.md) for release notes.
 Run the fat JAR with the same JVM options used by the packaged launchers:
 
 ```powershell
-java --enable-native-access=ALL-UNNAMED -Xmx2G -jar build\libs\veylon-0.6.0-all.jar
+java --enable-native-access=ALL-UNNAMED -Xmx2G -jar build\libs\veylon-0.7.0-all.jar
 ```
 
 ---
@@ -141,6 +168,12 @@ java --enable-native-access=ALL-UNNAMED -Xmx2G -jar build\libs\veylon-0.6.0-all.
 | `M` | Map (camp, **discovered POIs/settlements**, fortress rumors, services, beacon) |
 | `P` | Pause simulation |
 | `Esc` | Pause menu / close screen / wake up early |
+| `G` (paused) | **Game mode — switch this world between Survival and Creative** |
+| `T` (paused, Creative) | **World controls — time of day, freeze daylight, weather and its lock, wildlife spawning** |
+| `Space` twice (Creative) | **Start or stop flying** |
+| `Space` / `Left Ctrl` / `Left Shift` (flying) | **Rise / descend / fly faster** |
+| `E` (Creative) | **Creative catalog — browse or search every item, `1`-`9` fills a hotbar slot** |
+| `MMB` (Creative) | **Pick the block you are looking at** |
 | `O` (paused) | Graphics options |
 | `V` (title or paused) | Audio options: live sliders, Apply/F5 saves, Back/Esc restores |
 | `F3` | Debug overlay |
@@ -336,6 +369,13 @@ health/hunger/illness/rout state), patrol origin/mission/report state, per-facti
 reputation and bounty, open-gate close timers, and lit powder-keg fuses**. Settlement structure itself is
 re-derived deterministically from the seed — only deltas and dynamic state are stored.
 
+0.7.0 adds two **optional, length-prefixed v3 sections** rather than changing the base
+layout: `player.game-mode` (mode, permanent Creative mark, flight) and
+`world.creative-controls` (frozen daylight, weather lock, paused spawning). A save
+without them loads as an unmarked Survival world, so **every existing save keeps
+working**. A malformed section fails the whole load rather than loading partial state,
+and the live world survives the attempt.
+
 **v2 saves (0.1.0–0.2.0) load via an explicit migration path**: the world is pinned to
 the legacy terrain generator (identical terrain, no silent regeneration), and all new
 state gets safe defaults. Deep caves and settlements require a new world. v1 prototype
@@ -348,7 +388,19 @@ saves are rejected with a console message — no migration.
   not skeletal animation.
 - Water is full-cell cellular flow without levels; bounded by sea level by design.
 - No dropped-item entities (drops go straight to your inventory).
-- One save slot. Wildlife AI uses steering + jump; settlement humans use bounded A*
+- One save slot, shared by Survival and Creative worlds: starting or loading either
+  replaces it on the next save.
+- The Creative mark is permanent by design and cannot be cleared.
+- Creative flight keeps collision — there is no noclip or spectator mode — and a flying
+  player cannot leave the generated world.
+- The Creative catalog excludes twelve blocks whose meaning lives outside the block
+  itself (water, gates, alarm bells, beds, berry bushes, herbs, saplings, the resonant
+  core and the lit beacon); each exclusion and its reason is recorded in
+  [the Creative plan](docs/creative/CREATIVE_MODE_PLAN.md).
+- Builds older than 0.7.0 open a Creative save as Survival and lose the mark, flight and
+  world controls if they save over it; a save holding the new Creative-only block items
+  loads there but silently drops those stacks.
+- Wildlife AI uses steering + jump; settlement humans use bounded A*
   with a steering fallback (not a full navmesh — rough terrain can still stall them).
 - Crouching lowers the camera and slows you but doesn't shrink the collision box.
 - Sleeping fast-forwards the clock (~3 game hours per real second) rather than
@@ -364,6 +416,11 @@ saves are rejected with a console message — no migration.
   than remembering exact positions (identity, health and deaths do persist).
 - Fire does not spread to powder kegs at range — only adjacent flames, fuses, and
   other explosions set them off.
+
+Creative mode: [design decisions and research](docs/creative/CREATIVE_DESIGN.md),
+[milestone plan and evidence](docs/creative/CREATIVE_MODE_PLAN.md),
+[0.7.0 validation](docs/engineering/v0.7.0-validation.md) and
+[release notes](docs/releases/v0.7.0.md).
 
 Audio design and measured limits: [sonic direction](docs/audio/AUDIO_DESIGN.md),
 [milestone evidence](docs/audio/AUDIO_UPGRADE_PLAN.md),
