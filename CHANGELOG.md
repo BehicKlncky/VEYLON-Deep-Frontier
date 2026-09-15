@@ -2,6 +2,13 @@
 
 All notable user-facing changes to VEYLON: Deep Frontier are recorded here.
 
+## [0.6.11] - 2026-09-15
+
+### Added
+
+- Creative world controls in the pause menu: set the time of day, freeze the daylight
+  cycle, choose and lock the weather, and pause wildlife spawning.
+
 ## [0.6.10] - 2026-09-15
 
 ### Added
