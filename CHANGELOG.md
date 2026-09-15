@@ -2,6 +2,14 @@
 
 All notable user-facing changes to VEYLON: Deep Frontier are recorded here.
 
+## [Unreleased]
+
+### Added
+
+- The project is now licensed under the PolyForm Noncommercial License 1.0.0
+  (`LICENSE.md`). Noncommercial use, modification and sharing are allowed; commercial
+  use requires written permission. The license ships inside every jar and archive.
+
 ## [0.7.0] - 2026-09-16
 
 ### Added

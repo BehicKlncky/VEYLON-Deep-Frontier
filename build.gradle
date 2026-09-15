@@ -144,6 +144,10 @@ jar {
                 'Implementation-Title': 'VEYLON: Deep Frontier',
                 'Implementation-Version': project.version
     }
+    from('LICENSE.md') {
+        into 'META-INF'
+        rename { 'LICENSE-VEYLON.md' }
+    }
 }
 
 // Single runnable fat jar with all dependencies and natives included.
@@ -159,6 +163,10 @@ tasks.register('fatJar', Jar) {
     }
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
     from sourceSets.main.output
+    from('LICENSE.md') {
+        into 'META-INF'
+        rename { 'LICENSE-VEYLON.md' }
+    }
     from {
         configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) }
     }
@@ -238,6 +246,9 @@ if (isMacOs) {
             into 'Veylon'
         }
         from('CHANGELOG.md') {
+            into 'Veylon'
+        }
+        from('LICENSE.md') {
             into 'Veylon'
         }
         from('src/main/resources/assets/fonts/LICENSE-SourceSans3.md') {

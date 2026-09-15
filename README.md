@@ -426,3 +426,15 @@ Audio design and measured limits: [sonic direction](docs/audio/AUDIO_DESIGN.md),
 [milestone evidence](docs/audio/AUDIO_UPGRADE_PLAN.md),
 [0.6.0 validation](docs/engineering/v0.6.0-validation.md) and
 [release notes](docs/releases/v0.6.0.md).
+
+## License
+
+VEYLON: Deep Frontier is released under the
+[PolyForm Noncommercial License 1.0.0](LICENSE.md). You may play, study, modify and
+share it for noncommercial purposes, as long as the license and its `Required Notice:`
+lines travel with every copy. **Commercial use of any kind** — selling the game or
+derivatives, bundling it in a paid product or service, or monetizing it otherwise —
+requires separate written permission from the copyright holder.
+
+Bundled third-party components keep their own licenses: the Source Sans 3 font is
+licensed under the [SIL Open Font License 1.1](src/main/resources/assets/fonts/LICENSE-SourceSans3.md).
