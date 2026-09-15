@@ -12,6 +12,7 @@ import com.veylon.engine.Window;
 import com.veylon.entity.Creature;
 import com.veylon.entity.Entity;
 import com.veylon.entity.EntityManager;
+import com.veylon.entity.GameMode;
 import com.veylon.entity.Npc;
 import com.veylon.entity.Player;
 import com.veylon.entity.PlayerMovementSystem;
@@ -68,7 +69,14 @@ import static org.lwjgl.glfw.GLFW.*;
 public class Game implements SimulationScheduler.Ticks, World.BlockListener {
 
     public enum UiMode {
-        NONE, INVENTORY, CRAFTING, PAUSE, OPTIONS, MAP, CRATE, NPC, AUDIO_OPTIONS
+        NONE, INVENTORY, CRAFTING, PAUSE, OPTIONS, MAP, CRATE, NPC, AUDIO_OPTIONS, GAME_MODE,
+        CREATIVE_CATALOG, WORLD_CONTROLS;
+
+        /** The pause menu and the screens opened from it freeze the world. */
+        public boolean pausesSimulation() {
+            return this == PAUSE || this == OPTIONS || this == AUDIO_OPTIONS || this == GAME_MODE
+                    || this == WORLD_CONTROLS;
+        }
     }
 
     /** Player-facing NPC action selected by the same path used for prompts and F. */
@@ -88,11 +96,12 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
     }
 
     enum AppState {
-        TITLE, TITLE_OPTIONS, LOADING, PLAYING, DEATH, VICTORY, TITLE_AUDIO_OPTIONS;
+        TITLE, TITLE_OPTIONS, LOADING, PLAYING, DEATH, VICTORY, TITLE_AUDIO_OPTIONS, TITLE_NEW_WORLD;
 
         /** True while a live world is being drawn, so render stats are meaningful. */
         boolean rendersWorld() {
-            return this != TITLE && this != TITLE_OPTIONS && this != TITLE_AUDIO_OPTIONS && this != LOADING;
+            return this != TITLE && this != TITLE_OPTIONS && this != TITLE_AUDIO_OPTIONS && this != LOADING
+                    && this != TITLE_NEW_WORLD;
         }
     }
 
@@ -102,7 +111,7 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
     public final Camera camera = new Camera();
     public final Renderer renderer = new Renderer();
     public final UiRenderer ui = new UiRenderer();
-    public final AudioManager audio = new AudioManager();
+    public final AudioManager audio;
     public final ParticleSystem particles = new ParticleSystem();
     private final PlayerMovementSystem playerMovement = new PlayerMovementSystem();
     private final PlayerMovementSystem.Command movementCommand = new PlayerMovementSystem.Command();
@@ -153,6 +162,12 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
     final TitleScreen titleScreen = new TitleScreen();
     final AudioOptionsScreen audioOptionsScreen = new AudioOptionsScreen();
     final GraphicsOptionsScreen graphicsOptionsScreen = new GraphicsOptionsScreen();
+    final com.veylon.ui.NewFrontierScreen newFrontierScreen = new com.veylon.ui.NewFrontierScreen();
+    final com.veylon.ui.GameModeScreen gameModeScreen = new com.veylon.ui.GameModeScreen();
+    final com.veylon.ui.WorldControlsScreen worldControlsScreen =
+            new com.veylon.ui.WorldControlsScreen();
+    final com.veylon.ui.CreativeCatalogScreen creativeCatalogScreen =
+            new com.veylon.ui.CreativeCatalogScreen(inventoryScreen);
 
     /** Visible for testing; public only for gameplay tests outside {@code com.veylon}. */
     public UiMode uiMode = UiMode.NONE;
@@ -188,12 +203,15 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
 
     /** Reset, reseed, construct and camp placement for every new or loaded world. */
     private final WorldBootstrap bootstrap = new WorldBootstrap(this);
+    final GameModeController gameModes = new GameModeController(this);
+    final CreativeWorldControls creativeControls = new CreativeWorldControls(this);
 
     /** Title, graphics options and loading -- the states with no world in them. */
     final FrontendController frontend = new FrontendController(this);
 
     /** VEYLON_* benchmark scenes, timed captures and the release smoke gate. */
     private final AutomatedRunDriver automation = new AutomatedRunDriver(this);
+    final CreativeQaScenes creativeQa = new CreativeQaScenes(this);
 
     /** Global keys: screens, debug overlays, quick save/load, hotbar. */
     private final HotkeyRouter hotkeys = new HotkeyRouter(this);
@@ -277,8 +295,7 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
 
                 @Override
                 public void resetPrimary() {
-                    miningProgress = 0;
-                    miningTarget = null;
+                    blockActions.reset();
                 }
 
                 @Override
@@ -290,9 +307,17 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
                 public void interact() {
                     interactions.interact();
                 }
+
+                @Override
+                public void pickBlock() { Game.this.pickBlock(); }
             };
 
     final Vector3f spawnPos = new Vector3f();
+
+    public Game() { this(new AudioManager()); }
+
+    /** Allows headless command tests to observe sound requests without a native device. */
+    Game(AudioManager audio) { this.audio = java.util.Objects.requireNonNull(audio, "audio"); }
 
     public void run() {
         qa.applyResolutionOverride();
@@ -378,6 +403,31 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
         bootstrap.newWorld(seed, fresh, generatorVersion);
     }
 
+    public void newWorld(long seed, boolean fresh, GameMode mode) {
+        bootstrap.newWorld(seed, fresh, World.CURRENT_GENERATOR, mode);
+    }
+
+    public GameMode gameMode() { return gameModes.mode(); }
+    public boolean creativeMarked() { return gameModes.creativeMarked(); }
+    public boolean switchGameMode(GameMode mode) { return gameModes.switchTo(mode); }
+    public void restoreGameMode(GameMode mode, boolean marked, boolean flying) {
+        gameModes.restore(mode, marked, flying);
+    }
+
+    /** The frame's clock step. R25: freezing holds the clock and nothing else. */
+    public void advanceClock(double realSeconds) {
+        if (!creativeControls.daylightFrozen()) {
+            time.advance(realSeconds);
+        }
+    }
+
+    public boolean daylightFrozen() { return creativeControls.daylightFrozen(); }
+    public boolean weatherLocked() { return creativeControls.weatherLocked(); }
+    public boolean spawningPaused() { return creativeControls.spawningPaused(); }
+    public void restoreCreativeControls(boolean frozen, boolean locked, boolean spawnsPaused) {
+        creativeControls.restore(frozen, locked, spawnsPaused);
+    }
+
     void releaseWorldMeshes() {
         if (world == null) {
             return;
@@ -423,8 +473,7 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
         }
         window.captureCursor(appState == AppState.PLAYING && uiMode == UiMode.NONE, input);
 
-        boolean simulate = appState == AppState.PLAYING
-                && uiMode != UiMode.PAUSE && uiMode != UiMode.OPTIONS && uiMode != UiMode.AUDIO_OPTIONS && !simPaused;
+        boolean simulate = appState == AppState.PLAYING && !uiMode.pausesSimulation() && !simPaused;
 
         swingTimer = Math.max(0, swingTimer - dt);
         hitSoundTimer = Math.max(0, hitSoundTimer - dt);
@@ -450,7 +499,7 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
         }
 
         if (simulate) {
-            time.advance(dtD);
+            advanceClock(dtD);
             scheduler.update(dtD, this);
             particles.update(dt);
             projectiles.update(this, dt);
@@ -466,7 +515,7 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
         audio.setListener(camera.position.x, camera.position.y, camera.position.z, camera.yaw);
         audio.update(dt);
 
-        if (player.dead && appState == AppState.PLAYING) {
+        if (player.dead && !player.abilities.invulnerable() && appState == AppState.PLAYING) {
             appState = AppState.DEATH;
             deathTimer = 3f;
             closeScreens();
@@ -491,6 +540,13 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
             case PAUSE -> pauseMenu.update(this);
             case OPTIONS -> frontend.handlePauseOptions(graphicsOptionsScreen.update(this));
             case AUDIO_OPTIONS -> frontend.handlePauseAudio(audioOptionsScreen.update(this));
+            case GAME_MODE -> gameModes.handleScreen(gameModeScreen.update(this));
+            case WORLD_CONTROLS -> creativeControls.handleScreen(worldControlsScreen.update(this));
+            case CREATIVE_CATALOG -> {
+                if (creativeCatalogScreen.update(this) == com.veylon.ui.CreativeCatalogScreen.Action.CLOSE) {
+                    closeScreens();
+                }
+            }
             case NONE -> {
             }
         }
@@ -503,7 +559,7 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
         if (appState == AppState.DEATH) {
             PresentationOverlay.death(ui, deathTimer);
         } else if (appState == AppState.VICTORY) {
-            PresentationOverlay.victory(ui, totalTime);
+            PresentationOverlay.victory(ui, totalTime, creativeMarked());
         }
         ui.end();
     }
@@ -534,11 +590,13 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
 
 
     public void closeScreens() {
+        if (player != null && player.abilities.instantBuild()) blockActions.reset();
         uiMode = UiMode.NONE;
         openCrate = null;
         openCratePos = null;
         activeNpc = null;
         inventoryScreen.reset();
+        creativeCatalogScreen.reset();
     }
 
     // ------------------------------------------------------------------
@@ -595,6 +653,11 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
         return playerMovement.applyClimbCommand(player, ascendHeld, forwardHeld);
     }
 
+    /** Runs one command through the production movement system for scripted QA flights. */
+    void applyMovementCommand(PlayerMovementSystem.Command command, float dt) {
+        playerMovement.update(player, world, command, dt, movementResult);
+    }
+
     /**
      * Emits the same positioned footstep perception event used by native
      * movement. Exposed as a small command seam so input-independent gameplay
@@ -605,10 +668,9 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
             return false;
         }
         player.noise = Math.min(1f, player.noise + (sprinting ? 0.12f : 0.05f));
-        noise.emit(this, player.pos.x, player.pos.y, player.pos.z,
+        return noise.emit(this, player.pos.x, player.pos.y, player.pos.z,
                 sprinting ? 22f : 10f, sprinting ? 0.38f : 0.15f,
                 sprinting ? "sprint" : "footstep", true, player);
-        return true;
     }
 
     // ------------------------------------------------------------------
@@ -631,7 +693,8 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
                 input.isMouseDown(GLFW_MOUSE_BUTTON_LEFT),
                 input.wasMousePressed(GLFW_MOUSE_BUTTON_LEFT),
                 input.wasMousePressed(GLFW_MOUSE_BUTTON_RIGHT),
-                input.wasKeyPressed(GLFW_KEY_F), input.wasKeyPressed(GLFW_KEY_R));
+                input.wasKeyPressed(GLFW_KEY_F), input.wasKeyPressed(GLFW_KEY_R),
+                input.wasMousePressed(GLFW_MOUSE_BUTTON_MIDDLE));
         playerInteractions.update(interactionInput, heldItem, weapon, dir, interactionCommands);
     }
 
@@ -731,6 +794,9 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
         return blockActions.completePlayerBlockBreak(pos);
     }
 
+    /** Creative middle-button command, shared by native input and headless tests. */
+    public boolean pickBlock() { return blockActions.pickBlock(); }
+
     /** Gameplay placement command shared by RMB and integration tests. */
     public boolean placeSelectedBlockAt(int px, int py, int pz) {
         return blockActions.placeSelectedBlockAt(px, py, pz);
@@ -825,6 +891,10 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
     }
 
     private void respawn() {
+        if (player.abilities.invulnerable()) {
+            player.restoreCreativeBody();
+            return;
+        }
         log("You died. The frontier reclaims you... (respawned at the crash site)");
         player.dead = false;
         player.health = 55;

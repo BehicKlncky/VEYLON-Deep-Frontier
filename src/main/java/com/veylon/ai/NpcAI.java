@@ -58,19 +58,29 @@ public final class NpcAI {
         if (n.health < n.maxHealth * 0.30f) {
             n.state = NpcState.FLEE;
             Creature threat = g.entities.nearestCreature(n.pos.x, n.pos.y, n.pos.z, 14, c -> c.type.predator);
+            if (threat == null && !g.player.isPerceivableByAi()) {
+                // Nothing perceived to flee from (R11): shelter at the camp fire.
+                if (n.distSqTo(camp.x() + 0.5f, n.pos.y, camp.z() + 0.5f) > 2.4 * 2.4) {
+                    Steering.moveToward(n, camp.x() + 0.5f, camp.z() + 0.5f, 4.4f);
+                } else {
+                    Steering.stop(n);
+                }
+                return;
+            }
             float fx = threat != null ? threat.pos.x : g.player.pos.x;
             float fz = threat != null ? threat.pos.z : g.player.pos.z;
             Steering.moveToward(n, n.pos.x + (n.pos.x - fx), n.pos.z + (n.pos.z - fz), 4.4f);
             return;
         }
 
-        if (n.hostileToPlayer() && Math.sqrt(n.distSqTo(g.player)) < 12 && !g.player.dead) {
+        if (n.hostileToPlayer() && g.player.isPerceivableByAi()
+                && Math.sqrt(n.distSqTo(g.player)) < 12 && !g.player.dead) {
             n.state = NpcState.ATTACK;
             double d = Math.sqrt(n.distSqTo(g.player));
             if (d < 1.8) {
                 Steering.stop(n);
                 faceEntity(n, g.player.pos.x, g.player.pos.z);
-                if (n.attackCooldown <= 0) {
+                if (n.attackCooldown <= 0 && !g.player.abilities.invulnerable()) {
                     n.attackCooldown = 1.4f;
                     g.player.hurtPhysical(g, 5, true);
                     g.player.knockback(n.pos.x, n.pos.z, 3f);
@@ -364,13 +374,13 @@ public final class NpcAI {
             }
         }
         double playerD = n.distSqTo(g.player);
-        if (!g.player.dead && playerD < bestD && playerD < 10 * 10) {
+        if (!g.player.dead && g.player.isPerceivableByAi() && playerD < bestD && playerD < 10 * 10) {
             // Attack the player.
             double d = Math.sqrt(playerD);
             if (d < 1.8) {
                 Steering.stop(n);
                 faceEntity(n, g.player.pos.x, g.player.pos.z);
-                if (n.attackCooldown <= 0) {
+                if (n.attackCooldown <= 0 && !g.player.abilities.invulnerable()) {
                     n.attackCooldown = 1.3f;
                     g.player.hurtPhysical(g, 6, true);
                     g.player.knockback(n.pos.x, n.pos.z, 3f);

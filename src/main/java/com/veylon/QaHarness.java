@@ -253,6 +253,7 @@ final class QaHarness {
         if (uiCycleShowcase) {
             updateUiCycle(elapsed);
         }
+        game.creativeQa.updateFlightScene(elapsed);
     }
 
     /**
@@ -308,6 +309,7 @@ final class QaHarness {
 
     /** Clears smoke-run accumulators before the loop starts sampling. */
     void resetSmokeRun() {
+        game.creativeQa.beginSession();
         fortressApproachProfiler.reset();
         smokeFortress = null;
         fortressApproaching = false;
@@ -396,6 +398,7 @@ final class QaHarness {
                 game.world.loadedCount() - fortressApproachChunkStart, fortressApproachOk);
 
         StringBuilder failure = new StringBuilder();
+        game.creativeQa.appendSmokeFailure(failure);
         if (!saveOk) failure.append("isolated save failed; ");
         if (!loadOk) failure.append("isolated load failed; ");
         if (!materialsOk) failure.append("material validation failed; ");
@@ -645,7 +648,8 @@ final class QaHarness {
                 setupSilhouette30mShowcase(site);
             }
             case "held_pickaxe", "held_axe", "held_spear", "held_knife", "held_torch",
-                    "held_food", "held_berry", "held_medicine", "held_building" -> {
+                    "held_food", "held_berry", "held_medicine", "held_building",
+                    "held_bow", "held_musket", "held_bomb" -> {
                 site = moveBenchmarkToBiome(Biome.MEADOW);
                 clearBenchmarkStage(site, 11, 22);
                 setupPhase4Showcase(site.x(), site.z());
@@ -694,6 +698,7 @@ final class QaHarness {
                 uiCycleShowcase = true;
                 updateUiCycle(0);
             }
+            case "creative_flight" -> game.creativeQa.stageFlightScene();
             default -> System.out.println("[scene] unknown VEYLON_SCENE '" + scene + "'");
         }
         System.out.println("[scene] applied benchmark scene '" + scene + "'");
@@ -973,6 +978,9 @@ final class QaHarness {
             case "held_berry" -> ItemType.BERRY;
             case "held_medicine" -> ItemType.MEDICINE;
             case "held_building" -> ItemType.WORKBENCH;
+            case "held_bow" -> ItemType.PRIMITIVE_BOW;
+            case "held_musket" -> ItemType.MUSKET;
+            case "held_bomb" -> ItemType.SCRAP_BOMB;
             default -> ItemType.IRON_PICKAXE;
         };
         game.player.inventory.set(0, new ItemStack(item, 1));

@@ -1,6 +1,7 @@
 package com.veylon;
 
 import com.veylon.gfx.ScreenshotUtil;
+import com.veylon.entity.GameMode;
 import com.veylon.item.ItemType;
 import com.veylon.save.SaveSystem;
 import com.veylon.simulation.WeatherSystem;
@@ -83,7 +84,7 @@ final class AutomatedRunDriver {
                 || (shotEnv != null && !shotEnv.isBlank()) || frontendQa;
 
         if (automated && !frontendQa) {
-            game.newWorld(game.sessionSeed, true);
+            game.newWorld(game.sessionSeed, true, configuredGameMode(System.getenv("VEYLON_GAME_MODE")));
             game.qa.applyBenchmarkScene(scene);
             game.appState = Game.AppState.PLAYING;
             game.window.captureCursor(true, game.input);
@@ -106,6 +107,17 @@ final class AutomatedRunDriver {
         shotMarks = parseShotMarks(shotEnv);
         capturePrefix = resolveCapturePrefix();
         return automated;
+    }
+
+    /** Strict, locale-independent parsing is only invoked for automated worlds. */
+    static GameMode configuredGameMode(String configured) {
+        if (configured == null) return GameMode.SURVIVAL;
+        try {
+            return GameMode.fromId(configured.trim().toLowerCase(Locale.ROOT));
+        } catch (IllegalArgumentException invalid) {
+            throw new IllegalArgumentException("VEYLON_GAME_MODE must be survival or creative: " + configured,
+                    invalid);
+        }
     }
 
     /** {@code VEYLON_SHOT="5,10"} captures the framebuffer at those elapsed seconds. */
@@ -167,9 +179,11 @@ final class AutomatedRunDriver {
     /** Advances the scripted smoke session; inert outside a smoke run. */
     void advanceSmokeRun(double now) {
         double elapsed = now - sessionStart;
+        if (smoke) game.creativeQa.sampleBody();
         if (!smoke || game.world == null || game.appState != Game.AppState.PLAYING) {
             return;
         }
+        game.creativeQa.updateSmokeFlight(elapsed);
         if (audioQa && elapsed > nextAudioProbe) {
             nextAudioProbe = elapsed + 1;
             game.audio.scheduleThunder(game.player.pos.x + 60, game.player.pos.y, game.player.pos.z);
@@ -184,6 +198,7 @@ final class AutomatedRunDriver {
                     (int) game.player.pos.z + 2, BlockType.TORCH, true);
             game.player.inventory.add(ItemType.HIDE_COAT, 1);
             game.qa.equipFromInventoryFirst(ItemType.HIDE_COAT);
+            game.creativeQa.beforeSave();
             smokeSaveOk = SaveSystem.save(game, smokeSave);
             System.out.println("[smoke] isolated save=" + smokeSaveOk + " path=" + smokeSave);
         }
@@ -191,6 +206,7 @@ final class AutomatedRunDriver {
             smokePhase = 2;
             if (audioQa) game.audio.scheduleThunder(game.player.pos.x + 500, game.player.pos.y, game.player.pos.z);
             smokeLoadOk = SaveSystem.load(game, smokeSave);
+            game.creativeQa.afterLoad(smokeLoadOk);
             if (audioQa && game.audio.pendingWeatherSounds() != 0) {
                 throw new IllegalStateException("Old-world weather audio survived load");
             }

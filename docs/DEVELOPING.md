@@ -40,10 +40,11 @@ runs. All are inert when unset. Everything below is handled by `QaHarness`;
 | Variable | Effect |
 |---|---|
 | `VEYLON_SEED` | Fixed world seed (a non-numeric value is hashed) |
+| `VEYLON_GAME_MODE=survival\|creative` | Initial mode for automated world runs only; absent means Survival. Invalid values fail explicitly. Ignored for normal title sessions and frontend-only captures. |
 | `VEYLON_SMOKE=<seconds>` | Release smoke gate: save/load, fire, storm, a fortress approach, then a pass/fail report. Throws on failure |
-| `VEYLON_SCENE=<name>` | Stage a deterministic benchmark scene (`day`, `pinefog`, `nightfire`, `ruin`, `toxic`, `ao_shadow`, `phase4`, `ashwolf`, `silhouette30`, `vfx_blood`, `vfx_mining`, `vfx_beacon`, `movement`, `inventory`, `ui_cycle`, `held_*`) |
+| `VEYLON_SCENE=<name>` | Stage a deterministic benchmark scene (`day`, `pinefog`, `nightfire`, `ruin`, `toxic`, `ao_shadow`, `phase4`, `ashwolf`, `silhouette30`, `vfx_blood`, `vfx_mining`, `vfx_beacon`, `movement`, `inventory`, `ui_cycle`, `held_*`, and `creative_flight` with `VEYLON_GAME_MODE=creative`, which flies east at Shift speed and prints a `[flight]` streaming report at 29 s) |
 | `VEYLON_SHOT="5,10"` | Capture screenshots at those elapsed seconds |
-| `VEYLON_FRONTEND=<name>` | Pin a front-end screen (`options`, `loading`, `death`, `victory`, `glyphs`) |
+| `VEYLON_FRONTEND=<name>` | Pin a front-end screen (`options`, `audio`, `loading`, `death`, `victory`, `glyphs`, `newworld`). `newworld-save` shows the replace-save notice without writing a save. `pause` and `gamemode` stage a Survival world with the pause menu or the mode confirmation open; `pause-creative`, `gamemode-creative` and `victory-creative` stage a Creative world; `catalog`, `catalog-tools`, `catalog-search` (query "iron") and `catalog-inventory` open the Creative catalog; `worldcontrols` and `worldcontrols-held` open the Creative world controls, the second with dusk, a frozen clock, a locked storm and paused spawning already applied |
 | `VEYLON_RESOLUTION=1920x1080` | Framebuffer override |
 | `VEYLON_UI_SCALE`, `VEYLON_VSYNC`, `VEYLON_FULLSCREEN`, `VEYLON_SHADOWS` | Settings overrides |
 | `VEYLON_AUDIO_QA=1` | Add three positional audio reports per second to the smoke, without gameplay effects |
@@ -80,8 +81,39 @@ VEYLON_SEED=20260716 VEYLON_SCENE=day VEYLON_SHOT=6 ./gradlew run
 
 1. Append to `ItemType` (same ordinal rule) and fill in `ItemProps`.
 2. Add an icon in `IconAtlas` — the smoke gate fails if any item lacks one.
+   A placeable item gets a block projection for free from `MaterialRegistry`.
 3. Add a `Recipe` in `CraftingSystem` and pick its `Station`.
 4. Equipment also needs an `EquipSlot`; food needs a `FoodGroup`.
+5. **Give it a Creative catalog category.** `CreativeCatalog.classify` decides
+   membership in one place and `CreativeCatalogTest` fails if any item lands in
+   none or in two. A Creative-only block form also belongs in `CreativePalette`,
+   whose test fails if a `BlockType` is neither buildable nor given a written
+   exclusion reason.
+
+### A new way to hurt the player
+
+Route it through `Player.hurt`, `Player.hurtPhysical` or `Player.addAffliction`
+rather than writing `health` directly. Those three are where Creative
+invulnerability is enforced, and a direct subtraction bypasses it silently.
+`tickNeeds` is the exception that proves the rule: it subtracted health in
+several helpers and each one needed its own gate.
+
+### A new way for AI to notice the player
+
+Ask `Player.isPerceivableByAi()` before the detection, and gate the player-sourced
+`WorldNoise.emit` or scent write the same way. It is the single predicate behind
+R11, so a new sight cone, hearing check or targeting pass that skips it will make
+a Creative player visible again. Consequences that do not depend on someone
+noticing — reputation, ownership, theft, vandalism, bounty — stay ungated.
+
+### A new way to consume an item
+
+Decide which side of D4 it is on. Using an item up *for its own effect* (placing,
+firing, throwing, eating, drinking, treating, wearing out) checks
+`PlayerAbilities.unlimitedItems()` at the call site and skips the `shrink`,
+`remove` or `consumeDurability`. *Transforming, trading or moving* it (crafting,
+cooking, fuelling, drying, smelting, trade, gifts, quest delivery, crate
+transfers, equipping) keeps the Survival rule in both modes and needs no gate.
 
 ### A creature
 
@@ -172,6 +204,16 @@ across calls will make worlds diverge depending on the player's walking route.
 synchronization and the GL context is bound to the main thread. Budget the work
 across frames instead — see `ensureChunks(..., budget)`.
 
+**Case-insensitive text needs `Locale.ROOT`.** The host may run a Turkish default
+locale, where `"IRON".toLowerCase()` is `"ıron"` and the Creative catalog stops
+finding iron. Every `toLowerCase`/`toUpperCase` in comparison code passes
+`Locale.ROOT`; `CreativeCatalogTest` sets a Turkish default and restores it.
+
+**`World.getBlock` returns `AIR` for unloaded chunks.** That is not "there is
+nothing there", it is "nobody has generated it yet". Anything that moves or
+places by block lookup — Creative flight in particular — must check that the
+chunk column is loaded first, or it will happily fly into ungenerated space.
+
 **Tests must not touch GL.** `Game` is constructible headless, but `renderer`,
 `ui` and `audio` methods that allocate GPU or OpenAL resources will fail without
 a context. Drive gameplay through the tick methods and the command seams
@@ -209,6 +251,11 @@ Reload progress and bow draw deliberately do not.
   making the test reach into private state.
 - Name the test after the behaviour it pins, not the method it calls.
 - Assertion messages should say what invariant broke.
+- A Creative behaviour is pinned twice: the Creative case and its Survival twin
+  from the same fixture. `SurvivalCreativeParityTest` and the `Creative*Test`
+  classes are built in pairs for exactly that reason — a gate that accidentally
+  fires in Survival is the failure mode worth catching.
+- The suite is 638 tests across 97 classes at 0.7.0.
 
 ---
 

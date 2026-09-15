@@ -1,5 +1,6 @@
 package com.veylon.gfx;
 
+import com.veylon.item.CreativePalette;
 import com.veylon.item.EquipSlot;
 import com.veylon.item.ItemType;
 import com.veylon.item.ToolKind;
@@ -30,6 +31,10 @@ public final class IconAtlas {
     private static final int ATLAS_SIZE = 512;
     private static final int ICON_SIZE = 32;
     private static final int PADDING = 2;
+    /** Inset of a flat cutout sprite inside its icon, so it reads as an item, not a wall. */
+    private static final int SPRITE_MARGIN = 3;
+    /** Slight lift, matching the brightest cube face, so sprites sit at the same key. */
+    private static final float SPRITE_LIGHT = 1.05f;
 
     public static final class Region {
         public final String id;
@@ -316,8 +321,12 @@ public final class IconAtlas {
     private static void drawItem(Canvas c, ItemType item) {
         int base = itemColor(item);
         if (item.places() != null && MaterialRegistry.layerCount() > 0) {
-            drawBlock(c, item, base);
-            decoratePlaceable(c, item);
+            if (drawsAsCutoutSprite(item)) {
+                drawCutoutSprite(c, item);
+            } else {
+                drawBlock(c, item, base);
+                decoratePlaceable(c, item);
+            }
             return;
         }
         if (item.tool != ToolKind.NONE) {
@@ -336,6 +345,32 @@ public final class IconAtlas {
                     drawMedical(c, item, base);
             default -> drawMaterial(c, item, base);
         }
+    }
+
+    /**
+     * True for palette plants whose material is a cutout sprite rather than a
+     * surface. Projecting a mostly transparent tile onto the isometric cube
+     * leaves scattered fragments where the three faces happen to be opaque,
+     * which reads as a rendering fault rather than as a plant.
+     *
+     * <p>The rule is deliberately limited to {@link CreativePalette} items so
+     * this milestone adds icons without changing any that already shipped;
+     * {@code ROPE_LADDER} keeps its cube.
+     */
+    private static boolean drawsAsCutoutSprite(ItemType item) {
+        return CreativePalette.isPaletteItem(item)
+                && MaterialRegistry.of(item.places()).cutout;
+    }
+
+    /** Draws the block's own tile flat and centred, the way it faces the camera in world. */
+    private static void drawCutoutSprite(Canvas c, ItemType item) {
+        int[] tile = MaterialRegistry.layerPixels(MaterialRegistry.of(item.places()).sideLayer[0]);
+        texturedTriangle(c, SPRITE_MARGIN, SPRITE_MARGIN, c.width - SPRITE_MARGIN, SPRITE_MARGIN,
+                c.width - SPRITE_MARGIN, c.height - SPRITE_MARGIN,
+                0, 0, 1, 0, 1, 1, tile, SPRITE_LIGHT);
+        texturedTriangle(c, SPRITE_MARGIN, SPRITE_MARGIN, c.width - SPRITE_MARGIN,
+                c.height - SPRITE_MARGIN, SPRITE_MARGIN, c.height - SPRITE_MARGIN,
+                0, 0, 1, 1, 0, 1, tile, SPRITE_LIGHT);
     }
 
     private static void drawBlock(Canvas c, ItemType item, int fallback) {

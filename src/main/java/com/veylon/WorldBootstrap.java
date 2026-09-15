@@ -2,6 +2,7 @@ package com.veylon;
 
 import com.veylon.entity.Npc;
 import com.veylon.entity.Player;
+import com.veylon.entity.GameMode;
 import com.veylon.item.Inventory;
 import com.veylon.item.ItemType;
 import com.veylon.util.Vec3i;
@@ -52,11 +53,19 @@ final class WorldBootstrap {
     }
 
     void newWorld(long seed, boolean fresh, int generatorVersion) {
+        newWorld(seed, fresh, generatorVersion, GameMode.SURVIVAL);
+    }
+
+    void newWorld(long seed, boolean fresh, int generatorVersion, GameMode initialMode) {
+        java.util.Objects.requireNonNull(initialMode, "initialMode");
         resetForNewWorld(seed);
+        game.gameModes.reset(initialMode);
         game.world = new World(seed, generatorVersion);
         game.audio.bindWorld(game.world);
         game.world.listener = game;
         game.player = new Player(game.world);
+        game.gameModes.applyToPlayer();
+        if (game.player.abilities.invulnerable()) game.player.restoreCreativeBody();
         clearPerWorldState();
 
         placePlayerOnDryLand();
@@ -169,7 +178,9 @@ final class WorldBootstrap {
         game.drawingBow = false;
         game.bowDraw = 0;
         game.combat.reset();
+        game.blockActions.reset();
         game.crates.reset();
+        game.creativeCatalogScreen.reset();
     }
 
     /** Generates around spawn and walks outward until the crash site is not a lake. */
@@ -300,8 +311,18 @@ final class WorldBootstrap {
         game.player.inventory.add(ItemType.TORCH, 2);
         game.player.inventory.add(ItemType.BANDAGE, 1);
         game.player.inventory.add(ItemType.WATERSKIN_EMPTY, 1);
-        game.log("You crash-landed on Veylon. Survive.");
-        game.log("Gather wood and berries; craft tools with [C]. Watch your wounds.");
+        if (game.gameMode() == GameMode.CREATIVE) {
+            // Creative hints name only abilities that exist; the kit stays identical (R7).
+            // The HUD shows six log lines, so five hints plus the camp line stay visible.
+            game.log("You crash-landed on Veylon in Creative mode.");
+            game.log("Nothing here can hurt you, and wildlife and settlers ignore you.");
+            game.log("Double-tap Space to fly; Space rises and Ctrl descends.");
+            game.log("Press E for the catalog; LMB breaks instantly, RMB places freely, middle mouse picks.");
+            game.log("Press Esc, then [G], to switch this world's game mode.");
+        } else {
+            game.log("You crash-landed on Veylon. Survive.");
+            game.log("Gather wood and berries; craft tools with [C]. Watch your wounds.");
+        }
         game.log("An NPC camp lies somewhere nearby - and stranger things besides...");
         // Populate the world with wildlife before the player sees the first frame.
         for (int i = 0; i < INITIAL_WILDLIFE_TICKS; i++) {

@@ -5,7 +5,6 @@ import com.veylon.engine.UiRenderer;
 import com.veylon.item.EquipSlot;
 import com.veylon.item.Inventory;
 import com.veylon.item.ItemStack;
-import com.veylon.item.ItemType;
 
 import static org.lwjgl.glfw.GLFW.GLFW_MOUSE_BUTTON_LEFT;
 
@@ -22,12 +21,42 @@ public class InventoryScreen {
 
     private int selectedSlot = -1;
 
+    /** Left edge of the item grid; the Creative catalog's inventory tab aligns to it. */
+    static float gridLeft(int w) {
+        return w / 2f - (COLS * SLOT - (SLOT + 24)) / 2f;
+    }
+
+    /** Top edge of the item grid. */
+    static float gridTop(int h) {
+        return h / 2f - ROWS * SLOT / 2f - 10;
+    }
+
+    /** Top edge of the panel drawn around the grid and gear column. */
+    static float panelTop(int h) {
+        return gridTop(h) - 52;
+    }
+
+    /** Right edge of that panel. */
+    static float panelRight(int w) {
+        return gridLeft(w) + COLS * SLOT + 18;
+    }
+
+    /** Bottom edge of that panel. */
+    static float panelBottom(int h) {
+        return gridTop(h) + ROWS * SLOT + 78;
+    }
+
+    /** The inventory slot picked up by the first click, or -1. */
+    int selectedSlot() {
+        return selectedSlot;
+    }
+
     public void update(Game g) {
         UiRenderer ui = g.ui;
         int w = ui.screenW(), h = ui.screenH();
         float gw = COLS * SLOT, gh = ROWS * SLOT;
         float eqW = SLOT + 24;
-        float x0 = w / 2f - (gw - eqW) / 2f, y0 = h / 2f - gh / 2f - 10;
+        float x0 = gridLeft(w), y0 = gridTop(h);
         float ex = x0 - eqW - 22;
 
         ui.panel(ex - 16, y0 - 52, gw + eqW + 56, gh + 130);
@@ -112,7 +141,7 @@ public class InventoryScreen {
         }
         if (detail != null) {
             ui.textCentered(w / 2f, y0 + gh + 48, 1.5f, detail.type.displayName, 1f, 1f, 0.85f, 1f);
-            ui.textCentered(w / 2f, y0 + gh + 66, 1.2f, detailLine(detail), 0.75f, 0.8f, 0.85f, 1f);
+            ui.textCentered(w / 2f, y0 + gh + 66, 1.2f, ItemDetails.line(detail), 0.75f, 0.8f, 0.85f, 1f);
         }
 
         if (g.input.wasMousePressed(GLFW_MOUSE_BUTTON_LEFT)) {
@@ -166,40 +195,6 @@ public class InventoryScreen {
                 g.log("No room in your inventory.");
             }
         }
-    }
-
-    private String detailLine(ItemStack s) {
-        ItemType t = s.type;
-        StringBuilder sb = new StringBuilder();
-        sb.append(String.format("%.1f kg", t.weight * s.count));
-        if (t.food > 0) {
-            sb.append("  food +").append(t.food);
-        }
-        if (t.hydration > 0) {
-            sb.append("  water +").append(t.hydration);
-        }
-        if (t.spoils()) {
-            sb.append("  fresh ").append((int) (s.freshnessFrac() * 100)).append("%");
-        }
-        if (t.hasDurability()) {
-            sb.append("  dur ").append((int) s.durability).append("/").append((int) t.maxDurability);
-        }
-        if (t.damage > 1.5f) {
-            sb.append("  dmg ").append((int) t.damage);
-        }
-        if (t.insulation > 0) {
-            sb.append("  warmth +").append((int) t.insulation);
-        }
-        if (t.wetResist > 0) {
-            sb.append("  rainproof ").append((int) (t.wetResist * 100)).append("%");
-        }
-        if (t.armor > 0) {
-            sb.append("  armor ").append((int) t.armor);
-        }
-        if (t.carryBonus > 0) {
-            sb.append("  +").append((int) t.carryBonus).append("kg capacity");
-        }
-        return sb.toString();
     }
 
     static void moveOrSwap(Inventory inv, int from, int to) {

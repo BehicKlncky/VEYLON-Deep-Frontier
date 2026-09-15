@@ -21,6 +21,8 @@ import static com.veylon.entity.PlayerConstants.*;
 /** The player: physics body plus the full survival-needs simulation. */
 public class Player extends Entity {
 
+    public final PlayerAbilities abilities = new PlayerAbilities();
+
     public final Inventory inventory = new Inventory(INVENTORY_SLOTS);
     /** Worn gear, indexed by {@link EquipSlot#ordinal()}. */
     public final ItemStack[] equipment = new ItemStack[EquipSlot.values().length];
@@ -62,6 +64,12 @@ public class Player extends Entity {
     public boolean woundClean;
 
     private float pendingFallDamage;
+    /**
+     * Seconds since the last Space press that did not toggle flight (R13).
+     * Transient input state owned by PlayerMovementSystem: a new world builds a
+     * new Player, so it never crosses worlds, and it is never saved.
+     */
+    float secondsSinceJumpTap = Float.POSITIVE_INFINITY;
 
     /**
      * Every roll that decides whether the player is wounded, sprained,
@@ -158,6 +166,7 @@ public class Player extends Entity {
 
     /** Movement speed multiplier from load and injuries. */
     public float moveSpeedMul() {
+        if (abilities.invulnerable()) return 1f;
         float mul = 1f;
         float enc = encumbrance();
         if (enc > 1f) {
@@ -175,7 +184,7 @@ public class Player extends Entity {
     }
 
     public boolean canSprint() {
-        return stamina > SPRINT_MIN_STAMINA && hunger > SPRINT_MIN_HUNGER
+        return abilities.invulnerable() || stamina > SPRINT_MIN_STAMINA && hunger > SPRINT_MIN_HUNGER
                 && !has(Affliction.SPRAIN) && encumbrance() <= 1f;
     }
 
@@ -188,6 +197,7 @@ public class Player extends Entity {
     }
 
     public void addAffliction(Affliction a, float seconds) {
+        if (abilities.invulnerable()) return;
         afflictions.merge(a, seconds, Math::max);
     }
 
@@ -197,6 +207,7 @@ public class Player extends Entity {
 
     /** Damage with armor applied; wears down worn gear. */
     public void hurtPhysical(Game g, float dmg, boolean canBleed) {
+        if (abilities.invulnerable()) return;
         float reduced = Math.max(dmg * MIN_DAMAGE_FRACTION, dmg - armor());
         hurt(reduced, false);
         damageFlash = 1f;
@@ -221,7 +232,46 @@ public class Player extends Entity {
 
     @Override
     protected void onLanded(float fall) {
-        pendingFallDamage = (fall - FALL_SAFE_DISTANCE) * FALL_DAMAGE_PER_BLOCK;
+        pendingFallDamage = abilities.invulnerable() ? 0
+                : (fall - FALL_SAFE_DISTANCE) * FALL_DAMAGE_PER_BLOCK;
+    }
+
+    /** Direct environmental damage shares the same body gate as weapon damage. */
+    @Override
+    public void hurt(float dmg, boolean byPlayer) {
+        if (!abilities.invulnerable()) super.hurt(dmg, byPlayer);
+    }
+
+    @Override
+    public void knockback(float fromX, float fromZ, float strength) {
+        if (!abilities.invulnerable()) super.knockback(fromX, fromZ, strength);
+    }
+
+    /** Restart fall accounting at an explicit mode or flight transition. */
+    public void resetFallState() {
+        fallDist = 0;
+        pendingFallDamage = 0;
+    }
+
+    /** Restore the fixed Creative body without changing environment observations or items. */
+    public void restoreCreativeBody() {
+        health = maxHealth;
+        dead = false;
+        hunger = thirst = stamina = protein = vitamins = MAX_NEED;
+        bodyTemp = NORMAL_BODY_TEMP;
+        fatigue = wetness = smokeExposure = damageFlash = 0;
+        afflictions.clear();
+        woundClean = false;
+        resetFallState();
+    }
+
+    /**
+     * R11: the single predicate every AI perception and targeting site reads.
+     * An imperceptible player still exists physically: collision, gates, chunk
+     * streaming, settlement activation and reputation never consult it.
+     */
+    public boolean isPerceivableByAi() {
+        return abilities.perceivableByAi();
     }
 
     // ------------------------------------------------------------------
@@ -242,6 +292,16 @@ public class Player extends Entity {
 
         damageFlash = Math.max(0, damageFlash - DAMAGE_FLASH_DECAY_PER_SECOND * dt);
         noise = Math.max(0, noise - NOISE_DECAY_PER_SECOND * dt);
+        if (!isPerceivableByAi()) {
+            // R11: recent actions, carried meat and blood leave no trace to sense.
+            noise = 0;
+            scent = 0;
+        }
+
+        if (abilities.invulnerable()) {
+            restoreCreativeBody();
+            return;
+        }
 
         applyPendingFallDamage(g);
         tickHungerAndThirst(g, dt);
@@ -457,7 +517,7 @@ public class Player extends Entity {
      * @return true only when this call inflicted sickness
      */
     public boolean tickToxicFogExposure(Game g) {
-        if (!g.events.toxicFog() || !exposedToSky || shelter.roofed()
+        if (abilities.invulnerable() || !g.events.toxicFog() || !exposedToSky || shelter.roofed()
                 || has(Affliction.SICKNESS)
                 || rng.nextDouble() >= TOXIC_FOG_SICKNESS_CHANCE) {
             return false;
@@ -484,6 +544,7 @@ public class Player extends Entity {
     }
 
     public float maxStamina() {
+        if (abilities.invulnerable()) return MAX_NEED;
         float max = MAX_NEED;
         if (fatigue > FATIGUE_STAMINA_THRESHOLD) {
             max -= (fatigue - FATIGUE_STAMINA_THRESHOLD) * FATIGUE_STAMINA_PENALTY;

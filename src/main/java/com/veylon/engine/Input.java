@@ -4,10 +4,15 @@ import static org.lwjgl.glfw.GLFW.*;
 
 public class Input {
 
+    /** Typed characters kept per frame; far more than a person types between two frames. */
+    private static final int MAX_TYPED_PER_FRAME = 32;
+
     private final boolean[] keyDown = new boolean[GLFW_KEY_LAST + 1];
     private final boolean[] keyPressed = new boolean[GLFW_KEY_LAST + 1];
     private final boolean[] mouseDown = new boolean[8];
     private final boolean[] mousePressed = new boolean[8];
+    private final int[] typed = new int[MAX_TYPED_PER_FRAME];
+    private int typedCount;
 
     private double cursorX, cursorY;
     private double cursorScaleX = 1.0, cursorScaleY = 1.0;
@@ -16,7 +21,8 @@ public class Input {
     private double scrollY;
     private boolean firstMouse = true;
 
-    void onKey(int key, int action) {
+    /** GLFW key events; also the production input seam for deterministic routing tests. */
+    public void onKey(int key, int action) {
         if (key < 0 || key > GLFW_KEY_LAST) {
             return;
         }
@@ -56,6 +62,27 @@ public class Input {
 
     void onScroll(double dy) {
         scrollY += dy;
+    }
+
+    /**
+     * A Unicode code point typed this frame, after the keyboard layout applied
+     * it. GLFW's character callback feeds this, and headless text-input tests
+     * call it directly.
+     */
+    public void onTyped(int codePoint) {
+        if (typedCount < typed.length) {
+            typed[typedCount++] = codePoint;
+        }
+    }
+
+    /** Number of code points typed this frame. */
+    public int typedCount() {
+        return typedCount;
+    }
+
+    /** The code point typed at {@code index} this frame, oldest first. */
+    public int typedCodePoint(int index) {
+        return typed[index];
     }
 
     public boolean isKeyDown(int key) {
@@ -113,6 +140,7 @@ public class Input {
     public void endFrame() {
         java.util.Arrays.fill(keyPressed, false);
         java.util.Arrays.fill(mousePressed, false);
+        typedCount = 0;
         deltaX = 0;
         deltaY = 0;
         scrollY = 0;

@@ -102,6 +102,16 @@ public class WeatherSystem implements MediumTickSystem {
             }
         }
 
+        // R25: a locked sky rolls no new target. An in-flight transition above
+        // still completes and announces itself, so the lock never strands a
+        // half-blended sky, and the weather's own effects continue below.
+        if (g.weatherLocked()) {
+            if (effective() == Weather.STORM && rng.nextFloat() < LIGHTNING_CHANCE_PER_TICK) {
+                strikeLightning(g);
+            }
+            return;
+        }
+
         changeTimer -= dt;
         if (changeTimer <= 0) {
             changeTimer = CHANGE_TIMER_MIN + rng.nextFloat() * CHANGE_TIMER_RANGE;

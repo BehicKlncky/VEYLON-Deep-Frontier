@@ -82,6 +82,11 @@ final class SleepSystem {
 
     /** Attempts to begin sleeping; logs the reason and does nothing when refused. */
     void startSleep(boolean campBed) {
+        if (game.daylightFrozen()) {
+            // Sleeping fast-forwards the very clock the control is holding (R25).
+            game.log("The daylight cycle is frozen - unfreeze it in [T] World controls to sleep.");
+            return;
+        }
         Creature threat = game.entities.nearestCreature(game.player.pos.x, game.player.pos.y,
                 game.player.pos.z, PREDATOR_WATCH_RADIUS, c -> c.type.predator);
         if (threat != null) {
@@ -132,15 +137,19 @@ final class SleepSystem {
         game.time.totalMinutes += minutes;
         sleptMinutes += minutes;
 
-        // Reduced needs while asleep, faster fatigue recovery with quality.
-        game.player.fatigue = Math.max(0,
-                game.player.fatigue - dt * FATIGUE_RECOVERY_PER_SECOND * sleepQuality);
-        game.player.hunger = Math.max(0,
-                game.player.hunger - dt * SLEEP_HUNGER_DRAIN_PER_SECOND);
-        game.player.thirst = Math.max(0,
-                game.player.thirst - dt * SLEEP_THIRST_DRAIN_PER_SECOND);
-        if (sleepQuality < MISERABLE_QUALITY) {
-            game.player.bodyTemp -= dt * POOR_SLEEP_TEMP_LOSS_PER_SECOND;
+        if (game.player.abilities.invulnerable()) {
+            game.player.restoreCreativeBody();
+        } else {
+            // Reduced needs while asleep, faster fatigue recovery with quality.
+            game.player.fatigue = Math.max(0,
+                    game.player.fatigue - dt * FATIGUE_RECOVERY_PER_SECOND * sleepQuality);
+            game.player.hunger = Math.max(0,
+                    game.player.hunger - dt * SLEEP_HUNGER_DRAIN_PER_SECOND);
+            game.player.thirst = Math.max(0,
+                    game.player.thirst - dt * SLEEP_THIRST_DRAIN_PER_SECOND);
+            if (sleepQuality < MISERABLE_QUALITY) {
+                game.player.bodyTemp -= dt * POOR_SLEEP_TEMP_LOSS_PER_SECOND;
+            }
         }
 
         boolean morning = game.time.hourF() >= WAKE_HOUR_MIN && game.time.hourF() < WAKE_HOUR_MAX
@@ -161,7 +170,8 @@ final class SleepSystem {
         }
         game.log("You wake after " + (int) (sleptMinutes / 60f * 10) / 10f + " hours. Fatigue "
                 + (int) game.player.fatigue + ".");
-        if (sleepQuality < MISERABLE_QUALITY && rng.nextFloat() < POOR_SLEEP_SICKNESS_CHANCE) {
+        if (!game.player.abilities.invulnerable() && sleepQuality < MISERABLE_QUALITY
+                && rng.nextFloat() < POOR_SLEEP_SICKNESS_CHANCE) {
             game.player.addAffliction(Affliction.SICKNESS, SICKNESS_SECONDS);
             game.log("That miserable night left you SICK. Sleep warm, dry and sheltered.");
         }

@@ -32,6 +32,8 @@ public class DebugOverlay {
                 String.format("Chunk: %d, %d   Loaded: %d   Rendered: %d",
                         cx, cz, g.world.loadedCount(), g.renderer.chunksRendered),
                 "Seed: " + g.world.seed,
+                "Mode: " + g.gameMode().id + "  Creative world: " + g.creativeMarked()
+                        + "  Flying: " + p.abilities.flying(),
                 "Biome: " + p.biome.displayName + "   Time: " + g.time.timeString()
                         + "   " + g.seasons.current(g.time).displayName,
                 "Weather: " + g.weather.effective().displayName

@@ -2,6 +2,139 @@
 
 All notable user-facing changes to VEYLON: Deep Frontier are recorded here.
 
+## [0.7.0] - 2026-09-16
+
+### Added
+
+- **Creative mode.** Choose Survival or Creative when you start a new frontier, or
+  switch an existing world from the pause menu with `G`. The first switch to Creative
+  asks for confirmation and permanently marks the world.
+- In Creative you cannot be hurt or killed, and hunger, thirst, temperature, fatigue,
+  carry weight and injuries no longer apply. The HUD shows a Creative badge instead of
+  the survival bars.
+- Wildlife and settlement residents ignore Creative players: no detection, pursuit,
+  alarms or attacks, while the frontier keeps living around you.
+- Creative flight: double-tap `Space` to take off or land, hold `Space` to rise, `Ctrl`
+  to descend and `Shift` to fly faster.
+- Creative catalog: press `E` to browse every item by category or search by name, take
+  full stacks or single items, and delete unwanted stacks.
+- Creative building: blocks break instantly without drops or tool wear, placing never
+  uses up the held stack, and the middle mouse button picks the block you are looking at.
+- In Creative, arrows, ammunition, bombs, food and medicine are never used up, and
+  carried items keep their durability and freshness.
+- The Creative catalog includes natural and structural blocks that had no item form
+  before: grass, leaves, ice, basalt, stone brick, ruin stone, ores and wreckage.
+- Creative world controls (`T` while paused): set the time of day, freeze the daylight
+  cycle, choose and lock the weather, and pause wildlife spawning.
+
+### Changed
+
+- Reputation, ownership, theft and vandalism rules still apply in Creative; only the
+  consequences that need an NPC to notice you are gone.
+- Crafting, cooking, drying, smelting, fuelling, trade, gifts and quest deliveries keep
+  their normal costs in Creative. Only actions that use an item up for its own effect
+  are free.
+- The pause menu names the world's mode and its permanent Creative mark.
+
+### Quality
+
+- Survival behaviour is unchanged: the same rules, the same RNG draw order and the same
+  outcome for the same seed. 638 tests across 97 classes, and every performance budget
+  is met at its 0.6.0 value.
+
+### Compatibility
+
+- The save format stays binary v3. Game mode, the permanent mark, flight and the world
+  controls live in two new optional sections; a save without them loads as an unmarked
+  Survival world, so every existing save keeps working.
+- Older builds skip the new sections, so they open a 0.7.0 Creative save as Survival and
+  discard the mark, flight and world controls if they save over it. A save holding the
+  new Creative-only block items loads there too, but silently drops those stacks;
+  blocks already placed in the world survive.
+
+## [0.6.11] - 2026-09-15
+
+### Added
+
+- Creative world controls in the pause menu: set the time of day, freeze the daylight
+  cycle, choose and lock the weather, and pause wildlife spawning.
+
+## [0.6.10] - 2026-09-15
+
+### Added
+
+- The Creative catalog now includes natural and structural blocks such as grass,
+  leaves, ice, basalt, stone brick, ruin stone, ores and wreckage.
+
+## [0.6.9] - 2026-09-15
+
+### Added
+
+- In Creative, arrows, ammunition, bombs, food and medicine are never used up, and
+  carried items keep their durability and freshness. Crafting, cooking, trading and
+  station inputs still follow the normal rules.
+
+## [0.6.8] - 2026-09-15
+
+### Added
+
+- Creative building: blocks break instantly without drops or tool wear, placing never
+  uses up the held stack, and the middle mouse button picks the block you are looking at.
+
+## [0.6.7] - 2026-09-15
+
+### Added
+
+- Creative catalog: press E in Creative to browse every item by category or search by
+  name, take full stacks or single items, and delete unwanted stacks.
+
+## [0.6.6] - 2026-09-14
+
+### Added
+
+- Creative flight: double-tap Space to take off or land, hold Space to rise, Ctrl
+  to descend and Shift to fly faster.
+
+## [0.6.5] - 2026-09-14
+
+### Added
+
+- Choose Survival or Creative when starting a new frontier.
+- Switch an existing world from the pause menu with G. The first switch to Creative
+  asks for confirmation and permanently marks the world.
+
+## [0.6.4] - 2026-09-14
+
+### Added
+
+- Wildlife and settlement residents ignore Creative players: no detection, pursuit,
+  alarms or attacks, while the frontier keeps living around you. Reputation and
+  ownership rules still apply.
+
+## [0.6.3] - 2026-09-14
+
+### Added
+
+- Creative worlds: the player cannot be hurt or killed and has no hunger,
+  thirst, temperature, fatigue, carry-weight or medical pressure. The HUD
+  shows a Creative badge instead of survival bars.
+
+## [0.6.2] - 2026-09-14
+
+### Quality
+
+- Worlds now record a game mode in an optional save section. Existing saves load
+  unchanged as Survival worlds.
+
+## [0.6.1] - 2026-09-11
+
+### Quality
+
+- Survival behavior that Creative mode will interact with (damage, needs, mining,
+  placement, ammunition, wear and hostile perception) is pinned by deterministic tests
+  before any change.
+- Recorded the Creative mode research, design decisions and milestone plan.
+
 ## [0.6.0] - 2026-09-11
 
 ### Added

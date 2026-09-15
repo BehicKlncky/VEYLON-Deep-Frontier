@@ -354,6 +354,10 @@ public class UiRenderer {
         if (drawCallsLastFrame == 0) {
             return;
         }
+        // Only world rendering sets the viewport. Worldless screens (title,
+        // options, loading, new frontier) would otherwise keep a stale one
+        // after a fullscreen switch and draw shifted with a black band.
+        glViewport(0, 0, framebufferW, framebufferH);
         glDisable(GL_DEPTH_TEST);
         glDisable(GL_CULL_FACE); // screen-space quads are wound CW after the Y flip
         glEnable(GL_BLEND);

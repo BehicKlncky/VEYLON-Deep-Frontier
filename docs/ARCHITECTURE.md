@@ -376,3 +376,80 @@ Audio schedules and the first-night marker are transient, never save fields.
 AudioSettings mirrors graphics properties in AppPaths. Title and pause share
 AudioOptionsScreen; it edits the same mix live, persists on Apply, and restores
 its snapshot on Back. Its input owns Escape/F5 and pause options stop simulation.
+
+## Game modes and abilities (0.7.0)
+
+Every world is `SURVIVAL` or `CREATIVE` (`entity/GameMode`, stable ids
+`survival`/`creative`, `fromId` rejects anything else) and carries a permanent
+`creativeMarked` flag that is set the first time a world becomes Creative and is
+never cleared. `GameModeController` is the single owner: `reset(mode)` runs in
+`WorldBootstrap` before the new `Player` exists, `applyToPlayer` runs immediately
+after it is constructed, `switchTo` applies the player-visible side effects of a
+deliberate switch, and `restore` applies loaded state with no log line, no
+healing and no perception effect. `Game` holds one-line delegates only.
+
+**Gameplay code reads abilities, never the mode.** `entity/PlayerAbilities`
+derives `invulnerable`, `mayFly`, `instantBuild`, `unlimitedItems` and
+`perceivableByAi` from the mode in exactly one place; `flying` is the only
+non-derived value and is forced off whenever `mayFly` is false. A grep for
+`GameMode.CREATIVE` outside the controller, the save codec, the QA entry points
+and the screens should find nothing.
+
+Where the gates live:
+
+- **Damage and needs** sit in `Player`: `hurt` and `hurtPhysical` return before
+  armour wear, feedback and the bleed roll; `addAffliction` is a no-op;
+  `onLanded` drops queued fall damage; `tickNeeds` keeps its observation refresh
+  (biome, `envTemp`, `exposedToSky`, flash and noise decay) and then holds needs
+  at their maxima instead of draining. Values other systems accumulate —
+  `smokeExposure`, `fallDist`, wetness — are neutralised every tick so leaving
+  Creative cannot apply them all at once.
+- **Perception** has exactly one predicate, `Player.isPerceivableByAi()`, used at
+  every detection, targeting, hearing and scent site in `ai/`, `settlement/` and
+  `combat/`, and as the gate on player-sourced `WorldNoise` events. Proximity
+  simulation, friendly interaction and every non-perception consequence
+  (reputation, ownership, theft, vandalism, bounty) are untouched.
+- **Items** read `unlimitedItems()` at each use-up site — placement, bow shots,
+  firearm reloads, thrown bombs, eating, drinking, treatment, every
+  `consumeDurability` path and the carried-inventory pass of
+  `ItemConditionSystem`. Transforming, trading and moving items keep Survival
+  rules everywhere.
+- **World controls** (`CreativeWorldControls`) gate three places and no more:
+  `Game.advanceClock` (the frame's only clock step), `WeatherSystem.mediumTick`
+  (no new transition target while locked) and `EntityManager.slowTick` (no
+  natural spawning, after the despawn pass). `SleepSystem` refuses to sleep while
+  the clock is frozen, because sleeping fast-forwards that clock.
+
+The save format stays binary v3. Two optional, versioned, length-prefixed
+sections are appended to the v3 extension envelope and dispatched by
+`save/V3ExtensionSections`: `player.game-mode` (mode id, mark, flying) and
+`world.creative-controls` (frozen, locked, spawning paused), written in that
+order so a load restores the mode first. Each codec rejects an unsupported
+version, a truncated payload and trailing bytes, so a corrupt section fails the
+whole load and the verifier leaves the live world intact. Unknown ids are still
+skipped, so older builds load a Creative save as an unmarked Survival world.
+
+Reset and restore contract: every control and every transient timer is released
+in the `newWorld` path and asserted in
+`GameLoopIntegrationTest.newWorldClearsSimulationQueuesAndPlayerActionState`.
+`clear()` on the world controls also runs on every mode switch in both
+directions, and a load applies control flags only into a Creative world, so a
+flag can only be true while the world is Creative.
+
+| State | Persisted | Where |
+| --- | --- | --- |
+| Game mode | yes | `player.game-mode` |
+| Creative mark | yes | `player.game-mode` |
+| Flying | yes, restored only in Creative | `player.game-mode` |
+| Other abilities | no, derived from the mode | — |
+| World controls | yes, restored only in Creative | `world.creative-controls` |
+| Double-tap timer, break-repeat timer, catalog query/tab/scroll/focus, pending confirmation, chosen new-world mode | no | reset with the world or the screen |
+
+`AppState` gains the worldless `TITLE_NEW_WORLD`; `UiMode` gains `GAME_MODE`,
+`CREATIVE_CATALOG` and `WORLD_CONTROLS`. `GAME_MODE` and `WORLD_CONTROLS` pause
+the simulation like the options screens and are in the `HotkeyRouter` early
+return, so they own Escape, F5, F9, Q and every other key while open; the
+catalog behaves like the inventory screen and owns its keys from the opening
+frame. No thread, asset, dependency or outcome-affecting `Random` was added, and
+the hot paths gained only boolean reads. Game is 959 lines, below its 1,000-line
+gate.

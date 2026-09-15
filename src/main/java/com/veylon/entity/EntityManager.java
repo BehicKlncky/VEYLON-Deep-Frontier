@@ -232,6 +232,9 @@ public class EntityManager {
         float px = g.player.pos.x, pz = g.player.pos.z;
 
         creatures.removeIf(c -> c.distSqTo(px, c.pos.y, pz) > 170 * 170);
+        if (g.spawningPaused()) {
+            return; // R25: natural spawning only; despawning above still runs.
+        }
 
         int deer = 0, wolves = 0, birds = 0, hares = 0, thornhorns = 0, stalkers = 0;
         for (Creature c : creatures) {

@@ -179,10 +179,32 @@ class GameLoopIntegrationTest {
 
         var previousWorld = game.world;
         var previousPlayer = game.player;
+        game.restoreGameMode(com.veylon.entity.GameMode.CREATIVE, true, true);
+        assertTrue(game.creativeMarked() && game.player.abilities.flying(),
+                "precondition: outgoing world has persisted Creative state");
+        game.restoreCreativeControls(true, true, true);
+        assertTrue(game.daylightFrozen() && game.weatherLocked() && game.spawningPaused(),
+                "precondition: outgoing world holds every Creative world control");
+        game.creativeCatalogScreen.search("iron");
+        game.creativeCatalogScreen.showInventory();
+        game.targetHit = new com.veylon.world.Raycaster.Hit(fx, fy, fz, 0, 1, 0, 1, BlockType.LOG);
+        game.mine(0.01f);
+        assertTrue(game.blockActions.creativeBreakRemaining() > 0, "precondition: Creative break timer is active");
         game.newWorld(4242L, true);
+        assertEquals(0, game.blockActions.creativeBreakRemaining(), "R19: Creative break timing resets with the world");
+        assertEquals("", game.creativeCatalogScreen.query(),
+                "R16: the catalog query does not survive into a new world");
+        assertFalse(game.creativeCatalogScreen.inventoryTab() || game.creativeCatalogScreen.searchFocused(),
+                "R16: the catalog tab and search focus reset with the world");
 
         assertFalse(game.world == previousWorld, "a new World instance replaces the old one");
         assertFalse(game.player == previousPlayer, "a new Player replaces the old one");
+        assertFalse(game.daylightFrozen() || game.weatherLocked() || game.spawningPaused(),
+                "R25: Creative world controls do not survive into a new world");
+        assertEquals(com.veylon.entity.GameMode.SURVIVAL, game.gameMode(),
+                "R1: existing newWorld callers always start Survival");
+        assertFalse(game.creativeMarked(), "R1: the old world's permanent mark cannot leak");
+        assertFalse(game.player.abilities.flying(), "R15: new worlds cannot inherit flight");
         assertSame(game, game.world.listener, "the new world reports block changes to Game");
         assertEquals(0, game.fire.count(), "burning blocks do not survive into a new world");
         assertEquals(0, game.projectiles.liveCount(), "projectiles do not survive");
