@@ -2,6 +2,14 @@
 
 All notable user-facing changes to VEYLON: Deep Frontier are recorded here.
 
+## [0.6.9] - 2026-09-15
+
+### Added
+
+- In Creative, arrows, ammunition, bombs, food and medicine are never used up, and
+  carried items keep their durability and freshness. Crafting, cooking, trading and
+  station inputs still follow the normal rules.
+
 ## [0.6.8] - 2026-09-15
 
 ### Added

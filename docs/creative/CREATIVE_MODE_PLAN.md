@@ -84,7 +84,7 @@ wrapper, workflows, existing enum IDs and all budgets remain unchanged.
 | v0.6.6 | 06-flight | Double tap, collision, loaded columns, measured speeds/ceiling, reset and restore (R5, R13-R15) | verified; save gate is a recorded host deviation |
 | v0.6.7 | 07-catalog | Character input, categories, AND search, grants/trash, all key ownership (R16-R18) | verified |
 | v0.6.8 | 08-instant-building | Repeat timer, cleanup without drops/wear, free placement, pick mapping (R19-R21) | verified |
-| v0.6.9 | 09-unlimited-use | A2 use-up gates, ammunition HUD, unchanged transform/transfer/trade (R22-R23) | pending |
+| v0.6.9 | 09-unlimited-use | A2 use-up gates, ammunition HUD, unchanged transform/transfer/trade (R22-R23) | verified |
 | v0.6.10 | 10-building-palette | Per-block inclusion audit, appended items/icons, mappings and compatibility (R24) | pending |
 | v0.6.11 | 11-world-controls | Forward time, freeze, weather lock, spawn gate, strict section and release on exit (R25) | pending |
 | v0.7.0 | release/0.7.0 | Whole-diff audit, all final gates, both-resolution captures, artifacts/checksums, local main merge | pending |
@@ -878,3 +878,87 @@ panel under the "CREATIVE  /  Creative world" header. That line does not follow
 the two-column key layout of its neighbours; bracket-glyph softness and the
 modal covering the event log are unchanged from earlier milestones. Human
 evaluation of building feel, pick ergonomics and wording is unverified.
+
+### v0.6.9 evidence
+
+R22-R23: every A2 use-up row reads `PlayerAbilities.unlimitedItems()` at its
+own call site. PlayerCombatSystem: bow shots skip arrow removal and keep the
+deliberate arrow selection (default ARROW) instead of following carried stock,
+and [R] still cycles types when none are carried; firearm reloads skip the
+reserve check and removal but keep the reload time and per-shot magazine use;
+thrown bombs skip the shrink; `consumeDurability` (melee, mining, bow and
+firearm wear) and `useKnife` return before any wear. PlayerConsumables: eating,
+drinking (without an extra empty skin) and used treatments skip the shrink and
+keep their benefits. ItemConditionSystem skips only the carried inventory tick;
+crates, racks and collectors still tick, and equipment has no freshness tick in
+either mode. Armor wear stays behind the milestone-3 body gate. Hud readouts
+use ASCII "unlimited" for arrows, reserve rounds and thrown stacks through
+static label helpers, and an empty Creative magazine always shows [R] Reload.
+QaHarness `held_*` scenes gain `held_bow`, `held_musket` and `held_bomb` for
+readout captures.
+
+Unchanged and pinned in Creative (D4): `CraftingSystem.craft` receives only the
+inventory, so stations and ingredients apply; campfire cooking and fuel,
+lantern charcoal, trade, gifts, crate deposits and equipping run their Survival
+paths. Waterskin filling, rack and collector transforms, beacon installation,
+quest delivery and restitution contain no gate. No Random, save field, enum
+constant or thread was added; Survival arithmetic, messages and RNG order are
+unchanged. The previous agent's unapplied `draft09` sketch was used only as a
+checklist; its InventoryScreen unequip refactor was not needed and not applied.
+
+CreativeUnlimitedUseTest adds 6 cases with Survival twins at each changed seam.
+Focused unlimited-use, bow, firearm, reload, parity, treatment, crafting,
+lantern, crate theft, bow-hunt, body and building suites plus doclint: PASS, 79
+tests / 12 classes, zero failures, errors and skips, in 25s (25.475s wall). No
+existing test changed.
+
+The first readout captures (prefix `v069-final-`) showed "[R] Reload" drawn over
+the held-item label "Veylan Musket [220/220]" at both resolutions. Hud started
+the weapon status block 96 units above the bottom, so its second and third rows
+(reload hint, bow draw meter or reload bar, "Reloading...") collided with the
+hotbar's permanent label 70 units above the bottom. The geometry was unchanged
+from v0.6.0 and already collided in Survival for an empty magazine with reserve
+rounds; unlimited reserve makes the hint appear for every empty Creative
+magazine. A separate `fix(ui)` commit moves the block to `WEAPON_STATUS_TOP =
+120` with every string, colour and scale unchanged; compile and doclint passed
+(3.604s wall). The build, performance runs, smokes and captures made before it
+are superseded by the reruns below.
+
+Final v0.6.9 build: PASS, 615 tests / 93 classes, zero failures, errors and
+skips; 2m9s (129.560s wall), including JavaDoc doclint and line budgets. Real
+lines: Game 939/1000, QaHarness 1417/1500, SaveSystem 1109/1800,
+SettlementManager 1414/1500, FactionSystem 1265/1400, WorldGenerator 1178/1300.
+
+Performance on the same tree (unchanged budgets): every budget passes in both
+runs. First run (9.708s wall): save 1.745 ms, load 181.142 ms, chunk 0.335 ms,
+entity 0.311 ms, settlement 0.013 ms, audio 446.211 ms, PCM 40,824,424 bytes,
+occlusion 0.001845 ms/frame and music 0.000005 ms/frame; TickProfileTest passes
+(whole cycle 0.0866 ms). The paired untouched v0.6.2 worktree measured save
+1.543 ms (9.745s wall). Because that gap was wider than earlier pairs, both were
+repeated in the same session: milestone save 1.584 ms (load 183.418 ms, whole
+cycle 0.0847 ms; 10.029s wall) against a v0.6.2 reference of 1.809 ms (10.191s
+wall). A pair on the pre-fix tree read 1.744/1.510 ms and then 1.460/1.706 ms.
+The ordering reverses between repeats with no save code changed, so the spread
+is host noise; no host save deviation applies because save stays within 2.20 ms
+in every run.
+
+Native 30s smokes on the final tree, seed 20260910, VSync off, minimum 60 FPS,
+1280x720, NVIDIA RTX 1000 Ada / OpenGL 3.3 / driver 595.95, one at a time with
+no concurrent build. Creative: PASS, 897.9 FPS, p95 1.41 ms, p99 1.59 ms,
+26,939 body samples without damage or death, mode/mark/flight restored, and
+the scripted flight ran 1,423 frames across 2 chunks without entering an
+unloaded column. Survival: PASS, 898.0 FPS, p95 1.41 ms, p99 1.65 ms. Both
+completed isolated save/load and the fortress approach within every runtime
+hard limit, with 91/91 icons and zero GL, KHR-debug and OpenAL errors. The smoke
+does not script unlimited use; R22 evidence is the headless suite above.
+
+Final readout captures, inspected, each with zero GL, KHR-debug and OpenAL
+errors: Creative `held_bow`, `held_musket` and `held_bomb` at 6 s, 1280x720
+windowed and 1920x1080 fullscreen (6 PNGs, prefix `v069-final2-`). The bow
+shows "Selected Arrow [R]   unlimited arrows", the musket "0/1   unlimited Iron
+Ball" in the existing empty-magazine colour with "[R] Reload" beneath it, and
+the bomb "unlimited Scrap Bomb — LMB to throw". Every readout and hint sits
+clearly above the held-item label without clipping or overlap. The scenes pause
+the simulation for capture, so the bow draw meter and reload bar were not
+captured in motion; they use the same lifted rows. Human evaluation of the
+wording and of unlimited-use play is unverified.
