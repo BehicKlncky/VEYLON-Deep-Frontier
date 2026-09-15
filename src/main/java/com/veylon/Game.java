@@ -69,11 +69,13 @@ import static org.lwjgl.glfw.GLFW.*;
 public class Game implements SimulationScheduler.Ticks, World.BlockListener {
 
     public enum UiMode {
-        NONE, INVENTORY, CRAFTING, PAUSE, OPTIONS, MAP, CRATE, NPC, AUDIO_OPTIONS, GAME_MODE, CREATIVE_CATALOG;
+        NONE, INVENTORY, CRAFTING, PAUSE, OPTIONS, MAP, CRATE, NPC, AUDIO_OPTIONS, GAME_MODE,
+        CREATIVE_CATALOG, WORLD_CONTROLS;
 
         /** The pause menu and the screens opened from it freeze the world. */
         public boolean pausesSimulation() {
-            return this == PAUSE || this == OPTIONS || this == AUDIO_OPTIONS || this == GAME_MODE;
+            return this == PAUSE || this == OPTIONS || this == AUDIO_OPTIONS || this == GAME_MODE
+                    || this == WORLD_CONTROLS;
         }
     }
 
@@ -162,6 +164,8 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
     final GraphicsOptionsScreen graphicsOptionsScreen = new GraphicsOptionsScreen();
     final com.veylon.ui.NewFrontierScreen newFrontierScreen = new com.veylon.ui.NewFrontierScreen();
     final com.veylon.ui.GameModeScreen gameModeScreen = new com.veylon.ui.GameModeScreen();
+    final com.veylon.ui.WorldControlsScreen worldControlsScreen =
+            new com.veylon.ui.WorldControlsScreen();
     final com.veylon.ui.CreativeCatalogScreen creativeCatalogScreen =
             new com.veylon.ui.CreativeCatalogScreen(inventoryScreen);
 
@@ -200,6 +204,7 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
     /** Reset, reseed, construct and camp placement for every new or loaded world. */
     private final WorldBootstrap bootstrap = new WorldBootstrap(this);
     final GameModeController gameModes = new GameModeController(this);
+    final CreativeWorldControls creativeControls = new CreativeWorldControls(this);
 
     /** Title, graphics options and loading -- the states with no world in them. */
     final FrontendController frontend = new FrontendController(this);
@@ -409,6 +414,20 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
         gameModes.restore(mode, marked, flying);
     }
 
+    /** The frame's clock step. R25: freezing holds the clock and nothing else. */
+    public void advanceClock(double realSeconds) {
+        if (!creativeControls.daylightFrozen()) {
+            time.advance(realSeconds);
+        }
+    }
+
+    public boolean daylightFrozen() { return creativeControls.daylightFrozen(); }
+    public boolean weatherLocked() { return creativeControls.weatherLocked(); }
+    public boolean spawningPaused() { return creativeControls.spawningPaused(); }
+    public void restoreCreativeControls(boolean frozen, boolean locked, boolean spawnsPaused) {
+        creativeControls.restore(frozen, locked, spawnsPaused);
+    }
+
     void releaseWorldMeshes() {
         if (world == null) {
             return;
@@ -480,7 +499,7 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
         }
 
         if (simulate) {
-            time.advance(dtD);
+            advanceClock(dtD);
             scheduler.update(dtD, this);
             particles.update(dt);
             projectiles.update(this, dt);
@@ -522,6 +541,7 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
             case OPTIONS -> frontend.handlePauseOptions(graphicsOptionsScreen.update(this));
             case AUDIO_OPTIONS -> frontend.handlePauseAudio(audioOptionsScreen.update(this));
             case GAME_MODE -> gameModes.handleScreen(gameModeScreen.update(this));
+            case WORLD_CONTROLS -> creativeControls.handleScreen(worldControlsScreen.update(this));
             case CREATIVE_CATALOG -> {
                 if (creativeCatalogScreen.update(this) == com.veylon.ui.CreativeCatalogScreen.Action.CLOSE) {
                     closeScreens();
