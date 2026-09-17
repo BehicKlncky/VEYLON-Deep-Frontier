@@ -222,6 +222,46 @@ class SurvivalCreativeParityTest {
                 "R26: Survival lands within one gravity step of the floor, never hovering");
     }
 
+    @Test
+    void aKillInSurvivalLeavesAFallingBodyThatSettlesIntoACarcass() {
+        assertEquals(bodiesLeftByAKill(game), 1,
+                "R26: a Survival kill leaves exactly one body behind");
+    }
+
+    @Test
+    void aKillInCreativeLeavesTheSameBodyAndDoesNotPauseSpawning() {
+        // The player is invulnerable in Creative, but everything else still
+        // dies, and a game mode must not change what a death leaves behind.
+        Game creative = CreativeTestArena.create(com.veylon.entity.GameMode.CREATIVE);
+        assertFalse(creative.spawningPaused(),
+                "R26: the spawning control is untouched by a kill");
+        assertEquals(bodiesLeftByAKill(creative), 1,
+                "R26: a Creative kill leaves exactly the same body a Survival kill does");
+        assertFalse(creative.spawningPaused(),
+                "R26: settling a body must not disturb the world controls");
+    }
+
+    /**
+     * Kills one deer from a fixed impulse and returns how many carcasses the
+     * settled body produced. Shared so the Creative case is the same fixture as
+     * the Survival one, which is the only way a mode-dependent gate shows up.
+     */
+    private static int bodiesLeftByAKill(Game world) {
+        world.entities.carcasses.clear();
+        world.ragdolls.reset();
+        Creature deer = world.entities.spawnCreature(world.world, Creature.CreatureType.DEER,
+                world.player.pos.x + 2f, world.player.pos.y, world.player.pos.z);
+        deer.hurt(deer.health + 100f, true);
+        deer.vel.set(2f, 1f, 0f);
+        world.entities.fastTick(world, 0.05f);
+        assertEquals(1, world.ragdolls.liveCount(),
+                "R26: the body falls before it becomes a carcass in either mode");
+        for (int i = 0; i < 1200 && world.ragdolls.liveCount() > 0; i++) {
+            world.ragdolls.update(world, 1f / 60f);
+        }
+        return world.entities.carcasses.size();
+    }
+
     private void target(BlockType type) {
         game.world.setBlock(BLOCK.x(), BLOCK.y(), BLOCK.z(), type, false);
         game.targetHit = new Raycaster.Hit(BLOCK.x(), BLOCK.y(), BLOCK.z(), -1, 0, 0, 2, type);
