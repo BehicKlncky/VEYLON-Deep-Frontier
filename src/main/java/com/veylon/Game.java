@@ -126,6 +126,7 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
     public World world;
     public Player player;
     public final EntityManager entities = new EntityManager();
+    public final com.veylon.entity.RagdollSystem ragdolls = new com.veylon.entity.RagdollSystem();
     public final FactionSystem faction = new FactionSystem();
     // 0.3.0 world-expansion systems.
     public final com.veylon.combat.WorldNoise noise = new com.veylon.combat.WorldNoise();
@@ -503,6 +504,11 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
             scheduler.update(dtD, this);
             particles.update(dt, world);
             projectiles.update(this, dt);
+            // Per frame, not on the 20 Hz bucket: a tumbling body turns far
+            // faster than a walking one and entities are drawn without
+            // interpolation, so 20 Hz strobes. The solver sub-steps at a fixed
+            // rate internally, so behaviour stays frame-rate independent.
+            ragdolls.update(this, dt);
             explosions.tickFuses(this, dt);
             noise.update(dt);
             updateEmitters(dt);

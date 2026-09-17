@@ -4,6 +4,36 @@ All notable user-facing changes to VEYLON: Deep Frontier are recorded here.
 
 ## [Unreleased]
 
+## [0.7.2] - 2026-09-18
+
+### Added
+
+- Animals and people you kill now fall. A dying body is simulated as a jointed
+  ragdoll that carries the force of the blow that killed it, tumbles, catches on
+  ledges, slides down slopes, sinks in water and comes to rest where the terrain
+  puts it — and only then becomes the carcass or body you walk up to.
+- Human bodies stay in the world. Someone you kill leaves a corpse lying where
+  they fell instead of vanishing mid-stride. Corpses cannot be harvested, are not
+  seen or fought by anyone, and rot away over time like carcasses.
+- A burst of blood at the moment of death, thrown upward and along the direction
+  of the killing blow, with drips that follow the body while it is still moving
+  and a lasting stain under it once it settles.
+- A `death_ragdoll_showcase` capture scene, plus `death_ragdoll_sequence` for a
+  single body, with frozen physics snapshots for repeatable screenshots.
+
+### Changed
+
+- Dead animals no longer snap instantly into one fixed pose at the exact spot
+  they died. A carcass is drawn lying the way its body actually landed, facing
+  the way it fell, and is saved that way. Carcasses in existing saves look
+  exactly as they always have.
+- An animal you shoot lands a little away from where you hit it, so a killing
+  shot at a running deer reads as a killing shot rather than an instant stop.
+- Harvesting waits for the body. The `[F]` prompt says a body is still falling
+  rather than offering a carcass that does not exist yet; lodged arrows are
+  carried through the fall and still come back when you skin it.
+- Saving while a body is mid-fall settles it first, so a save can never lose one.
+
 ## [0.7.1] - 2026-09-17
 
 ### Added

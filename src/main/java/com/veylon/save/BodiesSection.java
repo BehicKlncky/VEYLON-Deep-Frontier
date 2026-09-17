@@ -1,0 +1,175 @@
+package com.veylon.save;
+
+import com.veylon.Game;
+import com.veylon.entity.BodyPose;
+import com.veylon.entity.BodySkeleton;
+import com.veylon.entity.Carcass;
+import com.veylon.entity.HumanCorpse;
+import com.veylon.settlement.NpcArchetype;
+
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
+
+import static com.veylon.save.SaveSystem.readCount;
+
+/**
+ * Optional v3 state: how every body in the world is lying.
+ *
+ * <p>Two things go in here. First, one {@link BodyPose} per {@link Carcass},
+ * positional and in the order the v3 body wrote them — the same index-aligned
+ * side-car the party-state section uses, and the reason a count mismatch is a
+ * hard failure rather than something to patch up. Second, the human corpses,
+ * which have no representation in the base v3 layout at all.
+ *
+ * <p>An absent section is exactly what every save written before this feature
+ * means: carcasses keep the fixed keeled-over pose their constructor assigns
+ * and the world holds no human corpses. Nothing here changes the frozen v3
+ * body, so the byte walk in {@code CorruptSaveResilienceTest} is untouched.
+ *
+ * <p><b>In-flight ragdolls are deliberately not persisted.</b> Like bow draw
+ * and reload progress they are transient. A save settles every falling body
+ * first, so a save taken mid-fall produces a settled corpse rather than losing
+ * one; loading clears the list through the {@code newWorld} reset path.
+ *
+ * <p>The record is entirely numeric. A stray UTF field here would move the
+ * byte anchors the migration tests locate fixtures with, so the archetype
+ * travels as a bounds-checked ordinal instead of its stable string id.
+ */
+final class BodiesSection {
+
+    static final String ID = "world.bodies";
+    private static final int VERSION = 1;
+    /** Far above the corpse despawn radius could ever sustain. */
+    private static final int MAX_CORPSES = 4096;
+    private static final float MAX_ANGLE = 40f;
+    private static final float MAX_HORIZONTAL = 100_000_000f;
+    private static final float MAX_VERTICAL = 10_000f;
+
+    private BodiesSection() {
+    }
+
+    static byte[] write(Game game) throws IOException {
+        if (game.entities.corpses.size() > MAX_CORPSES) {
+            throw new IOException("too many human corpses: " + game.entities.corpses.size());
+        }
+        ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+        try (DataOutputStream out = new DataOutputStream(bytes)) {
+            out.writeInt(VERSION);
+            out.writeInt(game.entities.carcasses.size());
+            for (Carcass carcass : game.entities.carcasses) {
+                writePose(out, carcass.pose);
+            }
+            out.writeInt(game.entities.corpses.size());
+            for (HumanCorpse corpse : game.entities.corpses) {
+                out.writeFloat(corpse.pos.x);
+                out.writeFloat(corpse.pos.y);
+                out.writeFloat(corpse.pos.z);
+                out.writeFloat(corpse.decay);
+                // Archetype by ordinal + 1, so zero stays available for "none".
+                out.writeInt(corpse.appearance.archetype == null
+                        ? 0 : corpse.appearance.archetype.ordinal() + 1);
+                out.writeBoolean(corpse.appearance.raider);
+                out.writeBoolean(corpse.appearance.trader);
+                out.writeBoolean(corpse.appearance.sick);
+                out.writeInt(corpse.appearance.campIndex);
+                writePose(out, corpse.pose);
+            }
+        }
+        return bytes.toByteArray();
+    }
+
+    static void read(byte[] payload, Game game) throws IOException {
+        try (DataInputStream in = new DataInputStream(new ByteArrayInputStream(payload))) {
+            int version = in.readInt();
+            if (version != VERSION) {
+                throw new IOException("unsupported bodies section version " + version);
+            }
+            int poses = readCount(in, "carcass poses");
+            if (poses != game.entities.carcasses.size()) {
+                throw new IOException("carcass pose count mismatch: " + poses
+                        + " for " + game.entities.carcasses.size() + " carcasses");
+            }
+            for (Carcass carcass : game.entities.carcasses) {
+                readPose(in, carcass.pose);
+            }
+
+            int count = readCount(in, "human corpses");
+            if (count > MAX_CORPSES) {
+                throw new IOException("too many human corpses: " + count);
+            }
+            game.entities.corpses.clear();
+            NpcArchetype[] archetypes = NpcArchetype.values();
+            for (int i = 0; i < count; i++) {
+                HumanCorpse corpse = new HumanCorpse(
+                        readFinite(in, "corpse x", -MAX_HORIZONTAL, MAX_HORIZONTAL),
+                        readFinite(in, "corpse y", -MAX_VERTICAL, MAX_VERTICAL),
+                        readFinite(in, "corpse z", -MAX_HORIZONTAL, MAX_HORIZONTAL));
+                corpse.decay = readFinite(in, "corpse decay", 0f, MAX_VERTICAL);
+                int archetype = in.readInt();
+                if (archetype < 0 || archetype > archetypes.length) {
+                    throw new IOException("invalid corpse archetype ordinal: " + archetype);
+                }
+                corpse.appearance.archetype =
+                        archetype == 0 ? null : archetypes[archetype - 1];
+                corpse.appearance.raider = in.readBoolean();
+                corpse.appearance.trader = in.readBoolean();
+                corpse.appearance.sick = in.readBoolean();
+                corpse.appearance.campIndex = in.readInt();
+                readPose(in, corpse.pose);
+                game.entities.corpses.add(corpse);
+            }
+            if (in.available() != 0) {
+                throw new IOException("unexpected bytes after bodies section");
+            }
+        }
+    }
+
+    private static void writePose(DataOutputStream out, BodyPose pose) throws IOException {
+        out.writeFloat(pose.yaw);
+        out.writeFloat(pose.pitch);
+        out.writeFloat(pose.roll);
+        out.writeFloat(pose.lift);
+        out.writeFloat(pose.pivotY);
+        out.writeBoolean(pose.solved);
+        out.writeInt(pose.boneCount);
+        for (int b = 0; b < pose.boneCount; b++) {
+            out.writeFloat(pose.boneRotX[b]);
+            out.writeFloat(pose.boneRotZ[b]);
+        }
+    }
+
+    private static void readPose(DataInputStream in, BodyPose pose) throws IOException {
+        pose.yaw = readFinite(in, "pose yaw", -MAX_ANGLE, MAX_ANGLE);
+        pose.pitch = readFinite(in, "pose pitch", -MAX_ANGLE, MAX_ANGLE);
+        pose.roll = readFinite(in, "pose roll", -MAX_ANGLE, MAX_ANGLE);
+        pose.lift = readFinite(in, "pose lift", -4f, 4f);
+        pose.pivotY = readFinite(in, "pose pivot", -4f, 4f);
+        pose.solved = in.readBoolean();
+        int bones = in.readInt();
+        if (bones < 0 || bones > BodySkeleton.MAX_BONES) {
+            throw new IOException("invalid pose bone count: " + bones);
+        }
+        pose.boneCount = bones;
+        for (int b = 0; b < bones; b++) {
+            pose.boneRotX[b] = readFinite(in, "bone rotX", -MAX_ANGLE, MAX_ANGLE);
+            pose.boneRotZ[b] = readFinite(in, "bone rotZ", -MAX_ANGLE, MAX_ANGLE);
+        }
+    }
+
+    /**
+     * A NaN here would load, and then no comparison against it would ever be
+     * true again — the same failure the player-scalar guard exists for. The
+     * bounded equivalents in SaveSystem and V3ExtensionSections are private.
+     */
+    private static float readFinite(DataInputStream in, String label, float min, float max)
+            throws IOException {
+        float value = in.readFloat();
+        if (!Float.isFinite(value) || value < min || value > max) {
+            throw new IOException("invalid " + label + ": " + value);
+        }
+        return value;
+    }
+}

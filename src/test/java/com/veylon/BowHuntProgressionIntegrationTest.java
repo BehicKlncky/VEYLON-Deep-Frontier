@@ -85,6 +85,15 @@ class BowHuntProgressionIntegrationTest {
 
         game.entities.fastTick(game, 0f);
         assertFalse(game.entities.creatures.contains(hare));
+        assertEquals(1, game.ragdolls.liveCount(),
+                "the killed animal becomes a falling body before it becomes a carcass");
+        assertTrue(game.entities.carcasses.isEmpty(),
+                "there is nothing to harvest while the body is still in the air");
+
+        // Drive the real per-frame body solver until it comes to rest.
+        for (int i = 0; i < 600 && game.ragdolls.liveCount() > 0; i++) {
+            game.ragdolls.update(game, 1f / 60f);
+        }
         assertEquals(1, game.entities.carcasses.size());
         Carcass carcass = game.entities.carcasses.getFirst();
         assertEquals(1, carcass.stuckArrows,

@@ -44,6 +44,12 @@ class SimulationSystemContractTest {
         // The clock has no bucket of its own — the run loop advances it with real
         // frame time — but it is still per-world state, so it is a SimulationSystem.
         assertInstanceOf(SimulationSystem.class, game.time);
+
+        // Falling bodies are the same shape: no bucket, because they are driven
+        // per frame beside particles and projectiles (a tumbling body turns far
+        // faster than the 20 Hz gait it had a moment earlier), but very much
+        // per-world state that must not outlive a world.
+        assertInstanceOf(SimulationSystem.class, game.ragdolls);
     }
 
     @Test
@@ -78,6 +84,18 @@ class SimulationSystemContractTest {
         game.events.onStormStarted(game);
         assertTrue(game.events.totalEventsTriggered > 0, "precondition: an event is running");
 
+        // A body mid-fall, plus a part-consumed solver accumulator and the two
+        // lifetime counters the debug overlay reads.
+        var victim = game.entities.spawnCreature(game.world, com.veylon.entity.Creature
+                .CreatureType.HARE, game.player.pos.x + 2f, game.player.pos.y, game.player.pos.z);
+        victim.hurt(victim.health + 100f, true);
+        victim.vel.set(2f, 1f, 0f);
+        game.entities.fastTick(game, 0.05f);
+        assertTrue(game.ragdolls.liveCount() > 0, "precondition: a body is falling");
+        assertTrue(game.ragdolls.totalSpawned > 0, "precondition: the spawn counter moved");
+        // Leaves most of a step banked in the accumulator.
+        game.ragdolls.update(game, 0.016f);
+
         game.newWorld(31_415L, true);
 
         assertEquals(8 * 60, game.time.totalMinutes, 1e-6,
@@ -98,6 +116,23 @@ class SimulationSystemContractTest {
         assertEquals(0, game.fire.count(), "burning cells do not carry over");
         assertTrue(game.events.active.isEmpty(), "active events do not carry over");
         assertEquals(0, game.events.totalEventsTriggered);
+
+        assertEquals(0, game.ragdolls.liveCount(),
+                "a falling body does not carry into the next world");
+        assertEquals(0, game.ragdolls.totalSpawned,
+                "body statistics do not carry into the next world");
+        assertEquals(0, game.ragdolls.totalSettled);
+        assertEquals(0, game.ragdolls.stepsLastUpdate);
+        // The solver accumulator is behind no getter, so observe it: a body fed
+        // less than one fixed step must not move, which it would if most of a
+        // step were still banked from the previous world.
+        var fresh = game.entities.spawnCreature(game.world, com.veylon.entity.Creature
+                .CreatureType.HARE, game.player.pos.x + 2f, game.player.pos.y, game.player.pos.z);
+        fresh.hurt(fresh.health + 100f, true);
+        game.entities.fastTick(game, 0.05f);
+        game.ragdolls.update(game, SimulationScheduler.FAST_DT / 10f);
+        assertEquals(0, game.ragdolls.stepsLastUpdate,
+                "a part-consumed solver accumulator carried into the next world");
     }
 
     @Test
@@ -111,7 +146,7 @@ class SimulationSystemContractTest {
 
         for (SimulationSystem system : List.of(game.time, game.weather, game.temperature,
                 game.water, game.fire, game.plants, game.events, game.itemConditions,
-                game.settlementManager)) {
+                game.settlementManager, game.ragdolls)) {
             system.reset();
         }
 

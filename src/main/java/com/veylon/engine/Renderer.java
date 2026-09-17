@@ -1,9 +1,14 @@
 package com.veylon.engine;
 
 import com.veylon.Game;
+import com.veylon.entity.BodyPose;
+import com.veylon.entity.BodySkeleton;
 import com.veylon.entity.Carcass;
 import com.veylon.entity.Creature;
+import com.veylon.entity.HumanCorpse;
 import com.veylon.entity.Npc;
+import com.veylon.entity.NpcAppearance;
+import com.veylon.entity.Ragdoll;
 import com.veylon.entity.Track;
 import com.veylon.gfx.Environment;
 import com.veylon.gfx.GraphicsSettings;
@@ -413,6 +418,8 @@ public class Renderer {
 
         renderTracks(game);
         renderCarcasses(game);
+        renderCorpses(game);
+        renderRagdolls(game);
 
         Vector3f camPos = game.camera.position;
         float entityRange = fogEnd + 12f;
@@ -605,14 +612,87 @@ public class Renderer {
             float rot = c.rotten() ? 0.6f : 1f;
             entityShader.set("uTintMul", rot, rot * 0.9f, rot * 0.85f);
             EntityModel carcassModel = CreatureModels.of(t);
-            Animator.poseCarcass(carcassModel);
-            // Carcass currently stores no death yaw; derive a stable orientation from position.
-            float yaw = (c.pos.x * 0.37f + c.pos.z * 0.73f) % ((float) Math.PI * 2f);
-            model.identity().translate(c.pos.x, c.pos.y + 0.05f, c.pos.z)
-                    .rotateY(yaw);
+            if (c.pose.solved) {
+                // The pose the body actually settled in, carried off the ragdoll.
+                Animator.poseBody(carcassModel, BodySkeleton.of(t), c.pose);
+            } else {
+                // Restored from an older save or staged by QA: the fixed sprawl.
+                Animator.poseCarcass(carcassModel);
+            }
+            bodyTransform(c.pos.x, c.pos.y, c.pos.z, c.pose);
             drawModel(carcassModel, model);
         }
         entityShader.set("uTintMul", 1f, 1f, 1f);
+        entityShader.set("uEmissive", 0f);
+    }
+
+    /** Settled human bodies: same seam as carcasses, humanoid model. */
+    private void renderCorpses(Game game) {
+        Vector3f camPos = game.camera.position;
+        float range = fogEnd + 8f;
+        for (HumanCorpse corpse : game.entities.corpses) {
+            if (!entityVisible(camPos, corpse.pos.x, corpse.pos.y, corpse.pos.z,
+                    0.7f, 1.0f, range)) {
+                continue;
+            }
+            setEntityLight(game, corpse.pos.x, corpse.pos.y + 0.2f, corpse.pos.z);
+            entityShader.set("uTintMul", 1f, 1f, 1f);
+            drawBody(BodySkeleton.humanoid(), corpse.pose, corpse.appearance,
+                    corpse.pos.x, corpse.pos.y, corpse.pos.z);
+        }
+        entityShader.set("uEmissive", 0f);
+    }
+
+    /** Bodies still falling. Same shader state block, no new mesh or draw path. */
+    private void renderRagdolls(Game game) {
+        Vector3f camPos = game.camera.position;
+        float range = fogEnd + 12f;
+        for (Ragdoll r : game.ragdolls.live) {
+            float x = r.px[Ragdoll.TORSO];
+            float y = r.py[Ragdoll.TORSO];
+            float z = r.pz[Ragdoll.TORSO];
+            if (!entityVisible(camPos, x, y, z, 0.9f, 1.2f, range)) {
+                continue;
+            }
+            setEntityLight(game, x, y, z);
+            entityShader.set("uTintMul", 1f, 1f, 1f);
+            if (r.human()) {
+                drawBody(r.skeleton, r.pose, r.appearance, x, y, z);
+            } else {
+                EntityModel creatureModel = CreatureModels.of(r.creatureType);
+                Animator.poseBody(creatureModel, r.skeleton, r.pose);
+                bodyTransform(x, y, z, r.pose);
+                drawModel(creatureModel, model);
+            }
+        }
+        entityShader.set("uEmissive", 0f);
+    }
+
+    private void drawBody(BodySkeleton skeleton, BodyPose pose, NpcAppearance appearance,
+                          float x, float y, float z) {
+        EntityModel npcModel = NpcModels.get();
+        Animator.poseBody(npcModel, skeleton, pose);
+        // resetPose inside poseBody makes every archetype accessory visible again.
+        Animator.applyAppearance(npcModel, appearance.archetype, appearance.raider,
+                appearance.trader, appearance.sick, appearance.campIndex);
+        bodyTransform(x, y, z, pose);
+        drawModel(npcModel, model);
+    }
+
+    /**
+     * The draw transform for a body with a {@link BodyPose}.
+     *
+     * <p>Orientation belongs here rather than on the model root: applied after
+     * the heading, {@code rotateZ} is a roll about the body's own spine, which
+     * is what rolling onto a flank means. The trailing translate hangs the
+     * model off the point the pose is positioned by — the torso for a solved
+     * body, the feet for one that never ran through the solver.
+     */
+    private void bodyTransform(float x, float y, float z, BodyPose pose) {
+        model.identity()
+                .translate(x, y + pose.lift, z)
+                .rotateY(pose.yaw).rotateX(pose.pitch).rotateZ(pose.roll)
+                .translate(0, -pose.pivotY, 0);
     }
 
     /** First-person held item, drawn in camera space over the scene. */

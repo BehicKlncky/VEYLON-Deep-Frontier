@@ -54,7 +54,8 @@ final class InteractPromptBuilder {
      */
     void update() {
         game.interactPrompt = null;
-        if (npcPrompt() || stuckArrowPrompt() || carcassPrompt() || targetBlockPrompt()
+        if (npcPrompt() || stuckArrowPrompt() || carcassPrompt() || fallingBodyPrompt()
+                || targetBlockPrompt()
                 || trackPrompt()) {
             return;
         }
@@ -97,6 +98,24 @@ final class InteractPromptBuilder {
                 + (carcass.rotten() ? " (rotting!)" : "")
                 + (game.playerHasKnife() ? "" : " (no knife: scraps only)");
         return true;
+    }
+
+    /**
+     * A body that is still falling is not a carcass yet, so F does nothing to
+     * it. Say so rather than showing nothing and letting the player conclude
+     * the prompt is broken.
+     */
+    private boolean fallingBodyPrompt() {
+        for (com.veylon.entity.Ragdoll r : game.ragdolls.live) {
+            if (r.leavesBody && r.distSqTo(game.player.pos.x, game.player.pos.y,
+                    game.player.pos.z) <= PICKUP_RANGE * PICKUP_RANGE) {
+                game.interactPrompt = r.human()
+                        ? "The body is still falling"
+                        : "The " + r.creatureType.displayName + " is still falling";
+                return true;
+            }
+        }
+        return false;
     }
 
     /** @return true when the targeted block produced a prompt, or blocked further ones */

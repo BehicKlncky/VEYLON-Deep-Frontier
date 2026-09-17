@@ -23,6 +23,13 @@ public class EntityManager {
     public final List<Creature> creatures = new ArrayList<>();
     public final List<Npc> npcs = new ArrayList<>();
     public final List<Carcass> carcasses = new ArrayList<>();
+    /**
+     * Settled human bodies. Deliberately a list of its own rather than dead
+     * entries in {@link #npcs}: a corpse is not a perception or combat target,
+     * costs nothing against {@code SettlementManager.MAX_ACTIVE_NPCS} and
+     * cannot disturb resident bookkeeping.
+     */
+    public final List<HumanCorpse> corpses = new ArrayList<>();
     /** Footprints and blood marks, oldest first. */
     public final ArrayDeque<Track> tracks = new ArrayDeque<>();
     private final Random rng = new Random();
@@ -68,9 +75,28 @@ public class EntityManager {
                 if (n.settled() || n.warParty) {
                     onSettledNpcDied(g, n);
                 }
+                if (reallyDied(n)) {
+                    g.ragdolls.spawn(g, n);
+                }
                 it.remove();
             }
         }
+    }
+
+    /**
+     * Whether a cleared {@code dead} flag means a body fell or merely that
+     * something left the world.
+     *
+     * <p>{@code Entity.dead} carries both meanings. A trader whose visit timer
+     * ran out, a raider fading at the edge of the camp, a war party whose
+     * settlement was cleared and routed survivors all set it with their health
+     * untouched, and every one of them would otherwise drop dead on the road in
+     * full view of the player. {@code health <= 0} is the discriminator
+     * {@code fastTick} already uses for its "has died" log line, so it is the
+     * one used here too.
+     */
+    static boolean reallyDied(Entity e) {
+        return e.health <= 0;
     }
 
     /** Settlement/war-party NPC died: resident bookkeeping + archetype loot. */
@@ -134,25 +160,31 @@ public class EntityManager {
         }
     }
 
+    /**
+     * Every consequence of an animal dying, fired on the tick it died.
+     *
+     * <p>The carcass itself is the one thing that waits: the body falls first,
+     * and {@code RagdollSystem} builds the carcass where it comes to rest, with
+     * the lodged arrows carried across. Reputation, loot and the log lines must
+     * not wait — quest credit that lagged a second behind the kill would read
+     * as a bug.
+     */
     private void onCreatureDied(Game g, Creature c) {
         if (c.lastHitByPlayer) {
             g.onCreatureKilled(c);
         }
         if (c.type == Creature.CreatureType.BIRD) {
-            // Too small to leave a carcass.
+            // Too small to leave a carcass; it still tumbles before it is gone.
             if (c.lastHitByPlayer) {
                 g.player.inventory.add(ItemType.RAW_MEAT, 1);
                 g.log("Hunted a " + c.type.displayName + " (+1 raw meat)");
             }
-            return;
-        }
-        Carcass carcass = new Carcass(c.type, c.pos.x, c.pos.y, c.pos.z);
-        carcass.stuckArrows = c.stuckArrows;
-        carcass.stuckArrowType = c.stuckArrowType;
-        carcasses.add(carcass);
-        if (c.lastHitByPlayer) {
+        } else if (c.lastHitByPlayer) {
             g.log("The " + c.type.displayName + " is down. Harvest the carcass with [F]"
                     + (g.playerHasKnife() ? "." : " (a knife would yield far more)."));
+        }
+        if (reallyDied(c)) {
+            g.ragdolls.spawn(g, c);
         }
     }
 
@@ -197,6 +229,14 @@ public class EntityManager {
                 it.remove();
             }
         }
+        // Human bodies rot on the same clock, but have nothing to be emptied of.
+        for (Iterator<HumanCorpse> it = corpses.iterator(); it.hasNext(); ) {
+            HumanCorpse corpse = it.next();
+            corpse.decay -= dt;
+            if (corpse.decay <= 0) {
+                it.remove();
+            }
+        }
     }
 
     public Track nearestTrack(float x, float y, float z, float range) {
@@ -232,6 +272,14 @@ public class EntityManager {
         float px = g.player.pos.x, pz = g.player.pos.z;
 
         creatures.removeIf(c -> c.distSqTo(px, c.pos.y, pz) > 170 * 170);
+        // Bodies get the same radius as the wildlife that left them, so a long
+        // walk cannot leave a trail of corpses accumulating behind the player.
+        float far = RagdollConstants.DESPAWN_DISTANCE * RagdollConstants.DESPAWN_DISTANCE;
+        corpses.removeIf(corpse -> {
+            float dx = corpse.pos.x - px;
+            float dz = corpse.pos.z - pz;
+            return dx * dx + dz * dz > far;
+        });
         if (g.spawningPaused()) {
             return; // R25: natural spawning only; despawning above still runs.
         }
