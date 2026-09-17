@@ -15,8 +15,8 @@ void main() {
     } else if (sprite == 1) {
         a = smoothstep(0.42, 0.3, length(d));                       // hard dot
     } else if (sprite == 2) {
-        a = smoothstep(0.5, 0.2, abs(d.x) * 4.0)                    // vertical streak
-          * smoothstep(0.52, 0.35, abs(d.y));
+        a = (1.0 - smoothstep(0.2, 0.5, abs(d.x)))                    // velocity-aligned streak
+          * (1.0 - smoothstep(0.35, 0.52, abs(d.y)));
     } else {
         a = smoothstep(0.5, 0.0, length(d));                        // bright spark
         a *= a;

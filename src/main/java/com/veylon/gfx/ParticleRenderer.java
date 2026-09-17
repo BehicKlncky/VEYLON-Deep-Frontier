@@ -13,7 +13,7 @@ import static org.lwjgl.opengl.GL33C.*;
  */
 public class ParticleRenderer {
 
-    private static final int INSTANCE_FLOATS = 10; // pos3 size1 rgba4 params2
+    public static final int INSTANCE_FLOATS = 13; // pos3 size1 rgba4 params2 velocity3
 
     private ShaderProgram shader;
     private int vao, quadVbo, instanceVbo;
@@ -44,7 +44,8 @@ public class ParticleRenderer {
         glVertexAttribPointer(2, 1, GL_FLOAT, false, stride, 12);
         glVertexAttribPointer(3, 4, GL_FLOAT, false, stride, 16);
         glVertexAttribPointer(4, 2, GL_FLOAT, false, stride, 32);
-        for (int a = 1; a <= 4; a++) {
+        glVertexAttribPointer(5, 3, GL_FLOAT, false, stride, 40);
+        for (int a = 1; a <= 5; a++) {
             glEnableVertexAttribArray(a);
             glVertexAttribDivisor(a, 1);
         }
@@ -73,12 +74,12 @@ public class ParticleRenderer {
 
         // Pass 1: alpha-blended (everything except sparks).
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-        int n = fill(ps, false, ambient);
+        int n = pack(ps, false, ambient, scratch);
         drawInstances(n);
 
         // Pass 2: additive sparks/embers/energy.
         glBlendFunc(GL_SRC_ALPHA, GL_ONE);
-        n = fill(ps, true, 1f);
+        n = pack(ps, true, 1f, scratch);
         drawInstances(n);
 
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
@@ -87,7 +88,8 @@ public class ParticleRenderer {
         glBindVertexArray(0);
     }
 
-    private int fill(ParticleSystem ps, boolean additive, float ambient) {
+    /** Headless packing seam shared by both render passes. */
+    public static int pack(ParticleSystem ps, boolean additive, float ambient, float[] scratch) {
         int n = 0;
         for (int i = 0; i < ps.count; i++) {
             boolean isAdd = ps.kind[i] == ParticleSystem.KIND_SPARK;
@@ -107,9 +109,12 @@ public class ParticleRenderer {
             scratch[o + 4] = ps.cr[i] * ambient;
             scratch[o + 5] = ps.cg[i] * ambient;
             scratch[o + 6] = ps.cb[i] * ambient;
-            scratch[o + 7] = additive ? fade : 0.85f * fade;
+            scratch[o + 7] = (ps.kind[i] == ParticleSystem.KIND_STREAK ? 0.60f : additive ? 1f : 0.85f) * fade;
             scratch[o + 8] = ps.kind[i] == ParticleSystem.KIND_SPARK ? 3f : ps.kind[i];
-            scratch[o + 9] = ps.kind[i] == ParticleSystem.KIND_STREAK ? 5f : 1f;
+            scratch[o + 9] = 1f;
+            scratch[o + 10] = ps.velocityX(i);
+            scratch[o + 11] = ps.velocityY(i);
+            scratch[o + 12] = ps.velocityZ(i);
             n++;
         }
         return n;
