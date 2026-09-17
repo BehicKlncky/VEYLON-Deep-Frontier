@@ -54,6 +54,7 @@ final class QaHarness {
 
     private final Game game;
     private final RainQaScene rainScene;
+    private final RagdollQaScene ragdollScene;
 
     // Render statistics sampled across an automated run.
     private long profiledRenderFrames;
@@ -97,6 +98,7 @@ final class QaHarness {
     QaHarness(Game game) {
         this.game = game;
         rainScene = new RainQaScene(game);
+        ragdollScene = new RagdollQaScene(game);
     }
 
     // ------------------------------------------------------------------
@@ -257,6 +259,7 @@ final class QaHarness {
         }
         game.creativeQa.updateFlightScene(elapsed);
         rainScene.update(elapsed);
+        ragdollScene.update(elapsed);
     }
 
     /**
@@ -666,6 +669,16 @@ final class QaHarness {
                 setupPhase4Showcase(site.x(), site.z());
                 heldCycleShowcase = true;
                 updateHeldCycle(0);
+            }
+            case "death_ragdoll_showcase", "vfx_ragdoll" -> {
+                site = moveBenchmarkToBiome(Biome.MEADOW);
+                clearBenchmarkStage(site, 12, 20);
+                ragdollScene.stage(site);
+            }
+            case "death_ragdoll_sequence", "ragdoll_seq" -> {
+                site = moveBenchmarkToBiome(Biome.MEADOW);
+                clearBenchmarkStage(site, 9, 14);
+                ragdollScene.stageSequence(site);
             }
             case "vfx_blood", "blood_tracks" -> {
                 site = moveBenchmarkToBiome(Biome.MEADOW);
