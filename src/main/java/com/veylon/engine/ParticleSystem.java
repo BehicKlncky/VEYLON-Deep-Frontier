@@ -44,6 +44,20 @@ public class ParticleSystem {
     private final RainCollision collision = new RainCollision();
     /** Weather leaves at least 1,200 slots for fire, combat and other effects. */
     public static final int RAIN_LIMIT = 2400, SPLASH_LIMIT = 2800;
+    /**
+     * Blood stops here, under the splash ceiling, so a fight during a storm
+     * still leaves room for flame, smoke and explosion debris.
+     */
+    public static final int BLOOD_LIMIT = 3600;
+    /**
+     * The most droplets and mist puffs one death burst can emit, before density
+     * scaling. Body size only ever scales this down, so the pair is a real
+     * ceiling rather than a typical case.
+     */
+    public static final int BURST_DROPS = 22, BURST_MIST = 5;
+    /** Body size at which a burst reaches full strength. */
+    private static final float BURST_FULL_POWER = 1.2f;
+    private static final float BLOOD_GRAVITY = 13f;
     private float windX, windZ;
     public int collisionProbesLastUpdate;
     public int impactsLastUpdate;
@@ -299,6 +313,56 @@ public class ParticleSystem {
                     0.48f + rng.nextFloat() * 0.14f, 0.06f, 0.06f,
                     0.05f + rng.nextFloat() * 0.04f, 0.5f, 13f);
         }
+    }
+
+    /**
+     * The moment of death: a radial spray thrown genuinely upward, biased along
+     * the killing blow, plus a little mist that fades before the droplets land.
+     *
+     * <p>Bounded twice over. Counts are small and fixed rather than scaled with
+     * damage, every one of them goes through {@link #scaled} so a zero density
+     * setting emits nothing at all, and the whole burst stops at
+     * {@link #BLOOD_LIMIT} — under the rain and splash ceilings — so even a
+     * massacre during a storm cannot crowd out fire and combat effects.
+     *
+     * @param power 0..~1.5 body-size scale; a hare sprays less than a thornhorn
+     */
+    public void bloodBurst(float x, float y, float z,
+                           float dirX, float dirY, float dirZ, float power) {
+        float scale = Math.min(1f, Math.max(0.35f, power / BURST_FULL_POWER));
+        int drops = scaled(Math.round(BURST_DROPS * scale));
+        for (int i = 0; i < drops && count < BLOOD_LIMIT; i++) {
+            float angle = rng.nextFloat() * (float) (Math.PI * 2.0);
+            float spread = 1.4f + rng.nextFloat() * 2.6f;
+            float lift = 2.2f + rng.nextFloat() * 3.4f;
+            spawn(KIND_DOT, x + rnd(0.16f), y + rnd(0.16f), z + rnd(0.16f),
+                    (float) Math.cos(angle) * spread + dirX * 3.2f,
+                    lift + dirY * 1.6f,
+                    (float) Math.sin(angle) * spread + dirZ * 3.2f,
+                    0.48f + rng.nextFloat() * 0.14f, 0.06f, 0.06f,
+                    0.045f + rng.nextFloat() * 0.05f,
+                    0.45f + rng.nextFloat() * 0.35f, BLOOD_GRAVITY);
+        }
+        int mist = scaled(BURST_MIST);
+        for (int i = 0; i < mist && count < BLOOD_LIMIT; i++) {
+            spawn(KIND_PUFF, x + rnd(0.2f), y + rnd(0.15f), z + rnd(0.2f),
+                    dirX * 1.1f + rnd(0.5f), 0.5f + rng.nextFloat() * 0.7f,
+                    dirZ * 1.1f + rnd(0.5f),
+                    0.52f + rng.nextFloat() * 0.10f, 0.06f, 0.06f,
+                    0.13f + rng.nextFloat() * 0.10f,
+                    0.22f + rng.nextFloat() * 0.16f, 2.5f);
+        }
+    }
+
+    /** One droplet shed by a body that is still tumbling. */
+    public void bloodDrip(float x, float y, float z, float velX, float velY, float velZ) {
+        if (scaled(1) < 1 || count >= BLOOD_LIMIT) {
+            return;
+        }
+        spawn(KIND_DOT, x + rnd(0.12f), y + rnd(0.12f), z + rnd(0.12f),
+                velX * 0.25f + rnd(0.5f), velY * 0.15f + rnd(0.4f), velZ * 0.25f + rnd(0.5f),
+                0.48f + rng.nextFloat() * 0.14f, 0.06f, 0.06f,
+                0.04f + rng.nextFloat() * 0.03f, 0.45f, BLOOD_GRAVITY);
     }
 
     public void splash(float x, float y, float z) {
