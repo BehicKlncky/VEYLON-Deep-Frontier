@@ -97,6 +97,7 @@ final class WorldBootstrap {
         game.projectiles.reset();
         game.explosions.reset();
         game.settlementManager.reset();
+        game.ragdolls.reset();
         game.particles.count = 0;
         reseedSimulation(seed);
     }
@@ -155,6 +156,7 @@ final class WorldBootstrap {
         game.entities.creatures.clear();
         game.entities.npcs.clear();
         game.entities.carcasses.clear();
+        game.entities.corpses.clear();
         game.entities.tracks.clear();
         game.eventLog.clear();
         game.faction.trust = 35;
