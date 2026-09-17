@@ -4,6 +4,8 @@ All notable user-facing changes to VEYLON: Deep Frontier are recorded here.
 
 ## [Unreleased]
 
+## [0.7.2] - 2026-09-18
+
 ### Added
 
 - Animals and people you kill now fall. A dying body is simulated as a jointed

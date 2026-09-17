@@ -24,6 +24,10 @@ find blueprints, master the crafting stations and **repair the distress beacon**
 
 ---
 
+Version **0.7.2 — Death Ragdolls & Blood** adds articulated death physics,
+persistent human corpses, landed carcass poses and blood effects. Existing saves
+remain compatible. See the [release notes](docs/releases/v0.7.2.md).
+
 Version **0.7.1 — Physical Rain** brings wind-driven world-space drops that strike
 roofs, terrain, foliage and water, with tiny impact droplets. Outdoor rain remains
 visible from shelter. See the [release notes](docs/releases/v0.7.1.md) and
@@ -105,9 +109,9 @@ Windows x64 (PowerShell):
 ```powershell
 .\gradlew.bat build             # compile + unit tests + jar
 .\gradlew.bat performanceTest   # opt-in benchmarks calibrated for the reference PC
-.\gradlew.bat fatJar            # build\libs\veylon-0.7.1-all.jar
+.\gradlew.bat fatJar            # build\libs\veylon-0.7.2-all.jar
 .\gradlew.bat jpackage          # build\jpackage\Veylon\Veylon.exe
-.\gradlew.bat appImageZip       # build\distributions\veylon-0.7.1-windows-x64.zip
+.\gradlew.bat appImageZip       # build\distributions\veylon-0.7.2-windows-x64.zip
 .\gradlew.bat releaseArtifacts  # tests + all host-specific release artifacts
 ```
 
@@ -117,7 +121,7 @@ macOS Intel or Apple Silicon (Terminal):
 ./gradlew build
 ./gradlew fatJar
 ./gradlew jpackage          # build/jpackage/Veylon.app
-./gradlew appImageZip       # build/distributions/veylon-0.7.1-macos-{x64|arm64}.zip
+./gradlew appImageZip       # build/distributions/veylon-0.7.2-macos-{x64|arm64}.zip
 ./gradlew releaseArtifacts
 ```
 
@@ -152,7 +156,7 @@ See [CHANGELOG.md](CHANGELOG.md) for release notes.
 Run the fat JAR with the same JVM options used by the packaged launchers:
 
 ```powershell
-java --enable-native-access=ALL-UNNAMED -Xmx2G -jar build\libs\veylon-0.7.1-all.jar
+java --enable-native-access=ALL-UNNAMED -Xmx2G -jar build\libs\veylon-0.7.2-all.jar
 ```
 
 ---
