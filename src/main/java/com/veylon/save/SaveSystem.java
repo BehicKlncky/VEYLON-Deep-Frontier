@@ -117,6 +117,10 @@ public final class SaveSystem {
     public static boolean save(Game g, Path savePath) {
         Objects.requireNonNull(g, "g");
         Objects.requireNonNull(savePath, "savePath");
+        // Falling bodies are transient and are not written. Freezing them here
+        // rather than dropping them is what makes a save taken mid-fall come
+        // back as a settled corpse instead of losing one.
+        g.ragdolls.settleAll(g);
         Path target = savePath.toAbsolutePath();
         Path temporary = null;
         try {
