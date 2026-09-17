@@ -255,7 +255,7 @@ Reload progress and bow draw deliberately do not.
   from the same fixture. `SurvivalCreativeParityTest` and the `Creative*Test`
   classes are built in pairs for exactly that reason — a gate that accidentally
   fires in Survival is the failure mode worth catching.
-- The suite is 638 tests across 97 classes at 0.7.0.
+- The suite is 659 tests across 99 classes at 0.7.1.
 
 ---
 
@@ -278,3 +278,28 @@ Tracked honestly so nobody rediscovers them:
   dependency and remains intentionally out of scope.
 
 Audio preferences use `veylon_audio.properties` in the same AppPaths directory as graphics preferences. Use V from the title or pause menu, or the title AUDIO button. `VEYLON_FRONTEND=audio` with `VEYLON_SHOT=2` captures the audio editor without a world; Apply saves and Back cancels live edits.
+
+## Physical rain QA and contributor rules (0.7.1)
+
+Use `VEYLON_SCENE=physical_rain`, `VEYLON_GAME_MODE=creative`, `VEYLON_SEED=711`
+and `VEYLON_SHOT=4,9,14,19,24,29,34,39,44,49,54,59` for the 60-second native
+sequence. Five-second phases cover ordinary rain, storm, shelter entrance,
+elevated roof view, uneven terrain/foliage/water, moving at running speed, rapid
+turning, 25% density, full density, clear-to-rain, stopping rain and snow. Captures
+are wall-clock scheduled, so particle pixels vary with frame cadence; the stage,
+seed and phase inputs are repeatable. Headless tests use fixed time steps.
+
+Run `gradlew test --tests '*PhysicalRainTest'` and the reference-machine
+`gradlew performanceTest --tests '*RainPerformanceTest'` during development.
+Keep new environmental physics in the packed particle arrays, use world-aware
+updates in gameplay/QA, and keep all hot-loop scratch bounded. An impact must
+come from loaded voxel traversal, never a predicted heightmap splash. Keep
+cosmetic randomness out of simulation RNG, reserve shared particle space, and
+update instance-packing tests whenever GPU attributes change. Cached columns
+must follow World lifetime rules; never cache voxel contents across edits.
+
+For a close inspection of one causal impact, use `VEYLON_SCENE=rain_impact` with
+`VEYLON_SHOT=1,3,5,7`. It recreates the same seeded drop and freezes four physics
+snapshots: falling, contact, ballistic scatter, expired. This scene deliberately
+uses fixed simulation steps each frame so the short spray can be inspected in
+native captures; the ordinary rain sequence exercises live continuous updates.

@@ -53,6 +53,7 @@ final class QaHarness {
     private static final double FORTRESS_APPROACH_SECONDS = 12.0;
 
     private final Game game;
+    private final RainQaScene rainScene;
 
     // Render statistics sampled across an automated run.
     private long profiledRenderFrames;
@@ -95,6 +96,7 @@ final class QaHarness {
 
     QaHarness(Game game) {
         this.game = game;
+        rainScene = new RainQaScene(game);
     }
 
     // ------------------------------------------------------------------
@@ -254,6 +256,7 @@ final class QaHarness {
             updateUiCycle(elapsed);
         }
         game.creativeQa.updateFlightScene(elapsed);
+        rainScene.update(elapsed);
     }
 
     /**
@@ -557,6 +560,8 @@ final class QaHarness {
         String normalized = scene.trim().toLowerCase(Locale.ROOT);
         Vec3i site;
         switch (normalized) {
+            case "physical_rain" -> rainScene.stage();
+            case "rain_impact" -> rainScene.stageImpact();
             case "day", "meadow" -> {
                 site = moveBenchmarkToBiome(Biome.MEADOW);
                 clearBenchmarkStage(site, 9, 18);
@@ -1244,7 +1249,7 @@ final class QaHarness {
             game.particles.blood(x, y + 0.22f, zz);
         }
         clearHeldForScenicCapture();
-        game.particles.update(0.08f);
+        game.particles.update(0.08f, game.world);
         game.simPaused = true;
         game.camera.pitch = 8f;
     }
@@ -1284,7 +1289,7 @@ final class QaHarness {
             game.particles.beaconMote(bp.x() + 0.5f, bp.y() + 0.25f + (i % 8) * 0.35f,
                     bp.z() + 0.5f);
         }
-        game.particles.update(0.10f);
+        game.particles.update(0.10f, game.world);
         clearHeldForScenicCapture();
         game.simPaused = true;
         game.camera.pitch = 4f;
@@ -1378,7 +1383,7 @@ final class QaHarness {
             game.particles.toxicMote(px - 12 + (i % 4) * 0.8f,
                     game.player.pos.y + 0.6f + (i % 3) * 0.35f, pz - 16 - i / 4f);
         }
-        game.particles.update(0.22f);
+        game.particles.update(0.22f, game.world);
 
         game.player.inventory.set(0, new ItemStack(ItemType.IRON_PICKAXE, 1));
         game.player.hotbarSel = 0;

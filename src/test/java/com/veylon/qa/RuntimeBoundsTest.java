@@ -92,7 +92,7 @@ class RuntimeBoundsTest {
         for (int tick = 0; tick < 3_200; tick++) {
             game.noise.update(0.05f);
             game.projectiles.update(game, 0.05f);
-            game.particles.update(0.05f);
+            game.particles.update(0.05f, game.world);
             game.explosions.tickFuses(game, 0.05f);
             game.fire.mediumTick(game, 0.05f);
             game.settlementManager.fastTick(game, 0.05f);

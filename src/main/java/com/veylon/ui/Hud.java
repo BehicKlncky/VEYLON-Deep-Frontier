@@ -374,12 +374,11 @@ public class Hud {
         ui.text(x + 3, y, 0.9f, label, 1f, 1f, 1f, 0.85f);
     }
 
-    /** Animated rain/snow streaks as a cheap full-screen overlay. */
+    /** Preserve the legacy snow overlay; rain is rendered exclusively in the depth-tested world pass. */
     private void renderWeatherOverlay(Game g, UiRenderer ui, int w, int h) {
-        if (!g.weather.isPrecip() || !g.player.exposedToSky) {
+        if (g.weather.effective() != WeatherSystem.Weather.SNOW || !g.player.exposedToSky) {
             return;
         }
-        boolean snow = g.weather.effective() == WeatherSystem.Weather.SNOW;
         float intensity = g.weather.intensity();
         int n = (int) (70 * intensity);
         double t = g.totalTime;
@@ -387,13 +386,9 @@ public class Hud {
             long hx = Noise.mix(i * 7919L + 13);
             long hy = Noise.mix(i * 104729L + 31);
             float px = (float) ((hx & 0xffff) / 65535.0) * w;
-            float speed = snow ? 60 : 420;
+            float speed = 60;
             float py = (float) ((((hy & 0xffff) / 65535.0) * h + t * speed) % h);
-            if (snow) {
-                ui.rect(px + (float) Math.sin(t * 2 + i) * 8, py, 3, 3, 1f, 1f, 1f, 0.7f);
-            } else {
-                ui.rect(px, py, 1.6f, 13, 0.65f, 0.75f, 0.95f, 0.45f);
-            }
+            ui.rect(px + (float) Math.sin(t * 2 + i) * 8, py, 3, 3, 1f, 1f, 1f, 0.7f);
         }
     }
 
