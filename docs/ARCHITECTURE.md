@@ -486,3 +486,105 @@ sprite/stretch2, velocity3 (attribute 5 at byte 40, stride 52). The shader align
 a trailing streak with world velocity transformed into view space, with a short
 fallback for end-on/zero motion and a close-camera fade. Depth testing and the
 alpha/additive passes remain unchanged. HUD precipitation is snow-only.
+
+## Death ragdolls and blood (0.7.2)
+
+A body that dies is no longer removed and replaced in the same tick. `EntityManager.fastTick`
+fires every consequence of the death where it always did — reputation, loot,
+mission failure, `counterattacks.onMemberDied`, resident bookkeeping, the log
+lines — and then hands the body to `RagdollSystem` instead of building the
+carcass. The carcass, or for a person the new `HumanCorpse`, is created where
+the body actually comes to rest. Quest credit and trust therefore still land on
+the tick of the kill; only the object left behind waits.
+
+`Entity.dead` means both "health hit 0" and "remove me from the world", and
+seven sites use the second meaning with health untouched: an expired trader, a
+raider fading at the camp edge, four war-party stand-downs and routed survivors.
+`EntityManager.reallyDied` gates on `health <= 0`, the discriminator `fastTick`
+already used for its "has died" line, so none of those drop dead on the road.
+Death by illness goes through health and is a real death.
+
+`RagdollSystem` is position-based dynamics over an articulated chain, not a
+rigid-body solver and not a physics library. A body is one torso point carrying
+the orientation plus up to six appendage point masses, one per bone named in
+`BodySkeleton`. A step integrates every point with the same numbers ordinary
+entities use — 26 m/s² in air, 7 in water, a −2.2 m/s descent clamp, 0.5
+horizontal water drag, 0.2-block axis sub-steps — relaxes each bone back onto
+its pivot three times, and then reads velocity back out of the distance actually
+travelled, which is what keeps the chain stable without a solver that can
+explode. Orientation is three explicit angles: the killing blow supplies an
+angular kick, a snagged limb torques the body, and once it is grounded a spring
+rolls it onto its resting side.
+
+The solver step is fixed at 1/60 s and driven per frame from the `simulate`
+gate beside `particles.update` and `projectiles.update`, not from the 20 Hz
+bucket. Creatures are drawn without interpolation and a tumbling body turns far
+faster than a walking one, so 20 Hz strobes; the fixed sub-step keeps behaviour
+frame-rate independent and a stalled frame clamps to four steps rather than
+replaying hundreds. A body settles when squared point speeds, squared angular
+speeds and the squared error against its resting orientation stay under
+`SETTLE_ENERGY` (0.55) for eight consecutive steps, or on a 6-second timeout.
+Folding the orientation error into that measure is what stops a body freezing
+while still standing upright; the timeout is what guarantees one can never stay
+unsettled. Live bodies are capped at twelve and the oldest settles immediately
+over the cap.
+
+`World.getBlock` answers `AIR` for an ungenerated column, so `RagdollCollision`
+treats an absent column as solid and a body killed at the streaming frontier
+settles on the spot instead of falling forever. It caches chunk references in
+the same direct-mapped 32-entry table `RainCollision` uses, and for the same
+reasons; absent columns are never cached. The per-frame solver allocates
+nothing.
+
+**No new `Random` was added and none will be.** Everything a body does follows
+from the impulse that killed it; where the choice is genuinely free — which side
+a body falls on when nothing pushed it — the sign comes from a hash of the death
+position. All the feature's randomness is presentation-only and lives in the
+already-seeded `ParticleSystem`.
+
+Rendering reuses the existing `entityShader` block: `renderCorpses` and
+`renderRagdolls` sit beside `renderCarcasses`, stamp the body's own `BodyPose`
+into the species' shared cached `EntityModel` through `Animator.poseBody`, and
+draw through the same `setEntityLight` / `entityVisible` / `drawModel` path. No
+new shader, mesh or draw-call class, and no model is cloned per body. A bone is
+aimed with two rotations and no yaw of its own, which covers the whole sphere
+exactly; measuring the target and the bone's authored rest axis the same way
+means an unmoved bone reads as zero and keeps the pose its builder gave it. The
+humanoid is a superset model whose accessories `resetPose` makes visible again,
+so `Animator.applyAppearance` — extracted from `poseNpc` and taking primitives
+rather than an `Npc` — runs for every body, and a corpse keeps the look of the
+person who died without holding the entity the world already removed.
+
+Orientation lives on the draw transform rather than the model root, because
+applied after the heading `rotateZ` is a roll about the body's own spine.
+`Carcass` gained a `BodyPose`; the positional-hash yaw the renderer used to
+invent is now a stored default assigned at construction, so a carcass restored
+from an older save or staged by QA looks exactly as it always did while a
+settled one is drawn in the pose it really came to rest in.
+
+`ParticleSystem.bloodBurst` throws a radial spray biased along the killing blow
+plus a little fast-fading mist — at most 22 droplets and 5 puffs, every count
+through `scaled(...)` so `particleDensity = 0` emits nothing. A body drips one
+droplet every 0.12 s while it is moving faster than 1.6 m/s, and settling adds a
+blood `Track`. Blood stops at `BLOOD_LIMIT` (3,600), and the worst case twelve
+bodies can emit fits inside the 1,200 slots weather already reserves.
+
+| State | Persisted | Where |
+| --- | --- | --- |
+| Settled carcass pose (yaw/pitch/roll/lift/pivot + bone angles) | yes | `world.bodies`, positional, one per carcass |
+| Human corpses (position, decay, appearance, pose) | yes | `world.bodies` |
+| Bodies still falling | no — a save settles them first, so a save taken mid-fall comes back as a corpse rather than a lost body | — |
+| Solver accumulator, settle timers, lifetime counters | no | reset with the world |
+
+The base v3 layout is untouched; `world.bodies` is an optional stable-ID section
+in the v3 extension envelope, entirely numeric (the archetype travels as a
+bounds-checked ordinal) so no byte anchor the migration tests rely on moves. An
+absent section means what every save written before 0.7.2 means: every carcass
+keeps its constructed pose and there are no human corpses.
+
+A human corpse is deliberately not an `Npc` and never enters `entities.npcs`, so
+it is not a perception or combat target, costs nothing against
+`SettlementManager.MAX_ACTIVE_NPCS`, and cannot disturb `residentIndex`
+bookkeeping. It rots on the slow tick beside carcasses and is despawned past the
+same 170 m radius wildlife uses. Birds tumble and leave nothing, as they always
+have.

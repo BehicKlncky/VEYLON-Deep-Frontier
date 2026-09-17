@@ -42,7 +42,7 @@ runs. All are inert when unset. Everything below is handled by `QaHarness`;
 | `VEYLON_SEED` | Fixed world seed (a non-numeric value is hashed) |
 | `VEYLON_GAME_MODE=survival\|creative` | Initial mode for automated world runs only; absent means Survival. Invalid values fail explicitly. Ignored for normal title sessions and frontend-only captures. |
 | `VEYLON_SMOKE=<seconds>` | Release smoke gate: save/load, fire, storm, a fortress approach, then a pass/fail report. Throws on failure |
-| `VEYLON_SCENE=<name>` | Stage a deterministic benchmark scene (`day`, `pinefog`, `nightfire`, `ruin`, `toxic`, `ao_shadow`, `phase4`, `ashwolf`, `silhouette30`, `vfx_blood`, `vfx_mining`, `vfx_beacon`, `movement`, `inventory`, `ui_cycle`, `held_*`, and `creative_flight` with `VEYLON_GAME_MODE=creative`, which flies east at Shift speed and prints a `[flight]` streaming report at 29 s) |
+| `VEYLON_SCENE=<name>` | Stage a deterministic benchmark scene (`day`, `pinefog`, `nightfire`, `ruin`, `toxic`, `ao_shadow`, `phase4`, `ashwolf`, `silhouette30`, `vfx_blood`, `vfx_mining`, `vfx_beacon`, `death_ragdoll_showcase`, `death_ragdoll_sequence`, `movement`, `inventory`, `ui_cycle`, `held_*`, and `creative_flight` with `VEYLON_GAME_MODE=creative`, which flies east at Shift speed and prints a `[flight]` streaming report at 29 s) |
 | `VEYLON_SHOT="5,10"` | Capture screenshots at those elapsed seconds |
 | `VEYLON_FRONTEND=<name>` | Pin a front-end screen (`options`, `audio`, `loading`, `death`, `victory`, `glyphs`, `newworld`). `newworld-save` shows the replace-save notice without writing a save. `pause` and `gamemode` stage a Survival world with the pause menu or the mode confirmation open; `pause-creative`, `gamemode-creative` and `victory-creative` stage a Creative world; `catalog`, `catalog-tools`, `catalog-search` (query "iron") and `catalog-inventory` open the Creative catalog; `worldcontrols` and `worldcontrols-held` open the Creative world controls, the second with dusk, a frozen clock, a locked storm and paused spawning already applied |
 | `VEYLON_RESOLUTION=1920x1080` | Framebuffer override |
@@ -120,8 +120,17 @@ transfers, equipping) keeps the Survival rule in both modes and needs no gate.
 1. Append to `Creature.CreatureType` (health, damage, speed, `predator`,
    `flying`, drops).
 2. Build its model in `CreatureModels`.
-3. Add spawn rules to `EntityManager` (biome, time of day, density cap).
-4. Only touch `CreatureAI` if it needs behaviour the existing states don't
+3. Map its bones in `BodySkeleton.buildCreature` so a dead one ragdolls instead
+   of dropping as a single rigid block. An entry names real `ModelPart` names,
+   the pivot each hangs from **in the model root frame**, the axis it is authored
+   along, and how far out along that axis its handle sits — all readable straight
+   off the model builder. A type with no entry falls through to
+   `BodySkeleton.rigid` and tumbles as one piece, which is a legitimate choice
+   for something tiny rather than an oversight. Only bones authored along Y or Z
+   can be aimed — the two-angle parameterisation cannot reach a sideways rest
+   axis — which is why the skitterwing's wings stay at rest.
+4. Add spawn rules to `EntityManager` (biome, time of day, density cap).
+5. Only touch `CreatureAI` if it needs behaviour the existing states don't
    cover.
 
 ### An NPC role
@@ -255,7 +264,7 @@ Reload progress and bow draw deliberately do not.
   from the same fixture. `SurvivalCreativeParityTest` and the `Creative*Test`
   classes are built in pairs for exactly that reason — a gate that accidentally
   fires in Survival is the failure mode worth catching.
-- The suite is 659 tests across 99 classes at 0.7.1.
+- The suite is 704 tests across 105 classes at 0.7.2.
 
 ---
 
@@ -303,3 +312,41 @@ For a close inspection of one causal impact, use `VEYLON_SCENE=rain_impact` with
 snapshots: falling, contact, ballistic scatter, expired. This scene deliberately
 uses fixed simulation steps each frame so the short spray can be inspected in
 native captures; the ordinary rain sequence exercises live continuous updates.
+
+## Death ragdoll QA and contributor rules (0.7.2)
+
+Use `VEYLON_SCENE=death_ragdoll_showcase`, `VEYLON_SEED=20260918` and
+`VEYLON_SHOT=1,2,3,5,8` for the staged meadow: four animals and one settler
+killed from known directions on one frame, then frozen at 0, 0.25, 0.8, 2.0 and
+5.0 seconds of solver time. `death_ragdoll_sequence` does the same to a single
+wolf, side-on and close, for reading one body frame by frame. Both keep the
+simulation paused and advance the solver in fixed steps tied to elapsed
+wall-clock seconds, the way `rain_impact` does, because a two-second tumble is
+too short to inspect at live frame cadence and a wall-clock screenshot would
+otherwise land somewhere different every run.
+
+Run `gradlew test --tests '*Ragdoll*' --tests '*DeathRagdoll*' --tests
+'*OverloadedDeadFlag*' --tests '*BloodBurst*' --tests '*BodiesSection*'` while
+working on this.
+
+Contributor rules this feature adds:
+
+- **Gate anything that happens on death on `health <= 0`, never on
+  `Entity.dead`.** The flag also means "remove me from the world" at seven sites
+  where health is untouched — expired traders, fading raiders, stood-down war
+  parties, routed survivors. `EntityManager.reallyDied` is the predicate;
+  `OverloadedDeadFlagTest` drives the real AI paths that set the flag and fails
+  if a despawn starts leaving a body.
+- **Consequences fire on the tick of death; only the object left behind waits.**
+  Reputation, loot, mission failure and resident bookkeeping that lagged a second
+  behind the kill would read as a bug.
+- **A body is positioned by its torso and drawn through its own `BodyPose`.**
+  Orientation belongs on the draw transform, not the model root, or a roll
+  becomes a rotation about world Z instead of the body's spine. Models stay
+  shared singletons — never clone one per body.
+- **Anything that poses the humanoid must run `Animator.applyAppearance`.**
+  `resetPose` makes all 22 archetype accessories visible again, so a body posed
+  without it wears a trader's pack, a raider's hood and a leader's mantle at once.
+- **Keep the per-frame solver allocation-free.** `RagdollAllocationTest` holds it
+  at zero with a 4 KB allowance, in the default suite rather than the
+  performance one, because what it pins is a property of the code.
