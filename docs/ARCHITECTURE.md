@@ -453,3 +453,36 @@ catalog behaves like the inventory screen and owns its keys from the opening
 frame. No thread, asset, dependency or outcome-affecting `Random` was added, and
 the hot paths gained only boolean reads. Game is 959 lines, below its 1,000-line
 gate.
+
+## Physical precipitation (0.7.1)
+
+`AmbienceSystem` owns a `RainField` that emits over a 22-block radius in loaded
+columns, using its existing world-seeded cosmetic RNG. The heightmap is only a
+sky-entry bound; shelter exposure still drives gameplay and audio, never the
+rain field. Per-column ceiling rejection limits deep-cave work. Drops remain in
+world space as the camera moves; precipitation beyond 32 blocks or 42 vertical
+blocks is recycled, including after teleportation.
+
+`ParticleSystem.update(dt, world)` integrates the existing structure-of-arrays
+pool. Rain relaxes toward a size-dependent terminal speed and smooth wind.
+`RainCollision` traverses each old-to-new position segment with voxel DDA and
+returns the first solid or water contact and its face normal. Unloaded space,
+invalid segments and starts inside geometry retire particles without an impact.
+Water uses the rendered 0.88 height; non-solid decorations retain world solidity
+semantics. Exact contact alone creates 2–4 density-scaled ballistic droplets,
+which collide and expire without recursively splashing. No collision writes
+world state. The no-world overload is for ordinary effects and retires rain.
+
+Descending packed-array iteration processes every original particle once even
+when removal swaps a tail and impacts append droplets. New droplets first move
+on the next update. The unchanged 4,000-slot pool admits rain below 2,400 total
+particles and splash below 2,800, preserving at least 1,200 slots for other
+emitters. Collision reuses one result and a 32-entry direct-mapped column cache:
+World retains voxel columns for its lifetime, references expose edits immediately,
+and changing World invalidates the cache. Missing columns are never cached.
+
+`ParticleRenderer` packs 13 floats per instance: position3, size1, RGBA4,
+sprite/stretch2, velocity3 (attribute 5 at byte 40, stride 52). The shader aligns
+a trailing streak with world velocity transformed into view space, with a short
+fallback for end-on/zero motion and a close-camera fade. Depth testing and the
+alpha/additive passes remain unchanged. HUD precipitation is snow-only.

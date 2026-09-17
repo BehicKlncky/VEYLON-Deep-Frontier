@@ -24,7 +24,12 @@ find blueprints, master the crafting stations and **repair the distress beacon**
 
 ---
 
-Version **0.7.0 — Stone & Sky** adds a **Creative mode**: an invulnerable body with no
+Version **0.7.1 — Physical Rain** brings wind-driven world-space drops that strike
+roofs, terrain, foliage and water, with tiny impact droplets. Outdoor rain remains
+visible from shelter. See the [release notes](docs/releases/v0.7.1.md) and
+[validation record](docs/engineering/v0.7.1-validation.md).
+
+Version **0.7.0 — Stone & Sky** added a **Creative mode**: an invulnerable body with no
 needs, flight, instant building, a searchable catalog of every item, wildlife and
 settlers that ignore you, and builder's controls over time, weather and spawning.
 Survival plays exactly as it did in 0.6.0.
@@ -100,9 +105,9 @@ Windows x64 (PowerShell):
 ```powershell
 .\gradlew.bat build             # compile + unit tests + jar
 .\gradlew.bat performanceTest   # opt-in benchmarks calibrated for the reference PC
-.\gradlew.bat fatJar            # build\libs\veylon-0.7.0-all.jar
+.\gradlew.bat fatJar            # build\libs\veylon-0.7.1-all.jar
 .\gradlew.bat jpackage          # build\jpackage\Veylon\Veylon.exe
-.\gradlew.bat appImageZip       # build\distributions\veylon-0.7.0-windows-x64.zip
+.\gradlew.bat appImageZip       # build\distributions\veylon-0.7.1-windows-x64.zip
 .\gradlew.bat releaseArtifacts  # tests + all host-specific release artifacts
 ```
 
@@ -112,7 +117,7 @@ macOS Intel or Apple Silicon (Terminal):
 ./gradlew build
 ./gradlew fatJar
 ./gradlew jpackage          # build/jpackage/Veylon.app
-./gradlew appImageZip       # build/distributions/veylon-0.7.0-macos-{x64|arm64}.zip
+./gradlew appImageZip       # build/distributions/veylon-0.7.1-macos-{x64|arm64}.zip
 ./gradlew releaseArtifacts
 ```
 
@@ -147,7 +152,7 @@ See [CHANGELOG.md](CHANGELOG.md) for release notes.
 Run the fat JAR with the same JVM options used by the packaged launchers:
 
 ```powershell
-java --enable-native-access=ALL-UNNAMED -Xmx2G -jar build\libs\veylon-0.7.0-all.jar
+java --enable-native-access=ALL-UNNAMED -Xmx2G -jar build\libs\veylon-0.7.1-all.jar
 ```
 
 ---
@@ -298,7 +303,7 @@ java --enable-native-access=ALL-UNNAMED -Xmx2G -jar build\libs\veylon-0.7.0-all.
   music leaves 120-180 seconds of silence between 12-second phrases. Four live
   volume controls and mute persist beside graphics preferences; missing audio
   devices remain safe and missing EFX falls back to dry playback.
-- **Visuals**: particles (block dust, smoke, embers, rain splashes, 3D snow and ash,
+- **Visuals**: particles (block dust, smoke, embers, physical rain and impact droplets, 3D snow and ash,
   blood, cold breath), first-person held item with swing/bob, entity walk-bob and
   stalking postures, bird wing flaps, damage/cold/smoke vignettes, beacon light column,
   toxic-fog green cast.

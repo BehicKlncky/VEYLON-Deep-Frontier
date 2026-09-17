@@ -4,11 +4,28 @@ All notable user-facing changes to VEYLON: Deep Frontier are recorded here.
 
 ## [Unreleased]
 
+## [0.7.1] - 2026-09-17
+
 ### Added
 
+- World-space rain with smooth wind, varied fall speeds and velocity-aligned
+  streaks. Storms produce a denser, more wind-deflected field than ordinary rain.
+- Swept voxel impacts on roofs, terrain, leaves and water. A drop terminates at
+  contact and creates a small, short-lived ballistic spray, subdued on soft surfaces.
+- A repeatable `physical_rain` QA sequence and headless physics, rendering-data,
+  density, determinism, pool-budget and allocation/performance coverage.
 - The project is now licensed under the PolyForm Noncommercial License 1.0.0
   (`LICENSE.md`). Noncommercial use, modification and sharing are allowed; commercial
   use requires written permission. The license ships inside every jar and archive.
+
+### Changed
+
+- Outdoor rain remains visible while sheltered; nearby loaded columns determine
+  emission, independently of gameplay exposure. Deep cave columns are rejected.
+- Removed predicted ground splashes and the legacy HUD rain overlay. Rain now
+  belongs to the depth-tested scene; the existing snow behavior is preserved.
+- Weather emissions reserve room for combat/fire effects in the unchanged
+  4,000-particle pool and still use at most two instanced render submissions.
 
 ## [0.7.0] - 2026-09-16
 
