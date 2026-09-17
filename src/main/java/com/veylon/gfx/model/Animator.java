@@ -1,5 +1,7 @@
 package com.veylon.gfx.model;
 
+import com.veylon.entity.BodyPose;
+import com.veylon.entity.BodySkeleton;
 import com.veylon.entity.Creature;
 import com.veylon.entity.Npc;
 
@@ -111,17 +113,44 @@ public final class Animator {
         }
     }
 
-    /** Carcass pose: same model, keeled over on its side. */
+    /**
+     * Carcass pose for a body nobody simulated: the fixed sprawl the game has
+     * always drawn.
+     *
+     * <p>The keel itself is no longer here. A body's orientation now lives on
+     * its {@link com.veylon.entity.BodyPose} and is applied to the draw
+     * transform, so this writes limbs only and the same code path serves both a
+     * solved pose and this one.
+     */
     public static void poseCarcass(EntityModel m) {
         m.resetPose();
-        ModelPart root = m.part("root");
-        root.rotZ = 1.45f;
-        root.poseY = 0.16f;
         m.part("leg_fl").rotX = 0.5f;
         m.part("leg_fr").rotX = -0.35f;
         m.part("leg_bl").rotX = 0.35f;
         m.part("leg_br").rotX = -0.5f;
         m.part("head").rotX = 0.3f;
+    }
+
+    /**
+     * Writes a solved body's own bone angles into the shared species model.
+     *
+     * <p>This is the whole of the ragdoll/corpse render seam: the model stays a
+     * cached singleton, and the per-body state lives on the {@link BodyPose}
+     * that is stamped in here immediately before the draw. The pose's
+     * yaw/pitch/roll are not written to the root — the caller puts them on the
+     * draw transform, where a roll is a roll about the body's own axis rather
+     * than about world Z.
+     */
+    public static void poseBody(EntityModel m, BodySkeleton skeleton, BodyPose pose) {
+        m.resetPose();
+        int bones = Math.min(pose.boneCount, skeleton.boneCount);
+        for (int b = 0; b < bones; b++) {
+            // An unmapped name resolves to a hidden dummy, so a species whose
+            // bones were never listed degrades instead of throwing.
+            ModelPart part = m.part(skeleton.part[b]);
+            part.rotX = pose.boneRotX[b];
+            part.rotZ = pose.boneRotZ[b];
+        }
     }
 
     // ------------------------------------------------------------------
@@ -136,83 +165,7 @@ public final class Animator {
         float swing = (float) Math.sin(phase) * run;
         float t = (float) time;
 
-        // Role/faction colors.
-        var a = n.archetype;
-        int vest;
-        if (a != null) {
-            vest = switch (a) {
-                case GUARD -> 0x5e4a30;
-                case ARCHER -> 0x4a5a38;
-                case MEDIC -> 0x707a80;
-                case TRADER -> 0xa8842e;
-                case FARMER -> 0x5c6a3a;
-                case SMITH -> 0x54483c;
-                case SCAVENGER -> 0x5a2a20;
-                case TRACKER -> 0x4a382c;
-                case SCOUT -> 0x3e4a42;
-                case HUNTER -> 0x513f2c;
-                case BRUTE -> 0x3a2f28;
-                case POWDERMAN -> 0x40342a;
-                case LEADER -> 0x5a2430;
-                case CAPTIVE -> 0x565250;
-                default -> 0x6a5a44;
-            };
-        } else if (n.raider) {
-            vest = 0x5a2a20;
-        } else if (n.isTrader) {
-            vest = 0xa8842e;
-        } else if (n.sick) {
-            vest = 0x4a5e56;
-        } else {
-            vest = switch (n.campIndex % 4) {
-                case 0 -> 0x5e4a30;  // guard: leather
-                case 1 -> 0x50603c;  // hunter: green
-                case 2 -> 0x6a5a44;  // gatherer
-                default -> 0x707a80; // medic: pale
-            };
-        }
-        m.part("vest").color(vest);
-
-        boolean scavengerLook = n.raider
-                || a == com.veylon.settlement.NpcArchetype.SCAVENGER;
-        boolean headhunter = a != null && a.hostileArchetype()
-                && a != com.veylon.settlement.NpcArchetype.SCAVENGER;
-        boolean trader = n.isTrader || a == com.veylon.settlement.NpcArchetype.TRADER;
-        m.part("pack").visible = trader;
-        m.part("traderRoll").visible = trader;
-        m.part("traderAntenna").visible = trader;
-        m.part("traderLamp").visible = trader;
-        m.part("traderSatchelL").visible = trader;
-        m.part("traderSatchelR").visible = trader;
-        m.part("hood").visible = scavengerLook;
-        m.part("visor").visible = scavengerLook;
-        m.part("raiderPadL").visible = scavengerLook;
-        m.part("raiderPadR").visible = scavengerLook;
-        ModelPart raiderSpear = m.part("raiderSpear");
-        raiderSpear.visible = scavengerLook;
-        raiderSpear.rotZ = 0.62f; // slung diagonally across the back
-        m.part("friendlyBadge").visible = !scavengerLook && !headhunter && !trader
-                && a != com.veylon.settlement.NpcArchetype.CAPTIVE;
-
-        // 0.3.0 archetype accessories.
-        boolean archer = a == com.veylon.settlement.NpcArchetype.ARCHER
-                || a == com.veylon.settlement.NpcArchetype.SCOUT;
-        m.part("quiver").visible = archer;
-        m.part("slungBow").visible = archer;
-        m.part("kegPack").visible = a == com.veylon.settlement.NpcArchetype.POWDERMAN;
-        m.part("slungGun").visible = a == com.veylon.settlement.NpcArchetype.POWDERMAN;
-        boolean brute = a == com.veylon.settlement.NpcArchetype.BRUTE;
-        m.part("brutePadL").visible = brute;
-        m.part("brutePadR").visible = brute;
-        m.part("bruteChest").visible = brute;
-        boolean leader = a == com.veylon.settlement.NpcArchetype.LEADER;
-        m.part("leaderCrest").visible = leader;
-        m.part("leaderMantle").visible = leader;
-        m.part("trophies").visible = headhunter;
-        m.part("warPaint").visible = headhunter;
-        m.part("medicSash").visible = a == com.veylon.settlement.NpcArchetype.MEDIC;
-        m.part("guardPlate").visible = a == com.veylon.settlement.NpcArchetype.GUARD;
-
+        applyAppearance(m, n.archetype, n.raider, n.isTrader, n.sick, n.campIndex);
         m.part("arm_l").rotX = swing * 0.7f;
         m.part("arm_r").rotX = -swing * 0.7f;
         m.part("leg_l").rotX = -swing * 0.8f;
@@ -261,5 +214,96 @@ public final class Animator {
             default -> {
             }
         }
+    }
+
+    /**
+     * Vest colour and accessory visibility for the shared humanoid.
+     *
+     * <p>The humanoid is a superset model: every archetype's kit exists in the
+     * tree and {@code resetPose} makes all of it visible again, so anything
+     * that poses a person has to run this or draw a body wearing a trader's
+     * pack, a raider's hood, a quiver, a powder keg and a leader's mantle at
+     * once. Taking primitives rather than an {@code Npc} is what lets a corpse
+     * keep the look of the person who died without holding on to the entity
+     * the world has already removed.
+     */
+    public static void applyAppearance(EntityModel m, com.veylon.settlement.NpcArchetype a,
+                                       boolean raider, boolean isTrader, boolean sick,
+                                       int campIndex) {
+        // Role/faction colors.
+        int vest;
+        if (a != null) {
+            vest = switch (a) {
+                case GUARD -> 0x5e4a30;
+                case ARCHER -> 0x4a5a38;
+                case MEDIC -> 0x707a80;
+                case TRADER -> 0xa8842e;
+                case FARMER -> 0x5c6a3a;
+                case SMITH -> 0x54483c;
+                case SCAVENGER -> 0x5a2a20;
+                case TRACKER -> 0x4a382c;
+                case SCOUT -> 0x3e4a42;
+                case HUNTER -> 0x513f2c;
+                case BRUTE -> 0x3a2f28;
+                case POWDERMAN -> 0x40342a;
+                case LEADER -> 0x5a2430;
+                case CAPTIVE -> 0x565250;
+                default -> 0x6a5a44;
+            };
+        } else if (raider) {
+            vest = 0x5a2a20;
+        } else if (isTrader) {
+            vest = 0xa8842e;
+        } else if (sick) {
+            vest = 0x4a5e56;
+        } else {
+            vest = switch (Math.floorMod(campIndex, 4)) {
+                case 0 -> 0x5e4a30;  // guard: leather
+                case 1 -> 0x50603c;  // hunter: green
+                case 2 -> 0x6a5a44;  // gatherer
+                default -> 0x707a80; // medic: pale
+            };
+        }
+        m.part("vest").color(vest);
+
+        boolean scavengerLook = raider
+                || a == com.veylon.settlement.NpcArchetype.SCAVENGER;
+        boolean headhunter = a != null && a.hostileArchetype()
+                && a != com.veylon.settlement.NpcArchetype.SCAVENGER;
+        boolean trader = isTrader || a == com.veylon.settlement.NpcArchetype.TRADER;
+        m.part("pack").visible = trader;
+        m.part("traderRoll").visible = trader;
+        m.part("traderAntenna").visible = trader;
+        m.part("traderLamp").visible = trader;
+        m.part("traderSatchelL").visible = trader;
+        m.part("traderSatchelR").visible = trader;
+        m.part("hood").visible = scavengerLook;
+        m.part("visor").visible = scavengerLook;
+        m.part("raiderPadL").visible = scavengerLook;
+        m.part("raiderPadR").visible = scavengerLook;
+        ModelPart raiderSpear = m.part("raiderSpear");
+        raiderSpear.visible = scavengerLook;
+        raiderSpear.rotZ = 0.62f; // slung diagonally across the back
+        m.part("friendlyBadge").visible = !scavengerLook && !headhunter && !trader
+                && a != com.veylon.settlement.NpcArchetype.CAPTIVE;
+
+        // 0.3.0 archetype accessories.
+        boolean archer = a == com.veylon.settlement.NpcArchetype.ARCHER
+                || a == com.veylon.settlement.NpcArchetype.SCOUT;
+        m.part("quiver").visible = archer;
+        m.part("slungBow").visible = archer;
+        m.part("kegPack").visible = a == com.veylon.settlement.NpcArchetype.POWDERMAN;
+        m.part("slungGun").visible = a == com.veylon.settlement.NpcArchetype.POWDERMAN;
+        boolean brute = a == com.veylon.settlement.NpcArchetype.BRUTE;
+        m.part("brutePadL").visible = brute;
+        m.part("brutePadR").visible = brute;
+        m.part("bruteChest").visible = brute;
+        boolean leader = a == com.veylon.settlement.NpcArchetype.LEADER;
+        m.part("leaderCrest").visible = leader;
+        m.part("leaderMantle").visible = leader;
+        m.part("trophies").visible = headhunter;
+        m.part("warPaint").visible = headhunter;
+        m.part("medicSash").visible = a == com.veylon.settlement.NpcArchetype.MEDIC;
+        m.part("guardPlate").visible = a == com.veylon.settlement.NpcArchetype.GUARD;
     }
 }
