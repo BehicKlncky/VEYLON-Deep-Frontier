@@ -121,6 +121,7 @@ tasks.named('check') {
 }
 
 tasks.register('performanceTest', Test) {
+    dependsOn 'rainPerformanceTest'
     group = 'verification'
     description = 'Runs the hardware-calibrated simulation and save/load benchmarks.'
     testClassesDirs = sourceSets.test.output.classesDirs
@@ -128,9 +129,27 @@ tasks.register('performanceTest', Test) {
     outputs.upToDateWhen { false }
     useJUnitPlatform {
         includeTags 'performance'
+        excludeTags 'rain-performance'
     }
     // The measured figures are the point of this task, so print them rather
     // than making every run pass --info to see whether a budget was close.
+    testLogging {
+        showStandardStreams = true
+    }
+    shouldRunAfter tasks.named('test')
+}
+
+// Heavy repeated rain traversal changes the shared JVM's world-query JIT profiles.
+// Keep it in a fresh worker so the existing simulation/save calibration is preserved.
+tasks.register('rainPerformanceTest', Test) {
+    group = 'verification'
+    description = 'Measures physical rain CPU, allocation and voxel-query budgets in isolation.'
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath
+    outputs.upToDateWhen { false }
+    useJUnitPlatform {
+        includeTags 'rain-performance'
+    }
     testLogging {
         showStandardStreams = true
     }
