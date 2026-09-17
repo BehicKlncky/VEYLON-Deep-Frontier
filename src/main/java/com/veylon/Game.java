@@ -501,7 +501,7 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
         if (simulate) {
             advanceClock(dtD);
             scheduler.update(dtD, this);
-            particles.update(dt);
+            particles.update(dt, world);
             projectiles.update(this, dt);
             explosions.tickFuses(this, dt);
             noise.update(dt);

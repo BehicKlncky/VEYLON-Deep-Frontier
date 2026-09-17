@@ -1,13 +1,14 @@
 package com.veylon.engine;
 
 import com.veylon.world.BlockType;
+import com.veylon.world.World;
 
 import java.util.Random;
 
 /**
  * CPU particle simulation drawn by the instanced ParticleRenderer.
  * kind selects the procedural sprite + blend: 0 soft puff, 1 hard dot,
- * 2 vertical streak (rain), 3 additive spark (embers, beacon motes).
+ * 2 velocity-aligned streak (rain), 3 additive spark (embers, beacon motes).
  */
 public class ParticleSystem {
 
@@ -16,6 +17,14 @@ public class ParticleSystem {
     public static final byte KIND_DOT = 1;
     public static final byte KIND_STREAK = 2;
     public static final byte KIND_SPARK = 3;
+    private static final float RAIN_WIND_RESPONSE = 1.7f;
+    private static final float RAIN_FALL_RESPONSE = 2.5f;
+    private static final float RAIN_TERMINAL_BASE = 15f;
+    private static final float RAIN_TERMINAL_SIZE_SCALE = 100f;
+    private static final float RAIN_FADE_IN = 0.12f;
+    private static final float RAIN_VERTICAL_RANGE = 42f;
+    private static final float IMPACT_OFFSET = 0.006f;
+    private static final float SPLASH_GRAVITY = 12f;
 
     public final float[] px = new float[MAX];
     public final float[] py = new float[MAX];
@@ -31,6 +40,13 @@ public class ParticleSystem {
     private final float[] life = new float[MAX];
     private final float[] maxLife = new float[MAX];
     private final float[] grav = new float[MAX];
+    private final boolean[] splash = new boolean[MAX];
+    private final RainCollision collision = new RainCollision();
+    /** Weather leaves at least 1,200 slots for fire, combat and other effects. */
+    public static final int RAIN_LIMIT = 2400, SPLASH_LIMIT = 2800;
+    private float windX, windZ;
+    public int collisionProbesLastUpdate;
+    public int impactsLastUpdate;
     public int count;
 
     /** 0..1 multiplier applied to emission counts (graphics setting). */
@@ -38,9 +54,12 @@ public class ParticleSystem {
 
     private final Random rng = new Random();
 
-    /** Dev-scene hook; normal gameplay intentionally keeps organically varying particles. */
+    /** WorldBootstrap and QA seed cosmetic randomness without consuming simulation RNG. */
     public void setRandomSeed(long seed) {
         rng.setSeed(seed);
+        // A new dry world must not retain the previous world's voxel data until its first rain.
+        collision.reset();
+        windX = windZ = 0;
     }
 
     public void spawn(byte particleKind, float x, float y, float z,
@@ -64,40 +83,103 @@ public class ParticleSystem {
         life[i] = lifetime;
         maxLife[i] = lifetime;
         grav[i] = gravity;
+        splash[i] = false;
     }
 
+    /** Compatibility for isolated non-weather effects; rain needs a loaded world to survive. */
     public void update(float dt) {
-        for (int i = 0; i < count; ) {
-            life[i] -= dt;
-            if (life[i] <= 0) {
-                int last = --count;
-                px[i] = px[last];
-                py[i] = py[last];
-                pz[i] = pz[last];
-                vx[i] = vx[last];
-                vy[i] = vy[last];
-                vz[i] = vz[last];
-                cr[i] = cr[last];
-                cg[i] = cg[last];
-                cb[i] = cb[last];
-                size[i] = size[last];
-                kind[i] = kind[last];
-                life[i] = life[last];
-                maxLife[i] = maxLife[last];
-                grav[i] = grav[last];
-                continue;
+        update(dt, null);
+    }
+
+    /** World-aware physics; new impact droplets begin integrating on the next frame. */
+    public void update(float dt, World world) {
+        collisionProbesLastUpdate = impactsLastUpdate = 0;
+        if (!(dt > 0) || !Float.isFinite(dt)) return;
+        // Descending traversal handles swap removal and appending secondary droplets together:
+        // the swapped tail has already been processed, or was just born this frame.
+        for (int i = count - 1; i >= 0; i--) {
+            boolean rain = kind[i] == KIND_STREAK;
+            float step = Math.min(dt, life[i]);
+            if (rain && world == null) { remove(i); continue; }
+            if (rain) {
+                float drag = 1f - (float) Math.exp(-RAIN_WIND_RESPONSE * step);
+                vx[i] += (windX - vx[i]) * drag;
+                vz[i] += (windZ - vz[i]) * drag;
+                float terminal = RAIN_TERMINAL_BASE + size[i] * RAIN_TERMINAL_SIZE_SCALE;
+                vy[i] += (-terminal - vy[i]) * (1f - (float) Math.exp(-RAIN_FALL_RESPONSE * step));
+            } else vy[i] -= grav[i] * step;
+            float x = px[i] + vx[i] * step, y = py[i] + vy[i] * step, z = pz[i] + vz[i] * step;
+            if ((rain || splash[i]) && world != null) {
+                int result = collision.trace(world, px[i], py[i], pz[i], x, y, z);
+                collisionProbesLastUpdate += collision.probes;
+                if (result != RainCollision.CLEAR) {
+                    remove(i);
+                    if (rain && result == RainCollision.HIT) {
+                        impactsLastUpdate++;
+                        impactSplash();
+                    }
+                    continue;
+                }
             }
-            vy[i] -= grav[i] * dt;
-            px[i] += vx[i] * dt;
-            py[i] += vy[i] * dt;
-            pz[i] += vz[i] * dt;
-            i++;
+            life[i] -= dt;
+            if (life[i] <= 0) { remove(i); continue; }
+            px[i] = x; py[i] = y; pz[i] = z;
+        }
+    }
+
+    private void remove(int i) {
+        int last = --count;
+        px[i] = px[last]; py[i] = py[last]; pz[i] = pz[last];
+        vx[i] = vx[last]; vy[i] = vy[last]; vz[i] = vz[last];
+        cr[i] = cr[last]; cg[i] = cg[last]; cb[i] = cb[last];
+        size[i] = size[last]; kind[i] = kind[last]; splash[i] = splash[last];
+        life[i] = life[last]; maxLife[i] = maxLife[last]; grav[i] = grav[last];
+    }
+
+    public float velocityX(int i) { return vx[i]; }
+    public float velocityY(int i) { return vy[i]; }
+    public float velocityZ(int i) { return vz[i]; }
+    public boolean isRainSplash(int i) { return splash[i]; }
+
+    /** Smooth cosmetic wind supplied by the rain field, independent of gameplay weather RNG. */
+    public void setRainWind(float x, float z) { windX = x; windZ = z; }
+
+    /** Existing particles stay in world space; only obsolete precipitation is recycled. */
+    public void cullRain(float x, float y, float z, float radius) {
+        for (int i = count - 1; i >= 0; i--) {
+            if (kind[i] != KIND_STREAK && !splash[i]) continue;
+            float dx = px[i] - x, dz = pz[i] - z;
+            if (dx * dx + dz * dz > radius * radius || Math.abs(py[i] - y) > RAIN_VERTICAL_RANGE) remove(i);
+        }
+    }
+
+    private void impactSplash() {
+        float response = switch (collision.material) {
+            case WATER -> 0.35f;
+            case LEAVES, GRASS, DIRT, SAND, CLAY, SNOW, ASH -> 0.55f;
+            default -> 1f;
+        };
+        int n = scaled(2 + rng.nextInt(3));
+        for (int j = 0; j < n && count < SPLASH_LIMIT; j++) {
+            float sx = rnd(0.85f) * response, sz = rnd(0.85f) * response;
+            float sy = (0.7f + rng.nextFloat() * 1.0f) * response;
+            // On side faces scatter back into air, never through the struck block.
+            if (collision.nx != 0) sx = collision.nx * (0.3f + Math.abs(sx));
+            if (collision.nz != 0) sz = collision.nz * (0.3f + Math.abs(sz));
+            if (collision.ny < 0) sy = -sy;
+            int i = count;
+            spawn(KIND_DOT, collision.x + collision.nx * IMPACT_OFFSET,
+                    collision.y + collision.ny * IMPACT_OFFSET, collision.z + collision.nz * IMPACT_OFFSET,
+                    sx, sy, sz, 0.52f, 0.62f, 0.73f,
+                    0.009f + rng.nextFloat() * 0.009f, 0.10f + rng.nextFloat() * 0.12f, SPLASH_GRAVITY);
+            splash[i] = true;
         }
     }
 
     /** 0..1 fade factor near end of life. */
     public float fade(int i) {
-        return Math.min(1f, life[i] / Math.max(0.01f, maxLife[i] * 0.35f));
+        float end = Math.min(1f, life[i] / Math.max(0.01f, maxLife[i] * 0.35f));
+        return kind[i] == KIND_STREAK ? end * Math.min(1f, (maxLife[i] - life[i]) / RAIN_FADE_IN) : end;
     }
 
     private float rnd(float spread) {
@@ -177,14 +259,6 @@ public class ParticleSystem {
                 0.22f + rng.nextFloat() * 0.15f, 0.35f + rng.nextFloat() * 0.3f, -1.2f);
     }
 
-    public void rainSplash(float x, float y, float z) {
-        for (int i = 0; i < scaled(2); i++) {
-            spawn(KIND_DOT, x + rnd(0.2f), y + 0.05f, z + rnd(0.2f),
-                    rnd(0.9f), 1.1f + rng.nextFloat(), rnd(0.9f),
-                    0.6f, 0.7f, 0.9f, 0.04f, 0.25f, 16f);
-        }
-    }
-
     public void snowflake(float x, float y, float z) {
         if (scaled(1) < 1) {
             return;
@@ -195,10 +269,10 @@ public class ParticleSystem {
     }
 
     public void rainDrop(float x, float y, float z) {
-        if (scaled(1) < 1) {
-            return;
-        }
-        spawn(KIND_STREAK, x, y, z, 0, -11f, 0, 0.60f, 0.68f, 0.9f, 0.05f, 1.0f, 0f);
+        if (count >= RAIN_LIMIT || scaled(1) < 1) return;
+        spawn(KIND_STREAK, x, y, z, windX + rnd(0.65f), -12f - rng.nextFloat() * 5f,
+                windZ + rnd(0.65f), 0.52f, 0.61f, 0.72f,
+                0.035f + rng.nextFloat() * 0.025f, 3.5f, 0f);
     }
 
     public void ashFlake(float x, float y, float z) {

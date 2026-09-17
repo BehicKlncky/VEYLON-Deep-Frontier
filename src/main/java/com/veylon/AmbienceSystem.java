@@ -31,7 +31,7 @@ final class AmbienceSystem {
     private static final float RAIN_SPAWN_HEIGHT_RANGE = 5f;
     /** Drops spawned per pass at full storm intensity. */
     private static final int RAIN_PARTICLES_AT_FULL_INTENSITY = 5;
-    private static final float RAIN_SPLASH_CHANCE = 0.5f;
+    private final com.veylon.engine.RainField rainField = new com.veylon.engine.RainField();
 
     // Weather events.
     private static final int ASHFALL_PARTICLES = 3;
@@ -86,10 +86,16 @@ final class AmbienceSystem {
     /** Keeps ambient scatter replayable per world seed. */
     void reseed(long seed) {
         emitterRng.setSeed(seed);
+        rainField.reset();
+        emitterTimer = breathTimer = coughTimer = 0;
     }
 
     /** Ambient particle and sound emitters driven by world state. */
     void updateEmitters(float dt) {
+        boolean snow = game.weather.effective() == WeatherSystem.Weather.SNOW;
+        rainField.update(dt, game.world, game.particles, emitterRng,
+                game.player.pos.x, game.player.pos.y, game.player.pos.z,
+                snow ? 0f : game.weather.intensity());
         emitterTimer -= dt;
         if (emitterTimer > 0) {
             return;
@@ -105,28 +111,14 @@ final class AmbienceSystem {
     }
 
     private void emitPrecipitation(float px, float py, float pz) {
-        if (!game.weather.isPrecip() || !game.player.exposedToSky) {
-            return;
-        }
-        Random rng = emitterRng;
-        boolean snow = game.weather.effective() == WeatherSystem.Weather.SNOW;
+        // Retain the existing snow cadence and exposure behavior.
+        if (game.weather.effective() != WeatherSystem.Weather.SNOW || !game.player.exposedToSky) return;
         int n = (int) (RAIN_PARTICLES_AT_FULL_INTENSITY * game.weather.intensity());
         for (int i = 0; i < n; i++) {
-            float x = px + (rng.nextFloat() * 2 - 1) * RAIN_RADIUS;
-            float z = pz + (rng.nextFloat() * 2 - 1) * RAIN_RADIUS;
-            float y = py + RAIN_SPAWN_HEIGHT + rng.nextFloat() * RAIN_SPAWN_HEIGHT_RANGE;
-            if (snow) {
-                game.particles.snowflake(x, y, z);
-                continue;
-            }
-            game.particles.rainDrop(x, y, z);
-            if (rng.nextFloat() < RAIN_SPLASH_CHANCE) {
-                int gx = (int) x, gz = (int) z;
-                // Only splash on ground that is actually loaded.
-                if (game.world.getChunk(Math.floorDiv(gx, 16), Math.floorDiv(gz, 16)) != null) {
-                    game.particles.rainSplash(x, game.world.surfaceHeight(gx, gz) + 1.05f, z);
-                }
-            }
+            float x = px + (emitterRng.nextFloat() * 2 - 1) * RAIN_RADIUS;
+            float z = pz + (emitterRng.nextFloat() * 2 - 1) * RAIN_RADIUS;
+            float y = py + RAIN_SPAWN_HEIGHT + emitterRng.nextFloat() * RAIN_SPAWN_HEIGHT_RANGE;
+            game.particles.snowflake(x, y, z);
         }
     }
 
