@@ -271,7 +271,7 @@ Reload progress and bow draw deliberately do not.
   from the same fixture. `SurvivalCreativeParityTest` and the `Creative*Test`
   classes are built in pairs for exactly that reason — a gate that accidentally
   fires in Survival is the failure mode worth catching.
-- The suite is 704 tests across 105 classes at 0.7.2.
+- The suite is 762 tests across 109 classes at 0.7.3.
 
 ---
 

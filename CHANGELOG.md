@@ -4,6 +4,30 @@ All notable user-facing changes to VEYLON: Deep Frontier are recorded here.
 
 ## [Unreleased]
 
+## [0.7.3] - 2026-09-18
+
+### Changed
+
+- The gameplay HUD uses larger, framed survival vitals with procedural icons,
+  numeric values and explicit low/critical warnings. Nutrition, temperatures,
+  wetness, fatigue, shelter and load are grouped, with larger affliction chips.
+- All nine hotbar slots are larger, with clearer selection, stack counts,
+  condition and freshness indicators, and held-item text.
+- Weapon status, reload and bow-draw progress share a readable panel above the
+  hotbar. Interaction prompts use keycaps; target and mining feedback have
+  clearer backgrounds while retaining the crosshair's aim geometry.
+- Context and mission cards organize time, weather, biome, camp, quests and
+  navigation. Long text truncates safely; recent events stay above the status
+  module without overlapping it.
+- Creative has a matching status panel for flight, environment and shelter,
+  without survival or medical pressure. Other screens and default UI scale are
+  unchanged.
+
+### Added
+
+- Deterministic HUD showcase scenes for daylight, fog and night, plus headless
+  layout, text-fitting and weapon-label regression tests.
+
 ## [0.7.2] - 2026-09-18
 
 ### Added
