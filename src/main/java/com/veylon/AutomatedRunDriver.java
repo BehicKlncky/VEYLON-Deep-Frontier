@@ -167,6 +167,8 @@ final class AutomatedRunDriver {
                 + " particles=" + game.renderer.particlesDrawn
                 + " particleSubmissions=" + game.renderer.particleDrawCalls
                 + " drawCalls=" + (game.renderer.drawCalls + game.ui.drawCallsLastFrame())
+                + " uiSubmissions=" + game.ui.drawCallsLastFrame()
+                + " uiScale=" + game.ui.uiScale()
                 + " triangles=" + game.renderer.trianglesRendered
                 + " glErrors=" + game.window.glErrorCount()
                 + " khrErrors=" + game.window.glDebugErrorCount());
