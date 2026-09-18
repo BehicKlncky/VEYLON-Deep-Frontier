@@ -1,27 +1,23 @@
 package com.veylon.ui;
 
 import com.veylon.Game;
+import com.veylon.combat.WeaponDefinition;
+import com.veylon.combat.WeaponRegistry;
 import com.veylon.engine.UiRenderer;
 import com.veylon.entity.Affliction;
 import com.veylon.entity.Player;
+import com.veylon.gfx.IconAtlas;
 import com.veylon.item.ItemStack;
 import com.veylon.simulation.WeatherSystem;
 import com.veylon.util.Noise;
 
-/**
- * In-game HUD: crosshair, survival bars, nutrition, affliction chips, carry
- * weight, shelter/season readouts, hotbar with durability/freshness bars,
- * damage/cold vignettes, weather overlay, prompts and the event log.
- */
+import java.util.Locale;
+
+import static com.veylon.ui.HudLayout.*;
+import static com.veylon.ui.HudStyle.*;
+
+/** Read-only gameplay HUD. All widgets append to the existing ordered UI batch. */
 public class Hud {
-
-    /**
-     * Distance from the bottom edge to the weapon status block. Its three rows
-     * (readout, reload hint or meter, reloading text) end above the held-item
-     * label that the hotbar draws 70 units from the bottom.
-     */
-    private static final float WEAPON_STATUS_TOP = 120f;
-
     /** Exact player-facing bow ammo readout used by rendering and workflow tests. */
     public static String bowAmmoLabel(Game g) {
         if (g.player.abilities.unlimitedItems()) {
@@ -54,137 +50,36 @@ public class Hud {
                 + held.type.displayName + " — LMB to throw";
     }
 
-    /** Ammo counter, reload bar and bow-draw meter above the hotbar. */
-    private void renderWeaponStatus(Game g, UiRenderer ui, int w, int h,
-                                    com.veylon.combat.WeaponDefinition weapon,
-                                    ItemStack held) {
-        if (weapon == null || held == null) {
-            return;
-        }
-        float cx = w / 2f;
-        float y = h - WEAPON_STATUS_TOP;
-        switch (weapon.category) {
-            case BOW -> {
-                int basic = g.player.inventory.count(com.veylon.item.ItemType.ARROW);
-                int iron = g.player.inventory.count(com.veylon.item.ItemType.IRON_ARROW);
-                String label = bowAmmoLabel(g);
-                boolean available = g.player.abilities.unlimitedItems() || basic + iron > 0;
-                ui.textCentered(cx, y, 1.4f, label,
-                        available ? 0.9f : 1f, available ? 0.9f : 0.4f, 0.7f, 1f);
-                if (g.drawingBow) {
-                    float bw = 120;
-                    ui.rect(cx - bw / 2, y + 18, bw, 7, 0.08f, 0.08f, 0.08f, 0.8f);
-                    boolean full = g.bowDraw >= 0.999f;
-                    ui.rect(cx - bw / 2 + 1, y + 19, (bw - 2) * g.bowDraw, 5,
-                            full ? 0.4f : 0.85f, full ? 0.9f : 0.7f, 0.35f, 0.95f);
-                }
-            }
-            case FIREARM -> {
-                String label = firearmAmmoLabel(g, held, weapon);
-                ui.textCentered(cx, y, 1.4f, label,
-                        held.charge > 0 ? 0.9f : 1f, held.charge > 0 ? 0.9f : 0.45f, 0.7f, 1f);
-                if (g.reloadTimer > 0 && g.reloadTotal > 0) {
-                    float bw = 120;
-                    float frac = 1f - g.reloadTimer / g.reloadTotal;
-                    ui.rect(cx - bw / 2, y + 18, bw, 7, 0.08f, 0.08f, 0.08f, 0.8f);
-                    ui.rect(cx - bw / 2 + 1, y + 19, (bw - 2) * frac, 5, 0.85f, 0.65f, 0.3f, 0.95f);
-                    ui.textCentered(cx, y + 30, 1.15f, "Reloading...", 0.85f, 0.8f, 0.7f, 1f);
-                } else if (showReloadHint(g, held, weapon)) {
-                    ui.textCentered(cx, y + 18, 1.15f, "[R] Reload", 0.9f, 0.8f, 0.5f, 1f);
-                }
-            }
-            case THROWN -> ui.textCentered(cx, y, 1.4f,
-                    thrownAmmoLabel(g, held),
-                    0.9f, 0.85f, 0.7f, 1f);
-        }
-    }
-
     public void render(Game g) {
         UiRenderer ui = g.ui;
         int w = ui.screenW(), h = ui.screenH();
         Player p = g.player;
-
+        boolean creative = p.abilities.invulnerable();
+        boolean smokeBuilding = p.smokeExposure > 25 && !p.has(Affliction.SMOKE);
+        HudLayout layout = new HudLayout(w, h, creative,
+                p.afflictions.size() + (smokeBuilding ? 1 : 0));
         renderWeatherOverlay(g, ui, w, h);
         renderVignettes(g, ui, w, h);
 
-        // Crosshair: spreads apart while a ranged weapon is inaccurate.
-        var heldStack = p.selected();
-        var weapon = com.veylon.combat.WeaponRegistry.of(heldStack == null ? null : heldStack.type);
-        float spread = 0f;
-        if (weapon != null && weapon.category == com.veylon.combat.WeaponDefinition.Category.BOW) {
-            spread = (1f - g.bowDraw) * 7f;
-        } else if (weapon != null) {
-            spread = weapon.spread * 0.8f;
-        }
-        ui.rect(w / 2f - 8 - spread, h / 2f - 1, 6, 2, 1, 1, 1, 0.8f);
-        ui.rect(w / 2f + 2 + spread, h / 2f - 1, 6, 2, 1, 1, 1, 0.8f);
-        ui.rect(w / 2f - 1, h / 2f - 8 - spread, 2, 6, 1, 1, 1, 0.8f);
-        ui.rect(w / 2f - 1, h / 2f + 2 + spread, 2, 6, 1, 1, 1, 0.8f);
-
-        renderWeaponStatus(g, ui, w, h, weapon, heldStack);
-
-        if (p.abilities.invulnerable()) renderCreativeStatus(g, ui, h);
-        else renderSurvivalStatus(g, ui, w, h);
-
-        renderHotbar(g, ui, w, h);
-
-        // Top-left info.
-        ui.textShadow(12, 12, 1.5f, g.time.timeString(), 1f, 1f, 0.9f, 1f);
-        var season = g.seasons.current(g.time);
-        ui.textShadow(12, 32, 1.4f, season.displayName + " (" + g.seasons.daysLeft(g.time)
-                + "d left)", 0.95f, 0.85f, 0.6f, 1f);
-        ui.textShadow(12, 50, 1.4f, "Weather: " + g.weather.effective().displayName, 0.85f, 0.9f, 1f, 1f);
-        ui.textShadow(12, 68, 1.4f, "Biome: " + p.biome.displayName, 0.8f, 1f, 0.8f, 1f);
-
-        // Top-right: events + camp standing + quest.
-        String ev = "Events: " + g.events.summary();
-        ui.textShadow(w - ui.textWidth(ev, 1.3f) - 12, 12, 1.3f, ev, 1f, 0.85f, 0.6f, 1f);
-        String camp = "Camp: " + g.faction.standing() + " (" + (int) g.faction.trust + ")";
-        ui.textShadow(w - ui.textWidth(camp, 1.3f) - 12, 30, 1.3f, camp,
-                g.faction.hostile ? 1f : 0.7f, g.faction.hostile ? 0.3f : 0.9f, 0.4f, 1f);
-        if (g.faction.quest != null) {
-            String q = "Request: " + g.faction.quest.describe();
-            ui.textShadow(w - ui.textWidth(q, 1.25f) - 12, 48, 1.25f, q, 0.7f, 0.85f, 1f, 1f);
-            String navigation = QuestObjectiveView.navigationLabel(g);
-            if (!navigation.isEmpty()) {
-                boolean returning = g.faction.quest.status
-                        == com.veylon.ai.Quest.Status.READY_TO_TURN_IN;
-                ui.textShadow(w - ui.textWidth(navigation, 1.2f) - 12, 66, 1.2f,
-                        navigation, returning ? 0.45f : 1f,
-                        returning ? 0.9f : 0.78f, returning ? 1f : 0.25f, 1f);
-            }
-        }
-
-        // Targeted block label + mining progress.
-        if (g.targetHit != null) {
-            String name = g.targetHit.type().displayName;
-            ui.textCentered(w / 2f, h / 2f + 18, 1.3f, name, 1f, 1f, 1f, 0.9f);
-            if (g.miningProgress > 0) {
-                float mw = 80;
-                ui.rect(w / 2f - mw / 2, h / 2f + 34, mw, 6, 0, 0, 0, 0.6f);
-                ui.rect(w / 2f - mw / 2, h / 2f + 34, mw * Math.min(1, g.miningProgress), 6,
-                        1f, 0.85f, 0.3f, 0.95f);
-            }
-        }
-
-        // Interaction prompt.
-        if (g.interactPrompt != null && !g.interactPrompt.isEmpty()) {
-            ui.textCentered(w / 2f, h / 2f + 52, 1.5f, g.interactPrompt, 1f, 1f, 0.7f, 1f);
-        }
-
-        // Event log (last 6 lines, bottom-left above bars/chips).
-        var lines = g.eventLog.recent(6);
-        float ly = h - 248 - lines.size() * 15;
-        for (String line : lines) {
-            ui.textShadow(16, ly, 1.2f, line, 0.92f, 0.92f, 0.85f, 0.85f);
-            ly += 15;
-        }
+        ItemStack held = p.selected();
+        WeaponDefinition weapon = WeaponRegistry.of(held == null ? null : held.type);
+        renderCrosshair(g, ui, w, h, weapon);
+        if (creative) renderCreativeStatus(g, ui, layout.status);
+        else renderSurvivalStatus(g, ui, layout.status, smokeBuilding);
+        renderHotbar(g, ui, layout);
+        renderWeaponStatus(g, ui, layout.weapon, weapon, held);
+        renderContext(g, ui, layout.context);
+        renderMission(g, ui, layout.mission);
+        renderFocus(g, ui, layout);
+        renderLog(g, ui, layout);
 
         if (g.simPaused) {
-            ui.textCentered(w / 2f, 70, 2f, "SIMULATION PAUSED (P)", 1f, 0.8f, 0.3f, 1f);
+            // Bounded to the gap between the two corner cards.
+            Rect pause = new Rect(layout.context.right() + GAP, MARGIN,
+                    layout.mission.x() - layout.context.right() - GAP * 2, 30);
+            ui.panel(pause.x(), pause.y(), pause.width(), pause.height(), PANEL_CORNER);
+            centered(ui, pause, pause.y() + 6, SMALL, "SIMULATION PAUSED [P]", AMBER);
         }
-
-        // Sleep fade overlay.
         if (g.sleepFade > 0.01f) {
             ui.rect(0, 0, w, h, 0, 0, 0, Math.min(0.92f, g.sleepFade));
             if (g.sleeping) {
@@ -194,95 +89,287 @@ public class Hud {
         }
     }
 
-    /** Preserve environment readouts while replacing medical pressure with the mode badge. */
-    private void renderCreativeStatus(Game g, UiRenderer ui, int h) {
-        ui.rect(12, h - 76, 200, 64, 0.035f, 0.07f, 0.09f, 0.8f);
-        ui.rect(12, h - 76, 3, 64, 0.25f, 0.85f, 0.9f, 1f);
-        ui.textShadow(23, h - 67, 1.6f, "CREATIVE", 1f, 0.8f, 0.4f, 1f);
-        if (g.player.abilities.flying()) {
-            ui.textShadow(128, h - 65, 1.3f, "FLYING", 0.45f, 0.95f, 1f, 1f);
-        }
-        ui.textShadow(23, h - 45, 1.3f,
-                String.format(java.util.Locale.ROOT, "Env %.1f C", g.player.envTemp),
-                0.85f, 0.95f, 1f, 1f);
-        ui.textShadow(23, h - 28, 1.3f, g.player.shelter.label(), 0.7f, 0.9f, 0.8f, 1f);
+    private void renderCrosshair(Game g, UiRenderer ui, int w, int h, WeaponDefinition weapon) {
+        float spread = 0;
+        if (weapon != null && weapon.category == WeaponDefinition.Category.BOW) {
+            spread = (1f - g.bowDraw) * 7f;
+        } else if (weapon != null) spread = weapon.spread * 0.8f;
+        // Preserve the original aim/spread geometry; a thin shadow survives bright terrain.
+        float cx = w / 2f, cy = h / 2f;
+        crosshairArm(ui, cx - 8 - spread, cy - 1, 6, 2);
+        crosshairArm(ui, cx + 2 + spread, cy - 1, 6, 2);
+        crosshairArm(ui, cx - 1, cy - 8 - spread, 2, 6);
+        crosshairArm(ui, cx - 1, cy + 2 + spread, 2, 6);
     }
 
-    private void renderSurvivalStatus(Game g, UiRenderer ui, int w, int h) {
+    private void crosshairArm(UiRenderer ui, float x, float y, float w, float h) {
+        rect(ui, x - 1, y - 1, w + 2, h + 2, NAVY, 0.65f);
+        rect(ui, x, y, w, h, TEXT, 0.95f);
+    }
+
+    private void panel(UiRenderer ui, Rect box, String heading, int accent) {
+        ui.panel(box.x(), box.y(), box.width(), box.height(), PANEL_CORNER);
+        rect(ui, box.x() + PAD, box.y() + 12, 3, 15, accent, 1);
+        fitted(ui, box.x() + PAD + 11, box.y() + 10, box.width() - PAD * 2 - 11,
+                SMALL, heading, accent);
+    }
+
+    private void renderSurvivalStatus(Game g, UiRenderer ui, Rect box, boolean smokeBuilding) {
         Player p = g.player;
-        // Survival bars (bottom-left).
-        float bx = 16, bw = 190, bh = 13;
-        float by = h - 30;
-        bar(ui, bx, by, bw, bh, p.stamina / 100f, 0.25f, 0.75f, 0.30f, "STA " + (int) p.stamina);
-        by -= 18;
-        bar(ui, bx, by, bw, bh, p.thirst / 100f, 0.25f, 0.55f, 0.95f, "H2O " + (int) p.thirst);
-        by -= 18;
-        bar(ui, bx, by, bw, bh, p.hunger / 100f, 0.92f, 0.60f, 0.20f, "FOOD " + (int) p.hunger);
-        by -= 18;
-        bar(ui, bx, by, bw, bh, p.health / p.maxHealth, 0.85f, 0.20f, 0.20f, "HP " + (int) p.health);
-        // Nutrition micro-bars.
-        by -= 12;
-        microBar(ui, bx, by, bw / 2 - 2, p.protein / 100f, 0.85f, 0.45f, 0.35f, "PRO");
-        microBar(ui, bx + bw / 2 + 2, by, bw / 2 - 2, p.vitamins / 100f, 0.45f, 0.8f, 0.35f, "VIT");
-
-        // Temperature / environment block right of the bars.
-        float tx = bx + bw + 12;
-        ui.textShadow(tx, h - 124, 1.4f, String.format("Body %.1f C", p.bodyTemp),
-                tempColorR(p.bodyTemp), tempColorG(p.bodyTemp), tempColorB(p.bodyTemp), 1f);
-        ui.textShadow(tx, h - 106, 1.4f, String.format("Env  %.1f C", p.envTemp), 0.9f, 0.9f, 0.9f, 1f);
-        ui.textShadow(tx, h - 88, 1.4f, String.format("Wet  %d%%", (int) (p.wetness * 100)),
-                0.55f, 0.7f, 0.95f, 1f);
-        ui.textShadow(tx, h - 70, 1.4f, "Fatigue " + (int) p.fatigue, 0.8f, 0.8f, 0.7f, 1f);
-        String shelterLabel = p.shelter.label();
-        ui.textShadow(tx, h - 52, 1.4f, shelterLabel,
-                p.shelter.indoor() ? 0.5f : 0.85f, 0.9f, p.shelter.indoor() ? 0.6f : 0.6f, 1f);
-        float enc = p.encumbrance();
-        ui.textShadow(tx, h - 34, 1.4f,
-                String.format("Load %.1f/%.0f kg%s", p.carriedWeight(), p.carryCapacity(),
-                        enc > 1f ? " OVER!" : ""),
-                enc > 1f ? 1f : 0.85f, enc > 1f ? 0.4f : 0.85f, enc > 0.8f ? 0.3f : 0.8f, 1f);
-
-        // Affliction chips above the bars.
-        float ay = h - 152;
-        for (var e : p.afflictions.entrySet()) {
-            Affliction a = e.getKey();
-            String label = a.displayName + " " + (int) (float) e.getValue() + "s";
-            float tw = ui.textWidth(label, 1.25f);
-            ui.rect(bx - 2, ay - 2, tw + 14, 16, 0.05f, 0.05f, 0.05f, 0.65f);
-            ui.rect(bx + 1, ay + 1, 8, 10, a.r, a.g, a.b, 1f);
-            ui.textShadow(bx + 13, ay, 1.25f, label, a.r, a.g, a.b, 1f);
-            ay -= 19;
+        panel(ui, box, "SURVIVAL / VITALS", CYAN);
+        float x = box.x() + PAD, y = box.y() + VITAL_TOP;
+        vital(ui, x, y, "Health", IconAtlas.HEALTH, p.health, p.maxHealth, RED);
+        vital(ui, x, y + VITAL_PITCH, "Hunger", IconAtlas.HUNGER, p.hunger, 100, AMBER);
+        vital(ui, x, y + VITAL_PITCH * 2, "Hydration", IconAtlas.HYDRATION, p.thirst, 100, TEAL);
+        vital(ui, x, y + VITAL_PITCH * 3, "Stamina", IconAtlas.STAMINA, p.stamina, 100, GREEN);
+        float half = (BAR_WIDTH - GAP) / 2;
+        nutrition(ui, x, box.y() + NUTRITION_TOP, half, "Protein", p.protein);
+        nutrition(ui, x + half + GAP, box.y() + NUTRITION_TOP, half, "Vitamins", p.vitamins);
+        float ty = box.y() + TELEMETRY_TOP;
+        rect(ui, x, ty - GAP, BAR_WIDTH, 1, LINE, 0.6f);
+        String body = p.bodyTemp < 33 ? "FREEZING" : p.bodyTemp > 40.5f ? "OVERHEATING" : "Body";
+        telemetry(ui, x, ty, half, body + " " + format("%.1f C", p.bodyTemp),
+                p.bodyTemp < 33 || p.bodyTemp > 40.5f ? AMBER : TEXT);
+        telemetry(ui, x + half + GAP, ty, half, "Air " + format("%.1f C", p.envTemp), TEXT);
+        telemetry(ui, x, ty + TELEMETRY_PITCH, half, "Wetness " + (int) (p.wetness * 100) + "%", MUTED);
+        telemetry(ui, x + half + GAP, ty + TELEMETRY_PITCH, half, "Fatigue " + (int) p.fatigue + "%", MUTED);
+        telemetry(ui, x, ty + TELEMETRY_PITCH * 2, half, p.shelter.label(), AMBER);
+        telemetry(ui, x + half + GAP, ty + TELEMETRY_PITCH * 2, half,
+                (p.encumbrance() > 1 ? "OVER " : "Load ")
+                        + format("%.1f/%.0f kg", p.carriedWeight(), p.carryCapacity()),
+                p.encumbrance() > 1 ? RED_TEXT : TEXT);
+        int index = 0;
+        for (var entry : p.afflictions.entrySet()) {
+            chip(ui, box, index++, entry.getKey().displayName,
+                    (int) (float) entry.getValue() + "s", entry.getKey() == Affliction.BLEEDING ? RED_TEXT : AMBER);
         }
-        if (p.smokeExposure > 25 && !p.has(Affliction.SMOKE)) {
-            ui.textShadow(bx, ay, 1.25f, "Smoke building... ventilate!", 0.7f, 0.7f, 0.7f, 1f);
-            ay -= 19;
+        if (smokeBuilding) chip(ui, box, index++, "Smoke building", "Ventilate shelter", AMBER);
+        if (index == 0) {
+            text(ui, x, box.y() + CHIP_TOP + 8, SMALL, "No active afflictions", MUTED);
         }
-
-        // Warnings.
-        float wy = h / 2f + 40;
-        boolean blink = ((int) (g.totalTime * 3) % 2) == 0;
-        if (p.bodyTemp < 33 && blink) {
-            ui.textCentered(w / 2f, wy, 2f, "FREEZING!", 0.5f, 0.8f, 1f, 1f);
-            wy += 22;
-        }
-        if (p.bodyTemp > 40.5f && blink) {
-            ui.textCentered(w / 2f, wy, 2f, "OVERHEATING!", 1f, 0.5f, 0.2f, 1f);
-            wy += 22;
-        }
-        if (p.hunger <= 5 && blink) {
-            ui.textCentered(w / 2f, wy, 2f, "STARVING!", 1f, 0.6f, 0.2f, 1f);
-            wy += 22;
-        }
-        if (p.thirst <= 5 && blink) {
-            ui.textCentered(w / 2f, wy, 2f, "DEHYDRATED!", 0.4f, 0.7f, 1f, 1f);
-            wy += 22;
-        }
-        if (enc > 1f && blink) {
-            ui.textCentered(w / 2f, wy, 1.6f, "OVERLOADED - drop weight to sprint",
-                    1f, 0.75f, 0.4f, 1f);
-        }
-
     }
+
+    private void vital(UiRenderer ui, float x, float y, String label, String icon,
+                       float value, float maximum, int color) {
+        float fraction = maximum > 0 ? clamp(value / maximum) : 0;
+        String state = vitalState(fraction);
+        ui.sprite(icon, x, y, VITAL_ICON, VITAL_ICON);
+        text(ui, x + VITAL_LABEL_X, y - 2, TITLE, label, TEXT);
+        if (!state.isEmpty()) {
+            text(ui, x + 126, y, MICRO, "! " + state, fraction <= 0.1f ? RED_TEXT : AMBER);
+        }
+        String number = (int) value + " / " + (int) maximum;
+        text(ui, x + BAR_WIDTH - width(ui, number, SMALL), y, SMALL, number, TEXT);
+        meter(ui, x, y + VITAL_METER_Y, BAR_WIDTH, BAR_HEIGHT, fraction,
+                fraction <= 0.1f ? RED : color);
+        if (!state.isEmpty()) {
+            outline(ui, new Rect(x, y + VITAL_METER_Y, BAR_WIDTH, BAR_HEIGHT), fraction <= 0.1f ? 2 : 1, AMBER);
+        }
+    }
+
+    private void meter(UiRenderer ui, float x, float y, float width, float height,
+                       float fraction, int color) {
+        rect(ui, x, y, width, height, NAVY, 1);
+        rect(ui, x + 2, y + 2, (width - 4) * clamp(fraction), height - 4, color, 0.95f);
+        outline(ui, new Rect(x, y, width, height), 1, LINE);
+        // Quarter marks remain visible when the bar is empty or desaturated.
+        for (int tick = 1; tick < 4; tick++) {
+            rect(ui, x + width * tick / 4, y + height - 5, 1, 4, TEXT, 0.45f);
+        }
+    }
+
+    private void nutrition(UiRenderer ui, float x, float y, float width, String label, float value) {
+        text(ui, x, y, MICRO, label + " " + (int) value, MUTED);
+        rect(ui, x, y + 18, width, 5, NAVY, 1);
+        rect(ui, x, y + 18, width * clamp(value / 100), 5, LINE, 1);
+    }
+
+    private void telemetry(UiRenderer ui, float x, float y, float width, String label, int color) {
+        fitted(ui, x, y, width, SMALL, label, color);
+    }
+
+    private void chip(UiRenderer ui, Rect box, int index, String label, String detail, int color) {
+        float width = (BAR_WIDTH - GAP) / 2;
+        float x = box.x() + PAD + index % 2 * (width + GAP);
+        float y = box.y() + CHIP_TOP + index / 2 * CHIP_PITCH;
+        ui.nineSlice(IconAtlas.SLOT, x, y, width, CHIP_HEIGHT, 4);
+        ui.sprite(IconAtlas.AFFLICTION, x + 5, y + 8, 18, 18, r(color), g(color), b(color), 1);
+        fitted(ui, x + 26, y + 2, width - 30, MICRO, label, TEXT);
+        fitted(ui, x + 26, y + 17, width - 30, MICRO, detail, color);
+    }
+
+    private void renderCreativeStatus(Game g, UiRenderer ui, Rect box) {
+        Player p = g.player;
+        panel(ui, box, "FRONTIER / CREATIVE", CYAN);
+        float x = box.x() + PAD;
+        text(ui, x, box.y() + 41, 2.6f, "CREATIVE", TEXT);
+        text(ui, x, box.y() + 78, BODY, "Explore. Build. Shape the frontier.", MUTED);
+        String[][] rows = {{"MOVEMENT", p.abilities.flying() ? "FLYING" : "GROUNDED"},
+                {"ENVIRONMENT", format("%.1f C", p.envTemp)}, {"SHELTER", p.shelter.label()},
+                {"TERRAIN", p.biome.displayName}};
+        for (int i = 0; i < rows.length; i++) {
+            float y = box.y() + 116 + i * 46;
+            rect(ui, x, y, BAR_WIDTH, 1, LINE, 0.65f);
+            text(ui, x, y + 11, MICRO, rows[i][0], MUTED);
+            float available = BAR_WIDTH - 112;
+            String value = fit(rows[i][1], available, s -> width(ui, s, TITLE));
+            text(ui, x + BAR_WIDTH - width(ui, value, TITLE), y + 7, TITLE, value,
+                    i == 0 ? CYAN : i == 2 ? AMBER : TEXT);
+        }
+        rect(ui, x, box.y() + CHIP_TOP, BAR_WIDTH, CHIP_HEIGHT, NAVY, 0.8f);
+        text(ui, x + 10, box.y() + CHIP_TOP + 8, SMALL, "Unlimited supplies / Free building", CYAN);
+    }
+
+    private void renderContext(Game g, UiRenderer ui, Rect box) {
+        panel(ui, box, "FIELD CONDITIONS", CYAN);
+        float x = box.x() + PAD, width = box.width() - PAD * 2;
+        fitted(ui, x, box.y() + 32, width, TITLE, g.time.timeString(), TEXT);
+        fitted(ui, x, box.y() + 56, width, SMALL,
+                g.seasons.current(g.time).displayName + " / " + g.seasons.daysLeft(g.time) + " days left", AMBER);
+        fitted(ui, x, box.y() + 77, width, SMALL, "Weather / " + g.weather.effective().displayName, TEXT);
+        fitted(ui, x, box.y() + 97, width, SMALL, "Biome / " + g.player.biome.displayName, MUTED);
+    }
+
+    private void renderMission(Game g, UiRenderer ui, Rect box) {
+        panel(ui, box, "FRONTIER / OPERATIONS", CYAN);
+        float x = box.x() + PAD, width = box.width() - PAD * 2;
+        fitted(ui, x, box.y() + 33, width, SMALL, "Events / " + g.events.summary(), AMBER);
+        fitted(ui, x, box.y() + 55, width, SMALL,
+                "Camp / " + g.faction.standing() + " (" + (int) g.faction.trust + ")",
+                g.faction.hostile ? RED_TEXT : TEXT);
+        rect(ui, x, box.y() + 79, width, 1, LINE, 0.65f);
+        fitted(ui, x, box.y() + 89, width, BODY,
+                g.faction.quest == null ? "No active request" : g.faction.quest.describe(), TEXT);
+        String navigation = QuestObjectiveView.navigationLabel(g);
+        fitted(ui, x, box.y() + 120, width, SMALL,
+                navigation.isEmpty() ? "[M] Map & navigation" : navigation, CYAN);
+    }
+
+    private void renderHotbar(Game g, UiRenderer ui, HudLayout layout) {
+        for (int i = 0; i < SLOT_COUNT; i++) {
+            boolean selected = i == g.player.hotbarSel;
+            Rect box = layout.slot(i, selected);
+            float x = box.x(), y = box.y(), size = box.width();
+            ui.slot(x, y, size, false, selected);
+            if (selected) {
+                outline(ui, box, 3, CYAN);
+                rect(ui, x + 4, y + size - 4, size - 8, 3, CYAN, 1);
+            }
+            ItemStack stack = g.player.inventory.get(i);
+            if (stack != null) {
+                ui.itemIcon(stack.type, x + 7, y + 5, ITEM_ICON);
+                if (stack.count > 1) {
+                    String count = Integer.toString(stack.count);
+                    float countWidth = width(ui, count, SMALL);
+                    rect(ui, x + size - countWidth - 8, y + size - 25, countWidth + 4, 17, NAVY, 0.95f);
+                    text(ui, x + size - countWidth - 6, y + size - 25, SMALL, count, TEXT);
+                }
+                if (stack.type.hasDurability()) {
+                    condition(ui, box, stack.durabilityFrac(), false);
+                } else if (stack.type.spoils()) {
+                    condition(ui, box, stack.freshnessFrac(), true);
+                }
+            }
+            rect(ui, x + 4, y + 4, 13, 16, NAVY, 0.9f);
+            text(ui, x + 6, y + 3, SMALL, Integer.toString(i + 1), selected ? CYAN : TEXT);
+        }
+        ItemStack held = g.player.selected();
+        if (held != null) {
+            String label = held.type.displayName;
+            if (held.type.hasDurability()) label += " / " + (int) held.durability + "/"
+                    + (int) held.type.maxDurability + " condition";
+            else if (held.type.spoils()) label += " / " + (int) (held.freshnessFrac() * 100) + "% fresh";
+            Rect box = layout.heldItem;
+            ui.nineSlice(IconAtlas.SLOT, box.x(), box.y(), box.width(), box.height(), 4);
+            centered(ui, box, box.y() + 4, BODY, label, TEXT);
+        }
+    }
+
+    /** Durability is a continuous teal rail; freshness uses separated amber segments. */
+    private void condition(UiRenderer ui, Rect box, float fraction, boolean freshness) {
+        float x = box.x() + 6, y = box.bottom() - 9, width = box.width() - 12;
+        rect(ui, x, y, width, CONDITION_HEIGHT, NAVY, 1);
+        rect(ui, x, y, width * clamp(fraction), CONDITION_HEIGHT, freshness ? AMBER : CYAN, 1);
+        if (freshness) for (int i = 1; i < 5; i++) {
+            rect(ui, x + width * i / 5, y, 2, CONDITION_HEIGHT, NAVY, 1);
+        }
+    }
+
+    private void renderWeaponStatus(Game g, UiRenderer ui, Rect box, WeaponDefinition weapon, ItemStack held) {
+        if (weapon == null || held == null) return;
+        ui.panel(box.x(), box.y(), box.width(), box.height(), PANEL_CORNER);
+        String label = switch (weapon.category) {
+            case BOW -> bowAmmoLabel(g);
+            case FIREARM -> firearmAmmoLabel(g, held, weapon);
+            case THROWN -> thrownAmmoLabel(g, held);
+        };
+        centered(ui, box, box.y() + 8, BODY, label, TEXT);
+        String action;
+        float progress = -1;
+        if (weapon.category == WeaponDefinition.Category.BOW) {
+            action = g.drawingBow ? (g.bowDraw >= 0.999f ? "READY" : "DRAW " + (int) (g.bowDraw * 100) + "%")
+                    : "Hold LMB to draw";
+            if (!g.player.abilities.unlimitedItems()
+                    && g.player.inventory.count(com.veylon.item.ItemType.ARROW)
+                    + g.player.inventory.count(com.veylon.item.ItemType.IRON_ARROW) == 0) {
+                action = "NO ARROWS";
+            }
+            if (g.drawingBow) progress = g.bowDraw;
+        } else if (weapon.category == WeaponDefinition.Category.FIREARM) {
+            if (g.reloadTimer > 0 && g.reloadTotal > 0) {
+                progress = 1 - g.reloadTimer / g.reloadTotal;
+                action = "RELOADING " + (int) (clamp(progress) * 100) + "%";
+            } else action = showReloadHint(g, held, weapon) ? "[R] Reload"
+                    : held.charge <= 0 ? "NO AMMUNITION" : "LMB to fire / [R] Reload";
+        } else action = "THROWABLE / Ready";
+        if (progress >= 0) {
+            text(ui, box.x() + PAD, box.y() + 36, SMALL, action, AMBER);
+            meter(ui, box.x() + WEAPON_METER_X, box.y() + 36,
+                    box.width() - WEAPON_METER_X - PAD, 16, progress, AMBER);
+        } else centered(ui, box, box.y() + 36, SMALL, action, AMBER);
+    }
+
+    private void renderFocus(Game g, UiRenderer ui, HudLayout layout) {
+        if (g.targetHit != null) {
+            Rect box = layout.target;
+            ui.nineSlice(IconAtlas.SLOT, box.x(), box.y(), box.width(), box.height(), 4);
+            centered(ui, box, box.y() + 4, BODY, g.targetHit.type().displayName, TEXT);
+            if (g.miningProgress > 0) {
+                meter(ui, box.x() + PAD, box.y() + 26, box.width() - PAD * 2, 9, g.miningProgress, AMBER);
+            }
+        }
+        if (g.interactPrompt == null || g.interactPrompt.isBlank()) return;
+        Rect box = layout.prompt;
+        ui.panel(box.x(), box.y(), box.width(), box.height(), PANEL_CORNER);
+        String prompt = g.interactPrompt;
+        if (prompt.startsWith("[") && prompt.indexOf(']') > 0 && prompt.indexOf(']') <= 6) {
+            int end = prompt.indexOf(']');
+            String key = prompt.substring(1, end);
+            Rect cap = new Rect(box.x() + 8, box.y() + 6, 48, 24);
+            outline(ui, cap, 1, AMBER);
+            centered(ui, new Rect(cap.x() - PAD, cap.y(), cap.width() + PAD * 2, cap.height()),
+                    cap.y() + 2, BODY, key, AMBER);
+            fitted(ui, box.x() + 66, box.y() + 8, box.width() - 66 - PAD,
+                    BODY, prompt.substring(end + 1).stripLeading(), TEXT);
+        } else centered(ui, box, box.y() + 8, BODY, prompt, AMBER);
+    }
+
+    private void renderLog(Game g, UiRenderer ui, HudLayout layout) {
+        var lines = g.eventLog.recent(layout.logLines);
+        if (lines.isEmpty()) return;
+        float height = lines.size() * LOG_LINE + PAD;
+        Rect box = new Rect(layout.eventLog.x(), layout.status.y() - GAP - height,
+                layout.eventLog.width(), height);
+        ui.nineSlice(IconAtlas.SLOT, box.x(), box.y(), box.width(), box.height(), 4);
+        float y = box.y() + PAD / 2;
+        for (String line : lines) {
+            fitted(ui, box.x() + PAD, y, box.width() - PAD * 2, SMALL, line, MUTED);
+            y += LOG_LINE;
+        }
+    }
+
+    private static float clamp(float value) { return Math.max(0, Math.min(1, value)); }
+    private static String format(String pattern, Object... values) { return String.format(Locale.ROOT, pattern, values); }
 
     /** Damage flash, low-health pulse and cold edges. */
     private void renderVignettes(Game g, UiRenderer ui, int w, int h) {
@@ -313,67 +400,6 @@ public class Hud {
         ui.rect(w - t, t, t, h - 2 * t, r, g, b, a);
     }
 
-    private void renderHotbar(Game g, UiRenderer ui, int w, int h) {
-        int slots = 9;
-        float slot = 46;
-        float total = slots * slot;
-        float x0 = w / 2f - total / 2f;
-        float y0 = h - slot - 8;
-        for (int i = 0; i < slots; i++) {
-            float x = x0 + i * slot;
-            boolean sel = i == g.player.hotbarSel;
-            ui.slot(x, y0, slot, false, sel);
-            ItemStack s = g.player.inventory.get(i);
-            if (s != null) {
-                ui.itemIcon(s.type, x + 8, y0 + 5, slot - 16);
-                if (s.count > 1) {
-                    ui.textShadow(x + 6, y0 + slot - 13, 1.2f, String.valueOf(s.count), 1f, 1f, 1f, 1f);
-                }
-                // Durability bar.
-                if (s.type.hasDurability()) {
-                    float frac = s.durabilityFrac();
-                    ui.rect(x + 5, y0 + slot - 7, slot - 10, 3, 0.1f, 0.1f, 0.1f, 0.9f);
-                    ui.rect(x + 5, y0 + slot - 7, (slot - 10) * frac, 3,
-                            1f - frac, frac, 0.15f, 1f);
-                }
-                // Freshness bar.
-                if (s.type.spoils()) {
-                    float frac = s.freshnessFrac();
-                    ui.rect(x + 5, y0 + slot - 7, slot - 10, 3, 0.1f, 0.1f, 0.1f, 0.9f);
-                    ui.rect(x + 5, y0 + slot - 7, (slot - 10) * frac, 3,
-                            0.5f - frac * 0.2f, 0.32f + frac * 0.45f, 0.2f, 1f);
-                }
-            }
-            ui.text(x + slot - 10, y0 + 3, 1f, String.valueOf(i + 1), 0.7f, 0.7f, 0.7f, 0.8f);
-        }
-        ItemStack sel = g.player.selected();
-        if (sel != null) {
-            String label = sel.type.displayName;
-            if (sel.type.hasDurability()) {
-                label += "  [" + (int) sel.durability + "/" + (int) sel.type.maxDurability + "]";
-            } else if (sel.type.spoils()) {
-                label += "  (" + (int) (sel.freshnessFrac() * 100) + "% fresh)";
-            }
-            ui.textCentered(w / 2f, y0 - 16, 1.4f, label, 1f, 1f, 1f, 0.95f);
-        }
-    }
-
-    private void bar(UiRenderer ui, float x, float y, float w, float h, float frac,
-                     float r, float g, float b, String label) {
-        frac = Math.max(0, Math.min(1, frac));
-        ui.rect(x, y, w, h, 0.05f, 0.05f, 0.05f, 0.75f);
-        ui.rect(x + 1, y + 1, (w - 2) * frac, h - 2, r, g, b, 0.95f);
-        ui.textShadow(x + 5, y + 2, 1.1f, label, 1f, 1f, 1f, 0.95f);
-    }
-
-    private void microBar(UiRenderer ui, float x, float y, float w, float frac,
-                          float r, float g, float b, String label) {
-        frac = Math.max(0, Math.min(1, frac));
-        ui.rect(x, y, w, 8, 0.05f, 0.05f, 0.05f, 0.7f);
-        ui.rect(x + 1, y + 1, (w - 2) * frac, 6, r, g, b, 0.9f);
-        ui.text(x + 3, y, 0.9f, label, 1f, 1f, 1f, 0.85f);
-    }
-
     /** Preserve the legacy snow overlay; rain is rendered exclusively in the depth-tested world pass. */
     private void renderWeatherOverlay(Game g, UiRenderer ui, int w, int h) {
         if (g.weather.effective() != WeatherSystem.Weather.SNOW || !g.player.exposedToSky) {
@@ -392,15 +418,4 @@ public class Hud {
         }
     }
 
-    private float tempColorR(float t) {
-        return t < 35 ? 0.5f : (t > 39 ? 1f : 0.9f);
-    }
-
-    private float tempColorG(float t) {
-        return t < 35 ? 0.75f : (t > 39 ? 0.45f : 0.9f);
-    }
-
-    private float tempColorB(float t) {
-        return t < 35 ? 1f : (t > 39 ? 0.3f : 0.85f);
-    }
 }

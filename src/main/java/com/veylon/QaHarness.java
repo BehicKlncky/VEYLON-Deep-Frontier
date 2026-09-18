@@ -55,6 +55,7 @@ final class QaHarness {
     private final Game game;
     private final RainQaScene rainScene;
     private final RagdollQaScene ragdollScene;
+    private final HudQaScene hudScene;
 
     // Render statistics sampled across an automated run.
     private long profiledRenderFrames;
@@ -99,6 +100,7 @@ final class QaHarness {
         this.game = game;
         rainScene = new RainQaScene(game);
         ragdollScene = new RagdollQaScene(game);
+        hudScene = new HudQaScene(game);
     }
 
     // ------------------------------------------------------------------
@@ -260,6 +262,7 @@ final class QaHarness {
         game.creativeQa.updateFlightScene(elapsed);
         rainScene.update(elapsed);
         ragdollScene.update(elapsed);
+        hudScene.update(elapsed);
     }
 
     /**
@@ -268,6 +271,7 @@ final class QaHarness {
      * prove dust + impact feedback + crack progression, not a static prop.
      */
     void updateMiningShowcase(float dt) {
+        hudScene.updateFocus();
         if (!miningShowcase) {
             return;
         }
@@ -563,6 +567,11 @@ final class QaHarness {
         String normalized = scene.trim().toLowerCase(Locale.ROOT);
         Vec3i site;
         switch (normalized) {
+            case "hud_showcase", "hud_showcase_night", "hud_showcase_fog" -> {
+                applyBenchmarkScene(normalized.endsWith("night") ? "nightfire"
+                        : normalized.endsWith("fog") ? "pinefog" : "day");
+                hudScene.stage();
+            }
             case "physical_rain" -> rainScene.stage();
             case "rain_impact" -> rainScene.stageImpact();
             case "day", "meadow" -> {

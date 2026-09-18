@@ -317,6 +317,11 @@ public class UiRenderer {
         nineSlice(IconAtlas.PANEL, x, y, w, h, 5);
     }
 
+    /** Panel with an explicit fixed corner inset, useful for tall HUD modules. */
+    public void panel(float x, float y, float w, float h, float cornerInset) {
+        nineSlice(IconAtlas.PANEL, x, y, w, h, cornerInset);
+    }
+
     /** Draws a reusable interaction-state button background. */
     public void button(float x, float y, float w, float h,
                        boolean hovered, boolean pressed, boolean enabled) {

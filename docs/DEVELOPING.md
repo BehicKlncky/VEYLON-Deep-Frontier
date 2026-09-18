@@ -59,6 +59,13 @@ Example:
 VEYLON_SEED=20260716 VEYLON_SCENE=day VEYLON_SHOT=6 ./gradlew run
 ```
 
+For gameplay HUD work, use `VEYLON_SCENE=hud_showcase` with
+`VEYLON_SHOT=3,7,11,16` for bow draw, reload, thrown weapon and mining states.
+`hud_showcase_night` and `hud_showcase_fog` reuse the same fixed HUD fixture over
+dark and foggy stages. Both Survival and Creative are supported. See
+[HUD validation](graphics/HUD_VALIDATION.md) for the capture matrix, scale policy
+and headless layout checks.
+
 ---
 
 ## How to add…
@@ -264,7 +271,7 @@ Reload progress and bow draw deliberately do not.
   from the same fixture. `SurvivalCreativeParityTest` and the `Creative*Test`
   classes are built in pairs for exactly that reason — a gate that accidentally
   fires in Survival is the failure mode worth catching.
-- The suite is 704 tests across 105 classes at 0.7.2.
+- The suite is 762 tests across 109 classes at 0.7.3.
 
 ---
 

@@ -27,6 +27,11 @@ public final class IconAtlas {
     public static final String BUTTON = "ui/button";
     public static final String SLOT = "ui/slot";
     public static final String MISSING = "ui/missing";
+    public static final String HEALTH = "status/health";
+    public static final String HUNGER = "status/hunger";
+    public static final String HYDRATION = "status/hydration";
+    public static final String STAMINA = "status/stamina";
+    public static final String AFFLICTION = "status/affliction";
 
     private static final int ATLAS_SIZE = 512;
     private static final int ICON_SIZE = 32;
@@ -213,6 +218,7 @@ public final class IconAtlas {
         registerSkin(PANEL, IconAtlas::drawPanelSkin);
         registerSkin(BUTTON, IconAtlas::drawButtonSkin);
         registerSkin(SLOT, IconAtlas::drawSlotSkin);
+        registerStatusIcons();
 
         for (ItemType item : ItemType.values()) {
             String id = idFor(item);
@@ -227,6 +233,34 @@ public final class IconAtlas {
         texture = Texture2D.fromArgb(atlasPixels, ATLAS_SIZE, ATLAS_SIZE, false, true);
         System.out.println("[ui] icon atlas: " + itemIds.size() + "/"
                 + ItemType.values().length + " item icons, stable string IDs OK");
+    }
+
+    /** Small, original silhouettes; labels remain beside them in the HUD. */
+    private void registerStatusIcons() {
+        int ink = 0xFFD8D4C8;
+        registerSkin(HEALTH, c -> {
+            c.rect(9, 3, 14, 20, ink);
+            c.rect(3, 9, 20, 14, ink);
+        });
+        registerSkin(HUNGER, c -> {
+            c.line(12, 4, 12, 21, 2, ink);
+            for (int y = 6; y <= 15; y += 5) {
+                c.line(6, y - 2, 12, y + 2, 2, ink);
+                c.line(18, y - 2, 12, y + 2, 2, ink);
+            }
+        });
+        registerSkin(HYDRATION, c -> {
+            c.polygon(new int[]{12, 5, 4, 7, 17, 20, 19},
+                    new int[]{2, 12, 16, 21, 21, 16, 12}, ink);
+            c.line(8, 14, 8, 17, 1, 0xFF536574);
+        });
+        registerSkin(STAMINA, c -> c.polygon(new int[]{13, 5, 11, 9, 20, 14},
+                new int[]{2, 13, 13, 22, 9, 9}, ink));
+        registerSkin(AFFLICTION, c -> {
+            c.outline(new int[]{12, 2, 22}, new int[]{2, 21, 21}, 2, 0xFFFFFFFF);
+            c.rect(11, 9, 13, 14, 0xFFFFFFFF);
+            c.rect(11, 17, 13, 18, 0xFFFFFFFF);
+        });
     }
 
     private void registerSkin(String id, IconPainter painter) {
