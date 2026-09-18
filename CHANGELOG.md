@@ -4,6 +4,19 @@ All notable user-facing changes to VEYLON: Deep Frontier are recorded here.
 
 ## [Unreleased]
 
+### Changed
+
+- Death ragdolls have articulated elbows, knees, head joints and linked tails;
+  bird wings now flop. Joint limits replace the pose-restoring spring, while
+  limb and torso contacts determine how a body lands and drapes over steps.
+- Settled bodies retain their full joint pose through saves. Older body poses
+  still load, and living silhouettes and animations retain their original shape.
+
+### Added
+
+- Close human, ledge and living-animation ragdoll QA scenes, joint-limit and
+  collision regression tests, and a full-population ragdoll tick benchmark.
+
 ## [0.7.3] - 2026-09-18
 
 ### Changed

@@ -26,7 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * different matter — like {@code RainCollision}, the column cache deliberately
  * never caches an absent chunk, so those probes go through
  * {@code World.getChunk} and box a key. That case is rare, settles within a
- * fraction of a second because unloaded space reads as solid, and caching it
+ * bounded time because unloaded space reads as solid, and caching it
  * would make a body blind to terrain that has since streamed in.
  */
 class RagdollAllocationTest {
@@ -86,6 +86,7 @@ class RagdollAllocationTest {
             game.ragdolls.update(game, 1f / 60f);
         }
         long bytes = (bean.getThreadAllocatedBytes(thread) - before) / MEASURED_FRAMES;
+        System.out.println("ragdoll airborne allocation: " + bytes + " bytes/fixed tick");
 
         assertEquals(RagdollConstants.MAX_LIVE, game.ragdolls.liveCount(),
                 "every measured frame must have simulated a full field of bodies");
@@ -103,6 +104,30 @@ class RagdollAllocationTest {
             RagdollTestArena.kill(wolf, 2f, 1f, 1f);
             game.entities.fastTick(game, 0.05f);
         }
+    }
+
+    @Test
+    void fullBudgetGroundContactsDoNotAllocatePerStep() {
+        Game game = RagdollTestArena.create(606L);
+        fillWithFallingBodies(game);
+        ThreadMXBean bean = (ThreadMXBean) ManagementFactory.getThreadMXBean();
+        long thread = Thread.currentThread().threadId();
+        for (int i = 0; i < WARMUP_FRAMES; i++) contactStep(game);
+        long before = bean.getThreadAllocatedBytes(thread);
+        for (int i = 0; i < MEASURED_FRAMES; i++) contactStep(game);
+        long bytes = (bean.getThreadAllocatedBytes(thread) - before) / MEASURED_FRAMES;
+        System.out.println("ragdoll contact allocation: " + bytes + " bytes/fixed tick");
+        assertEquals(RagdollConstants.MAX_LIVE, game.ragdolls.liveCount());
+        assertTrue(bytes < BYTES_PER_FRAME_ALLOWANCE, "ground contact allocated " + bytes + " bytes/tick");
+    }
+
+    private static void contactStep(Game game) {
+        for (int i = 0; i < game.ragdolls.live.size(); i++) {
+            Ragdoll r = game.ragdolls.live.get(i);
+            r.age = 0;
+            r.quietSteps = 0;
+        }
+        game.ragdolls.update(game, RagdollConstants.FIXED_STEP);
     }
 
     /**

@@ -70,4 +70,24 @@ final class RagdollTestArena {
         e.hurt(e.health + 1000f, true);
         e.vel.set(impulseX, impulseY, impulseZ);
     }
+
+    static Ragdoll human(Game game, float height, float vx, float vy, float vz) {
+        Npc n = game.entities.spawnNpc(game.world, "Villager", CENTER_X, GROUND + height, CENTER_Z);
+        n.yaw = 27;
+        kill(n, vx, vy, vz);
+        Ragdoll r = game.ragdolls.spawn(game, n);
+        game.entities.npcs.remove(n);
+        return r;
+    }
+
+    static void steps(Game game) {
+        for (int x = 0; x < 4; x++) {
+            for (int z = -3; z <= 3; z++) {
+                for (int y = 0; y <= x; y++) {
+                    game.world.setBlock((int) CENTER_X + x + 1, (int) GROUND + y,
+                            (int) CENTER_Z + z, BlockType.STONE, false);
+                }
+            }
+        }
+    }
 }

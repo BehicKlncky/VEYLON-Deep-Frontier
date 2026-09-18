@@ -149,6 +149,7 @@ public final class Animator {
             // bones were never listed degrades instead of throwing.
             ModelPart part = m.part(skeleton.part[b]);
             part.rotX = pose.boneRotX[b];
+            part.rotY = pose.boneRotY[b];
             part.rotZ = pose.boneRotZ[b];
         }
     }

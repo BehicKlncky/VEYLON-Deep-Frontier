@@ -110,6 +110,42 @@ final class RagdollCollision {
                 Math.floorMod(bz, Chunk.SZ)) == BlockType.WATER;
     }
 
+    /** Minimum face push-out for a sampled capsule point, including world edits. */
+    void project(World world, float px, float py, float pz, float radius) {
+        x = px; y = py; z = pz;
+        grounded = false;
+        for (int pass = 0; pass < 8; pass++) {
+            float best = Float.POSITIVE_INFINITY, correction = 0;
+            int axis = -1;
+            for (int bx = (int) Math.floor(x - radius); bx <= (int) Math.floor(x + radius); bx++) {
+                for (int bz = (int) Math.floor(z - radius); bz <= (int) Math.floor(z + radius); bz++) {
+                    Chunk chunk = column(world, Math.floorDiv(bx, Chunk.SX), Math.floorDiv(bz, Chunk.SZ));
+                    if (chunk == null) continue; // movement already treats this as a barrier
+                    for (int by = (int) Math.floor(y - radius); by <= (int) Math.floor(y + radius); by++) {
+                        if (by >= Chunk.SY || (by >= 0 && !chunk.get(Math.floorMod(bx, Chunk.SX), by,
+                                Math.floorMod(bz, Chunk.SZ)).solid)) continue;
+                        for (int a = 0; a < 3; a++) {
+                            float p = a == 0 ? x : a == 1 ? y : z;
+                            int block = a == 0 ? bx : a == 1 ? by : bz;
+                            float lo = block - radius - p - RagdollConstants.CONTACT_SKIN;
+                            float hi = block + 1 + radius - p + RagdollConstants.CONTACT_SKIN;
+                            float c = -lo < hi ? lo : hi;
+                            if (Math.abs(c) < best) { best = Math.abs(c); correction = c; axis = a; }
+                        }
+                    }
+                }
+            }
+            if (axis < 0) return;
+            offset(axis, correction);
+            grounded |= axis == 1 && correction > 0;
+        }
+    }
+
+    boolean loaded(World world, float px, float pz) {
+        return column(world, Math.floorDiv((int) Math.floor(px), Chunk.SX),
+                Math.floorDiv((int) Math.floor(pz), Chunk.SZ)) != null;
+    }
+
     /**
      * World retains voxel columns for its lifetime (only GPU meshes unload), so
      * caching a reference keeps edits visible. Absent columns are never cached.
@@ -141,6 +177,17 @@ final class RagdollCollision {
             offset(which, step);
             if (blocked(world, x, y, z, halfWidth, halfHeight)) {
                 offset(which, -step);
+                // Resolve the face to sub-millimetre precision instead of hovering
+                // up to MAX_AXIS_SUBSTEP away from it.
+                float free = 0, blocked = step;
+                for (int i = 0; i < 9; i++) {
+                    float middle = (free + blocked) * 0.5f;
+                    offset(which, middle);
+                    boolean hit = blocked(world, x, y, z, halfWidth, halfHeight);
+                    offset(which, -middle);
+                    if (hit) blocked = middle; else free = middle;
+                }
+                offset(which, free);
                 return true;
             }
         }

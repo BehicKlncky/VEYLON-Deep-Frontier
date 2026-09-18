@@ -129,13 +129,14 @@ transfers, equipping) keeps the Survival rule in both modes and needs no gate.
 2. Build its model in `CreatureModels`.
 3. Map its bones in `BodySkeleton.buildCreature` so a dead one ragdolls instead
    of dropping as a single rigid block. An entry names real `ModelPart` names,
-   the pivot each hangs from **in the model root frame**, the axis it is authored
-   along, and how far out along that axis its handle sits — all readable straight
-   off the model builder. A type with no entry falls through to
+   its parent joint, its pivot **in that parent's frame**, its rest vector,
+   collision radius and hinge/cone limits — all readable from the model builder.
+   Root joint pivots use the model frame. See
+   [joint authoring](engineering/RAGDOLL_JOINTS.md) for the complete format.
+   A type with no entry falls through to
    `BodySkeleton.rigid` and tumbles as one piece, which is a legitimate choice
-   for something tiny rather than an oversight. Only bones authored along Y or Z
-   can be aimed — the two-angle parameterisation cannot reach a sideways rest
-   axis — which is why the skitterwing's wings stay at rest.
+   for something tiny rather than an oversight. All rest directions, including
+   the skitterwing's sideways wings, are supported.
 4. Add spawn rules to `EntityManager` (biome, time of day, density cap).
 5. Only touch `CreatureAI` if it needs behaviour the existing states don't
    cover.

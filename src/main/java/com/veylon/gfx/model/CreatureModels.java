@@ -49,7 +49,7 @@ public final class CreatureModels {
         float[][] at = {{-hx, fz}, {hx, fz}, {-hx, bz}, {hx, bz}};
         for (int i = 0; i < 4; i++) {
             ModelPart leg = new ModelPart(names[i]).pivot(at[i][0], legH, at[i][1])
-                    .box(0, -legH * 0.5f, 0, legW, legH, legW).color(legCol);
+                    .box(0, -legH * 0.5f, 0, legW, legH, legW).color(legCol).split(names[i] + "_lower", true);
             root.child(leg);
         }
 
@@ -86,7 +86,7 @@ public final class CreatureModels {
             }
         }
         body.child(new ModelPart("tail").pivot(0, 0.12f, 0.44f)
-                .box(0, 0.02f, 0.04f, 0.08f, 0.08f, 0.12f).color(0x74573a));
+                .box(0, 0.02f, 0.04f, 0.08f, 0.08f, 0.12f).color(0x74573a).split("tail_tip", false));
         return new EntityModel(root);
     }
 
@@ -112,7 +112,7 @@ public final class CreatureModels {
         body.child(new ModelPart("ruff").pivot(0, 0.08f, -0.26f)
                 .box(0, 0, 0, 0.40f, 0.30f, 0.22f).color(0x4c4850));
         ModelPart tail = new ModelPart("tail").pivot(0, 0.10f, 0.42f)
-                .box(0, 0, 0.16f, 0.10f, 0.10f, 0.34f).color(0x46434a);
+                .box(0, 0, 0.16f, 0.10f, 0.10f, 0.34f).color(0x46434a).split("tail_tip", false);
         body.child(tail);
         return new EntityModel(root);
     }
@@ -156,15 +156,18 @@ public final class CreatureModels {
             head.child(new ModelPart(s < 0 ? "ear_l" : "ear_r").pivot(s * 0.045f, 0.12f, 0.02f)
                     .box(0, 0.10f, 0, 0.045f, 0.22f, 0.03f).color(0x6c5c46));
         }
-        body.child(head);
+        // The living hare never had an animated "neck"; keep those legacy
+        // Animator lookups inert while giving the dead head a real parent joint.
+        body.child(new ModelPart("head_joint").pivot(0, 0.07f, -0.18f).child(head));
+        head.pivot(0, 0.03f, 0);
         String[] legs = {"leg_fl", "leg_fr", "leg_bl", "leg_br"};
         float[][] at = {{-0.07f, -0.10f}, {0.07f, -0.10f}, {-0.09f, 0.14f}, {0.09f, 0.14f}};
         for (int i = 0; i < 4; i++) {
             root.child(new ModelPart(legs[i]).pivot(at[i][0], 0.12f, at[i][1])
-                    .box(0, -0.06f, 0, 0.05f, 0.12f, 0.05f).color(0x6c5c46));
+                    .box(0, -0.06f, 0, 0.05f, 0.12f, 0.05f).color(0x6c5c46).split(legs[i] + "_lower", true));
         }
         body.child(new ModelPart("tail").pivot(0, 0.06f, 0.22f)
-                .box(0, 0, 0.02f, 0.07f, 0.07f, 0.06f).color(0xb8ac96));
+                .box(0, 0, 0.02f, 0.07f, 0.07f, 0.06f).color(0xb8ac96).split("tail_tip", false));
         return new EntityModel(root);
     }
 
@@ -190,7 +193,7 @@ public final class CreatureModels {
                     .box(0, 0.03f, 0, 0.16f, 0.14f, 0.20f).color(0x4c4034));
         }
         body.child(new ModelPart("tail").pivot(0, 0.10f, 0.65f)
-                .box(0, 0, 0.10f, 0.14f, 0.14f, 0.26f).color(0x5a4c38));
+                .box(0, 0, 0.10f, 0.14f, 0.14f, 0.26f).color(0x5a4c38).split("tail_tip", false));
         return new EntityModel(root);
     }
 
@@ -212,7 +215,7 @@ public final class CreatureModels {
                     .box(0, 0.06f, 0, 0.03f, 0.16f, 0.03f).color(0x1e2126));
         }
         body.child(new ModelPart("tail").pivot(0, 0.02f, 0.36f)
-                .box(0, 0, 0.18f, 0.05f, 0.05f, 0.40f).color(0x272a30));
+                .box(0, 0, 0.18f, 0.05f, 0.05f, 0.40f).color(0x272a30).split("tail_tip", false));
         return new EntityModel(root);
     }
 }

@@ -35,7 +35,7 @@ public class Carcass {
         hideLeft = type.hideYield;
         decay = 420f;
         pose.yaw = defaultYaw(x, z);
-        pose.roll = RagdollConstants.CREATURE_REST_ROLL;
+        pose.roll = RagdollConstants.FALLBACK_CREATURE_ROLL;
         pose.lift = 0.21f;
     }
 

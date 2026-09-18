@@ -40,6 +40,51 @@ class BodiesSectionTest {
     Path directory;
 
     @Test
+    void versionOneFlatBonesMigrateByNameWithoutBendingTheNewChildLinks() throws IOException {
+        Game game = arena(4242L);
+        game.entities.carcasses.add(new Carcass(Creature.CreatureType.WOLF, X, GROUND, Z));
+        ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+        try (DataOutputStream out = new DataOutputStream(bytes)) {
+            out.writeInt(1);
+            out.writeInt(1);
+            writeLegacyPose(out, 6);
+            out.writeInt(1);
+            out.writeFloat(X); out.writeFloat(GROUND); out.writeFloat(Z);
+            out.writeFloat(200);
+            out.writeInt(NpcArchetype.GUARD.ordinal() + 1);
+            out.writeBoolean(false); out.writeBoolean(false); out.writeBoolean(false); out.writeInt(0);
+            writeLegacyPose(out, 5);
+        }
+        BodiesSection.read(bytes.toByteArray(), game);
+        var wolf = game.entities.carcasses.getFirst().pose;
+        assertTrue(wolf.solved);
+        assertEquals(12, wolf.boneCount);
+        assertEquals(0.1f, wolf.boneRotX[0]);
+        assertEquals(0.2f, wolf.boneRotX[2]);
+        assertEquals(0.5f, wolf.boneRotX[8]); // old neck
+        assertEquals(0.6f, wolf.boneRotX[10]); // old tail
+        assertEquals(0, wolf.boneRotX[1]); // new knee
+        assertEquals(0, wolf.boneRotX[11]); // new tail tip
+        var human = game.entities.corpses.getFirst().pose;
+        assertEquals(10, human.boneCount);
+        assertEquals(0.1f, human.boneRotX[1]); // old head, new head
+        assertEquals(0.2f, human.boneRotX[2]); // left arm
+        assertEquals(0.3f, human.boneRotX[6]); // right arm
+        assertEquals(0, human.boneRotX[3]); // forearm
+        for (float y : human.boneRotY) assertEquals(0, y);
+    }
+
+    private static void writeLegacyPose(DataOutputStream out, int count) throws IOException {
+        out.writeFloat(0.5f); out.writeFloat(0.2f); out.writeFloat(1.1f);
+        out.writeFloat(0); out.writeFloat(0.8f);
+        out.writeBoolean(true); out.writeInt(count);
+        for (int b = 0; b < count; b++) {
+            out.writeFloat((b + 1) / 10f);
+            out.writeFloat(-(b + 1) / 10f);
+        }
+    }
+
+    @Test
     void aSettledPoseAndItsCorpseRoundTripThroughARealSave() throws IOException {
         Game original = arena(4242L);
         killAndSettle(original);
@@ -61,6 +106,8 @@ class BodiesSectionTest {
         for (int b = 0; b < before.pose.boneCount; b++) {
             assertEquals(before.pose.boneRotX[b], after.pose.boneRotX[b], 1e-5f,
                     "bone " + b + " rotX must survive a save");
+            assertEquals(before.pose.boneRotY[b], after.pose.boneRotY[b], 0f,
+                    "third-axis rotations must survive a save exactly");
             assertEquals(before.pose.boneRotZ[b], after.pose.boneRotZ[b], 1e-5f);
         }
 
@@ -130,7 +177,7 @@ class BodiesSectionTest {
         byte[] section = payload(1, 1, 0);
 
         List<byte[]> corruptions = List.of(
-                payload(2, 1, 0),                                   // unsupported version
+                payload(3, 1, 0),                                   // unsupported version
                 payload(1, 0, 0),                                   // carcass count mismatch
                 Arrays.copyOf(section, section.length - 1),         // truncated
                 Arrays.copyOf(section, section.length + 1),         // trailing bytes

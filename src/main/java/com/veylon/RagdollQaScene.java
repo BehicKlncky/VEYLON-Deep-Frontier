@@ -119,21 +119,25 @@ final class RagdollQaScene {
     /** Close human, step contact, and frozen living-animation comparison fixtures. */
     void stageJoints(Vec3i site, String scene) {
         prepare(site);
-        living = scene.equals("ragdoll_living");
-        boolean ledge = scene.equals("death_ragdoll_ledge");
+        living = scene.startsWith("ragdoll_living");
+        boolean gallery = scene.equals("ragdoll_living_species");
+        boolean drape = scene.equals("death_ragdoll_drape");
+        boolean ledge = scene.equals("death_ragdoll_ledge") || drape;
         int ground = site.y();
         // Known one-block shelf, with empty air above and a lower landing.
         for (int x = site.x() - 8; x <= site.x() + 8; x++) {
             for (int z = site.z() - 12; z <= site.z() + 2; z++) {
                 for (int y = ground - 2; y <= ground + 8; y++) {
-                    game.world.setBlock(x, y, z, y < ground
-                            || (ledge && x <= site.x() && y == ground)
-                            ? com.veylon.world.BlockType.STONE : com.veylon.world.BlockType.AIR, false);
+                    game.world.setBlock(x, y, z, ledge && x <= site.x() && y == ground
+                            ? com.veylon.world.BlockType.STONE : y < ground
+                            ? (drape ? com.veylon.world.BlockType.DIRT : com.veylon.world.BlockType.STONE)
+                            : com.veylon.world.BlockType.AIR, false);
                 }
             }
         }
         Npc person = game.entities.spawnNpc(game.world, "Villager",
-                site.x() - (living ? 1.0f : 0.2f), ground + (ledge ? 1.05f : 0.05f), site.z() - 4f);
+                site.x() + (drape ? 0.2f : living ? -1.0f : -0.2f),
+                ground + (ledge ? 1.05f : 0.05f), site.z() - 4f);
         person.yaw = 45;
         person.bobPhase = 0.7f;
         person.archetype = NpcArchetype.GUARD;
@@ -150,6 +154,22 @@ final class RagdollQaScene {
         game.player.pos.set(site.x() + 0.5f, ground + 0.05f, site.z() + 0.5f);
         game.camera.yaw = 0;
         game.camera.pitch = 18;
+        if (drape) {
+            game.player.pos.x += 2;
+            game.camera.yaw = -28;
+        }
+        if (gallery) {
+            person.pos.x = site.x() - 4;
+            game.entities.creatures.clear();
+            Creature.CreatureType[] types = Creature.CreatureType.values();
+            for (int i = 0; i < types.length; i++) {
+                Creature c = game.entities.spawnCreature(game.world, types[i],
+                        site.x() - 2 + (i % 3) * 2.2f, ground + 0.05f, site.z() - 4 - (i / 3) * 3);
+                c.yaw = 45;
+                c.bobPhase = 0.7f;
+            }
+            game.player.pos.z += 2;
+        }
         active = true;
         update(0);
     }

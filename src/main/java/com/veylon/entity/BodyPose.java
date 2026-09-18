@@ -28,6 +28,8 @@ public final class BodyPose {
      */
     public float pivotY;
     public final float[] boneRotX = new float[BodySkeleton.MAX_BONES];
+    /** Parent-relative Y rotation; parts compose Rz * Ry * Rx. */
+    public final float[] boneRotY = new float[BodySkeleton.MAX_BONES];
     public final float[] boneRotZ = new float[BodySkeleton.MAX_BONES];
     public int boneCount;
     /**
@@ -46,6 +48,7 @@ public final class BodyPose {
         boneCount = other.boneCount;
         solved = other.solved;
         System.arraycopy(other.boneRotX, 0, boneRotX, 0, BodySkeleton.MAX_BONES);
+        System.arraycopy(other.boneRotY, 0, boneRotY, 0, BodySkeleton.MAX_BONES);
         System.arraycopy(other.boneRotZ, 0, boneRotZ, 0, BodySkeleton.MAX_BONES);
     }
 
@@ -54,6 +57,7 @@ public final class BodyPose {
         boneCount = 0;
         solved = false;
         java.util.Arrays.fill(boneRotX, 0f);
+        java.util.Arrays.fill(boneRotY, 0f);
         java.util.Arrays.fill(boneRotZ, 0f);
     }
 }

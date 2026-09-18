@@ -3,59 +3,22 @@ package com.veylon.entity;
 import com.veylon.Game;
 import com.veylon.simulation.SimulationSystem;
 import com.veylon.world.World;
-import org.joml.Matrix4f;
-import org.joml.Vector3f;
 
 import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Simulates bodies between the killing blow and the resting corpse.
+ * Fixed-step PBD death simulation. Independent endpoint inertia, parent-relative
+ * limited joints and sampled voxel contacts determine the pose. Torso contact
+ * lever arms produce rotation; no resting attitude is prescribed.
  *
- * <h2>The solver</h2>
+ * <p>The position hash supplies only a destabilizing launch impulse. Frame time
+ * is clamped and accumulated, never consulted by the solver. All scratch is
+ * preallocated; only spawning and emitting a corpse allocate.
  *
- * <p>Position-based dynamics over an articulated chain, not a rigid-body
- * engine. Each body is one torso point carrying the orientation plus one point
- * mass per appendage bone. A step integrates every point against gravity and
- * voxel collision, relaxes the bones back onto their pivots a few times, and
- * derives velocity from the distance actually travelled — so a constraint that
- * moves a point also changes how fast it is moving, which is what keeps the
- * chain stable without a solver that can explode.
- *
- * <p>Orientation is three explicit angles rather than a quaternion or an
- * inertia tensor. The killing blow hands the body an angular kick, a snagged
- * limb torques it, and once it is on the ground a spring rolls it onto its
- * resting side. That is far less machinery than a real rigid-body solver and
- * it is all a two-second tumble seen from ten metres needs.
- *
- * <p>The step is fixed at {@link RagdollConstants#FIXED_STEP} and driven from
- * the per-frame bucket, so a body tumbles at the same rate at 30 fps as at 144
- * and a stalled frame clamps instead of teleporting bodies through walls.
- *
- * <h2>Settling</h2>
- *
- * <p>A body freezes when {@link Ragdoll#energy} — squared point speeds, squared
- * angular speeds and the squared error against its resting orientation — stays
- * under {@link RagdollConstants#SETTLE_ENERGY} for
- * {@link RagdollConstants#SETTLE_STEPS} consecutive steps, or when
- * {@link RagdollConstants#SETTLE_TIMEOUT} elapses. Folding the orientation
- * error into the measure is what stops a body freezing while still standing
- * upright; the timeout is what guarantees one can never stay unsettled.
- *
- * <h2>Determinism</h2>
- *
- * <p>There is no {@link java.util.Random} here and there deliberately never
- * will be. Everything a body does follows from the impulse it was killed with;
- * where a choice is genuinely free — which side it falls on when nothing pushed
- * it — the sign comes from a hash of the death position. The only randomness in
- * the feature lives in {@code ParticleSystem}, which is already seeded from the
- * world seed and is presentation-only.
- *
- * <h2>Persistence</h2>
- *
- * <p>Ragdolls are transient and are not saved. A save taken mid-fall settles
- * the body first, so it produces a corpse rather than losing one; the corpse
- * and its pose do persist.
+ * <p>Quiet grounded bodies freeze after consecutive low-energy steps, with a
+ * hard timeout as a backstop. Saves and the population cap also freeze bodies,
+ * preserving appearance, arrows, blood and the solved joint pose.
  */
 public class RagdollSystem implements SimulationSystem {
 
@@ -63,10 +26,7 @@ public class RagdollSystem implements SimulationSystem {
     public final List<Ragdoll> live = new ArrayList<>();
 
     private final RagdollCollision collision = new RagdollCollision();
-    private final Matrix4f frame = new Matrix4f();
-    private final Matrix4f inverse = new Matrix4f();
-    private final Vector3f offset = new Vector3f();
-    private final Vector3f local = new Vector3f();
+    private final RagdollJoints joints = new RagdollJoints();
 
     private static final int MAX_POINTS = BodySkeleton.MAX_BONES + 1;
     private final float[] originX = new float[MAX_POINTS];
@@ -76,7 +36,7 @@ public class RagdollSystem implements SimulationSystem {
     private final boolean[] floorHit = new boolean[MAX_POINTS];
     private final boolean[] resting = new boolean[MAX_POINTS];
 
-    private float accumulator;
+    private double accumulator;
 
     /** Diagnostics for the debug overlay and the QA scene. */
     public long totalSpawned;
@@ -87,6 +47,7 @@ public class RagdollSystem implements SimulationSystem {
     public void reset() {
         live.clear();
         collision.reset();
+        joints.reset();
         accumulator = 0;
         totalSpawned = 0;
         totalSettled = 0;
@@ -139,14 +100,8 @@ public class RagdollSystem implements SimulationSystem {
         r.vy[Ragdoll.TORSO] = e.vel.y;
         r.vz[Ragdoll.TORSO] = e.vel.z;
 
-        for (int b = 0; b < s.boneCount; b++) {
-            int p = b + 1;
-            float lx = s.pivotX[b] + BodySkeleton.restX(s.axis[b]) * s.length[b];
-            float ly = s.pivotY[b] + BodySkeleton.restY(s.axis[b]) * s.length[b] - s.torsoY;
-            float lz = s.pivotZ[b] + BodySkeleton.restZ(s.axis[b]) * s.length[b];
-            r.px[p] = tx + lx * cos + lz * sin;
-            r.py[p] = ty + ly;
-            r.pz[p] = tz - lx * sin + lz * cos;
+        joints.initialize(r);
+        for (int p = 1; p < r.pointCount; p++) {
             r.vx[p] = e.vel.x;
             r.vy[p] = e.vel.y;
             r.vz[p] = e.vel.z;
@@ -182,22 +137,17 @@ public class RagdollSystem implements SimulationSystem {
             r.rollVel = -right * gain * 0.55f;
         }
         r.yawVel = right * 0.18f;
-        r.restRoll = r.human() ? 0f
-                : sideSign(r.rollVel, e.pos) * RagdollConstants.CREATURE_REST_ROLL;
-        r.restPitch = r.human()
-                ? sideSign(r.pitchVel != 0 ? r.pitchVel : r.rollVel, e.pos)
-                        * RagdollConstants.HUMAN_REST_PITCH
-                : 0f;
-    }
-
-    private static float sideSign(float velocity, Vector3f at) {
-        if (velocity > 1e-4f) {
-            return 1f;
+        // An unactuated straight leg is a singular chain. A one-off angular
+        // impulse breaks that balance; it does not prescribe a landing angle.
+        float tilt = (float) Math.sqrt(r.pitchVel * r.pitchVel + r.rollVel * r.rollVel);
+        if (tilt < RagdollConstants.MIN_TOPPLE_SPEED) {
+            if (tilt < 1e-4f) r.rollVel = positionBias(e.pos.x, e.pos.y, e.pos.z)
+                    * RagdollConstants.MIN_TOPPLE_SPEED;
+            else {
+                r.pitchVel *= RagdollConstants.MIN_TOPPLE_SPEED / tilt;
+                r.rollVel *= RagdollConstants.MIN_TOPPLE_SPEED / tilt;
+            }
         }
-        if (velocity < -1e-4f) {
-            return -1f;
-        }
-        return positionBias(at.x, at.y, at.z);
     }
 
     /** Deterministic +1/-1 from a position; stands in for a coin flip. */
@@ -247,9 +197,9 @@ public class RagdollSystem implements SimulationSystem {
         }
         accumulator += Math.min(dt,
                 RagdollConstants.FIXED_STEP * RagdollConstants.MAX_STEPS_PER_FRAME);
-        while (accumulator >= RagdollConstants.FIXED_STEP
+        while (accumulator + 1e-7 >= RagdollConstants.FIXED_STEP
                 && stepsLastUpdate < RagdollConstants.MAX_STEPS_PER_FRAME) {
-            accumulator -= RagdollConstants.FIXED_STEP;
+            accumulator = Math.max(0, accumulator - RagdollConstants.FIXED_STEP);
             stepsLastUpdate++;
             for (int i = live.size() - 1; i >= 0; i--) {
                 Ragdoll r = live.get(i);
@@ -271,24 +221,32 @@ public class RagdollSystem implements SimulationSystem {
 
     private void step(Game g, Ragdoll r, float dt) {
         World world = g.world;
-        r.age += dt;
+        r.age = Math.min(RagdollConstants.SETTLE_TIMEOUT, r.age + dt);
+        joints.remember(r);
         integratePoints(world, r, dt);
         integrateAngles(r, dt);
-        constrain(r);
+        float energyBudget = measureEnergy(r);
+        joints.solve(world, r);
+        r.torsoGrounded = joints.groundContact[0];
         deriveVelocities(r, dt);
-        writePose(r);
+        joints.deriveAngularVelocity(r, dt);
+        if (r.torsoGrounded) {
+            float keep = 1f - RagdollConstants.GROUND_FRICTION;
+            r.pitchVel *= keep;
+            r.yawVel *= keep;
+            r.rollVel *= keep;
+        }
+        dissipateProjectionEnergy(r, energyBudget);
+        joints.writePose(r);
         drip(g, r, dt);
 
         r.energy = measureEnergy(r);
-        if (r.energy < RagdollConstants.SETTLE_ENERGY && r.grounded) {
-            r.quietSteps++;
-        } else {
-            r.quietSteps = 0;
-        }
+        updateQuietWindow(r);
         boolean tooFar = g.player != null && r.distSqTo(g.player.pos.x, g.player.pos.y,
                 g.player.pos.z) > RagdollConstants.DESPAWN_DISTANCE
                 * RagdollConstants.DESPAWN_DISTANCE;
-        if (r.quietSteps >= RagdollConstants.SETTLE_STEPS
+        if ((r.quietSteps >= RagdollConstants.SETTLE_STEPS && r.energy < RagdollConstants.SETTLE_ENERGY)
+                || r.quietSteps >= RagdollConstants.SUPPORT_SLEEP_STEPS
                 || r.age >= RagdollConstants.SETTLE_TIMEOUT
                 || tooFar) {
             r.settled = true;
@@ -303,7 +261,7 @@ public class RagdollSystem implements SimulationSystem {
             originZ[p] = r.pz[p];
 
             float half = p == Ragdoll.TORSO
-                    ? r.skeleton.torsoRadius : RagdollConstants.POINT_RADIUS;
+                    ? r.skeleton.torsoRadius : r.skeleton.radius[p - 1];
             boolean water = collision.inWater(world, r.px[p], r.py[p], r.pz[p]);
             r.vy[p] -= (water ? RagdollConstants.GRAVITY_WATER
                     : RagdollConstants.GRAVITY_AIR) * dt;
@@ -333,6 +291,26 @@ public class RagdollSystem implements SimulationSystem {
         r.grounded = anyGround;
     }
 
+    /** Sleep measures the entire chain, not just its centre or an authored pose. */
+    private static void updateQuietWindow(Ragdoll r) {
+        if (!r.torsoGrounded) { r.quietSteps = 0; return; }
+        boolean moved = r.quietSteps == 0;
+        float distance = RagdollConstants.SLEEP_DISTANCE;
+        for (int p = 0; p < r.pointCount && !moved; p++) {
+            float x = r.px[p] - r.sleepX[p], y = r.py[p] - r.sleepY[p], z = r.pz[p] - r.sleepZ[p];
+            moved = x * x + y * y + z * z > distance * distance;
+        }
+        float angle = RagdollConstants.SLEEP_ANGLE;
+        moved |= Math.abs(r.orientation.dot(r.sleepOrientation)) < Math.cos(angle * 0.5f);
+        if (moved) {
+            System.arraycopy(r.px, 0, r.sleepX, 0, r.pointCount);
+            System.arraycopy(r.py, 0, r.sleepY, 0, r.pointCount);
+            System.arraycopy(r.pz, 0, r.sleepZ, 0, r.pointCount);
+            r.sleepOrientation.set(r.orientation);
+            r.quietSteps = 1;
+        } else r.quietSteps++;
+    }
+
     private static void clampSpeed(Ragdoll r, int p) {
         float sq = r.vx[p] * r.vx[p] + r.vy[p] * r.vy[p] + r.vz[p] * r.vz[p];
         float max = RagdollConstants.MAX_POINT_SPEED;
@@ -345,11 +323,7 @@ public class RagdollSystem implements SimulationSystem {
     }
 
     private void integrateAngles(Ragdoll r, float dt) {
-        if (r.grounded) {
-            r.rollVel += shortest(r.restRoll - r.roll) * RagdollConstants.SETTLE_TORQUE * dt;
-            r.pitchVel += shortest(r.restPitch - r.pitch) * RagdollConstants.SETTLE_TORQUE * dt;
-        }
-        float damping = r.grounded
+        float damping = r.torsoGrounded
                 ? RagdollConstants.GROUND_ANGULAR_DAMPING : RagdollConstants.ANGULAR_DAMPING;
         float shed = Math.min(1f, damping * dt);
         r.yawVel -= r.yawVel * shed;
@@ -358,98 +332,13 @@ public class RagdollSystem implements SimulationSystem {
         r.yawVel = clampAngular(r.yawVel);
         r.pitchVel = clampAngular(r.pitchVel);
         r.rollVel = clampAngular(r.rollVel);
-        r.yaw = wrap(r.yaw + r.yawVel * dt);
-        r.pitch = wrap(r.pitch + r.pitchVel * dt);
-        r.roll = wrap(r.roll + r.rollVel * dt);
+        r.orientation.rotateLocalX(r.pitchVel * dt).rotateLocalY(r.yawVel * dt)
+                .rotateLocalZ(r.rollVel * dt).normalize();
     }
 
     private static float clampAngular(float w) {
         float max = RagdollConstants.MAX_ANGULAR_SPEED;
         return w > max ? max : (w < -max ? -max : w);
-    }
-
-    /** Shortest signed representation of an angle difference, in (-pi, pi]. */
-    static float shortest(float angle) {
-        return wrap(angle);
-    }
-
-    static float wrap(float angle) {
-        float a = angle;
-        while (a > (float) Math.PI) {
-            a -= (float) (Math.PI * 2);
-        }
-        while (a <= -(float) Math.PI) {
-            a += (float) (Math.PI * 2);
-        }
-        return a;
-    }
-
-    /**
-     * Relaxes every bone back onto its pivot. Each pass pulls the point toward
-     * the direction the model authored the bone along — a cheap stand-in for
-     * real joint limits — then enforces the bone's length exactly, feeding part
-     * of the correction back into the torso as both a shove and a torque so a
-     * leg catching on a ledge actually tips the body over.
-     */
-    private void constrain(Ragdoll r) {
-        BodySkeleton s = r.skeleton;
-        if (s.boneCount == 0) {
-            return;
-        }
-        for (int iteration = 0; iteration < RagdollConstants.RELAX_ITERATIONS; iteration++) {
-            buildFrame(r);
-            for (int b = 0; b < s.boneCount; b++) {
-                int p = b + 1;
-                float lx = s.pivotX[b];
-                float ly = s.pivotY[b] - s.torsoY;
-                float lz = s.pivotZ[b];
-
-                // Rest handle, in world space.
-                offset.set(lx + BodySkeleton.restX(s.axis[b]) * s.length[b],
-                        ly + BodySkeleton.restY(s.axis[b]) * s.length[b],
-                        lz + BodySkeleton.restZ(s.axis[b]) * s.length[b]);
-                frame.transformDirection(offset);
-                float pull = RagdollConstants.JOINT_REST_PULL
-                        / RagdollConstants.RELAX_ITERATIONS;
-                r.px[p] += (r.px[Ragdoll.TORSO] + offset.x - r.px[p]) * pull;
-                r.py[p] += (r.py[Ragdoll.TORSO] + offset.y - r.py[p]) * pull;
-                r.pz[p] += (r.pz[Ragdoll.TORSO] + offset.z - r.pz[p]) * pull;
-
-                // Pivot, in world space, then the exact bone length.
-                offset.set(lx, ly, lz);
-                frame.transformDirection(offset);
-                float dx = r.px[p] - (r.px[Ragdoll.TORSO] + offset.x);
-                float dy = r.py[p] - (r.py[Ragdoll.TORSO] + offset.y);
-                float dz = r.pz[p] - (r.pz[Ragdoll.TORSO] + offset.z);
-                float length = (float) Math.sqrt(dx * dx + dy * dy + dz * dz);
-                if (length < 1e-4f) {
-                    continue;
-                }
-                float correction = (length - s.length[b]) / length;
-                float cx = dx * correction;
-                float cy = dy * correction;
-                float cz = dz * correction;
-                float keep = 1f - RagdollConstants.TORSO_REACTION;
-                r.px[p] -= cx * keep;
-                r.py[p] -= cy * keep;
-                r.pz[p] -= cz * keep;
-                r.px[Ragdoll.TORSO] += cx * RagdollConstants.TORSO_REACTION;
-                r.py[Ragdoll.TORSO] += cy * RagdollConstants.TORSO_REACTION;
-                r.pz[Ragdoll.TORSO] += cz * RagdollConstants.TORSO_REACTION;
-
-                // Torque = lever x force, both in the body's own frame.
-                local.set(cx, cy, cz);
-                inverse.transformDirection(local);
-                r.pitchVel += clampTorque(RagdollConstants.TORQUE_GAIN
-                        * (ly * local.z - lz * local.y));
-                r.rollVel += clampTorque(RagdollConstants.TORQUE_GAIN
-                        * (lx * local.y - ly * local.x));
-            }
-        }
-    }
-
-    private static float clampTorque(float t) {
-        return t > 0.6f ? 0.6f : (t < -0.6f ? -0.6f : t);
     }
 
     /**
@@ -466,7 +355,11 @@ public class RagdollSystem implements SimulationSystem {
             if (floorHit[p] && wantVy[p] < 0) {
                 r.vy[p] = -wantVy[p] * RagdollConstants.BOUNCE;
             }
-            if (resting[p]) {
+            if (joints.groundContact[p] && wantVy[p] < 0) {
+                // Positional penetration repair must not create a fresh bounce.
+                r.vy[p] = Math.min(r.vy[p], -wantVy[p] * RagdollConstants.BOUNCE);
+            }
+            if (resting[p] || joints.contact[p]) {
                 float keep = 1f - RagdollConstants.GROUND_FRICTION;
                 r.vx[p] *= keep;
                 r.vz[p] *= keep;
@@ -478,13 +371,30 @@ public class RagdollSystem implements SimulationSystem {
     private float measureEnergy(Ragdoll r) {
         float linear = 0;
         for (int p = 0; p < r.pointCount; p++) {
-            linear += r.vx[p] * r.vx[p] + r.vy[p] * r.vy[p] + r.vz[p] * r.vz[p];
+            linear = Math.max(linear, r.vx[p] * r.vx[p] + r.vy[p] * r.vy[p] + r.vz[p] * r.vz[p]);
         }
-        float pitchError = shortest(r.restPitch - r.pitch);
-        float rollError = shortest(r.restRoll - r.roll);
-        return linear / r.pointCount
-                + r.yawVel * r.yawVel + r.pitchVel * r.pitchVel + r.rollVel * r.rollVel
-                + pitchError * pitchError + rollError * rollError;
+        return linear
+                + r.yawVel * r.yawVel + r.pitchVel * r.pitchVel + r.rollVel * r.rollVel;
+    }
+
+    /**
+     * Iterated contacts at a voxel corner may repair position more than once.
+     * That repair is not an impulse: do not let it manufacture kinetic energy.
+     * Contact friction dissipates velocity separately; gravity still supplies
+     * energy on the next fixed step and unsupported limbs can continue falling.
+     */
+    private void dissipateProjectionEnergy(Ragdoll r, float budget) {
+        float energy = measureEnergy(r);
+        if (energy <= budget || energy < 1e-10f) return;
+        float scale = (float) Math.sqrt(budget / energy);
+        for (int p = 0; p < r.pointCount; p++) {
+            r.vx[p] *= scale;
+            r.vy[p] *= scale;
+            r.vz[p] *= scale;
+        }
+        r.pitchVel *= scale;
+        r.yawVel *= scale;
+        r.rollVel *= scale;
     }
 
     private void drip(Game g, Ragdoll r, float dt) {
@@ -496,61 +406,6 @@ public class RagdollSystem implements SimulationSystem {
         r.dripTimer = RagdollConstants.DRIP_INTERVAL;
         g.particles.bloodDrip(r.px[Ragdoll.TORSO], r.py[Ragdoll.TORSO], r.pz[Ragdoll.TORSO],
                 r.vx[Ragdoll.TORSO], r.vy[Ragdoll.TORSO], r.vz[Ragdoll.TORSO]);
-    }
-
-    // ------------------------------------------------------------------
-    // Pose
-    // ------------------------------------------------------------------
-
-    private void buildFrame(Ragdoll r) {
-        frame.identity().rotateY(r.yaw).rotateX(r.pitch).rotateZ(r.roll);
-        inverse.identity().rotateZ(-r.roll).rotateX(-r.pitch).rotateY(-r.yaw);
-    }
-
-    /**
-     * Turns the point cloud back into model angles.
-     *
-     * <p>A bone is aimed with two rotations and no yaw of its own, which is
-     * enough to point it anywhere: composing {@code rotateZ(c)} with
-     * {@code rotateX(a)} sweeps the whole sphere, so the aim is exact rather
-     * than approximated. Measuring both the target and the bone's authored rest
-     * axis the same way means a bone that has not moved reads as zero and keeps
-     * whatever pose its model builder gave it.
-     */
-    private void writePose(Ragdoll r) {
-        BodySkeleton s = r.skeleton;
-        r.pose.yaw = r.yaw;
-        r.pose.pitch = r.pitch;
-        r.pose.roll = r.roll;
-        r.pose.pivotY = s.torsoY;
-        r.pose.boneCount = s.boneCount;
-        r.pose.solved = true;
-        if (s.boneCount == 0) {
-            return;
-        }
-        buildFrame(r);
-        for (int b = 0; b < s.boneCount; b++) {
-            int p = b + 1;
-            offset.set(s.pivotX[b], s.pivotY[b] - s.torsoY, s.pivotZ[b]);
-            frame.transformDirection(offset);
-            local.set(r.px[p] - (r.px[Ragdoll.TORSO] + offset.x),
-                    r.py[p] - (r.py[Ragdoll.TORSO] + offset.y),
-                    r.pz[p] - (r.pz[Ragdoll.TORSO] + offset.z));
-            float length = local.length();
-            if (length < 1e-4f) {
-                continue;
-            }
-            local.div(length);
-            inverse.transformDirection(local);
-
-            float dz = Math.max(-1f, Math.min(1f, local.z));
-            float aim = (float) -Math.asin(dz);
-            float horizontal = (float) Math.sqrt(Math.max(0f, 1f - dz * dz));
-            r.pose.boneRotX[b] = wrap(aim - BodySkeleton.restAngle(s.axis[b]));
-            if (horizontal > 1e-3f) {
-                r.pose.boneRotZ[b] = (float) Math.atan2(local.x, -local.y);
-            }
-        }
     }
 
     // ------------------------------------------------------------------
@@ -584,14 +439,11 @@ public class RagdollSystem implements SimulationSystem {
      */
     private void emit(Game g, Ragdoll r) {
         totalSettled++;
+        joints.clearWorld(g.world, r);
+        joints.writePose(r);
         float x = r.px[Ragdoll.TORSO];
         float y = r.py[Ragdoll.TORSO];
         float z = r.pz[Ragdoll.TORSO];
-        float half = r.skeleton.torsoRadius;
-        for (int guard = 0; guard < 24
-                && collision.blocked(g.world, x, y, z, half, half); guard++) {
-            y += 0.2f;
-        }
         float groundY = lowestPoint(r);
         if (!r.leavesBody) {
             return;
@@ -617,7 +469,7 @@ public class RagdollSystem implements SimulationSystem {
     private float lowestPoint(Ragdoll r) {
         float lowest = r.py[Ragdoll.TORSO] - r.skeleton.torsoRadius;
         for (int p = 1; p < r.pointCount; p++) {
-            lowest = Math.min(lowest, r.py[p] - RagdollConstants.POINT_RADIUS);
+            lowest = Math.min(lowest, r.py[p] - r.skeleton.radius[p - 1]);
         }
         return lowest;
     }
