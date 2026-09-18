@@ -272,7 +272,7 @@ Reload progress and bow draw deliberately do not.
   from the same fixture. `SurvivalCreativeParityTest` and the `Creative*Test`
   classes are built in pairs for exactly that reason — a gate that accidentally
   fires in Survival is the failure mode worth catching.
-- The suite is 762 tests across 109 classes at 0.7.3.
+- The suite is 775 tests across 109 classes at 0.7.4.
 
 ---
 
@@ -325,17 +325,31 @@ native captures; the ordinary rain sequence exercises live continuous updates.
 
 Use `VEYLON_SCENE=death_ragdoll_showcase`, `VEYLON_SEED=20260918` and
 `VEYLON_SHOT=1,2,3,5,8` for the staged meadow: four animals and one settler
-killed from known directions on one frame, then frozen at 0, 0.25, 0.8, 2.0 and
-5.0 seconds of solver time. `death_ragdoll_sequence` does the same to a single
-wolf, side-on and close, for reading one body frame by frame. Both keep the
-simulation paused and advance the solver in fixed steps tied to elapsed
-wall-clock seconds, the way `rain_impact` does, because a two-second tumble is
-too short to inspect at live frame cadence and a wall-clock screenshot would
-otherwise land somewhere different every run.
+killed from known directions on one frame. Shots 1, 2, 3 and 5 freeze the
+solver at 0.25, 0.8, 2.0 and 5.0 seconds; shot 8 repeats the last snapshot.
+`death_ragdoll_sequence` does the same to a single wolf, side-on and close, for
+reading one body frame by frame. Both keep the simulation paused and advance the
+solver in fixed steps tied to elapsed wall-clock seconds, the way `rain_impact`
+does, because a two-second tumble is too short to inspect at live frame cadence
+and a wall-clock screenshot would otherwise land somewhere different every run.
+
+0.7.4 adds close fixtures for the joints, with the same seed and shots:
+`death_ragdoll_human` (a close human fall), `death_ragdoll_ledge` (a human at a
+one-block shelf), `death_ragdoll_drape` (a fall across the shelf edge onto a
+contrasting lower floor) and `death_ragdoll_quadruped` (the sequence wolf from
+the side). `ragdoll_living` and `ragdoll_living_species` pin idle, walk and
+attack poses at shots 1, 3 and 5, for one settler and a wolf or for every species.
+Compare them before and after any model change: a straight split limb must still
+draw the original cuboid. [Joint authoring](engineering/RAGDOLL_JOINTS.md)
+documents the skeleton format and tuning, and the
+[validation record](engineering/RAGDOLL_VALIDATION.md) holds the 0.7.4
+before/after captures.
 
 Run `gradlew test --tests '*Ragdoll*' --tests '*DeathRagdoll*' --tests
-'*OverloadedDeadFlag*' --tests '*BloodBurst*' --tests '*BodiesSection*'` while
-working on this.
+'*OverloadedDeadFlag*' --tests '*BloodBurst*' --tests '*BodiesSection*' --tests
+'*CreativeBody*'` while working on this. On the reference machine,
+`gradlew performanceTest --tests '*RagdollAllocationTest'` times a full field of
+twelve bodies against its 1 ms budget.
 
 Contributor rules this feature adds:
 
@@ -355,6 +369,20 @@ Contributor rules this feature adds:
 - **Anything that poses the humanoid must run `Animator.applyAppearance`.**
   `resetPose` makes all 22 archetype accessories visible again, so a body posed
   without it wears a trader's pack, a raider's hood and a leader's mantle at once.
-- **Keep the per-frame solver allocation-free.** `RagdollAllocationTest` holds it
-  at zero with a 4 KB allowance, in the default suite rather than the
-  performance one, because what it pins is a property of the code.
+- **Keep the per-frame solver allocation-free.** `RagdollAllocationTest` holds
+  the airborne and sustained ground-contact paths at zero with a 4 KB allowance,
+  in the default suite rather than the performance one, because what it pins is a
+  property of the code.
+- **Limits and contacts decide the landing; nothing steers it (0.7.4).** There
+  is no rest-pose spring and no roll or pitch target; the only assist is the
+  one-time minimum toppling speed at launch. A body that lands wrongly needs a
+  better limit, radius or torso box, not a pull toward a preferred pose.
+- **A joint needs a real model part.** Split an existing box with
+  `ModelPart.split` instead of adding a separate cuboid, list the joint
+  parent-first in `BodySkeleton`, and keep
+  `DeathRagdollTest.renderedParentChainsReachTheSolvedHandlesForEverySpeciesAndHumans`
+  passing so the drawn limb sits where the solver put it.
+- **Bump the body section when the joint layout changes, and keep reading old
+  versions.** `BodiesSectionTest` keeps a handcrafted version 1 fixture for that.
+  Every build fails the whole load on a body-section version newer than its own,
+  so a bump is a downgrade limit and belongs in the release notes.

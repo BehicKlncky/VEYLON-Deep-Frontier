@@ -292,3 +292,32 @@ p99 1.03 ms) and Survival 1267.2 FPS (p95 0.92 ms, p99 1.04 ms), both with zero
 GL, KHR-debug and OpenAL errors. The Creative smoke additionally flew 2,009
 scripted frames across two chunk columns without entering an unloaded one, and
 recorded 37,812 body samples with no damage and no death.
+
+## v0.7.4 rerun (articulated ragdolls)
+
+0.7.4 adds one wall-clock budget. `RagdollAllocationTest.fullLiveBudgetTickProfile`
+keeps twelve wolves live over loaded terrain, warms 3,000 fixed steps and reports
+the fastest of five 6,000-step samples against **1.0 ms per fixed tick**. The
+class's two allocation checks, airborne and sustained ground contact, stay in the
+default suite with the existing 4 KiB allowance. No existing baseline or budget
+changed.
+
+These figures also come from a **second machine**, not the reference machine
+above: AMD Ryzen 5 5600X, Windows x64, Temurin 25.0.4.1. They do not re-baseline
+anything. "Before" is the instrumented baseline `9c97a1b`; "after" is `7b6ec92`.
+
+| Benchmark | Before | After | Budget | Result |
+| --- | ---: | ---: | ---: | --- |
+| Ragdoll, 12 live bodies | 0.016588 ms | 0.372215 ms | 1.00 ms | PASS |
+| `chunk tick` | 0.547 ms | 0.475 ms | 0.92 ms | PASS |
+| `entity tick` | 0.466 ms | 0.414 ms | 0.95 ms | PASS |
+| `settlement tick` | 0.016 ms | 0.017 ms | 0.52 ms | PASS |
+| `save` | 6.114 ms | 5.750 ms | 2.20 ms | **FAIL before and after** |
+
+Articulation adds 0.356 ms to a full-population tick, about 2.2% of a 16.67 ms
+frame. The audio, music and `TickProfileTest` budgets and both rain benchmarks
+pass. The `save` failure predates the ragdoll change: this host exceeds the
+budget with and without it. The assertion stops that test before its load
+timing, so `load` was not measured. The save gate has not been re-run on the
+reference machine and should be investigated there. Measurement details are in
+the [ragdoll validation record](engineering/RAGDOLL_VALIDATION.md#performance).

@@ -4,6 +4,8 @@ All notable user-facing changes to VEYLON: Deep Frontier are recorded here.
 
 ## [Unreleased]
 
+## [0.7.4] - 2026-09-18
+
 ### Changed
 
 - Death ragdolls have articulated elbows, knees, head joints and linked tails;
@@ -16,6 +18,14 @@ All notable user-facing changes to VEYLON: Deep Frontier are recorded here.
 
 - Close human, ledge and living-animation ragdoll QA scenes, joint-limit and
   collision regression tests, and a full-population ragdoll tick benchmark.
+
+### Compatibility
+
+- The save format stays binary v3. Joint poses move to version 2 of the optional
+  `world.bodies` section; version 1 still loads, so every existing save keeps working.
+- 0.7.2 and 0.7.3 cannot open a save written by 0.7.4: they reject the newer body
+  section and report "No compatible save was found." The save file is not modified,
+  and 0.7.4 still opens it.
 
 ## [0.7.3] - 2026-09-18
 

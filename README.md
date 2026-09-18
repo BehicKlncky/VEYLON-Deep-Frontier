@@ -24,6 +24,13 @@ find blueprints, master the crafting stations and **repair the distress beacon**
 
 ---
 
+Version **0.7.4 — Articulated Ragdolls** gives dying bodies bending elbows, knees
+and hocks, a jointed neck and head, two-link tails and loose bird wings. Contacts,
+not a preset pose, decide how a body lands or drapes over a ledge, and saves keep
+that pose. Existing saves remain compatible. See the
+[release notes](docs/releases/v0.7.4.md) and
+[validation record](docs/engineering/RAGDOLL_VALIDATION.md).
+
 Version **0.7.3 — HUD Visual Overhaul** brings larger survival vitals and hotbar
 slots, clearer weapon and interaction feedback, compact context and mission
 cards, and a matching Creative status panel. Existing saves remain compatible.
@@ -114,9 +121,9 @@ Windows x64 (PowerShell):
 ```powershell
 .\gradlew.bat build             # compile + unit tests + jar
 .\gradlew.bat performanceTest   # opt-in benchmarks calibrated for the reference PC
-.\gradlew.bat fatJar            # build\libs\veylon-0.7.3-all.jar
+.\gradlew.bat fatJar            # build\libs\veylon-0.7.4-all.jar
 .\gradlew.bat jpackage          # build\jpackage\Veylon\Veylon.exe
-.\gradlew.bat appImageZip       # build\distributions\veylon-0.7.3-windows-x64.zip
+.\gradlew.bat appImageZip       # build\distributions\veylon-0.7.4-windows-x64.zip
 .\gradlew.bat releaseArtifacts  # tests + all host-specific release artifacts
 ```
 
@@ -126,7 +133,7 @@ macOS Intel or Apple Silicon (Terminal):
 ./gradlew build
 ./gradlew fatJar
 ./gradlew jpackage          # build/jpackage/Veylon.app
-./gradlew appImageZip       # build/distributions/veylon-0.7.3-macos-{x64|arm64}.zip
+./gradlew appImageZip       # build/distributions/veylon-0.7.4-macos-{x64|arm64}.zip
 ./gradlew releaseArtifacts
 ```
 
@@ -161,7 +168,7 @@ See [CHANGELOG.md](CHANGELOG.md) for release notes.
 Run the fat JAR with the same JVM options used by the packaged launchers:
 
 ```powershell
-java --enable-native-access=ALL-UNNAMED -Xmx2G -jar build\libs\veylon-0.7.3-all.jar
+java --enable-native-access=ALL-UNNAMED -Xmx2G -jar build\libs\veylon-0.7.4-all.jar
 ```
 
 ---
@@ -392,7 +399,9 @@ layout: `player.game-mode` (mode, permanent Creative mark, flight) and
 `world.creative-controls` (frozen daylight, weather lock, paused spawning). A save
 without them loads as an unmarked Survival world, so **every existing save keeps
 working**. A malformed section fails the whole load rather than loading partial state,
-and the live world survives the attempt.
+and the live world survives the attempt. 0.7.2 adds `world.bodies` for settled carcass
+poses and human corpses; 0.7.4 moves it to version 2 for three-axis joint poses and
+still reads version 1.
 
 **v2 saves (0.1.0–0.2.0) load via an explicit migration path**: the world is pinned to
 the legacy terrain generator (identical terrain, no silent regeneration), and all new
@@ -418,6 +427,9 @@ saves are rejected with a console message — no migration.
 - Builds older than 0.7.0 open a Creative save as Survival and lose the mark, flight and
   world controls if they save over it; a save holding the new Creative-only block items
   loads there but silently drops those stacks.
+- 0.7.2 and 0.7.3 cannot open a save written by 0.7.4 or later: they reject its
+  version-2 body section and report "No compatible save was found." The file is not
+  modified, and a current build still opens it.
 - Wildlife AI uses steering + jump; settlement humans use bounded A*
   with a steering fallback (not a full navmesh — rough terrain can still stall them).
 - Crouching lowers the camera and slows you but doesn't shrink the collision box.
