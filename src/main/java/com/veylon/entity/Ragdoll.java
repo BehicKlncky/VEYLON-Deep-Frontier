@@ -13,7 +13,7 @@ import com.veylon.item.ItemType;
  * creature's species and lodged arrows, or the person's appearance.
  *
  * <p>The torso is one point carrying the orientation; every other point is an
- * appendage tied to a bone by a distance constraint. Solving happens in
+ * segment endpoint tied to its parent by limited joint constraints. Solving happens in
  * {@link RagdollSystem}; this is state only.
  */
 public class Ragdoll {
@@ -50,14 +50,21 @@ public class Ragdoll {
     public float yawVel;
     public float pitchVel;
     public float rollVel;
-    /** Orientation a grounded body is steered toward; how it ends up lying. */
-    public float restPitch;
-    public float restRoll;
+    public final org.joml.Quaternionf orientation = new org.joml.Quaternionf();
+    /** Joint and world frames are allocated once, never in a solver step. */
+    public final org.joml.Quaternionf[] jointRotation = new org.joml.Quaternionf[BodySkeleton.MAX_BONES];
+    public final org.joml.Quaternionf[] worldRotation = new org.joml.Quaternionf[BodySkeleton.MAX_BONES];
+    public final float[] jointX = new float[BodySkeleton.MAX_BONES];
+    public final float[] jointY = new float[BodySkeleton.MAX_BONES];
+    public final float[] jointZ = new float[BodySkeleton.MAX_BONES];
+    final float[] sleepX = new float[MAX_POINTS], sleepY = new float[MAX_POINTS], sleepZ = new float[MAX_POINTS];
+    final org.joml.Quaternionf sleepOrientation = new org.joml.Quaternionf();
 
     // ---- Lifecycle --------------------------------------------------
     public float age;
     public int quietSteps;
     public boolean grounded;
+    public boolean torsoGrounded;
     public boolean settled;
     public float dripTimer;
     /** Last measured settle energy, for tests and the debug overlay. */
@@ -74,6 +81,10 @@ public class Ragdoll {
         pose.boneCount = skeleton.boneCount;
         pose.pivotY = skeleton.torsoY;
         pose.solved = true;
+        for (int b = 0; b < BodySkeleton.MAX_BONES; b++) {
+            jointRotation[b] = new org.joml.Quaternionf();
+            worldRotation[b] = new org.joml.Quaternionf();
+        }
     }
 
     public boolean human() {

@@ -504,30 +504,46 @@ raider fading at the camp edge, four war-party stand-downs and routed survivors.
 already used for its "has died" line, so none of those drop dead on the road.
 Death by illness goes through health and is a real death.
 
-`RagdollSystem` is position-based dynamics over an articulated chain, not a
-rigid-body solver and not a physics library. A body is one torso point carrying
-the orientation plus up to six appendage point masses, one per bone named in
-`BodySkeleton`. A step integrates every point with the same numbers ordinary
-entities use — 26 m/s² in air, 7 in water, a −2.2 m/s descent clamp, 0.5
-horizontal water drag, 0.2-block axis sub-steps — relaxes each bone back onto
-its pivot three times, and then reads velocity back out of the distance actually
-travelled, which is what keeps the chain stable without a solver that can
-explode. Orientation is three explicit angles: the killing blow supplies an
-angular kick, a snagged limb torques the body, and once it is grounded a spring
-rolls it onto its resting side.
+`RagdollSystem` is position-based dynamics over an articulated joint tree, not a
+rigid-body solver and not a physics library. A body is a rigid torso box with a
+quaternion orientation plus one endpoint mass per joint named in `BodySkeleton`:
+at most twelve, listed parent-first, each a hinge or a cone with its own limits.
+Humans have ten, quadrupeds twelve and birds six. A step integrates every point
+with the same numbers ordinary entities use — 26 m/s² in air, 7 in water, a
+−2.2 m/s descent clamp, 0.5 horizontal water drag, 0.2-block axis sub-steps —
+runs six parent-first projection passes over segment lengths, joint limits,
+limb-versus-torso contact and sampled segment sweeps through loaded voxels, and
+then reads velocity back out of the distance actually travelled, which is what
+keeps the chain stable without a solver that can explode. The killing blow
+supplies an angular kick, raised to a one-time minimum toppling speed so a body
+killed standing still falls over. After that only contacts, applied at their
+lever arms, and joint reactions turn the torso. There is no rest-pose spring and
+no roll or pitch target: what a body hits decides how it lies.
+
+This replaced the 0.7.2 solver in 0.7.4. That solver had at most six free bones,
+three relaxation passes, a pull toward each bone's rest offset and a spring that
+rolled a grounded body onto a preset side. The authoring contract and every
+tuning value are in [joint authoring](engineering/RAGDOLL_JOINTS.md); the
+measurements behind them are in the
+[validation record](engineering/RAGDOLL_VALIDATION.md).
 
 The solver step is fixed at 1/60 s and driven per frame from the `simulate`
 gate beside `particles.update` and `projectiles.update`, not from the 20 Hz
 bucket. Creatures are drawn without interpolation and a tumbling body turns far
 faster than a walking one, so 20 Hz strobes; the fixed sub-step keeps behaviour
 frame-rate independent and a stalled frame clamps to four steps rather than
-replaying hundreds. A body settles when squared point speeds, squared angular
-speeds and the squared error against its resting orientation stay under
-`SETTLE_ENERGY` (0.55) for eight consecutive steps, or on a 6-second timeout.
-Folding the orientation error into that measure is what stops a body freezing
-while still standing upright; the timeout is what guarantees one can never stay
-unsettled. Live bodies are capped at twelve and the oldest settles immediately
-over the cap.
+replaying hundreds. The accumulator is a double with a small tolerance, so a
+death at 30 fps and the same death at 144 fps run identical steps and come to
+the same rest. Only a body whose torso is supported counts quiet steps, and any
+endpoint moving more than 4 cm or the root turning more than 0.06 rad from the
+sleep snapshot restarts the count. A body settles after twelve quiet steps with
+squared point and angular speeds under `SETTLE_ENERGY` (0.25), after thirty
+quiet steps of bounded contact jitter, or on the 6-second timeout. Requiring
+torso support is what stops a body freezing while it still stands on its legs;
+measuring every endpoint is what stops a resting torso freezing a limb that is
+still swinging; the timeout is what guarantees one can never stay unsettled.
+Live bodies are capped at twelve and the oldest settles immediately over the
+cap.
 
 `World.getBlock` answers `AIR` for an ungenerated column, so `RagdollCollision`
 treats an absent column as solid and a body killed at the streaming frontier
@@ -546,14 +562,17 @@ Rendering reuses the existing `entityShader` block: `renderCorpses` and
 `renderRagdolls` sit beside `renderCarcasses`, stamp the body's own `BodyPose`
 into the species' shared cached `EntityModel` through `Animator.poseBody`, and
 draw through the same `setEntityLight` / `entityVisible` / `drawModel` path. No
-new shader, mesh or draw-call class, and no model is cloned per body. A bone is
-aimed with two rotations and no yaw of its own, which covers the whole sphere
-exactly; measuring the target and the bone's authored rest axis the same way
-means an unmoved bone reads as zero and keeps the pose its builder gave it. The
-humanoid is a superset model whose accessories `resetPose` makes visible again,
-so `Animator.applyAppearance` — extracted from `poseNpc` and taking primitives
-rather than an `Npc` — runs for every body, and a corpse keeps the look of the
-person who died without holding the entity the world already removed.
+new shader, mesh or draw-call class, and no model is cloned per body. Each joint
+is posed by three parent-relative angles that its part composes as Rz·Ry·Rx, so
+an unmoved joint reads as zero and keeps the pose its builder gave it. Forearms,
+shins, lower legs and tail tips are real child parts: `ModelPart.split` halves
+an existing box and, while the child is straight, still draws the original single
+cuboid. Living animation never bends those children, which is why living models
+render pixel-identical to 0.7.3. The humanoid is a superset model whose
+accessories `resetPose` makes visible again, so `Animator.applyAppearance` —
+extracted from `poseNpc` and taking primitives rather than an `Npc` — runs for
+every body, and a corpse keeps the look of the person who died without holding
+the entity the world already removed.
 
 Orientation lives on the draw transform rather than the model root, because
 applied after the heading `rotateZ` is a roll about the body's own spine.
@@ -571,7 +590,7 @@ bodies can emit fits inside the 1,200 slots weather already reserves.
 
 | State | Persisted | Where |
 | --- | --- | --- |
-| Settled carcass pose (yaw/pitch/roll/lift/pivot + bone angles) | yes | `world.bodies`, positional, one per carcass |
+| Settled carcass pose (yaw/pitch/roll/lift/pivot + three angles per joint) | yes | `world.bodies`, positional, one per carcass |
 | Human corpses (position, decay, appearance, pose) | yes | `world.bodies` |
 | Bodies still falling | no — a save settles them first, so a save taken mid-fall comes back as a corpse rather than a lost body | — |
 | Solver accumulator, settle timers, lifetime counters | no | reset with the world |
@@ -580,7 +599,11 @@ The base v3 layout is untouched; `world.bodies` is an optional stable-ID section
 in the v3 extension envelope, entirely numeric (the archetype travels as a
 bounds-checked ordinal) so no byte anchor the migration tests rely on moves. An
 absent section means what every save written before 0.7.2 means: every carcass
-keeps its constructed pose and there are no human corpses.
+keeps its constructed pose and there are no human corpses. 0.7.4 moved the
+section to version 2, which writes three floats per joint; version 1 still
+loads, with its flat bone indices mapped by name into the new tree and new child
+joints left straight. 0.7.2 and 0.7.3 accept only version 1, so they refuse a
+0.7.4 save as a whole rather than load part of it.
 
 A human corpse is deliberately not an `Npc` and never enters `entities.npcs`, so
 it is not a perception or combat target, costs nothing against

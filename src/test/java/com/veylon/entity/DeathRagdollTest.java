@@ -27,6 +27,75 @@ class DeathRagdollTest {
 
     private Game game;
 
+    @Test
+    void renderedParentChainsReachTheSolvedHandlesForEverySpeciesAndHumans() {
+        for (int kind = 0; kind <= Creature.CreatureType.values().length; kind++) {
+            game.ragdolls.reset();
+            Ragdoll r;
+            com.veylon.gfx.model.EntityModel model;
+            if (kind == Creature.CreatureType.values().length) {
+                r = RagdollTestArena.human(game, 3, 2, 1, -1);
+                model = com.veylon.gfx.model.NpcModels.get();
+            } else {
+                Creature.CreatureType type = Creature.CreatureType.values()[kind];
+                Creature c = game.entities.spawnCreature(game.world, type,
+                        RagdollTestArena.CENTER_X, RagdollTestArena.GROUND + 3, RagdollTestArena.CENTER_Z);
+                c.vel.set(2, 1, -1);
+                r = game.ragdolls.spawn(game, c);
+                model = com.veylon.gfx.model.CreatureModels.of(type);
+            }
+            for (int tick = 0; tick < 180 && !r.settled; tick++) {
+                game.ragdolls.update(game, RagdollConstants.FIXED_STEP);
+                com.veylon.gfx.model.Animator.poseBody(model, r.skeleton, r.pose);
+                org.joml.Matrix4f root = new org.joml.Matrix4f().translate(r.px[0], r.py[0], r.pz[0])
+                        .rotateY(r.pose.yaw).rotateX(r.pose.pitch).rotateZ(r.pose.roll)
+                        .translate(0, -r.pose.pivotY, 0);
+                for (int b = 0; b < r.skeleton.boneCount; b++) {
+                    org.joml.Matrix4f frame = modelFrame(model.root, r.skeleton.part[b], root);
+                    org.junit.jupiter.api.Assertions.assertNotNull(frame, "skeleton must name a real part");
+                    org.joml.Vector3f end = new org.joml.Vector3f(r.skeleton.restX[b],
+                            r.skeleton.restY[b], r.skeleton.restZ[b]).mul(r.skeleton.length[b]);
+                    frame.transformPosition(end);
+                    assertEquals(r.px[b + 1], end.x, 0.001f, r.skeleton.part[b] + " render x");
+                    assertEquals(r.py[b + 1], end.y, 0.001f, r.skeleton.part[b] + " render y");
+                    assertEquals(r.pz[b + 1], end.z, 0.001f, r.skeleton.part[b] + " render z");
+                }
+            }
+        }
+    }
+
+    private static org.joml.Matrix4f modelFrame(com.veylon.gfx.model.ModelPart part, String name,
+                                               org.joml.Matrix4f parent) {
+        org.joml.Matrix4f frame = new org.joml.Matrix4f(parent).translate(part.pivotX, part.pivotY, part.pivotZ)
+                .rotateZ(part.rotZ).rotateY(part.rotY).rotateX(part.rotX);
+        if (part.name.equals(name)) return frame;
+        for (com.veylon.gfx.model.ModelPart child : part.children) {
+            org.joml.Matrix4f found = modelFrame(child, name, frame);
+            if (found != null) return found;
+        }
+        return null;
+    }
+
+    @Test
+    void birdWingsMoveOnAllThreeAxesAndTheSettledPoseIsCopiedExactly() {
+        Creature bird = game.entities.spawnCreature(game.world, Creature.CreatureType.BIRD,
+                RagdollTestArena.CENTER_X, RagdollTestArena.GROUND + 5, RagdollTestArena.CENTER_Z);
+        bird.vel.set(4, 0, 2);
+        Ragdoll r = game.ragdolls.spawn(game, bird);
+        for (int i = 0; i < 20; i++) game.ragdolls.update(game, RagdollConstants.FIXED_STEP);
+        float travel = 0;
+        for (int b = 2; b < r.skeleton.boneCount; b++) {
+            travel += Math.abs(r.pose.boneRotX[b]) + Math.abs(r.pose.boneRotY[b]) + Math.abs(r.pose.boneRotZ[b]);
+        }
+        assertTrue(travel > 0.25f, "sideways wing handles must be aimable");
+        BodyPose copy = new BodyPose();
+        copy.copyFrom(r.pose);
+        org.junit.jupiter.api.Assertions.assertArrayEquals(r.pose.boneRotY, copy.boneRotY);
+        copy.clear();
+        assertFalse(copy.solved);
+        for (float angle : copy.boneRotY) assertEquals(0, angle);
+    }
+
     @BeforeEach
     void setUp() {
         game = RagdollTestArena.create(20260918L);

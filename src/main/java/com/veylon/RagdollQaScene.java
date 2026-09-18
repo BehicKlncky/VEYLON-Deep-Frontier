@@ -38,6 +38,7 @@ final class RagdollQaScene {
     private final Game game;
     private boolean active;
     private boolean singleBody;
+    private boolean living;
     private double simulated;
 
     RagdollQaScene(Game game) {
@@ -115,6 +116,64 @@ final class RagdollQaScene {
         simulated = 0;
     }
 
+    /** Close human, step contact, and frozen living-animation comparison fixtures. */
+    void stageJoints(Vec3i site, String scene) {
+        prepare(site);
+        living = scene.startsWith("ragdoll_living");
+        boolean gallery = scene.equals("ragdoll_living_species");
+        boolean drape = scene.equals("death_ragdoll_drape");
+        boolean ledge = scene.equals("death_ragdoll_ledge") || drape;
+        int ground = site.y();
+        // Known one-block shelf, with empty air above and a lower landing.
+        for (int x = site.x() - 8; x <= site.x() + 8; x++) {
+            for (int z = site.z() - 12; z <= site.z() + 2; z++) {
+                for (int y = ground - 2; y <= ground + 8; y++) {
+                    game.world.setBlock(x, y, z, ledge && x <= site.x() && y == ground
+                            ? com.veylon.world.BlockType.STONE : y < ground
+                            ? (drape ? com.veylon.world.BlockType.DIRT : com.veylon.world.BlockType.STONE)
+                            : com.veylon.world.BlockType.AIR, false);
+                }
+            }
+        }
+        Npc person = game.entities.spawnNpc(game.world, "Villager",
+                site.x() + (drape ? 0.2f : living ? -1.0f : -0.2f),
+                ground + (ledge ? 1.05f : 0.05f), site.z() - 4f);
+        person.yaw = 45;
+        person.bobPhase = 0.7f;
+        person.archetype = NpcArchetype.GUARD;
+        if (!living) {
+            kill(person, ledge ? new float[]{1.2f, 0f, 0f} : new float[]{1.8f, 1f, 0.2f});
+            game.entities.fastTick(game, 0f);
+        } else {
+            Creature wolf = game.entities.spawnCreature(game.world, Creature.CreatureType.WOLF,
+                    site.x() + 1.2f, ground + 0.05f, site.z() - 4f);
+            wolf.yaw = 45;
+            wolf.bobPhase = 0.7f;
+        }
+        game.player.inventory.set(0, null);
+        game.player.pos.set(site.x() + 0.5f, ground + 0.05f, site.z() + 0.5f);
+        game.camera.yaw = 0;
+        game.camera.pitch = 18;
+        if (drape) {
+            game.player.pos.x += 2;
+            game.camera.yaw = -28;
+        }
+        if (gallery) {
+            person.pos.x = site.x() - 4;
+            game.entities.creatures.clear();
+            Creature.CreatureType[] types = Creature.CreatureType.values();
+            for (int i = 0; i < types.length; i++) {
+                Creature c = game.entities.spawnCreature(game.world, types[i],
+                        site.x() - 2 + (i % 3) * 2.2f, ground + 0.05f, site.z() - 4 - (i / 3) * 3);
+                c.yaw = 45;
+                c.bobPhase = 0.7f;
+            }
+            game.player.pos.z += 2;
+        }
+        active = true;
+        update(0);
+    }
+
     /** Kills outright and sets the launch velocity the solver reads. */
     private static void kill(com.veylon.entity.Entity e, float[] impulse) {
         e.hurt(e.health + 1000f, true);
@@ -128,6 +187,19 @@ final class RagdollQaScene {
      */
     void update(double elapsed) {
         if (!active) {
+            return;
+        }
+        if (living) {
+            int phase = Math.min(2, (int) elapsed / 2);
+            game.totalTime = 2;
+            for (Npc n : game.entities.npcs) {
+                n.vel.set(phase == 1 ? 2 : 0, 0, 0);
+                n.state = phase == 2 ? Npc.NpcState.ATTACK : Npc.NpcState.IDLE;
+            }
+            for (Creature c : game.entities.creatures) {
+                c.vel.set(phase == 1 ? 2 : 0, 0, 0);
+                c.state = phase == 2 ? Creature.CreatureState.ATTACK : Creature.CreatureState.WANDER;
+            }
             return;
         }
         double target = SHOT_TIMES[Math.min(SHOT_TIMES.length - 1,

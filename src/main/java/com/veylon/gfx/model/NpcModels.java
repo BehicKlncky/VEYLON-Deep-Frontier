@@ -40,13 +40,16 @@ public final class NpcModels {
                 .box(0, 0.09f, 0, 0.025f, 0.20f, 0.025f).color(0x8c7745));
         head.child(new ModelPart("traderLamp").pivot(0.10f, 0.38f, 0)
                 .box(0, 0, 0, 0.055f, 0.055f, 0.055f).color(0xe0b84b).emissive(0.4f));
-        torso.child(head);
+        torso.child(new ModelPart("neck").pivot(0, 0.58f, 0).child(head));
+        head.pivotY -= 0.58f;
 
         for (int s = -1; s <= 1; s += 2) {
             torso.child(new ModelPart(s < 0 ? "arm_l" : "arm_r").pivot(s * 0.30f, 0.55f, 0)
-                    .box(0, -0.26f, 0, 0.13f, 0.55f, 0.15f).color(0x3d5468));
+                    .box(0, -0.26f, 0, 0.13f, 0.55f, 0.15f).color(0x3d5468)
+                    .split(s < 0 ? "forearm_l" : "forearm_r", true));
             root.child(new ModelPart(s < 0 ? "leg_l" : "leg_r").pivot(s * 0.115f, hipY, 0)
-                    .box(0, -0.43f, 0, 0.16f, 0.86f, 0.18f).color(0x2e3a44));
+                    .box(0, -0.43f, 0, 0.16f, 0.86f, 0.18f).color(0x2e3a44)
+                    .split(s < 0 ? "shin_l" : "shin_r", true));
         }
 
         torso.child(new ModelPart("pack").pivot(0, 0.30f, 0.20f)

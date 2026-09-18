@@ -31,6 +31,33 @@ public class ModelPart {
     public final List<ModelPart> children = new ArrayList<>();
     private final Matrix4f local = new Matrix4f();
     private final Matrix4f draw = new Matrix4f();
+    private ModelPart straightChild;
+    private float wholeX, wholeY, wholeZ, wholeSizeX, wholeSizeY, wholeSizeZ;
+
+    /** Split a box at its midpoint. A straight chain draws the original box exactly. */
+    public ModelPart split(String childName, boolean alongY) {
+        wholeX = boxX; wholeY = boxY; wholeZ = boxZ;
+        wholeSizeX = sizeX; wholeSizeY = sizeY; wholeSizeZ = sizeZ;
+        ModelPart tip = new ModelPart(childName).color(r, g, b).emissive(emissive);
+        if (alongY) {
+            tip.pivot(0, boxY, 0).box(boxX, -sizeY * 0.25f, boxZ, sizeX, sizeY * 0.5f, sizeZ);
+            boxY += sizeY * 0.25f;
+            sizeY *= 0.5f;
+        } else {
+            tip.pivot(0, 0, boxZ).box(boxX, boxY, sizeZ * 0.25f, sizeX, sizeY, sizeZ * 0.5f);
+            boxZ -= sizeZ * 0.25f;
+            sizeZ *= 0.5f;
+        }
+        straightChild = tip;
+        child(tip);
+        return this;
+    }
+
+    private boolean straight() {
+        return straightChild != null && straightChild.rotX == 0 && straightChild.rotY == 0
+                && straightChild.rotZ == 0 && straightChild.poseX == 0
+                && straightChild.poseY == 0 && straightChild.poseZ == 0 && straightChild.scale == 1;
+    }
 
     public ModelPart(String name) {
         this.name = name;
@@ -89,6 +116,11 @@ public class ModelPart {
      * uColor/uEmissive); the shadow pass only needs uModel.
      */
     public int render(Matrix4f parent, ShaderProgram shader, Mesh centeredCube, boolean colorPass) {
+        return render(parent, shader, centeredCube, colorPass, false);
+    }
+
+    private int render(Matrix4f parent, ShaderProgram shader, Mesh centeredCube,
+                       boolean colorPass, boolean skipBox) {
         if (!visible) {
             return 0;
         }
@@ -99,8 +131,13 @@ public class ModelPart {
         if (scale != 1f) {
             local.scale(scale);
         }
-        if (sizeX > 0) {
-            draw.set(local).translate(boxX, boxY, boxZ).scale(sizeX, sizeY, sizeZ);
+        boolean merged = straight();
+        if (sizeX > 0 && !skipBox) {
+            if (merged) {
+                draw.set(local).translate(wholeX, wholeY, wholeZ).scale(wholeSizeX, wholeSizeY, wholeSizeZ);
+            } else {
+                draw.set(local).translate(boxX, boxY, boxZ).scale(sizeX, sizeY, sizeZ);
+            }
             shader.set("uModel", draw);
             if (colorPass) {
                 shader.set("uColor", r, g, b);
@@ -110,7 +147,7 @@ public class ModelPart {
             draws++;
         }
         for (ModelPart c : children) {
-            draws += c.render(local, shader, centeredCube, colorPass);
+            draws += c.render(local, shader, centeredCube, colorPass, merged && c == straightChild);
         }
         return draws;
     }

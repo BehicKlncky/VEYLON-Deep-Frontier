@@ -41,7 +41,7 @@ import static com.veylon.save.SaveSystem.readCount;
 final class BodiesSection {
 
     static final String ID = "world.bodies";
-    private static final int VERSION = 1;
+    private static final int VERSION = 2;
     /** Far above the corpse despawn radius could ever sustain. */
     private static final int MAX_CORPSES = 4096;
     private static final float MAX_ANGLE = 40f;
@@ -84,7 +84,7 @@ final class BodiesSection {
     static void read(byte[] payload, Game game) throws IOException {
         try (DataInputStream in = new DataInputStream(new ByteArrayInputStream(payload))) {
             int version = in.readInt();
-            if (version != VERSION) {
+            if (version < 1 || version > VERSION) {
                 throw new IOException("unsupported bodies section version " + version);
             }
             int poses = readCount(in, "carcass poses");
@@ -93,7 +93,7 @@ final class BodiesSection {
                         + " for " + game.entities.carcasses.size() + " carcasses");
             }
             for (Carcass carcass : game.entities.carcasses) {
-                readPose(in, carcass.pose);
+                readPose(in, carcass.pose, version, BodySkeleton.of(carcass.type));
             }
 
             int count = readCount(in, "human corpses");
@@ -118,7 +118,7 @@ final class BodiesSection {
                 corpse.appearance.trader = in.readBoolean();
                 corpse.appearance.sick = in.readBoolean();
                 corpse.appearance.campIndex = in.readInt();
-                readPose(in, corpse.pose);
+                readPose(in, corpse.pose, version, BodySkeleton.humanoid());
                 game.entities.corpses.add(corpse);
             }
             if (in.available() != 0) {
@@ -137,11 +137,13 @@ final class BodiesSection {
         out.writeInt(pose.boneCount);
         for (int b = 0; b < pose.boneCount; b++) {
             out.writeFloat(pose.boneRotX[b]);
+            out.writeFloat(pose.boneRotY[b]);
             out.writeFloat(pose.boneRotZ[b]);
         }
     }
 
-    private static void readPose(DataInputStream in, BodyPose pose) throws IOException {
+    private static void readPose(DataInputStream in, BodyPose pose, int version,
+                                 BodySkeleton skeleton) throws IOException {
         pose.yaw = readFinite(in, "pose yaw", -MAX_ANGLE, MAX_ANGLE);
         pose.pitch = readFinite(in, "pose pitch", -MAX_ANGLE, MAX_ANGLE);
         pose.roll = readFinite(in, "pose roll", -MAX_ANGLE, MAX_ANGLE);
@@ -149,14 +151,46 @@ final class BodiesSection {
         pose.pivotY = readFinite(in, "pose pivot", -4f, 4f);
         pose.solved = in.readBoolean();
         int bones = in.readInt();
-        if (bones < 0 || bones > BodySkeleton.MAX_BONES) {
+        if (bones < 0 || bones > (version == 1 ? 6 : skeleton.boneCount)) {
             throw new IOException("invalid pose bone count: " + bones);
         }
         pose.boneCount = bones;
         for (int b = 0; b < bones; b++) {
-            pose.boneRotX[b] = readFinite(in, "bone rotX", -MAX_ANGLE, MAX_ANGLE);
-            pose.boneRotZ[b] = readFinite(in, "bone rotZ", -MAX_ANGLE, MAX_ANGLE);
+            int target = version == 1 ? legacyBone(skeleton, b) : b;
+            float x = readFinite(in, "bone rotX", -MAX_ANGLE, MAX_ANGLE);
+            float y = version == 1 ? 0 : readFinite(in, "bone rotY", -MAX_ANGLE, MAX_ANGLE);
+            float z = readFinite(in, "bone rotZ", -MAX_ANGLE, MAX_ANGLE);
+            if (target >= 0) {
+                pose.boneRotX[target] = x;
+                pose.boneRotY[target] = y;
+                pose.boneRotZ[target] = z;
+            }
         }
+        if (version == 1 && pose.solved) pose.boneCount = skeleton.boneCount;
+    }
+
+    /** Version 1 stored flat bones in a different order, never child rotations. */
+    private static int legacyBone(BodySkeleton skeleton, int old) {
+        String name;
+        if (skeleton == BodySkeleton.humanoid()) {
+            name = switch (old) {
+                case 0 -> "head"; case 1 -> "arm_l"; case 2 -> "arm_r";
+                case 3 -> "leg_l"; case 4 -> "leg_r"; default -> "";
+            };
+        } else if (skeleton == BodySkeleton.of(com.veylon.entity.Creature.CreatureType.BIRD)) {
+            name = old == 0 ? "head" : old == 1 ? "tail" : "";
+        } else {
+            name = switch (old) {
+                case 0 -> "leg_fl"; case 1 -> "leg_fr"; case 2 -> "leg_bl"; case 3 -> "leg_br";
+                case 4 -> skeleton == BodySkeleton.of(com.veylon.entity.Creature.CreatureType.HARE)
+                        ? "head" : "neck";
+                case 5 -> "tail"; default -> "";
+            };
+        }
+        for (int b = 0; b < skeleton.boneCount; b++) {
+            if (skeleton.part[b].equals(name)) return b;
+        }
+        return -1;
     }
 
     /**

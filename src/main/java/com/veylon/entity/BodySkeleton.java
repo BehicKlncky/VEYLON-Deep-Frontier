@@ -1,203 +1,162 @@
 package com.veylon.entity;
 
 import com.veylon.entity.Creature.CreatureType;
-
 import java.util.EnumMap;
 import java.util.Map;
 
 /**
- * The point-mass layout of one species, expressed in the coordinates its
- * {@code EntityModel} is actually built in.
- *
- * <p>A body is one torso point carrying the orientation, plus up to
- * {@link #MAX_BONES} appendage points. Each appendage names a real
- * {@code ModelPart}, the pivot that part hangs from <em>in the model root's
- * frame</em>, the axis it is authored along, and how far out along that axis
- * its handle sits. Everything an appendage needs is therefore derivable from
- * the model builders, and nothing here clones a model.
- *
- * <p>Ancestors of every listed part are unrotated by the ragdoll pose, which is
- * what lets a pivot be quoted in the root frame: a quadruped's legs and neck
- * hang off {@code root}, its tail off the unrotated {@code body}, a humanoid's
- * arms and head off the unrotated {@code torso}. A species with no entry
- * degrades to {@link #rigid} — a torso and no articulation — rather than
- * guessing bone names.
+ * Parent-first joint tree matching the models. Root pivots use model coordinates;
+ * child pivots and rest vectors use the parent's frame. Limits are radians.
+ * See docs/engineering/RAGDOLL_JOINTS.md for the authoring contract.
  */
 public final class BodySkeleton {
-
-    /** Widest layout is the quadruped: four legs, a neck and a tail. */
-    public static final int MAX_BONES = 6;
-
-    /** Rest axis of a bone handle, in the body's local frame. Forward is -Z. */
-    public static final int AXIS_DOWN = 0;
-    public static final int AXIS_FORWARD = 1;
-    public static final int AXIS_BACK = 2;
-    public static final int AXIS_UP = 3;
-
-    private static final Map<CreatureType, BodySkeleton> CREATURES =
-            new EnumMap<>(CreatureType.class);
-    private static BodySkeleton humanoid;
-
+    public static final int MAX_BONES = 12;
+    public static final int TORSO = -1;
+    public enum Joint { CONE, HINGE }
     public final String[] part = new String[MAX_BONES];
-    public final float[] pivotX = new float[MAX_BONES];
-    public final float[] pivotY = new float[MAX_BONES];
-    public final float[] pivotZ = new float[MAX_BONES];
-    public final float[] length = new float[MAX_BONES];
-    public final int[] axis = new int[MAX_BONES];
+    public final int[] parent = new int[MAX_BONES];
+    public final Joint[] joint = new Joint[MAX_BONES];
+    public final float[] pivotX = new float[MAX_BONES], pivotY = new float[MAX_BONES], pivotZ = new float[MAX_BONES];
+    public final float[] restX = new float[MAX_BONES], restY = new float[MAX_BONES], restZ = new float[MAX_BONES];
+    public final float[] length = new float[MAX_BONES], radius = new float[MAX_BONES];
+    /** Authored socket overlap is exempt from self-contact; distal samples are not. */
+    public final float[] selfCollisionStart = new float[MAX_BONES];
+    public final float[] minAngle = new float[MAX_BONES], maxAngle = new float[MAX_BONES];
     public int boneCount;
+    public float torsoY, torsoRadius;
+    /** Oriented support box and self-collision proxy about the torso centre. */
+    public float halfX, halfY, halfZ;
+    private static final Map<CreatureType, BodySkeleton> CREATURES = new EnumMap<>(CreatureType.class);
+    private static final BodySkeleton HUMAN = buildHumanoid();
 
-    /** Height of the torso point above the model origin (the ground contact). */
-    public float torsoY;
-    /**
-     * Half-extent of the cube the torso point sweeps through voxels. It is
-     * deliberately isotropic: the point is a centre-of-mass proxy, and a body
-     * that has rolled onto its side must not keep a standing torso's height.
-     */
-    public float torsoRadius = 0.22f;
-
-    private BodySkeleton() {
-    }
-
-    /**
-     * Rotation about local X that aims the "down" handle along {@code axis}.
-     * Chosen so a bone at rest reads {@code rotX = rotZ = 0} and keeps whatever
-     * pose its model builder authored.
-     */
-    public static float restAngle(int axis) {
-        return switch (axis) {
-            case AXIS_FORWARD -> (float) (Math.PI * 0.5);
-            case AXIS_BACK -> (float) (-Math.PI * 0.5);
-            case AXIS_UP -> (float) Math.PI;
-            default -> 0f;
-        };
-    }
-
-    /** Unit rest direction of {@code axis} in the body frame. */
-    public static float restX(int axis) {
-        return 0f;
-    }
-
-    public static float restY(int axis) {
-        return axis == AXIS_DOWN ? -1f : (axis == AXIS_UP ? 1f : 0f);
-    }
-
-    public static float restZ(int axis) {
-        return axis == AXIS_FORWARD ? -1f : (axis == AXIS_BACK ? 1f : 0f);
-    }
-
+    private BodySkeleton() { }
     public static synchronized BodySkeleton of(CreatureType type) {
         return CREATURES.computeIfAbsent(type, BodySkeleton::buildCreature);
     }
-
-    public static synchronized BodySkeleton humanoid() {
-        if (humanoid == null) {
-            humanoid = buildHumanoid();
-        }
-        return humanoid;
-    }
-
-    /**
-     * Fallback for a body whose bones were never mapped: a torso and nothing
-     * else, sized from the entity itself. It tumbles as one rigid piece instead
-     * of reaching for part names the model may not have.
-     */
+    public static BodySkeleton humanoid() { return HUMAN; }
     public static BodySkeleton rigid(float width, float height) {
         BodySkeleton s = new BodySkeleton();
-        s.torsoY = height * 0.5f;
-        s.torsoRadius = Math.max(0.09f, Math.min(width, height) * 0.4f);
+        s.body(height * 0.5f, width * 0.5f, height * 0.5f, width * 0.5f);
         return s;
     }
-
-    private void bone(String name, float px, float py, float pz, int boneAxis, float len) {
-        if (boneCount >= MAX_BONES) {
-            return;
-        }
-        int i = boneCount++;
-        part[i] = name;
-        pivotX[i] = px;
-        pivotY[i] = py;
-        pivotZ[i] = pz;
-        axis[i] = boneAxis;
-        length[i] = len;
+    private void body(float y, float x, float h, float z) {
+        torsoY = y; halfX = x; halfY = h; halfZ = z;
+        torsoRadius = Math.min(x, Math.min(h, z));
     }
-
+    private int cone(String name, int ancestor, float x, float y, float z,
+                     float dx, float dy, float dz, float r, float limit) {
+        if (boneCount == MAX_BONES || ancestor >= boneCount || ancestor < TORSO) {
+            throw new IllegalArgumentException("invalid skeleton hierarchy: " + name);
+        }
+        int b = boneCount++;
+        part[b] = name; parent[b] = ancestor; joint[b] = Joint.CONE;
+        pivotX[b] = x; pivotY[b] = y; pivotZ[b] = z;
+        length[b] = (float) Math.sqrt(dx * dx + dy * dy + dz * dz);
+        restX[b] = dx / length[b]; restY[b] = dy / length[b]; restZ[b] = dz / length[b];
+        radius[b] = r; maxAngle[b] = limit;
+        float sx = x, sy = y - torsoY, sz = z;
+        for (int p = ancestor; p >= 0; p = parent[p]) {
+            sx += pivotX[p]; sy += pivotY[p]; sz += pivotZ[p];
+        }
+        float hx = halfX + r, hy = halfY + r, hz = halfZ + r;
+        if (Math.abs(sx) <= halfX + 1e-5f && Math.abs(sy) <= halfY + 1e-5f
+                && Math.abs(sz) <= halfZ + 1e-5f) {
+            float exit = Float.POSITIVE_INFINITY;
+            if (Math.abs(dx) > 1e-6f) exit = Math.min(exit, (Math.copySign(hx, dx) - sx) / dx);
+            if (Math.abs(dy) > 1e-6f) exit = Math.min(exit, (Math.copySign(hy, dy) - sy) / dy);
+            if (Math.abs(dz) > 1e-6f) exit = Math.min(exit, (Math.copySign(hz, dz) - sz) / dz);
+            selfCollisionStart[b] = Math.min(1, exit);
+        }
+        return b;
+    }
+    private void limb(String upper, String lower, float x, float y, float z,
+                      float top, float bottom, float r, boolean reverse) {
+        int b = cone(upper, TORSO, x, y, z, 0, -top, 0, r, RagdollConstants.HIP_CONE);
+        int c = cone(lower, b, 0, -top, 0, 0, -bottom, 0, r, 0);
+        joint[c] = Joint.HINGE;
+        minAngle[c] = reverse ? -RagdollConstants.KNEE_BEND : 0;
+        maxAngle[c] = reverse ? 0 : RagdollConstants.KNEE_BEND;
+    }
+    private void tail(float y, float z, float split, float tip, float r) {
+        int b = cone("tail", TORSO, 0, y, z, 0, 0, split, r, RagdollConstants.TAIL_CONE);
+        cone("tail_tip", b, 0, 0, split, 0, 0, tip, r, RagdollConstants.TAIL_CONE);
+    }
+    private static BodySkeleton buildHumanoid() {
+        BodySkeleton s = new BodySkeleton();
+        s.body(1.17f, 0.25f, 0.31f, 0.15f);
+        int neck = s.cone("neck", TORSO, 0, 1.44f, 0, 0, 0.06f, 0, 0.06f, RagdollConstants.NECK_CONE);
+        s.cone("head", neck, 0, 0.06f, 0, 0, 0.26f, 0, 0.13f, RagdollConstants.HEAD_CONE);
+        for (int side = -1; side <= 1; side += 2) {
+            String suffix = side < 0 ? "_l" : "_r";
+            int arm = s.boneCount;
+            s.limb("arm" + suffix, "forearm" + suffix, side * 0.30f, 1.41f, 0,
+                    0.26f, 0.275f, 0.075f, false);
+            s.maxAngle[arm] = RagdollConstants.SHOULDER_CONE;
+            s.maxAngle[arm + 1] = RagdollConstants.ELBOW_BEND;
+            s.limb("leg" + suffix, "shin" + suffix, side * 0.115f, 0.86f, 0,
+                    0.43f, 0.43f, 0.09f, true);
+        }
+        return s;
+    }
     private static BodySkeleton buildCreature(CreatureType type) {
         return switch (type) {
-            // CreatureModels.quadruped(tag, bodyLen, bodyW, bodyH, legH, legW, ...)
-            case DEER -> quadruped(0.85f, 0.42f, 0.42f, 0.58f);
-            case WOLF -> quadruped(0.80f, 0.34f, 0.34f, 0.42f);
-            case THORNHORN -> quadruped(1.25f, 0.72f, 0.72f, 0.55f);
-            case STALKER -> quadruped(0.70f, 0.26f, 0.26f, 0.72f);
+            case DEER -> quadruped(0.85f, 0.42f, 0.42f, 0.58f, 0.11f,
+                    0.16f, -0.06f, 0.30f, 0.12f, 0.44f, 0.04f, 0.06f, 0.04f);
+            case WOLF -> quadruped(0.80f, 0.34f, 0.34f, 0.42f, 0.10f,
+                    0.06f, -0.05f, 0.26f, 0.10f, 0.42f, 0.16f, 0.17f, 0.05f);
+            case THORNHORN -> quadruped(1.25f, 0.72f, 0.72f, 0.55f, 0.20f,
+                    -0.02f, -0.10f, 0.40f, 0.10f, 0.65f, 0.10f, 0.13f, 0.07f);
+            case STALKER -> quadruped(0.70f, 0.26f, 0.26f, 0.72f, 0.06f,
+                    0.10f, -0.06f, 0.30f, 0.02f, 0.36f, 0.18f, 0.20f, 0.025f);
             case HARE -> hare();
             case BIRD -> bird();
-            // A creature type appended without a bone mapping tumbles as one
-            // rigid piece instead of reaching for part names it does not have.
             default -> rigid(type.width, type.height);
         };
     }
-
-    /** Mirrors {@code CreatureModels.quadruped}: root -> body/legs/neck, body -> tail. */
-    private static BodySkeleton quadruped(float bodyLen, float bodyW, float bodyH,
-                                          float legH) {
+    private static BodySkeleton quadruped(float len, float width, float height, float leg,
+            float legWidth, float headY, float headZ, float headLen,
+            float tailY, float tailZ, float tailSplit, float tailTip, float tailRadius) {
         BodySkeleton s = new BodySkeleton();
-        float shoulderY = legH + bodyH * 0.5f;
-        float hx = bodyW * 0.32f;
-        float fz = -bodyLen * 0.38f;
-        float bz = bodyLen * 0.38f;
-        s.bone("leg_fl", -hx, legH, fz, AXIS_DOWN, legH);
-        s.bone("leg_fr", hx, legH, fz, AXIS_DOWN, legH);
-        s.bone("leg_bl", -hx, legH, bz, AXIS_DOWN, legH);
-        s.bone("leg_br", hx, legH, bz, AXIS_DOWN, legH);
-        // The neck carries the head: rotating it swings the whole skull.
-        s.bone("neck", 0, shoulderY + bodyH * 0.30f, -bodyLen * 0.48f,
-                AXIS_FORWARD, bodyLen * 0.38f);
-        // Tail hangs off the body, whose pivot sits at the shoulder height.
-        s.bone("tail", 0, shoulderY + bodyH * 0.26f, bodyLen * 0.50f,
-                AXIS_BACK, bodyLen * 0.30f);
-        s.torsoY = shoulderY;
-        s.torsoRadius = Math.max(0.12f, Math.min(bodyW, bodyH) * 0.5f);
+        float y = leg + height * 0.5f;
+        s.body(y, width * 0.5f, height * 0.5f, len * 0.5f);
+        String[] names = {"leg_fl", "leg_fr", "leg_bl", "leg_br"};
+        for (int i = 0; i < 4; i++) {
+            s.limb(names[i], names[i] + "_lower", (i % 2 == 0 ? -1 : 1) * width * 0.32f,
+                    leg, (i < 2 ? -1 : 1) * len * 0.38f, leg * 0.5f, leg * 0.5f,
+                    legWidth * 0.5f, i < 2);
+        }
+        int neck = s.cone("neck", TORSO, 0, y + height * 0.30f, -len * 0.48f,
+                0, headY, headZ, height * 0.22f, RagdollConstants.NECK_CONE);
+        s.cone("head", neck, 0, headY, headZ, 0, 0, -headLen,
+                height * 0.26f, RagdollConstants.HEAD_CONE);
+        s.tail(y + tailY, tailZ, tailSplit, tailTip, tailRadius);
         return s;
     }
-
-    /** Mirrors {@code CreatureModels.murkhare}: short legs, head and tail on the body. */
     private static BodySkeleton hare() {
         BodySkeleton s = new BodySkeleton();
-        s.bone("leg_fl", -0.07f, 0.12f, -0.10f, AXIS_DOWN, 0.12f);
-        s.bone("leg_fr", 0.07f, 0.12f, -0.10f, AXIS_DOWN, 0.12f);
-        s.bone("leg_bl", -0.09f, 0.12f, 0.14f, AXIS_DOWN, 0.12f);
-        s.bone("leg_br", 0.09f, 0.12f, 0.14f, AXIS_DOWN, 0.12f);
-        s.bone("head", 0, 0.26f, -0.18f, AXIS_FORWARD, 0.14f);
-        s.bone("tail", 0, 0.22f, 0.22f, AXIS_BACK, 0.08f);
-        s.torsoY = 0.16f;
-        s.torsoRadius = 0.11f;
+        s.body(0.18f, 0.13f, 0.11f, 0.19f);
+        String[] names = {"leg_fl", "leg_fr", "leg_bl", "leg_br"};
+        for (int i = 0; i < 4; i++) {
+            s.limb(names[i], names[i] + "_lower", (i % 2 == 0 ? -1 : 1) * (i < 2 ? 0.07f : 0.09f),
+                    0.12f, i < 2 ? -0.10f : 0.14f, 0.06f, 0.06f, 0.025f, i < 2);
+        }
+        int neck = s.cone("head_joint", TORSO, 0, 0.23f, -0.18f, 0, 0.03f, 0, 0.035f, RagdollConstants.NECK_CONE);
+        s.cone("head", neck, 0, 0.03f, 0, 0, 0, -0.12f, 0.075f, RagdollConstants.HEAD_CONE);
+        s.tail(0.22f, 0.22f, 0.02f, 0.03f, 0.035f);
         return s;
     }
-
-    /**
-     * Mirrors {@code CreatureModels.skitterwing}. The four wings are authored
-     * along +/-X, an axis this two-angle parameterisation cannot aim, so they
-     * stay at rest and only the body, head and tail tumble.
-     */
     private static BodySkeleton bird() {
         BodySkeleton s = new BodySkeleton();
-        s.bone("head", 0, 0.23f, -0.17f, AXIS_FORWARD, 0.10f);
-        s.bone("tail", 0, 0.18f, 0.17f, AXIS_BACK, 0.09f);
-        s.torsoY = 0.18f;
-        s.torsoRadius = 0.08f;
-        return s;
-    }
-
-    /** Mirrors {@code NpcModels.build}: legs on the root, arms and head on the torso. */
-    private static BodySkeleton buildHumanoid() {
-        BodySkeleton s = new BodySkeleton();
-        float hipY = 0.86f;
-        s.bone("head", 0, hipY + 0.64f, 0, AXIS_UP, 0.26f);
-        s.bone("arm_l", -0.30f, hipY + 0.55f, 0, AXIS_DOWN, 0.55f);
-        s.bone("arm_r", 0.30f, hipY + 0.55f, 0, AXIS_DOWN, 0.55f);
-        s.bone("leg_l", -0.115f, hipY, 0, AXIS_DOWN, 0.86f);
-        s.bone("leg_r", 0.115f, hipY, 0, AXIS_DOWN, 0.86f);
-        s.torsoY = hipY + 0.31f;
-        s.torsoRadius = 0.20f;
+        s.body(0.18f, 0.08f, 0.07f, 0.15f);
+        s.cone("head", TORSO, 0, 0.23f, -0.17f, 0, 0, -0.10f, 0.05f, RagdollConstants.HEAD_CONE);
+        s.cone("tail", TORSO, 0, 0.18f, 0.17f, 0, 0, 0.11f, 0.025f, RagdollConstants.TAIL_CONE);
+        for (int pair = 0; pair < 2; pair++) {
+            for (int side = -1; side <= 1; side += 2) {
+                s.cone("wing" + pair + (side < 0 ? "_l" : "_r"), TORSO,
+                        side * 0.08f, 0.23f, -0.06f + pair * 0.14f,
+                        side * 0.31f, 0, 0, 0.018f, RagdollConstants.WING_CONE);
+            }
+        }
         return s;
     }
 }

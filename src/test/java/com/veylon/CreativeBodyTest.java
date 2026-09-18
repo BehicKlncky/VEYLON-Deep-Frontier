@@ -23,6 +23,37 @@ import static org.junit.jupiter.api.Assertions.*;
 class CreativeBodyTest {
     @TempDir Path temporary;
 
+    @Test
+    void npcDeathsUseTheSameJointPhysicsInSurvivalAndCreative() {
+        com.veylon.entity.BodyPose survival = null;
+        for (GameMode mode : GameMode.values()) {
+            Game game = CreativeTestArena.create(mode);
+            var npc = game.entities.spawnNpc(game.world, "Villager", 310.5f, 43f, 310.5f);
+            npc.hurt(npc.health + 100, true);
+            npc.vel.set(2, 1, -1);
+            game.entities.fastTick(game, 0);
+            assertEquals(1, game.ragdolls.liveCount(), "both modes retain NPC death physics");
+            var body = game.ragdolls.live.getFirst();
+            for (int i = 0; i < 361 && !body.settled; i++) {
+                game.ragdolls.update(game, com.veylon.entity.RagdollConstants.FIXED_STEP);
+            }
+            assertTrue(body.settled);
+            assertEquals(1, game.entities.corpses.size());
+            var pose = game.entities.corpses.getFirst().pose;
+            assertEquals(10, pose.boneCount, "both modes keep the complete humanoid chain");
+            if (survival == null) {
+                survival = new com.veylon.entity.BodyPose();
+                survival.copyFrom(pose);
+            } else {
+                assertArrayEquals(survival.boneRotX, pose.boneRotX);
+                assertArrayEquals(survival.boneRotY, pose.boneRotY);
+                assertArrayEquals(survival.boneRotZ, pose.boneRotZ);
+                assertEquals(survival.pitch, pose.pitch);
+                assertEquals(survival.roll, pose.roll);
+            }
+        }
+    }
+
     enum NeedHazard { STARVATION, DEHYDRATION, FREEZING, OVERHEATING, SMOKE }
 
     @Test

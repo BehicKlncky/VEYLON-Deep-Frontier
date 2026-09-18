@@ -684,10 +684,21 @@ final class QaHarness {
                 clearBenchmarkStage(site, 12, 20);
                 ragdollScene.stage(site);
             }
-            case "death_ragdoll_sequence", "ragdoll_seq" -> {
+            case "death_ragdoll_sequence", "ragdoll_seq", "death_ragdoll_quadruped" -> {
                 site = moveBenchmarkToBiome(Biome.MEADOW);
                 clearBenchmarkStage(site, 9, 14);
                 ragdollScene.stageSequence(site);
+                if (normalized.equals("death_ragdoll_quadruped")) {
+                    game.player.pos.x += 3;
+                    game.camera.yaw = -28;
+                    game.camera.pitch = 18;
+                }
+            }
+            case "death_ragdoll_human", "death_ragdoll_ledge", "death_ragdoll_drape",
+                    "ragdoll_living", "ragdoll_living_species" -> {
+                site = moveBenchmarkToBiome(Biome.MEADOW);
+                clearBenchmarkStage(site, 9, 14);
+                ragdollScene.stageJoints(site, normalized);
             }
             case "vfx_blood", "blood_tracks" -> {
                 site = moveBenchmarkToBiome(Biome.MEADOW);

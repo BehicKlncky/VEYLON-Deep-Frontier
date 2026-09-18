@@ -8,6 +8,7 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 
 /**
  * The solver's guarantees: a body stays inside the world, comes to rest in open
@@ -16,6 +17,191 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class RagdollPhysicsTest {
 
     private Game game;
+
+    @Test
+    void anUnpushedDeathCannotFreezeBalancedOnItsFeet() {
+        Ragdoll r = RagdollTestArena.human(game, 0.05f, 0, 0, 0);
+        RagdollTestArena.settleAll(game);
+        assertTrue(r.py[0] < RagdollTestArena.GROUND + 0.55f,
+                "torso must land, not freeze standing: " + r.py[0]);
+        assertTrue(r.torsoGrounded, "natural settling requires torso support");
+        assertTrue(r.age < RagdollConstants.SETTLE_TIMEOUT);
+    }
+
+    @Test
+    void elbowsAndKneesStayInTheirHingePlanesAndLimitsThroughoutAFullFall() {
+        float elbowTravel = 0, kneeTravel = 0;
+        for (int fall = 0; fall < 4; fall++) {
+            Ragdoll r = RagdollTestArena.human(game, 4, (fall % 2 == 0 ? 1 : -1) * 3, 2,
+                    fall < 2 ? -3 : 3);
+            for (int tick = 0; !r.settled && tick < 361; tick++) {
+                game.ragdolls.update(game, RagdollConstants.FIXED_STEP);
+                assertJoints(r);
+                for (int b = 0; b < r.skeleton.boneCount; b++) {
+                    if (r.skeleton.part[b].startsWith("forearm")) {
+                        elbowTravel = Math.max(elbowTravel, Math.abs(r.pose.boneRotX[b]));
+                    }
+                    if (r.skeleton.part[b].startsWith("shin")) {
+                        kneeTravel = Math.max(kneeTravel, Math.abs(r.pose.boneRotX[b]));
+                    }
+                }
+            }
+            assertTrue(r.settled);
+        }
+        assertTrue(elbowTravel > 0.25f, "elbows must visibly fold: " + elbowTravel);
+        assertTrue(kneeTravel > 0.25f, "knees must visibly fold: " + kneeTravel);
+    }
+
+    @Test
+    void groundedQuadrupedsGiveWayInsteadOfBalancingOnStraightLegs() {
+        for (Creature.CreatureType type : Creature.CreatureType.values()) {
+            if (type == Creature.CreatureType.BIRD || type == Creature.CreatureType.HARE) continue;
+            for (int direction = 0; direction < 4; direction++) {
+                Creature c = game.entities.spawnCreature(game.world, type,
+                        RagdollTestArena.CENTER_X, RagdollTestArena.GROUND + 0.05f, RagdollTestArena.CENTER_Z);
+                c.yaw = direction * 90;
+                RagdollTestArena.kill(c, direction == 0 ? 0 : 7.5f, direction == 0 ? 0 : 3.4f, 0);
+                Ragdoll r = game.ragdolls.spawn(game, c);
+                game.entities.creatures.remove(c);
+                for (int tick = 0; !r.settled && tick < 361; tick++) {
+                    game.ragdolls.update(game, RagdollConstants.FIXED_STEP);
+                }
+                assertTrue(r.torsoGrounded,
+                        type + " remained standing after direction " + direction + " at " + r.py[0]);
+            }
+        }
+    }
+
+    @Test
+    void insetShortLegSocketsDoNotGenerateLiftInFreeFall() {
+        Creature hare = game.entities.spawnCreature(game.world, Creature.CreatureType.HARE,
+                RagdollTestArena.CENTER_X, RagdollTestArena.GROUND + 5, RagdollTestArena.CENTER_Z);
+        RagdollTestArena.kill(hare, 0, 0, 0);
+        Ragdoll body = game.ragdolls.spawn(game, hare);
+        float initialY = body.py[0];
+        for (int tick = 0; tick < 20; tick++) game.ragdolls.update(game, RagdollConstants.FIXED_STEP);
+        assertTrue(body.py[0] < initialY - 0.7f,
+                "internal socket contacts must not cancel gravity or propel a small body");
+        assertFalse(body.grounded);
+    }
+
+    @Test
+    void freeLimbsLagBehindTheTorsoAndContinueMovingAfterContact() {
+        Ragdoll r = RagdollTestArena.human(game, 2, 2, 1, 1);
+        int arm = 2;
+        float early = 0, postContact = 0, previous = 0;
+        boolean touched = false;
+        for (int tick = 0; !r.settled && tick < 361; tick++) {
+            game.ragdolls.update(game, RagdollConstants.FIXED_STEP);
+            float angle = r.jointRotation[arm].angle();
+            early = Math.max(early, angle);
+            if (touched) postContact += Math.abs(angle - previous);
+            touched |= r.grounded;
+            previous = angle;
+        }
+        assertTrue(early > 0.5f, "a shoulder must swing freely relative to the torso: " + early);
+        assertTrue(postContact > 0.1f, "limbs must keep swinging after the first ground contact: " + postContact);
+    }
+
+    @Test
+    void everySpeciesKeepsItsWholeChainClearOnStepsAndSettlesBeforeTheBackstop() {
+        RagdollTestArena.steps(game);
+        for (int kind = 0; kind <= Creature.CreatureType.values().length; kind++) {
+            Ragdoll r;
+            if (kind == Creature.CreatureType.values().length) r = RagdollTestArena.human(game, 5, 2, 0, 1);
+            else {
+                Creature c = game.entities.spawnCreature(game.world, Creature.CreatureType.values()[kind],
+                        RagdollTestArena.CENTER_X, RagdollTestArena.GROUND + 5, RagdollTestArena.CENTER_Z);
+                RagdollTestArena.kill(c, 2, 0, 1);
+                r = game.ragdolls.spawn(game, c);
+                game.entities.creatures.remove(c);
+            }
+            for (int tick = 0; !r.settled && tick < 361; tick++) {
+                game.ragdolls.update(game, RagdollConstants.FIXED_STEP);
+                assertJoints(r);
+                for (int p = 0; p < r.pointCount; p++) {
+                    assertTrue(Float.isFinite(r.px[p]) && Float.isFinite(r.py[p]) && Float.isFinite(r.pz[p]));
+                    assertFalse(solidAt(r.px[p], r.py[p], r.pz[p]), "endpoint in rock: " + kind + "/" + p);
+                }
+                for (int b = 0; b < r.skeleton.boneCount; b++) {
+                    for (int sample = 0; sample <= 10; sample++) {
+                        float t = sample / 10f;
+                        assertFalse(solidAt(r.jointX[b] + (r.px[b + 1] - r.jointX[b]) * t,
+                                r.jointY[b] + (r.py[b + 1] - r.jointY[b]) * t,
+                                r.jointZ[b] + (r.pz[b + 1] - r.jointZ[b]) * t),
+                                "segment in rock: " + kind + "/" + b + " at " + tick);
+                    }
+                }
+            }
+            assertTrue(r.settled, "species " + kind + " did not terminate");
+            System.out.println("settle species " + kind + ": " + r.age + " energy " + r.energy);
+            assertTrue(r.age < RagdollConstants.SETTLE_TIMEOUT,
+                    "ordinary falls must settle from energy, not the hard backstop: " + kind);
+        }
+    }
+
+    @Test
+    void identicalDeathsHaveBitIdenticalFinalPosesAtThirtyAndOneHundredFortyFourFps() {
+        Game other = RagdollTestArena.create(770077L);
+        Ragdoll a = RagdollTestArena.human(game, 4, 3, 2, -1);
+        Ragdoll b = RagdollTestArena.human(other, 4, 3, 2, -1);
+        for (int tick = 0; !a.settled && tick < 2000; tick++) game.ragdolls.update(game, 1f / 30);
+        for (int tick = 0; !b.settled && tick < 2000; tick++) other.ragdolls.update(other, 1f / 144);
+        assertArrayEquals(a.px, b.px);
+        assertArrayEquals(a.py, b.py);
+        assertArrayEquals(a.pz, b.pz);
+        assertArrayEquals(a.pose.boneRotX, b.pose.boneRotX);
+        assertArrayEquals(a.pose.boneRotY, b.pose.boneRotY);
+        assertArrayEquals(a.pose.boneRotZ, b.pose.boneRotZ);
+        assertEquals(Float.floatToIntBits(a.pose.yaw), Float.floatToIntBits(b.pose.yaw));
+        assertEquals(Float.floatToIntBits(a.pose.pitch), Float.floatToIntBits(b.pose.pitch));
+        assertEquals(Float.floatToIntBits(a.pose.roll), Float.floatToIntBits(b.pose.roll));
+    }
+
+    private static void assertJoints(Ragdoll r) {
+        BodySkeleton s = r.skeleton;
+        org.joml.Vector3f direction = new org.joml.Vector3f();
+        for (int b = 0; b < s.boneCount; b++) {
+            direction.set(r.px[b + 1] - r.jointX[b], r.py[b + 1] - r.jointY[b],
+                    r.pz[b + 1] - r.jointZ[b]);
+            assertEquals(s.length[b], direction.length(), 0.0002f, "bone length: " + s.part[b]);
+            (s.parent[b] < 0 ? r.orientation : r.worldRotation[s.parent[b]]).transformInverse(direction);
+            direction.normalize();
+            if (s.joint[b] == BodySkeleton.Joint.HINGE) {
+                float angle = (float) Math.atan2(s.restY[b] * direction.z - s.restZ[b] * direction.y,
+                        s.restY[b] * direction.y + s.restZ[b] * direction.z);
+                assertTrue(angle >= s.minAngle[b] - 0.001f && angle <= s.maxAngle[b] + 0.001f,
+                        s.part[b] + " hinge outside limits: " + angle);
+                assertEquals(0, direction.x, 0.001f, "hinge left its plane");
+            } else {
+                float angle = (float) Math.acos(Math.clamp(direction.x * s.restX[b]
+                        + direction.y * s.restY[b] + direction.z * s.restZ[b], -1f, 1f));
+                assertTrue(angle <= s.maxAngle[b] + 0.001f, s.part[b] + " outside cone: " + angle);
+            }
+        }
+    }
+
+    @Test
+    void foldedArmsAndLegsDoNotPassThroughTheTorso() {
+        Ragdoll r = RagdollTestArena.human(game, 3, 5, 1, -2);
+        org.joml.Vector3f v = new org.joml.Vector3f();
+        for (int tick = 0; !r.settled && tick < 361; tick++) {
+            game.ragdolls.update(game, RagdollConstants.FIXED_STEP);
+            for (int b = 2; b < r.skeleton.boneCount; b++) {
+                for (int j = 1; j <= 4; j++) {
+                    float t = j / 4f;
+                    v.set(r.jointX[b] + (r.px[b + 1] - r.jointX[b]) * t - r.px[0],
+                            r.jointY[b] + (r.py[b + 1] - r.jointY[b]) * t - r.py[0],
+                            r.jointZ[b] + (r.pz[b + 1] - r.jointZ[b]) * t - r.pz[0]);
+                    r.orientation.transformInverse(v);
+                    assertFalse(Math.abs(v.x) < r.skeleton.halfX - 0.015f
+                                    && Math.abs(v.y) < r.skeleton.halfY - 0.015f
+                                    && Math.abs(v.z) < r.skeleton.halfZ - 0.015f,
+                            r.skeleton.part[b] + " passed through torso at tick " + tick + ": " + v);
+                }
+            }
+        }
+    }
 
     @BeforeEach
     void setUp() {
@@ -71,6 +257,10 @@ class RagdollPhysicsTest {
         Carcass carcass = game.entities.carcasses.getFirst();
         assertFalse(solidAt(carcass.pos.x, carcass.pos.y, carcass.pos.z),
                 "a body walled in mid-fall must still settle in open space");
+        for (int p = 0; p < body.pointCount; p++) {
+            assertFalse(solidAt(body.px[p], body.py[p], body.pz[p]),
+                    "world-edit recovery must clear the entire chain, point " + p);
+        }
     }
 
     @Test
