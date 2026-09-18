@@ -689,6 +689,11 @@ final class QaHarness {
                 clearBenchmarkStage(site, 9, 14);
                 ragdollScene.stageSequence(site);
             }
+            case "death_ragdoll_human", "death_ragdoll_ledge", "ragdoll_living" -> {
+                site = moveBenchmarkToBiome(Biome.MEADOW);
+                clearBenchmarkStage(site, 9, 14);
+                ragdollScene.stageJoints(site, normalized);
+            }
             case "vfx_blood", "blood_tracks" -> {
                 site = moveBenchmarkToBiome(Biome.MEADOW);
                 clearBenchmarkStage(site, 10, 18);

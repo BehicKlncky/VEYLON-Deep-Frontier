@@ -3,6 +3,7 @@ package com.veylon.entity;
 import com.veylon.Game;
 import com.sun.management.ThreadMXBean;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Tag;
 
 import java.lang.management.ManagementFactory;
 
@@ -36,6 +37,31 @@ class RagdollAllocationTest {
 
     /** Where the bodies are re-seated each frame, well inside the arena. */
     private static final float DROP_HEIGHT = RagdollTestArena.GROUND + 12f;
+
+    @Test
+    @Tag("performance")
+    void fullLiveBudgetTickProfile() {
+        Game game = RagdollTestArena.create(606L);
+        fillWithFallingBodies(game);
+        for (int i = 0; i < WARMUP_FRAMES; i++) {
+            reseat(game);
+            game.ragdolls.update(game, RagdollConstants.FIXED_STEP);
+        }
+        long best = Long.MAX_VALUE;
+        for (int sample = 0; sample < 5; sample++) {
+            long started = System.nanoTime();
+            for (int i = 0; i < MEASURED_FRAMES; i++) {
+                reseat(game);
+                game.ragdolls.update(game, RagdollConstants.FIXED_STEP);
+            }
+            best = Math.min(best, System.nanoTime() - started);
+        }
+        double ms = best / (double) MEASURED_FRAMES / 1_000_000;
+        System.out.printf(java.util.Locale.ROOT,
+                "ragdoll MAX_LIVE=%d: %.6f ms/fixed tick%n", RagdollConstants.MAX_LIVE, ms);
+        assertEquals(RagdollConstants.MAX_LIVE, game.ragdolls.liveCount());
+        assertTrue(ms < 1.0, "a full field of ragdolls exceeded its 1 ms tick budget: " + ms);
+    }
 
     @Test
     void theFullBodyBudgetUpdatesWithoutAllocatingPerFrame() {
