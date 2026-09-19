@@ -8,6 +8,7 @@ import com.veylon.combat.WeaponDefinition;
 import com.veylon.combat.WeaponRegistry;
 import com.veylon.combat.WorldNoise;
 import com.veylon.engine.ParticleSystem;
+import com.veylon.entity.BodyFragmentConstants;
 import com.veylon.entity.Npc;
 import com.veylon.item.ItemType;
 import com.veylon.settlement.CounterattackDirector;
@@ -82,6 +83,7 @@ class RuntimeBoundsTest {
         stressProjectiles(game);
         stressFire(game);
         stressFusesAndChains(game);
+        stressBodyFragments(game);
         stressMissions(game);
 
         RuntimeBudgetSnapshot peak = RuntimeBudgetSnapshot.capture(game);
@@ -96,8 +98,10 @@ class RuntimeBoundsTest {
             game.explosions.tickFuses(game, 0.05f);
             game.fire.mediumTick(game, 0.05f);
             game.settlementManager.fastTick(game, 0.05f);
+            game.fragments.update(game, 0.05f);
             assertTrue(RuntimeBudgetSnapshot.capture(game).withinHardLimits(),
                     "runtime ceiling exceeded at stress tick " + tick);
+            assertFragmentCaps(game);
         }
 
         RuntimeBudgetSnapshot settled = RuntimeBudgetSnapshot.capture(game);
@@ -115,6 +119,10 @@ class RuntimeBoundsTest {
                 "simulation without chunk generation cannot grow the pending frontier");
         assertEquals(pendingEdits, settled.pendingGenerationEdits(),
                 "simulation without chunk generation cannot grow pending edits");
+        assertEquals(0, game.fragments.liveCount(), "flying body pieces settle");
+        game.entities.tickWorldDetritus(game, 0.05f);
+        assertEquals(0, game.fragments.settledCount(),
+                "body pieces left far behind the player are reclaimed");
     }
 
     @Test
@@ -285,6 +293,35 @@ class RuntimeBoundsTest {
         assertTrue(game.particles.count <= ParticleSystem.MAX);
         assertTrue(game.noise.count() <= WorldNoise.MAX_EVENTS);
         assertTrue(game.fire.count() <= FireSystem.MAX_ACTIVE_FIRES);
+    }
+
+    /**
+     * Seventy-five people blown apart on the spot: the first twelve fill the
+     * live cap, every later one pushes the oldest ten pieces to the ground, and
+     * the ground fills its own cap and starts dropping the oldest.
+     */
+    private static void stressBodyFragments(Game game) {
+        Npc victim = game.entities.spawnNpc(game.world, "QA victim",
+                game.player.pos.x + 3f, game.player.pos.y, game.player.pos.z);
+        game.entities.npcs.remove(victim);
+        int bodies = (BodyFragmentConstants.MAX_LIVE_FRAGMENTS
+                + BodyFragmentConstants.MAX_SETTLED_FRAGMENTS) / 10 + 3;
+        for (int i = 0; i < bodies; i++) {
+            game.fragments.spawnFromNpc(game, victim, victim.pos.x + 1f, victim.pos.y + 1f,
+                    victim.pos.z, 3.8f);
+            assertFragmentCaps(game);
+        }
+        assertEquals(BodyFragmentConstants.MAX_LIVE_FRAGMENTS, game.fragments.liveCount(),
+                "the exact live fragment cap is reachable");
+        assertEquals(BodyFragmentConstants.MAX_SETTLED_FRAGMENTS, game.fragments.settledCount(),
+                "the exact settled fragment cap is reachable");
+    }
+
+    private static void assertFragmentCaps(Game game) {
+        assertTrue(game.fragments.liveCount() <= BodyFragmentConstants.MAX_LIVE_FRAGMENTS,
+                "live body pieces over their cap: " + game.fragments.liveCount());
+        assertTrue(game.fragments.settledCount() <= BodyFragmentConstants.MAX_SETTLED_FRAGMENTS,
+                "settled body pieces over their cap: " + game.fragments.settledCount());
     }
 
     private static void stressMissions(Game game) {

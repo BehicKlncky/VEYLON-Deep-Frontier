@@ -50,6 +50,8 @@ class SimulationSystemContractTest {
         // faster than the 20 Hz gait it had a moment earlier), but very much
         // per-world state that must not outlive a world.
         assertInstanceOf(SimulationSystem.class, game.ragdolls);
+        // Severed pieces are driven beside them, for the same reason.
+        assertInstanceOf(SimulationSystem.class, game.fragments);
     }
 
     @Test
@@ -96,6 +98,15 @@ class SimulationSystemContractTest {
         // Leaves most of a step banked in the accumulator.
         game.ragdolls.update(game, 0.016f);
 
+        // A body blown apart earlier and lying in pieces, a second one still in
+        // the air, and most of a fragment step banked.
+        blowApart(game);
+        game.fragments.settleAll(game);
+        blowApart(game);
+        game.fragments.update(game, 0.016f);
+        assertTrue(game.fragments.liveCount() > 0 && game.fragments.settledCount() > 0,
+                "precondition: pieces are both flying and lying in the world");
+
         game.newWorld(31_415L, true);
 
         assertEquals(8 * 60, game.time.totalMinutes, 1e-6,
@@ -133,6 +144,24 @@ class SimulationSystemContractTest {
         game.ragdolls.update(game, SimulationScheduler.FAST_DT / 10f);
         assertEquals(0, game.ragdolls.stepsLastUpdate,
                 "a part-consumed solver accumulator carried into the next world");
+
+        assertEquals(0, game.fragments.liveCount(), "flying pieces do not carry into the next world");
+        assertEquals(0, game.fragments.settledCount(), "nor do pieces lying on the ground");
+        assertEquals(0, game.fragments.totalSpawned, "fragment statistics do not carry over");
+        assertEquals(0, game.fragments.totalSettled);
+        assertEquals(0, game.fragments.stepsLastUpdate);
+        blowApart(game);
+        game.fragments.update(game, SimulationScheduler.FAST_DT / 10f);
+        assertEquals(0, game.fragments.stepsLastUpdate,
+                "a part-consumed fragment accumulator carried into the next world");
+    }
+
+    private static void blowApart(Game game) {
+        var victim = game.entities.spawnNpc(game.world, "Villager",
+                game.player.pos.x + 3f, game.player.pos.y, game.player.pos.z);
+        game.entities.npcs.remove(victim);
+        game.fragments.spawnFromNpc(game, victim, victim.pos.x + 1f, victim.pos.y + 1f,
+                victim.pos.z, 2.6f);
     }
 
     @Test
@@ -146,7 +175,7 @@ class SimulationSystemContractTest {
 
         for (SimulationSystem system : List.of(game.time, game.weather, game.temperature,
                 game.water, game.fire, game.plants, game.events, game.itemConditions,
-                game.settlementManager, game.ragdolls)) {
+                game.settlementManager, game.ragdolls, game.fragments)) {
             system.reset();
         }
 

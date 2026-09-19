@@ -178,6 +178,14 @@ class GameLoopIntegrationTest {
         assertTrue(game.entities.creatureCount() > 0, "precondition: a creature exists");
         fireMusketUpward(game);
         game.projectiles.lastNpcHitZone = com.veylon.combat.HitZone.TORSO;
+        var blown = game.entities.spawnNpc(game.world, "Villager",
+                game.player.pos.x + 3, game.player.pos.y, game.player.pos.z);
+        game.entities.npcs.remove(blown);
+        game.fragments.spawnFromNpc(game, blown, blown.pos.x + 1, blown.pos.y + 1, blown.pos.z, 2.6f);
+        game.fragments.settleAll(game);
+        game.fragments.spawnFromNpc(game, blown, blown.pos.x + 1, blown.pos.y + 1, blown.pos.z, 2.6f);
+        assertTrue(game.fragments.liveCount() > 0 && game.fragments.settledCount() > 0,
+                "precondition: severed pieces are flying and lying in the world");
 
         var previousWorld = game.world;
         var previousPlayer = game.player;
@@ -211,6 +219,8 @@ class GameLoopIntegrationTest {
         assertEquals(0, game.fire.count(), "burning blocks do not survive into a new world");
         assertEquals(0, game.projectiles.liveCount(), "projectiles do not survive");
         assertNull(game.projectiles.lastNpcHitZone, "the hit-zone diagnostic does not survive");
+        assertEquals(0, game.fragments.liveCount(), "flying body pieces do not survive");
+        assertEquals(0, game.fragments.settledCount(), "body pieces on the ground do not survive");
         assertEquals(Game.UiMode.NONE, game.uiMode);
         assertFalse(game.simPaused);
         assertFalse(game.sleeping);
