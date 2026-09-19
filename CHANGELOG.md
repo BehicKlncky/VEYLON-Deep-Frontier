@@ -4,6 +4,54 @@ All notable user-facing changes to VEYLON: Deep Frontier are recorded here.
 
 ## [Unreleased]
 
+### Changed
+
+- Where you hit a person decides the fight. A bullet or an arrow in the head
+  kills outright, and a chest takes two bullets or three arrows whoever they
+  are and however much health they have; an arrow wound counts for less than a
+  bullet's, wounds from both add up, and a limb still costs only the weapon's
+  own damage. Every pellet of one blunderbuss shot counts as a single chest
+  wound. Shots NPCs fire at each other follow the same rules; the player and
+  animals are unchanged.
+- Anyone caught inside a scrap bomb's or a powder keg's lethal radius — 3.9 and
+  5.7 blocks — dies outright whatever their health and whatever cover they are
+  behind, and is torn into ten pieces that fly, bounce off walls, come to rest
+  where the terrain puts them and rot away like corpses. Further out, blasts
+  deal the damage they always did. Deaths by any other cause still leave a whole
+  body.
+- Fire bombs are molotovs. One breaks on the first thing it hits instead of
+  waiting on a fuse, makes no explosion at all, and spills a pool of burning
+  liquid that runs downhill and around obstacles, burns whoever stands in it,
+  sets light to grass, trees and buildings it touches and lights the fuse of a
+  powder keg beside it.
+- Rain, storm and snow put out any fire open to the sky within a couple of
+  seconds and leave its block unburnt — a log stays a log — while fires under a
+  roof or a tree's crown burn on. Fire spreads better than it did: it picks fuel
+  rather than any neighbouring cell and climbs, so it now carries reliably up a
+  bare trunk into a canopy or along a wooden wall. A lightning fire in a storm
+  flares and goes out.
+
+### Added
+
+- Capture scenes for the new work: `dismember_showcase`, `dismember_wall` and
+  `dismember_bomb` (a real scrap bomb thrown into a group), and
+  `molotov_ground`, `molotov_tree` and `molotov_rain`.
+- Cross-feature, bounds and allocation tests covering the three rules together,
+  including a worst case of twelve people blown apart, seven burning pools and a
+  full block-fire cap stepped side by side.
+- An engineering record of the rules, the constants behind them, the test
+  inventory and the deliberate limits, in
+  `docs/engineering/COMBAT_LETHALITY_AND_MOLOTOV.md`.
+
+### Compatibility
+
+- The save format stays binary v3. Settled body pieces are written to a new
+  optional `world.fragments` section rather than a new version of an existing
+  one, so **older builds still open the save**: they skip the section they do
+  not know and the pieces are simply absent. Pools of burning liquid and burning
+  blocks are not saved, as burning blocks never were; a fire bomb still in the
+  air is saved with the other explosives and breaks where it lands.
+
 ## [0.7.4] - 2026-09-18
 
 ### Changed
