@@ -1,5 +1,6 @@
 package com.veylon.qa;
 
+import com.sun.management.ThreadMXBean;
 import com.veylon.Game;
 import com.veylon.ai.Pathfinder;
 import com.veylon.combat.ExplosionSystem;
@@ -10,6 +11,7 @@ import com.veylon.combat.WorldNoise;
 import com.veylon.engine.ParticleSystem;
 import com.veylon.entity.BodyFragmentConstants;
 import com.veylon.entity.Npc;
+import com.veylon.entity.RagdollConstants;
 import com.veylon.item.ItemType;
 import com.veylon.settlement.CounterattackDirector;
 import com.veylon.settlement.HumanFaction;
@@ -20,12 +22,15 @@ import com.veylon.settlement.SettlementPlanner;
 import com.veylon.settlement.SettlementType;
 import com.veylon.simulation.FireSystem;
 import com.veylon.simulation.LiquidFireConstants;
+import com.veylon.simulation.SimulationScheduler;
+import com.veylon.simulation.WeatherSystem;
 import com.veylon.util.Vec3i;
 import com.veylon.world.BlockType;
 import com.veylon.world.Chunk;
 import com.veylon.world.World;
 import org.junit.jupiter.api.Test;
 
+import java.lang.management.ManagementFactory;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -40,6 +45,8 @@ class RuntimeBoundsTest {
     private static final long[] REQUIRED_SEEDS = {
             1L, 42L, 999L, -1234567L, 20260716L, 987654321L
     };
+    /** {@code RagdollAllocationTest}'s allowance for the per-frame body step. */
+    private static final long FRAGMENT_BYTES_PER_FRAME_ALLOWANCE = 4_096;
 
     @Test
     void allRequiredSeedsKeepPendingGenerationBoundedAcrossNegativeAndReversedChunkOrder() {
@@ -130,6 +137,107 @@ class RuntimeBoundsTest {
         game.entities.tickWorldDetritus(game, 0.05f);
         assertEquals(0, game.fragments.settledCount(),
                 "body pieces left far behind the player are reclaimed");
+    }
+
+    /**
+     * The most this release's combat can put in the world at once, stepped the
+     * way the frame and the medium tick drive it: twelve people blown apart by
+     * three scrap-bomb blasts (exactly the live fragment cap), seven fire bombs
+     * burning where they broke, and every block fire the fire cap allows.
+     * Every ceiling holds on every frame until the pieces have come to rest.
+     *
+     * <p>The fragment step is measured the way {@code RagdollAllocationTest}
+     * measures the body solver, against the same 4 KB/frame allowance, but over
+     * real blast trajectories from launch to rest, with the rest of the scene at
+     * full load. Only the {@code fragments.update} calls are inside the
+     * measurement; settling may grow the settled list, which the allowance
+     * covers, and nothing else in a step may allocate.
+     */
+    @Test
+    void blastsMolotovsAndAFullFireCapTogetherStayWithinEveryCap() {
+        Game game = flatArena(20260716L);
+        float feet = 40.1f;
+
+        // Every block fire the cap allows, on a plank floor away from the rest.
+        int admitted = 0;
+        for (int x = 290; x < 312; x++) {
+            for (int z = 290; z < 300; z++) {
+                game.world.setBlock(x, 40, z, BlockType.PLANK, false);
+                admitted += game.fire.ignite(game, x, 40, z) ? 1 : 0;
+            }
+        }
+        assertEquals(FireSystem.MAX_ACTIVE_FIRES, admitted, "precondition: the fire cap is full");
+
+        // Seven fire bombs dropped onto bare floor, far enough apart not to meet.
+        WeaponDefinition fireBomb = WeaponRegistry.byId("fire_bomb");
+        for (int i = 0; i < 7; i++) {
+            game.projectiles.fire(game, game.player, true, 293.5f + i * 8, 42f, 340.5f,
+                    0, -1, 0, fireBomb, null);
+        }
+        for (int i = 0; i < 100 && game.projectiles.liveCount() > 0; i++) {
+            game.projectiles.update(game, 0.01f);
+        }
+        assertEquals(7 * LiquidFireConstants.MAX_PATCHES_PER_SPILL, game.liquidFire.count(),
+                "precondition: seven full pools are burning");
+
+        // Twelve people in three groups of four, each group caught by one blast.
+        int victims = BodyFragmentConstants.MAX_LIVE_FRAGMENTS / 10;
+        float[][] ring = {{1.5f, 0}, {-1.5f, 0}, {0, 1.5f}, {0, -1.5f}};
+        for (int blast = 0; blast < victims / ring.length; blast++) {
+            float bx = 300.5f + blast * 20;
+            for (float[] offset : ring) {
+                game.entities.spawnNpc(game.world, "QA victim", bx + offset[0], feet,
+                        320.5f + offset[1]);
+            }
+            game.explosions.explode(game, bx, feet + 0.875f, 320.5f, 2.6f, 14f, 0f, true, true);
+        }
+        game.entities.fastTick(game, SimulationScheduler.FAST_DT);
+        assertEquals(0, game.entities.npcCount(), "precondition: every one of them was killed");
+        assertEquals(BodyFragmentConstants.MAX_LIVE_FRAGMENTS, game.fragments.liveCount(),
+                "precondition: twelve bodies blown apart fill the live fragment cap");
+        assertEquals(0, game.ragdolls.liveCount(), "none of them fell whole");
+        assertTrue(RuntimeBudgetSnapshot.capture(game).withinHardLimits(),
+                RuntimeBudgetSnapshot.hardLimitSummary());
+
+        ThreadMXBean bean = (ThreadMXBean) ManagementFactory.getThreadMXBean();
+        long thread = Thread.currentThread().threadId();
+        float dt = 1f / 60f;
+        int framesPerTick = Math.round(SimulationScheduler.MEDIUM_DT / dt);
+        long fragmentBytes = 0;
+        int flyingFrames = 0;
+        for (int frame = 1; frame <= 12 * 60; frame++) {
+            game.projectiles.update(game, dt);
+            game.explosions.tickFuses(game, dt);
+            game.noise.update(dt);
+            game.particles.update(dt, game.world);
+            boolean flying = game.fragments.liveCount() > 0;
+            long before = bean.getThreadAllocatedBytes(thread);
+            game.fragments.update(game, dt);
+            long after = bean.getThreadAllocatedBytes(thread);
+            if (flying) {
+                fragmentBytes += after - before;
+                flyingFrames++;
+            }
+            if (frame % framesPerTick == 0) {
+                game.fire.mediumTick(game, SimulationScheduler.MEDIUM_DT);
+                game.liquidFire.mediumTick(game, SimulationScheduler.MEDIUM_DT);
+            }
+            assertTrue(RuntimeBudgetSnapshot.capture(game).withinHardLimits(),
+                    "runtime ceiling exceeded at frame " + frame + ": "
+                            + RuntimeBudgetSnapshot.capture(game).occupancySummary());
+            assertFragmentCaps(game);
+            assertTrue(game.ragdolls.liveCount() <= RagdollConstants.MAX_LIVE);
+        }
+
+        assertEquals(0, game.fragments.liveCount(), "every piece came to rest");
+        assertEquals(BodyFragmentConstants.MAX_LIVE_FRAGMENTS, game.fragments.settledCount(),
+                "and lies in the world, under the settled cap");
+        long perFrame = fragmentBytes / flyingFrames;
+        System.out.println("worst-case fragment allocation: " + perFrame + " bytes/frame over "
+                + flyingFrames + " frames in flight");
+        assertTrue(perFrame < FRAGMENT_BYTES_PER_FRAME_ALLOWANCE, "the fragment step allocated "
+                + perFrame + " bytes/frame, over the " + FRAGMENT_BYTES_PER_FRAME_ALLOWANCE
+                + " byte allowance");
     }
 
     @Test
@@ -352,6 +460,41 @@ class RuntimeBoundsTest {
                 "the exact live fragment cap is reachable");
         assertEquals(BodyFragmentConstants.MAX_SETTLED_FRAGMENTS, game.fragments.settledCount(),
                 "the exact settled fragment cap is reachable");
+    }
+
+    /**
+     * {@code CombatSystemsTest}'s isolated arena: four chunks of stone up to
+     * y = 39, nobody about, dry, and fixed seeds.
+     */
+    private static Game flatArena(long seed) {
+        Game game = new Game();
+        game.newWorld(seed, true);
+        for (int cx = 18; cx <= 21; cx++) {
+            for (int cz = 18; cz <= 21; cz++) {
+                Chunk c = game.world.getOrCreateChunk(cx, cz);
+                for (int lx = 0; lx < 16; lx++) {
+                    for (int lz = 0; lz < 16; lz++) {
+                        for (int y = 0; y < Chunk.SY; y++) {
+                            c.set(lx, y, lz, y <= 39 ? BlockType.STONE : BlockType.AIR);
+                        }
+                    }
+                }
+                c.recomputeAllHeights();
+                c.rebuildLights();
+            }
+        }
+        game.player.pos.set(310, 40.1f, 310);
+        game.entities.creatures.clear();
+        game.entities.npcs.clear();
+        game.noise.reset();
+        game.particles.count = 0;
+        game.projectiles.setRandomSeed(0xC0B7L);
+        game.fire.setRandomSeed(0xF12EL);
+        game.liquidFire.setRandomSeed(0x11F1L);
+        game.weather.current = WeatherSystem.Weather.CLEAR;
+        game.weather.next = WeatherSystem.Weather.CLEAR;
+        game.weather.blend = 1f;
+        return game;
     }
 
     private static void assertFragmentCaps(Game game) {

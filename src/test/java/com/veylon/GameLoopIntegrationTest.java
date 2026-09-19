@@ -1,6 +1,8 @@
 package com.veylon;
 
+import com.veylon.combat.ProjectileLethality;
 import com.veylon.entity.Affliction;
+import com.veylon.entity.Npc;
 import com.veylon.item.ItemStack;
 import com.veylon.item.ItemType;
 import com.veylon.save.SaveSystem;
@@ -188,6 +190,7 @@ class GameLoopIntegrationTest {
         game.fragments.spawnFromNpc(game, blown, blown.pos.x + 1, blown.pos.y + 1, blown.pos.z, 2.6f);
         assertTrue(game.fragments.liveCount() > 0 && game.fragments.settledCount() > 0,
                 "precondition: severed pieces are flying and lying in the world");
+        List<Npc> marked = woundAndMarkForABlast(game);
 
         var previousWorld = game.world;
         var previousPlayer = game.player;
@@ -240,12 +243,54 @@ class GameLoopIntegrationTest {
         fireMusketUpward(game);
         assertEquals(0, game.projectiles.live.getFirst().shotId,
                 "shot identity restarts with the world, like the new NPCs' torso wound records");
+        assertNoWoundOrBlastRecordSurvives(game, marked);
     }
 
     private static void fireMusketUpward(Game game) {
         game.projectiles.fire(game, game.player, true, game.player.pos.x,
                 game.player.pos.y + 1.5f, game.player.pos.z, 0, 1, 0,
                 com.veylon.combat.WeaponRegistry.byId("musket"), null);
+    }
+
+    /**
+     * A person one torso hit from death, and one a blast has just killed and
+     * marked to be blown apart on the next entity tick: the transient records
+     * {@code ProjectileLethality} and {@code ExplosionSystem} leave on an NPC.
+     */
+    private static List<Npc> woundAndMarkForABlast(Game game) {
+        Npc wounded = game.entities.spawnNpc(game.world, "Wounded",
+                game.player.pos.x - 3, game.player.pos.y, game.player.pos.z);
+        wounded.torsoWounds = ProjectileLethality.LETHAL_TORSO_WOUNDS - 1;
+        wounded.lastTorsoShotId = 7;
+        Npc blasted = game.entities.spawnNpc(game.world, "Blasted",
+                game.player.pos.x, game.player.pos.y, game.player.pos.z - 3);
+        blasted.killBy(true);
+        blasted.dismemberOnDeath = true;
+        blasted.blastX = blasted.pos.x + 1;
+        blasted.blastY = blasted.pos.y + 1;
+        blasted.blastZ = blasted.pos.z;
+        blasted.blastStrength = 3.8f;
+        assertTrue(game.entities.npcs.contains(wounded) && game.entities.npcs.contains(blasted),
+                "precondition: both are still in the outgoing world");
+        return List.of(wounded, blasted);
+    }
+
+    /**
+     * Neither person comes back, every person the new world holds starts
+     * without wounds or a blast record, and the first entity tick blows
+     * nobody apart.
+     */
+    private static void assertNoWoundOrBlastRecordSurvives(Game game, List<Npc> marked) {
+        for (Npc n : marked) {
+            assertFalse(game.entities.npcs.contains(n), n.name + " does not survive into the next world");
+        }
+        for (Npc n : game.entities.npcs) {
+            assertEquals(0, n.torsoWounds, n.name + " starts without torso wounds");
+            assertEquals(-1, n.lastTorsoShotId, n.name + " has been hit by no shot yet");
+            assertFalse(n.dismemberOnDeath, n.name + " carries no blast record");
+        }
+        game.entities.fastTick(game, SimulationScheduler.FAST_DT);
+        assertEquals(0, game.fragments.liveCount(), "no old blast record blows anyone apart");
     }
 
     @Test
@@ -360,6 +405,10 @@ class GameLoopIntegrationTest {
         int markY = game.world.surfaceHeight(markX, markZ) + 1;
         game.world.setBlock(markX, markY, markZ, BlockType.CRATE, true);
         game.player.inventory.set(0, new ItemStack(ItemType.TORCH, 5));
+        blowApart(game);
+        game.fragments.settleAll(game);
+        int savedPieces = game.fragments.settledCount();
+        assertTrue(savedPieces > 0, "precondition: the saved world has pieces lying in it");
 
         Path savePath = AppPaths.dataDirectory().resolve("build/qa/game-loop-replace.dat");
         assertTrue(SaveSystem.save(game, savePath));
@@ -369,11 +418,35 @@ class GameLoopIntegrationTest {
         assertNotNull(game.world);
         game.entities.spawnCreature(game.world, com.veylon.entity.Creature.CreatureType.WOLF,
                 game.player.pos.x + 3, game.player.pos.y, game.player.pos.z);
+        blowApart(game);
+        game.fragments.settleAll(game);
+        blowApart(game);
+        int sx = (int) game.player.pos.x + 3;
+        int sz = (int) game.player.pos.z + 3;
+        int sy = game.world.surfaceHeight(sx, sz) + 1;
+        game.world.setBlock(sx, sy, sz, BlockType.STONE, true);
+        game.liquidFire.spill(game, sx + 0.5f, sy + 1.5f, sz + 0.5f, 1, 0, true);
+        assertTrue(game.fragments.liveCount() > 0 && game.liquidFire.count() > 0,
+                "precondition: the discarded world has pieces in flight and liquid burning");
+        List<Npc> marked = woundAndMarkForABlast(game);
 
         assertTrue(SaveSystem.load(game, savePath), "loading over a live world must succeed");
         assertEquals(555L, game.world.seed, "the loaded seed replaces the live one");
         assertEquals(BlockType.CRATE, game.world.getBlock(markX, markY, markZ),
                 "the loaded world's edits are present");
         assertEquals(0, game.fire.count(), "no simulation queue leaks from the discarded world");
+        assertEquals(0, game.liquidFire.count(), "nor does its burning liquid");
+        assertEquals(0, game.fragments.liveCount(), "nor its pieces in flight");
+        assertEquals(savedPieces, game.fragments.settledCount(),
+                "the pieces lying in the world are the save's, not the discarded world's as well");
+        assertNoWoundOrBlastRecordSurvives(game, marked);
+    }
+
+    /** Blows a person apart two blocks from the player, the way a blast death does. */
+    private static void blowApart(Game game) {
+        Npc n = game.entities.spawnNpc(game.world, "Villager",
+                game.player.pos.x + 2, game.player.pos.y, game.player.pos.z);
+        game.entities.npcs.remove(n);
+        game.fragments.spawnFromNpc(game, n, n.pos.x + 1, n.pos.y + 1, n.pos.z, 2.6f);
     }
 }
