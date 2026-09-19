@@ -176,6 +176,8 @@ class GameLoopIntegrationTest {
         game.entities.spawnCreature(game.world, com.veylon.entity.Creature.CreatureType.WOLF,
                 game.player.pos.x + 4, game.player.pos.y, game.player.pos.z);
         assertTrue(game.entities.creatureCount() > 0, "precondition: a creature exists");
+        fireMusketUpward(game);
+        game.projectiles.lastNpcHitZone = com.veylon.combat.HitZone.TORSO;
 
         var previousWorld = game.world;
         var previousPlayer = game.player;
@@ -208,6 +210,7 @@ class GameLoopIntegrationTest {
         assertSame(game, game.world.listener, "the new world reports block changes to Game");
         assertEquals(0, game.fire.count(), "burning blocks do not survive into a new world");
         assertEquals(0, game.projectiles.liveCount(), "projectiles do not survive");
+        assertNull(game.projectiles.lastNpcHitZone, "the hit-zone diagnostic does not survive");
         assertEquals(Game.UiMode.NONE, game.uiMode);
         assertFalse(game.simPaused);
         assertFalse(game.sleeping);
@@ -220,6 +223,15 @@ class GameLoopIntegrationTest {
         assertTrue(game.player.afflictions.isEmpty(), "a fresh player starts healthy");
         assertEquals(ItemType.ARROW, game.selectedBowAmmo(),
                 "ammo selection returns to the default");
+        fireMusketUpward(game);
+        assertEquals(0, game.projectiles.live.getFirst().shotId,
+                "shot identity restarts with the world, like the new NPCs' torso wound records");
+    }
+
+    private static void fireMusketUpward(Game game) {
+        game.projectiles.fire(game, game.player, true, game.player.pos.x,
+                game.player.pos.y + 1.5f, game.player.pos.z, 0, 1, 0,
+                com.veylon.combat.WeaponRegistry.byId("musket"), null);
     }
 
     @Test
