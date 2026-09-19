@@ -19,8 +19,10 @@ import com.veylon.settlement.SettlementManager;
 import com.veylon.settlement.SettlementPlanner;
 import com.veylon.settlement.SettlementType;
 import com.veylon.simulation.FireSystem;
+import com.veylon.simulation.LiquidFireConstants;
 import com.veylon.util.Vec3i;
 import com.veylon.world.BlockType;
+import com.veylon.world.Chunk;
 import com.veylon.world.World;
 import org.junit.jupiter.api.Test;
 
@@ -76,12 +78,14 @@ class RuntimeBoundsTest {
         game.noise.reset();
         game.projectiles.reset();
         game.fire.reset();
+        game.liquidFire.reset();
         game.particles.count = 0;
 
         stressNoise(game);
         stressParticles(game);
         stressProjectiles(game);
         stressFire(game);
+        stressLiquidFire(game);
         stressFusesAndChains(game);
         stressBodyFragments(game);
         stressMissions(game);
@@ -97,6 +101,7 @@ class RuntimeBoundsTest {
             game.particles.update(0.05f, game.world);
             game.explosions.tickFuses(game, 0.05f);
             game.fire.mediumTick(game, 0.05f);
+            game.liquidFire.mediumTick(game, 0.05f);
             game.settlementManager.fastTick(game, 0.05f);
             game.fragments.update(game, 0.05f);
             assertTrue(RuntimeBudgetSnapshot.capture(game).withinHardLimits(),
@@ -112,6 +117,8 @@ class RuntimeBoundsTest {
         assertEquals(0, settled.kegFuseAttributions(),
                 "resolved/removed kegs leave no stale source attribution");
         assertEquals(0, settled.fires(), "burned-out cells leave no fire state");
+        assertEquals(0, settled.liquidFirePatches(), "spilled liquid burns out");
+        assertEquals(0, game.liquidFire.trackedNpcSpills(), "burned-out spills are forgotten");
         assertEquals(0, settled.particles(), "visual effects expire");
         assertEquals(0, settled.counterattackMissions(), "resolved missions clean up");
         assertEquals(0, settled.dormantCounterattackers(), "mission cleanup releases dormant capacity");
@@ -250,6 +257,36 @@ class RuntimeBoundsTest {
         assertEquals(FireSystem.MAX_ACTIVE_FIRES, game.fire.count());
         game.fire.mediumTick(game, 20f);
         assertEquals(0, game.fire.count());
+    }
+
+    /**
+     * Ten molotovs on a bare stone platform high above the terrain, with
+     * clear air around it so the liquid has nothing to light: more liquid
+     * than the cap allows, which the oldest spills give way to.
+     */
+    private static void stressLiquidFire(Game game) {
+        int x = (int) Math.floor(game.player.pos.x) - 24;
+        int y = Math.min(Chunk.SY - 6, (int) Math.floor(game.player.pos.y) + 24);
+        int z = (int) Math.floor(game.player.pos.z) - 40;
+        for (int dx = -1; dx <= 45; dx++) {
+            for (int dz = -1; dz <= 19; dz++) {
+                boolean platform = dx >= 0 && dx <= 44 && dz >= 0 && dz <= 18;
+                game.world.setBlock(x + dx, y, z + dz,
+                        platform ? BlockType.STONE : BlockType.AIR, false);
+                for (int dy = 1; dy <= 3; dy++) {
+                    game.world.setBlock(x + dx, y + dy, z + dz, BlockType.AIR, false);
+                }
+            }
+        }
+        int bottles = LiquidFireConstants.MAX_PATCHES / LiquidFireConstants.MAX_PATCHES_PER_SPILL + 3;
+        for (int i = 0; i < bottles; i++) {
+            game.liquidFire.spill(game, x + 4.5f + (i % 5) * 9, y + 1.5f, z + 4.5f + (i / 5) * 10,
+                    1, 0, false);
+            assertTrue(game.liquidFire.count() <= LiquidFireConstants.MAX_PATCHES,
+                    "liquid fire over its cap after bottle " + i);
+        }
+        assertEquals(LiquidFireConstants.MAX_PATCHES, game.liquidFire.count(),
+                "the exact liquid fire cap is reachable");
     }
 
     private static void stressFusesAndChains(Game game) {

@@ -172,6 +172,8 @@ class GameLoopIntegrationTest {
         game.world.setBlock(fx, fy, fz, BlockType.LOG, true);
         game.fire.ignite(game, fx, fy, fz);
         assertTrue(game.fire.count() > 0, "precondition: a fire is burning");
+        game.liquidFire.spill(game, fx + 0.5f, fy + 1.5f, fz + 0.5f, 1, 0, true);
+        assertTrue(game.liquidFire.count() > 0, "precondition: burning liquid lies on the log");
         game.player.addAffliction(Affliction.BLEEDING, 30f);
         game.entities.spawnCreature(game.world, com.veylon.entity.Creature.CreatureType.WOLF,
                 game.player.pos.x + 4, game.player.pos.y, game.player.pos.z);
@@ -217,6 +219,8 @@ class GameLoopIntegrationTest {
         assertFalse(game.player.abilities.flying(), "R15: new worlds cannot inherit flight");
         assertSame(game, game.world.listener, "the new world reports block changes to Game");
         assertEquals(0, game.fire.count(), "burning blocks do not survive into a new world");
+        assertEquals(0, game.liquidFire.count(), "burning liquid does not survive");
+        assertEquals(0, game.liquidFire.totalSpills);
         assertEquals(0, game.projectiles.liveCount(), "projectiles do not survive");
         assertNull(game.projectiles.lastNpcHitZone, "the hit-zone diagnostic does not survive");
         assertEquals(0, game.fragments.liveCount(), "flying body pieces do not survive");

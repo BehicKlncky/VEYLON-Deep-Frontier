@@ -30,7 +30,8 @@ class SimulationSystemContractTest {
         assertInstanceOf(FastTickSystem.class, game.settlementManager,
                 "settlements are driven from Game.fastTick");
 
-        for (Object mediumSystem : List.of(game.weather, game.temperature, game.water, game.fire)) {
+        for (Object mediumSystem : List.of(game.weather, game.temperature, game.water, game.fire,
+                game.liquidFire)) {
             assertInstanceOf(MediumTickSystem.class, mediumSystem,
                     mediumSystem.getClass().getSimpleName() + " is driven from Game.mediumTick");
         }
@@ -61,6 +62,21 @@ class SimulationSystemContractTest {
 
         // Dirty one piece of state on each system, through its own API where
         // there is one.
+        // Burning liquid on a stone slab with someone standing in it, while
+        // the new world's sky is still clear.
+        int lx = (int) game.player.pos.x - 4;
+        int lz = (int) game.player.pos.z - 4;
+        int ly = game.world.surfaceHeight(lx, lz) + 1;
+        game.world.setBlock(lx, ly, lz, BlockType.STONE, true);
+        game.world.setBlock(lx, ly + 1, lz, BlockType.AIR, true);
+        game.world.setBlock(lx, ly + 2, lz, BlockType.AIR, true);
+        var bather = game.entities.spawnNpc(game.world, "Villager", lx + 0.5f, ly + 1.1f, lz + 0.5f);
+        assertTrue(game.liquidFire.spill(game, lx + 0.5f, ly + 1.5f, lz + 0.5f, 1, 0, true) > 0,
+                "precondition: liquid is burning");
+        game.liquidFire.mediumTick(game, SimulationScheduler.MEDIUM_DT);
+        assertTrue(bather.health < bather.maxHealth && game.liquidFire.trackedNpcSpills() > 0,
+                "precondition: the liquid has burned someone it now remembers");
+        game.liquidFire.totalPatchIgnitions = 4;
         game.time.advance(9_000);
         game.weather.current = WeatherSystem.Weather.STORM;
         game.weather.next = WeatherSystem.Weather.SNOW;
@@ -131,6 +147,18 @@ class SimulationSystemContractTest {
         assertEquals(0, game.fire.count(), "burning cells do not carry over");
         assertEquals(0, game.fire.totalIgnitions, "fire statistics do not carry over");
         assertEquals(0, game.fire.totalExtinguished);
+        assertEquals(0, game.liquidFire.count(), "burning liquid does not carry over");
+        assertEquals(0, game.liquidFire.trackedNpcSpills(), "nor who it has burned");
+        assertEquals(0, game.liquidFire.totalSpills, "liquid fire statistics do not carry over");
+        assertEquals(0, game.liquidFire.totalPatchIgnitions);
+        int nx = (int) game.player.pos.x - 4;
+        int nz = (int) game.player.pos.z - 4;
+        int ny = game.world.surfaceHeight(nx, nz) + 1;
+        game.world.setBlock(nx, ny, nz, BlockType.STONE, true);
+        game.world.setBlock(nx, ny + 1, nz, BlockType.AIR, true);
+        game.liquidFire.spill(game, nx + 0.5f, ny + 1.5f, nz + 0.5f, 0, 0, false);
+        assertEquals(0, game.liquidFire.patches().getFirst().spillId(),
+                "spill ids start again from zero in the next world");
         assertTrue(game.events.active.isEmpty(), "active events do not carry over");
         assertEquals(0, game.events.totalEventsTriggered);
 
@@ -180,7 +208,7 @@ class SimulationSystemContractTest {
         game.weather.current = WeatherSystem.Weather.RAIN;
 
         for (SimulationSystem system : List.of(game.time, game.weather, game.temperature,
-                game.water, game.fire, game.plants, game.events, game.itemConditions,
+                game.water, game.fire, game.liquidFire, game.plants, game.events, game.itemConditions,
                 game.settlementManager, game.ragdolls, game.fragments)) {
             system.reset();
         }
