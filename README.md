@@ -24,6 +24,13 @@ find blueprints, master the crafting stations and **repair the distress beacon**
 
 ---
 
+Version **0.8.0 — Lethal Combat & Molotov Fire** makes a head shot fatal and a chest
+take two bullets or three arrows, kills and dismembers everyone inside a bomb's
+lethal radius, and turns the fire bomb into a molotov that spills spreading liquid
+fire. Rain now puts exposed fires out. Existing saves remain compatible. See the
+[release notes](docs/releases/v0.8.0.md) and
+[engineering record](docs/engineering/COMBAT_LETHALITY_AND_MOLOTOV.md).
+
 Version **0.7.4 — Articulated Ragdolls** gives dying bodies bending elbows, knees
 and hocks, a jointed neck and head, two-link tails and loose bird wings. Contacts,
 not a preset pose, decide how a body lands or drapes over a ledge, and saves keep
@@ -121,9 +128,9 @@ Windows x64 (PowerShell):
 ```powershell
 .\gradlew.bat build             # compile + unit tests + jar
 .\gradlew.bat performanceTest   # opt-in benchmarks calibrated for the reference PC
-.\gradlew.bat fatJar            # build\libs\veylon-0.7.4-all.jar
+.\gradlew.bat fatJar            # build\libs\veylon-0.8.0-all.jar
 .\gradlew.bat jpackage          # build\jpackage\Veylon\Veylon.exe
-.\gradlew.bat appImageZip       # build\distributions\veylon-0.7.4-windows-x64.zip
+.\gradlew.bat appImageZip       # build\distributions\veylon-0.8.0-windows-x64.zip
 .\gradlew.bat releaseArtifacts  # tests + all host-specific release artifacts
 ```
 
@@ -133,7 +140,7 @@ macOS Intel or Apple Silicon (Terminal):
 ./gradlew build
 ./gradlew fatJar
 ./gradlew jpackage          # build/jpackage/Veylon.app
-./gradlew appImageZip       # build/distributions/veylon-0.7.4-macos-{x64|arm64}.zip
+./gradlew appImageZip       # build/distributions/veylon-0.8.0-macos-{x64|arm64}.zip
 ./gradlew releaseArtifacts
 ```
 
@@ -168,7 +175,7 @@ See [CHANGELOG.md](CHANGELOG.md) for release notes.
 Run the fat JAR with the same JVM options used by the packaged launchers:
 
 ```powershell
-java --enable-native-access=ALL-UNNAMED -Xmx2G -jar build\libs\veylon-0.7.4-all.jar
+java --enable-native-access=ALL-UNNAMED -Xmx2G -jar build\libs\veylon-0.8.0-all.jar
 ```
 
 ---

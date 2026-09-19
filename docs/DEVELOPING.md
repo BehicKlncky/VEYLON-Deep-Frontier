@@ -310,7 +310,7 @@ those three points.
   from the same fixture. `SurvivalCreativeParityTest` and the `Creative*Test`
   classes are built in pairs for exactly that reason — a gate that accidentally
   fires in Survival is the failure mode worth catching.
-- The suite is 886 tests across 121 classes.
+- The suite is 886 tests across 121 classes at 0.8.0.
 
 ---
 

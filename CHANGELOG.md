@@ -4,6 +4,8 @@ All notable user-facing changes to VEYLON: Deep Frontier are recorded here.
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-09-20
+
 ### Changed
 
 - Where you hit a person decides the fight. A bullet or an arrow in the head
