@@ -220,6 +220,28 @@ Every hard limit held on every frame, all 120 pieces came to rest, and the
 fragment step allocated **24 bytes per frame** against the 4 KB allowance
 `RagdollAllocationTest` uses.
 
+## Validation run
+
+`gradlew.bat build --rerun-tasks` on `d6ee7f7`: green, **886 tests in 121
+classes**, no failures and none skipped (`build/combat-fire-final-build.log`).
+
+The release smoke gate, `VEYLON_SEED=20260716 VEYLON_SMOKE=90`, **passed**
+(`build/combat-fire-smoke2.log`): save and load both true, 55 materials, 656
+glyphs, 110/110 item icons, **0 GL and 0 KHR errors**, `withinHardLimits=true`
+with every new collection empty at the end (`fires=0 liquidFire=0
+projectiles={live=0,stuck=0}`), the fortress approach complete, and
+avgFps 142.5 with p99 8.25 ms against the mandatory 60 (`target60=true`,
+`performanceGate=true`). An earlier attempt ended at about 30 s when its window
+closed before the 90 s mark; that run produced no report and is not the result
+above.
+
+`gradlew.bat performanceTest`: 8 of 9 pass. The one failure is the durable-save
+gate, 5.977 ms against a 2.20 ms budget — the pre-existing gap on this host,
+which is not the reference machine the budget was recorded on and which failed
+the same gate before this branch. For reference from the same run: a full field
+of twelve ragdolls costs 0.382 ms per fixed tick, the whole simulation cycle
+0.149 ms, and the medium bucket including fire 0.020 ms.
+
 ## Native visual evidence
 
 Captured on this host at 1280×720 with `VEYLON_SEED=20260919`. The PNGs are in
