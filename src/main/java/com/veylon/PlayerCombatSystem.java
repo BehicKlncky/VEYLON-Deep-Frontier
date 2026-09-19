@@ -577,7 +577,10 @@ final class PlayerCombatSystem {
         game.audio.playSwing();
         rangedCooldown = weapon.attackInterval;
         game.swingTimer = Math.max(game.swingTimer, SWING_THROW);
-        game.log("Fuse lit — get clear!");
+        // A fire bomb has no fuse to get clear of: it breaks where it lands.
+        game.log(weapon.item == ItemType.FIRE_BOMB
+                ? "Rag lit — it bursts into flame where it lands!"
+                : "Fuse lit — get clear!");
     }
 
     // ------------------------------------------------------------------

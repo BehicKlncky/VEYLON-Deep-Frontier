@@ -7,6 +7,8 @@ import com.veylon.entity.Affliction;
 import com.veylon.entity.Creature;
 import com.veylon.entity.GameMode;
 import com.veylon.entity.Npc;
+import com.veylon.item.ItemStack;
+import com.veylon.item.ItemType;
 import com.veylon.save.SaveSystem;
 import com.veylon.settlement.HumanFaction;
 import com.veylon.settlement.NpcArchetype;
@@ -17,6 +19,7 @@ import com.veylon.simulation.WeatherSystem.Weather;
 import com.veylon.util.Vec3i;
 import com.veylon.world.BlockType;
 import com.veylon.world.Chunk;
+import org.joml.Vector3f;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -374,6 +377,22 @@ class MolotovTest {
     }
 
     @Test
+    void throwingABottleWarnsOfFireNotOfAFuse() {
+        g.camera.position.set(310.5f, 41.7f, 310.5f);
+        g.player.hotbarSel = 0;
+
+        g.player.inventory.set(0, new ItemStack(ItemType.SCRAP_BOMB, 1));
+        assertTrue(g.updateThrownWeaponCommand(2f, true, new Vector3f(1, 0, 0)));
+        assertTrue(lastLogLine().contains("Fuse lit"), "control: a scrap bomb still has a fuse to clear");
+
+        g.player.inventory.set(0, new ItemStack(ItemType.FIRE_BOMB, 1));
+        assertTrue(g.updateThrownWeaponCommand(2f, true, new Vector3f(1, 0, 0)));
+        String line = lastLogLine();
+        assertFalse(line.contains("Fuse") || line.contains("get clear"),
+                "a bottle breaks where it lands, so there is no fuse to get clear of: " + line);
+    }
+
+    @Test
     void aPatchLightsANeighbouringKegsFuseForWhoeverThrewIt() {
         Vec3i keg = new Vec3i(333, 40, 330);
         g.world.setBlock(keg.x(), keg.y(), keg.z(), BlockType.POWDER_KEG, false);
@@ -535,6 +554,11 @@ class MolotovTest {
             g.fire.mediumTick(g, TICK);
             g.liquidFire.mediumTick(g, TICK);
         }
+    }
+
+    private String lastLogLine() {
+        var lines = g.eventLog.all();
+        return lines.isEmpty() ? "" : lines.getLast();
     }
 
     private Patch patchAt(int x, int y, int z) {
