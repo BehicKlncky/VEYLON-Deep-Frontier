@@ -1,7 +1,9 @@
 package com.veylon.qa;
 
 import com.veylon.ai.Quest;
+import com.veylon.entity.BodyFragment;
 import com.veylon.item.ItemType;
+import com.veylon.settlement.NpcArchetype;
 import com.veylon.world.BlockType;
 import org.junit.jupiter.api.Test;
 
@@ -60,6 +62,17 @@ class SerializedEnumOrderTest {
             "RECOVER_STOLEN_SUPPLIES", "CAPTURE_FORT", "DEFEND_OUTPOST",
             "EXPLORE_SETTLEMENT_CAVE");
 
+    /** {@code world.bodies} and {@code world.fragments} store the archetype as ordinal + 1. */
+    private static final List<String> NPC_ARCHETYPE_ORDER = List.of(
+            "VILLAGER", "GUARD", "MEDIC", "TRADER", "FARMER", "SMITH", "ARCHER",
+            "SCAVENGER", "TRACKER", "SCOUT", "HUNTER", "BRUTE", "POWDERMAN", "LEADER",
+            "CAPTIVE");
+
+    /** {@code world.fragments} stores the piece id as its ordinal. */
+    private static final List<String> BODY_FRAGMENT_PIECE_ORDER = List.of(
+            "TORSO", "HEAD", "UPPER_ARM_L", "UPPER_ARM_R", "FOREARM_L", "FOREARM_R",
+            "THIGH_L", "THIGH_R", "SHIN_L", "SHIN_R");
+
     @Test
     void blockTypeNamesAndOrderMatchTheChunkFormatSnapshot() {
         List<String> actual = Arrays.stream(BlockType.values()).map(BlockType::name).toList();
@@ -85,5 +98,19 @@ class SerializedEnumOrderTest {
         assertEquals(QUEST_TYPE_ORDER,
                 Arrays.stream(Quest.Type.values()).map(Quest.Type::name).toList(),
                 "SaveSystem persists Quest.Type.ordinal(); append only");
+    }
+
+    @Test
+    void npcArchetypeNamesAndOrderMatchTheBodySectionSnapshot() {
+        assertEquals(NPC_ARCHETYPE_ORDER,
+                Arrays.stream(NpcArchetype.values()).map(NpcArchetype::name).toList(),
+                "the body and fragment sections persist NpcArchetype.ordinal(); append only");
+    }
+
+    @Test
+    void bodyFragmentPieceNamesAndOrderMatchTheFragmentSectionSnapshot() {
+        assertEquals(BODY_FRAGMENT_PIECE_ORDER,
+                Arrays.stream(BodyFragment.Piece.values()).map(BodyFragment.Piece::name).toList(),
+                "the fragment section persists BodyFragment.Piece.ordinal(); append only");
     }
 }
