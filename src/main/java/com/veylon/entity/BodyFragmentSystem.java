@@ -428,6 +428,21 @@ public class BodyFragmentSystem implements SimulationSystem {
         live.clear();
     }
 
+    /**
+     * Lays a piece read from a save back down exactly as it was written: no
+     * push-out and no drop, because {@link #rest} did both before the save.
+     * Only the sweep box is derived, refit to the saved orientation. The
+     * settled cap holds here as it does in {@link #rest}.
+     */
+    public void restoreSettled(BodyFragment f) {
+        f.settled = true;
+        fitExtents(f);
+        if (settled.size() >= BodyFragmentConstants.MAX_SETTLED_FRAGMENTS) {
+            settled.removeFirst();
+        }
+        settled.add(f);
+    }
+
     private void settleOldest(Game g) {
         if (live.isEmpty()) {
             return;

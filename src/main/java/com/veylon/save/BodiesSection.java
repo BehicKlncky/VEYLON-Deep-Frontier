@@ -5,6 +5,7 @@ import com.veylon.entity.BodyPose;
 import com.veylon.entity.BodySkeleton;
 import com.veylon.entity.Carcass;
 import com.veylon.entity.HumanCorpse;
+import com.veylon.entity.NpcAppearance;
 import com.veylon.settlement.NpcArchetype;
 
 import java.io.ByteArrayInputStream;
@@ -45,8 +46,9 @@ final class BodiesSection {
     /** Far above the corpse despawn radius could ever sustain. */
     private static final int MAX_CORPSES = 4096;
     private static final float MAX_ANGLE = 40f;
-    private static final float MAX_HORIZONTAL = 100_000_000f;
-    private static final float MAX_VERTICAL = 10_000f;
+    /** Position bounds; {@link FragmentsSection} holds its pieces to the same ones. */
+    static final float MAX_HORIZONTAL = 100_000_000f;
+    static final float MAX_VERTICAL = 10_000f;
 
     private BodiesSection() {
     }
@@ -68,13 +70,7 @@ final class BodiesSection {
                 out.writeFloat(corpse.pos.y);
                 out.writeFloat(corpse.pos.z);
                 out.writeFloat(corpse.decay);
-                // Archetype by ordinal + 1, so zero stays available for "none".
-                out.writeInt(corpse.appearance.archetype == null
-                        ? 0 : corpse.appearance.archetype.ordinal() + 1);
-                out.writeBoolean(corpse.appearance.raider);
-                out.writeBoolean(corpse.appearance.trader);
-                out.writeBoolean(corpse.appearance.sick);
-                out.writeInt(corpse.appearance.campIndex);
+                writeAppearance(out, corpse.appearance);
                 writePose(out, corpse.pose);
             }
         }
@@ -101,23 +97,13 @@ final class BodiesSection {
                 throw new IOException("too many human corpses: " + count);
             }
             game.entities.corpses.clear();
-            NpcArchetype[] archetypes = NpcArchetype.values();
             for (int i = 0; i < count; i++) {
                 HumanCorpse corpse = new HumanCorpse(
                         readFinite(in, "corpse x", -MAX_HORIZONTAL, MAX_HORIZONTAL),
                         readFinite(in, "corpse y", -MAX_VERTICAL, MAX_VERTICAL),
                         readFinite(in, "corpse z", -MAX_HORIZONTAL, MAX_HORIZONTAL));
                 corpse.decay = readFinite(in, "corpse decay", 0f, MAX_VERTICAL);
-                int archetype = in.readInt();
-                if (archetype < 0 || archetype > archetypes.length) {
-                    throw new IOException("invalid corpse archetype ordinal: " + archetype);
-                }
-                corpse.appearance.archetype =
-                        archetype == 0 ? null : archetypes[archetype - 1];
-                corpse.appearance.raider = in.readBoolean();
-                corpse.appearance.trader = in.readBoolean();
-                corpse.appearance.sick = in.readBoolean();
-                corpse.appearance.campIndex = in.readInt();
+                readAppearance(in, corpse.appearance, "corpse");
                 readPose(in, corpse.pose, version, BodySkeleton.humanoid());
                 game.entities.corpses.add(corpse);
             }
@@ -125,6 +111,35 @@ final class BodiesSection {
                 throw new IOException("unexpected bytes after bodies section");
             }
         }
+    }
+
+    /**
+     * The look of the person a body came from. Shared with
+     * {@link FragmentsSection}, so a piece of a person is recorded exactly as
+     * the whole corpse is.
+     */
+    static void writeAppearance(DataOutputStream out, NpcAppearance appearance)
+            throws IOException {
+        // Archetype by ordinal + 1, so zero stays available for "none".
+        out.writeInt(appearance.archetype == null ? 0 : appearance.archetype.ordinal() + 1);
+        out.writeBoolean(appearance.raider);
+        out.writeBoolean(appearance.trader);
+        out.writeBoolean(appearance.sick);
+        out.writeInt(appearance.campIndex);
+    }
+
+    static void readAppearance(DataInputStream in, NpcAppearance appearance, String owner)
+            throws IOException {
+        NpcArchetype[] archetypes = NpcArchetype.values();
+        int archetype = in.readInt();
+        if (archetype < 0 || archetype > archetypes.length) {
+            throw new IOException("invalid " + owner + " archetype ordinal: " + archetype);
+        }
+        appearance.archetype = archetype == 0 ? null : archetypes[archetype - 1];
+        appearance.raider = in.readBoolean();
+        appearance.trader = in.readBoolean();
+        appearance.sick = in.readBoolean();
+        appearance.campIndex = in.readInt();
     }
 
     private static void writePose(DataOutputStream out, BodyPose pose) throws IOException {
@@ -196,9 +211,10 @@ final class BodiesSection {
     /**
      * A NaN here would load, and then no comparison against it would ever be
      * true again — the same failure the player-scalar guard exists for. The
-     * bounded equivalents in SaveSystem and V3ExtensionSections are private.
+     * bounded equivalents in SaveSystem and V3ExtensionSections are private;
+     * {@link FragmentsSection} reads through this one.
      */
-    private static float readFinite(DataInputStream in, String label, float min, float max)
+    static float readFinite(DataInputStream in, String label, float min, float max)
             throws IOException {
         float value = in.readFloat();
         if (!Float.isFinite(value) || value < min || value > max) {
