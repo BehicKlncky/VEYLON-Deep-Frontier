@@ -13,7 +13,7 @@ Setup requirements (JDK 25, OpenGL 3.3, the proxy workaround) are in
 
 ```bash
 ./gradlew run            # play the game
-./gradlew test           # 302 deterministic tests, headless, ~90 s
+./gradlew test           # 886 deterministic tests, headless, ~4 min
 ./gradlew performanceTest # 5 wall-clock benchmarks + the per-system tick
                           # profile; reference PC only
 ./gradlew build          # compile + test
@@ -42,7 +42,7 @@ runs. All are inert when unset. Everything below is handled by `QaHarness`;
 | `VEYLON_SEED` | Fixed world seed (a non-numeric value is hashed) |
 | `VEYLON_GAME_MODE=survival\|creative` | Initial mode for automated world runs only; absent means Survival. Invalid values fail explicitly. Ignored for normal title sessions and frontend-only captures. |
 | `VEYLON_SMOKE=<seconds>` | Release smoke gate: save/load, fire, storm, a fortress approach, then a pass/fail report. Throws on failure |
-| `VEYLON_SCENE=<name>` | Stage a deterministic benchmark scene (`day`, `pinefog`, `nightfire`, `ruin`, `toxic`, `ao_shadow`, `phase4`, `ashwolf`, `silhouette30`, `vfx_blood`, `vfx_mining`, `vfx_beacon`, `death_ragdoll_showcase`, `death_ragdoll_sequence`, `movement`, `inventory`, `ui_cycle`, `held_*`, and `creative_flight` with `VEYLON_GAME_MODE=creative`, which flies east at Shift speed and prints a `[flight]` streaming report at 29 s) |
+| `VEYLON_SCENE=<name>` | Stage a deterministic benchmark scene (`day`, `pinefog`, `nightfire`, `ruin`, `toxic`, `ao_shadow`, `phase4`, `ashwolf`, `silhouette30`, `vfx_blood`, `vfx_mining`, `vfx_beacon`, `death_ragdoll_showcase`, `death_ragdoll_sequence`, `dismember_showcase`, `dismember_wall`, `dismember_bomb` (a real scrap bomb thrown into a group of six, one outside the lethal radius; it goes off at 2.4 s), `molotov_ground`, `molotov_tree` and `molotov_rain` (a real fire bomb thrown at 0.5 s onto a dry clearing at dusk, beside a round tree that catches, or with rain from 3 s that puts the pool out; shots `0.7,1.2,3,7,11`, `1,4,10,20` and `2,3.5,5`), `movement`, `inventory`, `ui_cycle`, `held_*`, and `creative_flight` with `VEYLON_GAME_MODE=creative`, which flies east at Shift speed and prints a `[flight]` streaming report at 29 s) |
 | `VEYLON_SHOT="5,10"` | Capture screenshots at those elapsed seconds |
 | `VEYLON_FRONTEND=<name>` | Pin a front-end screen (`options`, `audio`, `loading`, `death`, `victory`, `glyphs`, `newworld`). `newworld-save` shows the replace-save notice without writing a save. `pause` and `gamemode` stage a Survival world with the pause menu or the mode confirmation open; `pause-creative`, `gamemode-creative` and `victory-creative` stage a Creative world; `catalog`, `catalog-tools`, `catalog-search` (query "iron") and `catalog-inventory` open the Creative catalog; `worldcontrols` and `worldcontrols-held` open the Creative world controls, the second with dusk, a frozen clock, a locked storm and paused spawning already applied |
 | `VEYLON_RESOLUTION=1920x1080` | Framebuffer override |
@@ -104,6 +104,21 @@ rather than writing `health` directly. Those three are where Creative
 invulnerability is enforced, and a direct subtraction bypasses it silently.
 `tickNeeds` is the exception that proves the rule: it subtracted health in
 several helpers and each one needed its own gate.
+
+### A projectile kind
+
+1. Append to `ProjectileSystem.Kind` and give it a case in `fire`, `step`,
+   `onBlockHit` and `onEntityHit`.
+2. **Give it a row in the torso-wound table, or say it has none.**
+   `ProjectileLethality.torsoWounds` and `torsoHealthFraction` switch over
+   `Kind` with no default on purpose, so a new kind does not compile until it
+   either states what a torso hit of it costs a person or joins the kinds that
+   deal no impact damage and throw. A kind that deals impact damage to an `Npc`
+   must also be classified in `ProjectileSystem.step`, which is where
+   `HitZone.classify` is called with the entry point of the hit.
+3. Decide whether it is a *bomb* for `ExplosionSystem`: a blast that passes
+   `lethalToHumans` kills and dismembers every person inside
+   `power × LETHAL_RADIUS_FACTOR`. The fire bomb deliberately is not one.
 
 ### A new way for AI to notice the player
 
@@ -250,6 +265,29 @@ fail depending on what ran before it. Presentation-only randomness
 **Adding transient player state?** Decide explicitly whether it survives a save.
 Reload progress and bow draw deliberately do not.
 
+**A straight split limb draws as one box, so hiding its tip hides nothing.**
+`ModelPart.split` halves a box, and while the chain is straight the parent
+draws the original whole cuboid — which is what keeps living models
+pixel-identical. Hide a forearm and the upper arm still draws the whole arm.
+Set `forceSplitDraw` on the parent (as `Animator.isolatePart` does for a piece
+of a dismembered body) to make it draw only its own half; `resetPose` clears
+it, so nothing leaks into the next thing posed from the shared model.
+
+**Shelter from the rain needs headroom.** `FireSystem.isRainedOn` samples the
+sky light of the cell *above* the one being tested, and the top of a column is
+always fully lit, so a roof resting directly on a block does not shelter it —
+leave a block of air between. This catches out test fixtures more than
+gameplay: a tree's own canopy shelters the trunk beneath it because there is
+air between the logs and the leaves.
+
+**Wounds and blast records die with the `Npc` that carries them.** Torso wound
+counts, the shot id that last wounded a torso and the blast record that marks a
+body to be blown apart are transient fields on `Npc`, never saved. A person who
+leaves the world and comes back — through a save, a load, or a settlement going
+dormant and reactivating — returns at their stored health with no wounds. That
+is deliberate, but it means anything you attach to an `Npc` instance is lost at
+those three points.
+
 ---
 
 ## Testing conventions
@@ -272,7 +310,7 @@ Reload progress and bow draw deliberately do not.
   from the same fixture. `SurvivalCreativeParityTest` and the `Creative*Test`
   classes are built in pairs for exactly that reason — a gate that accidentally
   fires in Survival is the failure mode worth catching.
-- The suite is 775 tests across 109 classes at 0.7.4.
+- The suite is 886 tests across 121 classes at 0.8.0.
 
 ---
 
@@ -386,3 +424,55 @@ Contributor rules this feature adds:
   versions.** `BodiesSectionTest` keeps a handcrafted version 1 fixture for that.
   Every build fails the whole load on a body-section version newer than its own,
   so a bump is a downgrade limit and belongs in the release notes.
+
+## Lethal combat and molotov QA and contributor rules (0.8.0)
+
+Use `VEYLON_SEED=20260919` for every scene below; each one keeps the simulation
+paused and advances the systems it is about in fixed steps tied to elapsed
+wall-clock seconds, the way `rain_impact` does, so a shot requested at 1.2 s
+shows the same moment on every run.
+
+- `dismember_showcase` and `dismember_wall` (`VEYLON_SHOT=1,3,8`) blow four
+  people apart at one second, the second with a stone wall three blocks behind
+  them. `dismember_bomb` (`VEYLON_SHOT=2.2,4,9`) throws a real scrap bomb into
+  a group of six, one of them outside the lethal radius; it goes off at 2.4 s.
+- `molotov_ground`, `molotov_tree` and `molotov_rain`
+  (`VEYLON_SHOT=0.7,1.2,3,7,11`, `1,4,10,20` and `2,3.5,5`) throw a real fire
+  bomb onto a dry clearing at dusk, beside a tree that catches, and with rain
+  from 3 s that puts the pool out.
+
+Captures are wall-clock scheduled, so a slow first frame can push a shot past
+the moment it was aimed at — rerun it, and use `VEYLON_CAPTURE_TAG` when two
+shots in one run would round to the same filename (`VEYLON_SHOT` names files by
+whole seconds, so 1.2 and 1.6 overwrite each other).
+
+Run `gradlew test --tests '*ProjectileHitZone*' --tests '*BlastLethality*'
+--tests '*BodyFragment*' --tests '*Fragment*' --tests '*Molotov*' --tests
+'*FireWeather*' --tests '*LiquidFire*' --tests '*CombatFireIntegration*'` while
+working on any of this.
+
+Contributor rules this feature adds:
+
+- **Give a new projectile kind a row in the torso-wound table**, as "How to
+  add…" describes. The table is the only place a person's wound cost lives.
+- **Kill people through the damage path, never by writing `dead`.**
+  `Npc.killBy` hurts for more than the remaining health, so `health <= 0`,
+  `lastHitByPlayer` and `EntityManager.reallyDied` all agree and the death
+  pipeline treats a head shot or a blast exactly like any other kill.
+- **What kills a body decides how it falls.** `dismemberOnDeath` is set only by
+  a lethal blast, and only on a body that blast killed; everything else
+  ragdolls. Nothing may set it on a living NPC, and a second blast never
+  overwrites the first one's record.
+- **Light fires through `FireSystem.ignite`.** It is what holds every block
+  fire — from bottles, blasts, lightning and spread alike — under one
+  `MAX_ACTIVE_FIRES`, and what refuses a cell that is already burning.
+- **Ask `FireSystem.isRainedOn` before anything catches.** It is the one rain
+  predicate, shared by burning blocks, campfires and pools of burning liquid;
+  do not write another sky-light test.
+- **Keep the fragment step allocation-free.** `BodyFragmentAllocationTest` holds
+  the airborne and ground-contact paths at zero with a 4 KB allowance, and
+  `RuntimeBoundsTest` measures the same step over real blast trajectories with
+  the fire and liquid systems at full load.
+- **Cap every new pile of debris and prove it.** Pieces, pools and their
+  remembered (NPC, spill) pairs each have a hard cap with a `RuntimeBoundsTest`
+  case that reaches it exactly and cannot pass it.

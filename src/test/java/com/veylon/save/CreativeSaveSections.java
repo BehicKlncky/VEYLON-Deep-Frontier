@@ -19,17 +19,42 @@ final class CreativeSaveSections {
     }
 
     static byte[] replace(byte[] save, String id, byte[] replacement) throws IOException {
-        int envelope = -1;
+        int envelope = envelope(save);
+        List<Section> sections = new ArrayList<>();
+        boolean found = false;
+        for (Section section : sections(save, envelope)) {
+            if (section.id.equals(id)) {
+                found = true;
+                if (replacement != null) sections.add(new Section(id, replacement));
+            } else sections.add(section);
+        }
+        if (!found) throw new IOException("fixture missing section " + id);
+        return rebuild(save, envelope, sections);
+    }
+
+    /** Adds a section after the last one, the way a newer build would write it. */
+    static byte[] append(byte[] save, String id, byte[] payload) throws IOException {
+        int envelope = envelope(save);
+        List<Section> sections = sections(save, envelope);
+        for (Section section : sections) {
+            if (section.id.equals(id)) throw new IOException("fixture already has section " + id);
+        }
+        sections.add(new Section(id, payload));
+        return rebuild(save, envelope, sections);
+    }
+
+    private static int envelope(byte[] save) throws IOException {
         for (int i = 0; i <= save.length - 8; i++) {
             if ((save[i] & 255) == 0x53 && (save[i + 1] & 255) == 0x33
                     && (save[i + 2] & 255) == 0x45 && (save[i + 3] & 255) == 0x43) {
-                envelope = i;
-                break;
+                return i;
             }
         }
-        if (envelope < 0) throw new IOException("fixture has no v3 section envelope");
+        throw new IOException("fixture has no v3 section envelope");
+    }
+
+    private static List<Section> sections(byte[] save, int envelope) throws IOException {
         List<Section> sections = new ArrayList<>();
-        boolean found = false;
         try (DataInputStream in = new DataInputStream(new ByteArrayInputStream(
                 save, envelope, save.length - envelope))) {
             if (in.readInt() != ENVELOPE_MAGIC) throw new IOException("invalid fixture envelope");
@@ -39,14 +64,15 @@ final class CreativeSaveSections {
                 int length = in.readInt();
                 byte[] payload = in.readNBytes(length);
                 if (payload.length != length) throw new IOException("truncated fixture");
-                if (sectionId.equals(id)) {
-                    found = true;
-                    if (replacement != null) sections.add(new Section(id, replacement));
-                } else sections.add(new Section(sectionId, payload));
+                sections.add(new Section(sectionId, payload));
             }
             if (in.available() != 0) throw new IOException("unexpected fixture tail");
         }
-        if (!found) throw new IOException("fixture missing section " + id);
+        return sections;
+    }
+
+    private static byte[] rebuild(byte[] save, int envelope, List<Section> sections)
+            throws IOException {
         ByteArrayOutputStream bytes = new ByteArrayOutputStream();
         try (DataOutputStream out = new DataOutputStream(bytes)) {
             out.write(save, 0, envelope);

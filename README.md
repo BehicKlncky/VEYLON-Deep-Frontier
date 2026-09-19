@@ -24,6 +24,13 @@ find blueprints, master the crafting stations and **repair the distress beacon**
 
 ---
 
+Version **0.8.0 — Lethal Combat & Molotov Fire** makes a head shot fatal and a chest
+take two bullets or three arrows, kills and dismembers everyone inside a bomb's
+lethal radius, and turns the fire bomb into a molotov that spills spreading liquid
+fire. Rain now puts exposed fires out. Existing saves remain compatible. See the
+[release notes](docs/releases/v0.8.0.md) and
+[engineering record](docs/engineering/COMBAT_LETHALITY_AND_MOLOTOV.md).
+
 Version **0.7.4 — Articulated Ragdolls** gives dying bodies bending elbows, knees
 and hocks, a jointed neck and head, two-link tails and loose bird wings. Contacts,
 not a preset pose, decide how a body lands or drapes over a ledge, and saves keep
@@ -121,9 +128,9 @@ Windows x64 (PowerShell):
 ```powershell
 .\gradlew.bat build             # compile + unit tests + jar
 .\gradlew.bat performanceTest   # opt-in benchmarks calibrated for the reference PC
-.\gradlew.bat fatJar            # build\libs\veylon-0.7.4-all.jar
+.\gradlew.bat fatJar            # build\libs\veylon-0.8.0-all.jar
 .\gradlew.bat jpackage          # build\jpackage\Veylon\Veylon.exe
-.\gradlew.bat appImageZip       # build\distributions\veylon-0.7.4-windows-x64.zip
+.\gradlew.bat appImageZip       # build\distributions\veylon-0.8.0-windows-x64.zip
 .\gradlew.bat releaseArtifacts  # tests + all host-specific release artifacts
 ```
 
@@ -133,7 +140,7 @@ macOS Intel or Apple Silicon (Terminal):
 ./gradlew build
 ./gradlew fatJar
 ./gradlew jpackage          # build/jpackage/Veylon.app
-./gradlew appImageZip       # build/distributions/veylon-0.7.4-macos-{x64|arm64}.zip
+./gradlew appImageZip       # build/distributions/veylon-0.8.0-macos-{x64|arm64}.zip
 ./gradlew releaseArtifacts
 ```
 
@@ -168,7 +175,7 @@ See [CHANGELOG.md](CHANGELOG.md) for release notes.
 Run the fat JAR with the same JVM options used by the packaged launchers:
 
 ```powershell
-java --enable-native-access=ALL-UNNAMED -Xmx2G -jar build\libs\veylon-0.7.4-all.jar
+java --enable-native-access=ALL-UNNAMED -Xmx2G -jar build\libs\veylon-0.8.0-all.jar
 ```
 
 ---
@@ -249,8 +256,15 @@ java --enable-native-access=ALL-UNNAMED -Xmx2G -jar build\libs\veylon-0.7.4-all.
     arrows from carcasses and surfaces). Deep-cave **sulfur + saltpeter + charcoal**
     makes **black powder**; the anvil forges a **musket**, **flintlock** and
     **blunderbuss** — devastating, but slow to reload, and every shot is a huge noise
-    event that draws predators and alerts settlements. **Powder kegs** breach weak
-    gates and walls; **scrap and fire bombs** are thrown with a lit fuse.
+    event that draws predators and alerts settlements. Against **people**, where you
+    hit decides the fight: a bullet or an arrow **in the head kills outright**, and
+    the chest takes **two bullets or three arrows** whoever they are and however
+    much health they have — an arrow wound counts for less than a bullet's, and
+    wounds from both add up. Limbs still only cost the weapon's own damage.
+    **Powder kegs** breach weak gates and walls, and anyone caught close by a keg or
+    a **scrap bomb** is killed and **blown apart** by it. A scrap bomb is thrown with
+    a lit fuse; a **fire bomb** is a molotov that **breaks on the first thing it
+    hits** and spills burning liquid.
 12. **Siege & capture:** infiltrate a hostile fort through a rear gap, sabotage the
     **alarm bell**, free **captives**, rout or defeat the garrison and its leader —
     a cleared settlement stays cleared, and supplying its campfire with food and logs
@@ -296,9 +310,19 @@ java --enable-native-access=ALL-UNNAMED -Xmx2G -jar build\libs\veylon-0.7.4-all.
   powdermen, and morale-driven routs.
 - **Combat**: data-driven weapon definitions shared by player and NPCs; arrows with
   drop, recovery and sticking; muzzle-loaded firearms with reload timing, recoil and
-  huge noise footprints; a reusable explosion system with distance falloff, cover
+  huge noise footprints; **hit zones on people** (head, chest and legs, read from
+  where the shot entered the body, and the same for shots NPCs fire at each other);
+  a reusable explosion system with distance falloff, cover
   occlusion, blast resistance (ancient/progression blocks are blast-proof), bounded
-  powder-keg chains and single-batch world edits.
+  powder-keg chains and single-batch world edits, plus a **lethal radius** inside
+  which a blast kills people outright and **tears them into ten pieces** that fly,
+  bounce, settle where the terrain puts them, rot like corpses and survive a save.
+- **Fire**: burning blocks spread to flammable neighbours and **climb trees and
+  walls**; **rain, storm and snow put out any fire open to the sky** within seconds
+  and leave its block unburnt, while fires under a roof or a canopy burn on. A
+  **fire bomb** spills a pool of burning liquid that runs downhill and around
+  obstacles, burns whoever stands in it, lights what it touches and sets off
+  powder kegs beside it.
 - **Shelter**: roof and wall-enclosure detection — affects wetness, storm wind chill,
   sleep quality and indoor campfire smoke.
 - **Wildlife**: Glowdeer, Ashwolves, Skitterwings, **Murkhares, Thornhorns (charge when
@@ -350,13 +374,15 @@ com.veylon
                                 DormantSettlementSimulation (off-screen life),
                                 SettlementType, NpcArchetype, HumanFaction
   combat/                     - WeaponDefinition/WeaponRegistry (string-id stats shared
-                                by player and NPCs), ProjectileSystem, ExplosionSystem,
+                                by player and NPCs), ProjectileSystem, HitZone,
+                                ProjectileLethality, ExplosionSystem,
                                 WorldNoise (positional perception events)
   simulation/                 - SimulationScheduler, cadence interfaces, Time, Weather,
-                                Temperature, Water, Fire, Plant, data-driven Event,
-                                Season, Shelter, ItemCondition
+                                Temperature, Water, Fire, LiquidFire (molotov pools),
+                                Plant, data-driven Event, Season, Shelter, ItemCondition
   entity/                     - Entity, Player, Creature, Npc, EntityManager,
                                 PlayerMovementSystem, PlayerTreatmentSystem,
+                                RagdollSystem, BodyFragmentSystem (blast debris),
                                 VoxelPhysics, Affliction, Carcass, Track
   input/                      - PlayerInteractionSystem (gameplay command routing;
                                 engine.Input remains the raw GLFW abstraction)
@@ -401,7 +427,12 @@ without them loads as an unmarked Survival world, so **every existing save keeps
 working**. A malformed section fails the whole load rather than loading partial state,
 and the live world survives the attempt. 0.7.2 adds `world.bodies` for settled carcass
 poses and human corpses; 0.7.4 moves it to version 2 for three-axis joint poses and
-still reads version 1.
+still reads version 1. A further section, `world.fragments`, holds the pieces of
+people blown apart once they have come to rest. It is a new section rather than a new
+version of an existing one, so **older builds still open the save** — they skip what
+they do not know and the pieces are simply absent. Pools of burning liquid and burning
+blocks are deliberately not saved; a fire bomb still in the air is, and shatters where
+it lands.
 
 **v2 saves (0.1.0–0.2.0) load via an explicit migration path**: the world is pinned to
 the legacy terrain generator (identical terrain, no silent regeneration), and all new
@@ -446,6 +477,16 @@ saves are rejected with a console message — no migration.
   than remembering exact positions (identity, health and deaths do persist).
 - Fire does not spread to powder kegs at range — only adjacent flames, fuses, and
   other explosions set them off.
+- Only people are dismembered: animals and the player keep whole-body ragdolls, and
+  a person killed by anything other than a blast — a shot, a blade, fire — falls
+  whole. Pieces cannot be harvested or looted.
+- Burning liquid and burning blocks are not saved. A save taken while the world is
+  alight loads with the fires out and the pools gone.
+- A wounded person's chest wounds are forgotten if they leave the world and come
+  back (a save and load, or a settlement going dormant and reactivating): they
+  return at their stored health, unwounded.
+- A fire bomb that breaks more than three blocks above the ground — against the side
+  of a tree canopy, say — finds no surface to pool on and spills nothing.
 
 Creative mode: [design decisions and research](docs/creative/CREATIVE_DESIGN.md),
 [milestone plan and evidence](docs/creative/CREATIVE_MODE_PLAN.md),

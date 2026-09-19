@@ -127,6 +127,7 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
     public Player player;
     public final EntityManager entities = new EntityManager();
     public final com.veylon.entity.RagdollSystem ragdolls = new com.veylon.entity.RagdollSystem();
+    public final com.veylon.entity.BodyFragmentSystem fragments = new com.veylon.entity.BodyFragmentSystem();
     public final FactionSystem faction = new FactionSystem();
     // 0.3.0 world-expansion systems.
     public final com.veylon.combat.WorldNoise noise = new com.veylon.combat.WorldNoise();
@@ -139,6 +140,7 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
     public final TemperatureSystem temperature = new TemperatureSystem();
     public final WaterSystem water = new WaterSystem();
     public final FireSystem fire = new FireSystem();
+    public final com.veylon.simulation.LiquidFireSystem liquidFire = new com.veylon.simulation.LiquidFireSystem();
     public final PlantSystem plants = new PlantSystem();
     public final EventSystem events = new EventSystem();
     public final SeasonSystem seasons = new SeasonSystem();
@@ -509,6 +511,7 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
             // interpolation, so 20 Hz strobes. The solver sub-steps at a fixed
             // rate internally, so behaviour stays frame-rate independent.
             ragdolls.update(this, dt);
+            fragments.update(this, dt);
             explosions.tickFuses(this, dt);
             noise.update(dt);
             updateEmitters(dt);
@@ -933,6 +936,7 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
         temperature.mediumTick(this, dt);
         water.mediumTick(this, dt);
         fire.mediumTick(this, dt);
+        liquidFire.mediumTick(this, dt);
         environment.mediumTick(dt);
         ambience.updateAmbienceMix();
     }

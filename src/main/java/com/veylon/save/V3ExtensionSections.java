@@ -77,6 +77,7 @@ final class V3ExtensionSections {
         sections.add(new V3Section(GameModeSection.ID, GameModeSection.write(g)));
         sections.add(new V3Section(CreativeControlsSection.ID, CreativeControlsSection.write(g)));
         sections.add(new V3Section(BodiesSection.ID, BodiesSection.write(g)));
+        sections.add(new V3Section(FragmentsSection.ID, FragmentsSection.write(g)));
         out.writeInt(V3_SECTION_ENVELOPE_MAGIC);
         out.writeInt(sections.size());
         for (V3Section section : sections) {
@@ -306,6 +307,8 @@ final class V3ExtensionSections {
                 CreativeControlsSection.read(payload, g);
             } else if (BodiesSection.ID.equals(id)) {
                 BodiesSection.read(payload, g);
+            } else if (FragmentsSection.ID.equals(id)) {
+                FragmentsSection.read(payload, g);
             }
             // Unknown stable IDs are intentionally skipped using their bounded length.
         }

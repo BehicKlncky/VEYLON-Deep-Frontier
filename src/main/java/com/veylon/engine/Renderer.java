@@ -1,6 +1,7 @@
 package com.veylon.engine;
 
 import com.veylon.Game;
+import com.veylon.entity.BodyFragment;
 import com.veylon.entity.BodyPose;
 import com.veylon.entity.BodySkeleton;
 import com.veylon.entity.Carcass;
@@ -20,12 +21,18 @@ import com.veylon.gfx.SkyRenderer;
 import com.veylon.gfx.model.Animator;
 import com.veylon.gfx.model.CreatureModels;
 import com.veylon.gfx.model.EntityModel;
+import com.veylon.gfx.model.FragmentModels;
 import com.veylon.gfx.model.HeldItemModels;
+import com.veylon.gfx.model.ModelPart;
 import com.veylon.gfx.model.NpcModels;
 import com.veylon.item.ItemStack;
 import com.veylon.item.ItemType;
 import com.veylon.item.ToolKind;
+import com.veylon.simulation.LiquidFireConstants;
+import com.veylon.simulation.LiquidFireSystem;
+import com.veylon.util.MathUtil;
 import com.veylon.util.Vec3i;
+import com.veylon.world.BlockType;
 import com.veylon.world.Chunk;
 import com.veylon.world.ChunkMesher;
 import com.veylon.world.Raycaster;
@@ -69,6 +76,11 @@ public class Renderer {
     private Mesh crackMesh;
     private final ChunkMesher mesher = new ChunkMesher();
     private final Matrix4f model = new Matrix4f();
+    /** A body fragment's own frame, kept while its root part and cut faces are drawn. */
+    private final Matrix4f fragmentBase = new Matrix4f();
+    private final Vector3f cutAt = new Vector3f();
+    private final Vector3f cutSize = new Vector3f();
+    private final Vector3f fragmentTint = new Vector3f();
     private final Matrix4f identity = new Matrix4f();
     private final Matrix4f projView = new Matrix4f();
     private final FrustumIntersection frustum = new FrustumIntersection();
@@ -420,6 +432,7 @@ public class Renderer {
         renderCarcasses(game);
         renderCorpses(game);
         renderRagdolls(game);
+        renderFragments(game);
 
         Vector3f camPos = game.camera.position;
         float entityRange = fogEnd + 12f;
@@ -463,6 +476,7 @@ public class Renderer {
                     .scale(0.95f * pulse, 1.05f * pulse, 0.95f * pulse);
             drawCube(1.0f, 0.45f + 0.15f * pulse, 0.08f);
         }
+        renderLiquidFire(game);
 
         // Active beacon: pulsing cyan light column.
         if (game.world.beaconStage >= 3 && game.world.beaconPos != null) {
@@ -521,12 +535,23 @@ public class Renderer {
                     drawCube(0.9f, 0.78f, 0.5f);
                     entityShader.set("uEmissive", 0f);
                 }
-                case BOMB, FIRE_BOMB -> {
+                case BOMB -> {
                     model.identity().translate(p.x, p.y, p.z)
                             .rotateY((float) (game.totalTime * 4.0 % (Math.PI * 2)))
                             .scale(0.16f);
-                    drawCube(p.kind == com.veylon.combat.ProjectileSystem.Kind.FIRE_BOMB
-                            ? 0.55f : 0.24f, 0.22f, 0.18f);
+                    drawCube(0.24f, 0.22f, 0.18f);
+                }
+                case FIRE_BOMB -> {
+                    // A green glass bottle with its rag alight on top; the rag
+                    // also sheds flames from ProjectileSystem as it flies.
+                    model.identity().translate(p.x, p.y, p.z)
+                            .rotateY((float) (game.totalTime * 4.0 % (Math.PI * 2)))
+                            .scale(0.16f);
+                    drawCube(0.55f, 0.70f, 0.55f);
+                    model.identity().translate(p.x, p.y + 0.16f, p.z).scale(0.07f);
+                    entityShader.set("uEmissive", 1f);
+                    drawCube(1f, 0.62f, 0.18f);
+                    entityShader.set("uEmissive", 0f);
                 }
             }
         }
@@ -543,6 +568,88 @@ public class Renderer {
                     .scale(0.035f, 0.035f, 0.5f);
             drawCube(0.66f, 0.54f, 0.36f);
         }
+    }
+
+    /**
+     * Burning liquid from fire bombs: one thin, flat emissive sheet on the
+     * floor of every covered cell. Fresh liquid at the centre of a spill is
+     * bright yellow-orange, the rim and liquid that has nearly burned down a
+     * deep orange; each cell shimmers on its own phase so a pool never pulses
+     * in step, and a sheet shrinks and dims away over its last seconds or as
+     * the rain soaks it. The flames, smoke and steam are particles.
+     */
+    private void renderLiquidFire(Game game) {
+        List<LiquidFireSystem.Patch> patches = game.liquidFire.patches();
+        Vector3f camPos = game.camera.position;
+        float range = fogEnd + 8f;
+        for (int i = 0; i < patches.size(); i++) {
+            LiquidFireSystem.Patch p = patches.get(i);
+            float fade = liquidSheetFade(p.burnLeft(), p.wet());
+            float cx = p.x + 0.5f, cz = p.z + 0.5f;
+            float dx = cx - camPos.x, dz = cz - camPos.z;
+            if (fade <= 0f || dx * dx + dz * dz > range * range
+                    || !frustum.testAab(p.x, p.y, p.z, p.x + 1, p.y + 0.1f, p.z + 1)) {
+                continue;
+            }
+            // A plant the liquid soaked stands in the cell; keep clear of its base.
+            float lift = game.world.getBlock(p.x, p.y, p.z).shape == BlockType.Shape.CROSS
+                    ? SHEET_LIFT_OVER_PLANT : SHEET_LIFT;
+            float heat = ParticleSystem.liquidHeat(p.intensity(), p.lifeLeft());
+            float shimmer = 0.85f + 0.15f
+                    * (float) Math.sin(game.totalTime * 11.0 + p.x * 1.7 + p.z * 2.3);
+            float side = SHEET_SIDE * fade;
+            setEntityLight(game, cx, p.y + 0.5f, cz);
+            entityShader.set("uEmissive", SHEET_EMISSIVE * shimmer * (0.4f + 0.6f * fade));
+            model.identity().translate(cx, p.y + lift, cz).scale(side, SHEET_THICKNESS, side);
+            drawCube(1f, MathUtil.lerp(SHEET_COOL_G, SHEET_HOT_G, heat),
+                    MathUtil.lerp(SHEET_COOL_B, SHEET_HOT_B, heat));
+        }
+        entityShader.set("uEmissive", 0f);
+    }
+
+    private static final float SHEET_SIDE = 0.98f;
+    private static final float SHEET_THICKNESS = 0.04f;
+    private static final float SHEET_LIFT = 0.02f;
+    private static final float SHEET_LIFT_OVER_PLANT = 0.05f;
+    private static final float SHEET_EMISSIVE = 1.1f;
+    /**
+     * What a sheet's colour ends up scaled by before tonemapping at dusk: its
+     * own glow, {@code uEmissive * 2.6}, about 0.34 of sky and sun, and the
+     * composite's 1.19 dusk exposure.
+     */
+    private static final float SHEET_LIGHT = (SHEET_EMISSIVE * 2.6f + 0.34f) * 1.19f;
+    // The sheet should look (1.0, 0.78, 0.22) on screen where it is hottest and
+    // (1.0, 0.42, 0.05) where it is coolest. The composite tonemaps each channel
+    // through ACES and then gamma, which drives a colour this bright towards
+    // white, so the shader is handed whatever composites back to those.
+    private static final float SHEET_HOT_G = shaderColourFor(0.78f), SHEET_HOT_B = shaderColourFor(0.22f);
+    private static final float SHEET_COOL_G = shaderColourFor(0.42f), SHEET_COOL_B = shaderColourFor(0.05f);
+    /** Seconds of burn over which a sheet shrinks away before it goes out. */
+    static final float SHEET_FADE_SECONDS = 1.5f;
+
+    /**
+     * The colour channel that, lit at {@link #SHEET_LIGHT}, comes out of the
+     * composite as {@code display}: post_final.frag's 2.2 gamma undone, then
+     * its ACES fit {@code x(2.51x + 0.03) / (x(2.43x + 0.59) + 0.14)} solved
+     * for x.
+     */
+    static float shaderColourFor(float display) {
+        double y = Math.pow(display, 2.2);
+        double a = 2.51 - 2.43 * y, b = 0.03 - 0.59 * y, c = -0.14 * y;
+        double hdr = (-b + Math.sqrt(b * b - 4 * a * c)) / (2 * a);
+        return (float) (hdr / SHEET_LIGHT);
+    }
+
+    /**
+     * How much of a patch's sheet is left, 0..1: whole until its last
+     * {@link #SHEET_FADE_SECONDS} of burn, and shrinking as the rain soaks it
+     * towards going out. Zero, never NaN, for anything that is not burning.
+     */
+    static float liquidSheetFade(float burnLeft, float wet) {
+        float burning = burnLeft > 0f ? Math.min(1f, burnLeft / SHEET_FADE_SECONDS) : 0f;
+        float soaked = wet > 0f
+                ? Math.max(0f, 1f - wet / LiquidFireConstants.RAIN_EXTINGUISH_SECONDS) : 1f;
+        return Math.min(burning, soaked);
     }
 
     /** One line draw over the struck face; scale/intensity communicate mining progress. */
@@ -668,6 +775,50 @@ public class Renderer {
         entityShader.set("uEmissive", 0f);
     }
 
+    /**
+     * Pieces of people blown apart, in flight and at rest. Same shader state
+     * block as the bodies: each piece is the shared humanoid isolated to one
+     * part subtree and drawn from that part, plus one dark cube per cut face.
+     */
+    private void renderFragments(Game game) {
+        Vector3f camPos = game.camera.position;
+        float range = fogEnd + 8f;
+        List<BodyFragment> live = game.fragments.live;
+        for (int i = 0; i < live.size(); i++) {
+            drawFragment(game, camPos, live.get(i), range);
+        }
+        List<BodyFragment> settled = game.fragments.settled;
+        for (int i = 0; i < settled.size(); i++) {
+            drawFragment(game, camPos, settled.get(i), range);
+        }
+        entityShader.set("uTintMul", 1f, 1f, 1f);
+        entityShader.set("uEmissive", 0f);
+    }
+
+    private void drawFragment(Game game, Vector3f camPos, BodyFragment f, float range) {
+        BodyFragment.Piece piece = f.piece;
+        float r = FragmentModels.radius(piece);
+        if (!entityVisible(camPos, f.pos.x, f.pos.y - r, f.pos.z, r, r * 2f, range)) {
+            return;
+        }
+        setEntityLight(game, f.pos.x, f.pos.y, f.pos.z);
+        entityShader.set("uTintMul", FragmentModels.tint(f, fragmentTint));
+        ModelPart root = Animator.poseFragment(NpcModels.get(), f);
+        FragmentModels.pieceTransform(f, fragmentBase);
+        FragmentModels.rootTransform(piece, fragmentBase, model);
+        drawPart(root, model);
+        // Parts leave their own emission set; a wound has none.
+        entityShader.set("uEmissive", 0f);
+        for (int c = 0; c < FragmentModels.cutCount(piece); c++) {
+            FragmentModels.cutCentre(piece, c, cutAt);
+            FragmentModels.cutSize(piece, c, cutSize);
+            // drawCube's cube stands on its base; lower it half its height to centre it.
+            model.set(fragmentBase).translate(cutAt.x, cutAt.y - cutSize.y * 0.5f, cutAt.z)
+                    .scale(cutSize);
+            drawCube(FragmentModels.CUT_R, FragmentModels.CUT_G, FragmentModels.CUT_B);
+        }
+    }
+
     private void drawBody(BodySkeleton skeleton, BodyPose pose, NpcAppearance appearance,
                           float x, float y, float z) {
         EntityModel npcModel = NpcModels.get();
@@ -788,8 +939,18 @@ public class Renderer {
         shake = Math.min(1f, shake + Math.max(0f, intensity));
     }
 
+    /** Shake queued and not yet decayed; plain CPU state, readable without a GL context. */
+    public float pendingShake() {
+        return shake;
+    }
+
     private void drawModel(EntityModel entityModel, Matrix4f base) {
-        int submitted = entityModel.render(base, entityShader, centeredCubeMesh, true);
+        drawPart(entityModel.root, base);
+    }
+
+    /** Draws one part and everything visible below it; {@code base} is its parent's frame. */
+    private void drawPart(ModelPart part, Matrix4f base) {
+        int submitted = part.render(base, entityShader, centeredCubeMesh, true);
         drawCalls += submitted;
         trianglesRendered += (long) submitted * 12L;
     }

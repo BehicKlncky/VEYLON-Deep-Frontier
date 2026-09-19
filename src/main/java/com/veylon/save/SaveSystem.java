@@ -121,6 +121,7 @@ public final class SaveSystem {
         // rather than dropping them is what makes a save taken mid-fall come
         // back as a settled corpse instead of losing one.
         g.ragdolls.settleAll(g);
+        g.fragments.settleAll(g);
         Path target = savePath.toAbsolutePath();
         Path temporary = null;
         try {

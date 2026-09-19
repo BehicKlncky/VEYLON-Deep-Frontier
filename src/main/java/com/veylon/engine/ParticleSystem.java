@@ -1,5 +1,6 @@
 package com.veylon.engine;
 
+import com.veylon.util.MathUtil;
 import com.veylon.world.BlockType;
 import com.veylon.world.World;
 
@@ -49,6 +50,21 @@ public class ParticleSystem {
      * still leaves room for flame, smoke and explosion debris.
      */
     public static final int BLOOD_LIMIT = 3600;
+    // Burning liquid from a fire bomb (the bottle's burst, pool flames, steam)
+    // stops at SPLASH_LIMIT as well. Like rain's splashes it can never take the
+    // 1,200 slots above that ceiling that blood and blast debris are promised,
+    // and because rain stops at RAIN_LIMIT, the heaviest storm still leaves a
+    // pool the 400 slots between the two. The rain a big pool could crowd out
+    // is the rain that puts every pool open to the sky out within a second.
+    /** The most glass shards, burning droplets and flash sparks one shattering bottle emits. */
+    public static final int SHATTER_GLASS = 10, SHATTER_DROPS = 22, SHATTER_FLASH = 3;
+    /** Puffs in one breath of steam from a doused pool. */
+    public static final int STEAM_PUFFS = 3;
+    private static final float GLASS_GRAVITY = 18f;
+    private static final float DROPLET_GRAVITY = 14f;
+    /** Burning liquid at its hottest (fresh, centre of a spill) and at its coolest. */
+    private static final float LIQUID_HOT_G = 0.85f, LIQUID_HOT_B = 0.30f;
+    private static final float LIQUID_COOL_G = 0.45f, LIQUID_COOL_B = 0.06f;
     /**
      * The most droplets and mist puffs one death burst can emit, before density
      * scaling. Body size only ever scales this down, so the pair is a real
@@ -440,6 +456,97 @@ public class ParticleSystem {
         for (int i = 0; i < scaled(5); i++) {
             ember(x + rnd(1.2f), y + 0.4f, z + rnd(1.2f));
         }
+    }
+
+    /**
+     * A fire bomb breaking: a few pale shards of glass and a splash of burning
+     * droplets that arc out the way it was thrown and fall, over one brief
+     * flash far smaller than a blast's. No debris, dust or smoke column,
+     * because nothing blew up. {@code (dirX, dirZ)} need not be normalised;
+     * zero scatters the splash evenly.
+     */
+    public void molotovShatter(float x, float y, float z, float dirX, float dirZ) {
+        float len = (float) Math.sqrt(dirX * dirX + dirZ * dirZ);
+        float bx = len > 1e-4f ? dirX / len : 0f;
+        float bz = len > 1e-4f ? dirZ / len : 0f;
+        int flash = scaled(SHATTER_FLASH - 1 + rng.nextInt(2));
+        for (int i = 0; i < flash && count < SPLASH_LIMIT; i++) {
+            spawn(KIND_SPARK, x + rnd(0.15f), y + 0.1f + rnd(0.1f), z + rnd(0.15f),
+                    rnd(0.4f), 0.3f + rnd(0.4f), rnd(0.4f),
+                    1f, 0.9f, 0.6f, 0.45f + rng.nextFloat() * 0.2f, 0.1f, 0f);
+        }
+        int glass = scaled(SHATTER_GLASS - 4 + rng.nextInt(5));
+        for (int i = 0; i < glass && count < SPLASH_LIMIT; i++) {
+            float angle = rng.nextFloat() * (float) (Math.PI * 2.0);
+            float speed = 1f + rng.nextFloat() * 1.8f;
+            float shade = rnd(0.05f);
+            spawn(KIND_DOT, x + rnd(0.1f), y + rnd(0.1f), z + rnd(0.1f),
+                    (float) Math.cos(angle) * speed + bx * 1.2f, 1.2f + rng.nextFloat() * 1.8f,
+                    (float) Math.sin(angle) * speed + bz * 1.2f,
+                    0.75f + shade, 0.85f + shade, 0.80f + shade,
+                    0.04f + rng.nextFloat() * 0.03f, 0.35f + rng.nextFloat() * 0.25f, GLASS_GRAVITY);
+        }
+        int drops = scaled(SHATTER_DROPS - 8 + rng.nextInt(9));
+        for (int i = 0; i < drops && count < SPLASH_LIMIT; i++) {
+            float angle = rng.nextFloat() * (float) (Math.PI * 2.0);
+            float spread = 0.6f + rng.nextFloat() * 1.6f;
+            float ahead = 1.5f + rng.nextFloat() * 2.5f;
+            float t = rng.nextFloat();
+            spawn(KIND_SPARK, x + rnd(0.12f), y + 0.05f + rnd(0.08f), z + rnd(0.12f),
+                    bx * ahead + (float) Math.cos(angle) * spread, 2.5f + rng.nextFloat() * 2.5f,
+                    bz * ahead + (float) Math.sin(angle) * spread,
+                    1f, 0.55f + 0.37f * t, 0.08f + 0.37f * t,
+                    0.10f + rng.nextFloat() * 0.08f, 0.5f + rng.nextFloat() * 0.4f, DROPLET_GRAVITY);
+        }
+    }
+
+    /**
+     * One low, wide tongue of flame off burning liquid, anywhere over the
+     * cell whose floor centre is {@code (x, y, z)}. It burns yellow over
+     * fresh liquid at the centre of a spill and deep orange at the rim and
+     * as the pool burns down; see {@link #liquidHeat}.
+     *
+     * @param intensity the patch's intensity, 1 at the centre of a spill
+     * @param lifeLeft  share of the patch's burn still ahead of it, 1 when fresh
+     */
+    public void liquidFlame(float x, float y, float z, float intensity, float lifeLeft) {
+        float strength = unit(intensity);
+        if (strength <= 0f || count >= SPLASH_LIMIT || scaled(1) < 1) {
+            return;
+        }
+        float heat = unit(liquidHeat(intensity, lifeLeft) + rnd(0.08f));
+        spawn(KIND_SPARK, x + rnd(0.45f), y + 0.08f, z + rnd(0.45f),
+                rnd(0.15f), 0.6f + rng.nextFloat() * 0.7f, rnd(0.15f),
+                1f, MathUtil.lerp(LIQUID_COOL_G, LIQUID_HOT_G, heat),
+                MathUtil.lerp(LIQUID_COOL_B, LIQUID_HOT_B, heat),
+                (0.25f + rng.nextFloat() * 0.20f) * strength, 0.25f + rng.nextFloat() * 0.25f, -0.8f);
+    }
+
+    /** A breath of steam off burning liquid the rain is putting out: light grey-white, rising. */
+    public void steamPuff(float x, float y, float z) {
+        int n = scaled(STEAM_PUFFS);
+        for (int i = 0; i < n && count < SPLASH_LIMIT; i++) {
+            float s = 0.82f + rng.nextFloat() * 0.12f;
+            spawn(KIND_PUFF, x + rnd(0.35f), y + rng.nextFloat() * 0.15f, z + rnd(0.35f),
+                    rnd(0.2f), 0.8f + rng.nextFloat() * 0.7f, rnd(0.2f),
+                    s, s, s + 0.03f,
+                    0.28f + rng.nextFloat() * 0.22f, 1.0f + rng.nextFloat() * 0.8f, -0.3f);
+        }
+    }
+
+    /**
+     * How hot burning liquid looks, 0..1: 1 for fresh liquid at the centre
+     * of a spill, half that at its rim or once it has nearly burned down.
+     * The pool's sheet and its flames share it, so they cool together.
+     * Anything that is not a positive number counts as cold.
+     */
+    public static float liquidHeat(float intensity, float lifeLeft) {
+        return unit(intensity) * (0.5f + 0.5f * unit(lifeLeft));
+    }
+
+    /** Clamps to 0..1, with NaN as 0. */
+    private static float unit(float v) {
+        return v > 0f ? Math.min(1f, v) : 0f;
     }
 
     /** Brief muzzle flash + powder smoke at a firing position. */

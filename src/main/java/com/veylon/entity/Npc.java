@@ -101,6 +101,27 @@ public class Npc extends Entity {
     public Entity combatTarget;
     /** Animation phase for walking bob. */
     public float bobPhase;
+    /**
+     * Torso wound units from bullets and arrows; the NPC dies when they reach
+     * {@code ProjectileLethality.LETHAL_TORSO_WOUNDS}. Healing does not clear
+     * them. Transient: not saved, reset only by a new {@code Npc} instance.
+     */
+    public int torsoWounds;
+    /**
+     * Shot id of the last trigger pull or bow release that wounded this torso,
+     * so the other pellets of that shot do not count again; -1 before any.
+     * Transient: not saved, reset only by a new {@code Npc} instance.
+     */
+    public int lastTorsoShotId = -1;
+    /**
+     * Set by a blast that killed this person inside its lethal radius, so the
+     * death pipeline blows the body apart instead of letting it fall as a
+     * ragdoll. The first fatal blast's record is kept. Transient: not saved;
+     * a dead NPC leaves the world on the next entity tick.
+     */
+    public boolean dismemberOnDeath;
+    /** Centre and power of that blast; meaningful only with {@link #dismemberOnDeath}. */
+    public float blastX, blastY, blastZ, blastStrength;
 
     public Npc(World world, String name) {
         super(world);
@@ -109,6 +130,15 @@ public class Npc extends Entity {
         height = 1.75f;
         maxHealth = 35;
         health = 35;
+    }
+
+    /**
+     * Kills this NPC through the ordinary damage path, so {@code dead},
+     * {@code health <= 0} and {@code lastHitByPlayer} are set exactly as by any
+     * fatal hit and the death pipeline treats it as a real death.
+     */
+    public void killBy(boolean byPlayer) {
+        hurt(health + 1f, byPlayer);
     }
 
     public boolean hostileToPlayer() {

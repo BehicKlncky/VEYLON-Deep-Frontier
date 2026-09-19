@@ -16,7 +16,13 @@ import java.util.Random;
 /**
  * Shared projectile simulation for player and NPC ranged attacks: arrows,
  * musket balls, pellets and thrown bombs. Substepped segment sweeps against
- * blocks and entity AABBs; strict caps so projectiles can never leak.
+ * blocks and entity AABBs; strict caps so projectiles can never leak. A bullet
+ * or arrow that hits an NPC is judged by the {@link HitZone} it entered through
+ * ({@link ProjectileLethality}); every other hit deals plain impact damage.
+ * A scrap bomb stops against whatever it hits and goes off when its fuse ends;
+ * a fire bomb is a bottle that shatters on the first thing it hits and spills
+ * burning liquid ({@code LiquidFireSystem}), its fuse only a fallback for one
+ * that never lands.
  */
 public class ProjectileSystem {
 
@@ -40,24 +46,60 @@ public class ProjectileSystem {
         public Entity owner;
         /** Recoverable ammo item for arrows. */
         public ItemType ammoItem;
-        /** Bomb fuse seconds; explodes when it reaches zero. */
+        /**
+         * Bomb fuse seconds; a scrap bomb explodes when it reaches zero, and a
+         * fire bomb that has not hit anything yet shatters where it is.
+         */
         public float fuse;
         /** Arrows stuck in terrain wait for pickup. */
         public boolean stuck;
         public float stuckTime;
-        /** Bombs stop after their first entity impact and ignore further bodies. */
+        /** Scrap bombs stop after their first entity impact and ignore further bodies. */
         public boolean impactedEntity;
-        /** Guards exactly-once fuse resolution. */
+        /** Guards exactly-once resolution: a detonation or a shatter. */
         public boolean detonated;
         /** Facing derived from velocity for rendering. */
         public float yaw, pitch;
+        /**
+         * The trigger pull or bow release this came from: every pellet of one
+         * {@link ProjectileSystem#fire} call shares it, which is how a
+         * blunderbuss shot counts once against a torso. Not persisted; only
+         * explosives survive a save and they never read it.
+         */
+        public int shotId;
     }
+
+    /** Horizontal padding of the projectile hit box beyond an entity's half-width. */
+    private static final float HIT_BOX_PAD_XZ = 0.1f;
+    /** How far below an entity's feet its projectile hit box reaches. */
+    private static final float HIT_BOX_BELOW = 0.05f;
+    /** How far above an entity's height its projectile hit box reaches. */
+    private static final float HIT_BOX_ABOVE = 0.1f;
+    /** Seconds between flames shed by a fire bomb's burning rag in flight. */
+    private static final float RAG_FLAME_INTERVAL = 0.1f;
+    /** Height of the rag above the bottle's position: the top of its drawn cube. */
+    private static final float RAG_HEIGHT = 0.16f;
 
     public final List<Projectile> live = new ArrayList<>();
     public final List<Projectile> stuck = new ArrayList<>();
     private static final int MAX_POOL = MAX_LIVE + MAX_STUCK;
     private final ArrayDeque<Projectile> pool = new ArrayDeque<>(MAX_POOL);
     private final Random rng = new Random();
+    /**
+     * Id the next {@link #fire} call hands its projectiles. It starts at 0, so
+     * the -1 an {@code Npc} holds before its first torso wound is never a real
+     * id until the counter wraps, about four billion shots into one world.
+     * Ids are only ever compared for equality, so the wrap itself is harmless;
+     * at worst the one shot that draws -1 counts as a repeat pellet against an
+     * unwounded torso.
+     */
+    private int nextShotId;
+    /**
+     * Non-persisted deterministic diagnostic: the zone of the most recent
+     * bullet or arrow hit on an NPC, null until one lands. Cleared with the
+     * world.
+     */
+    public HitZone lastNpcHitZone;
 
     public void reset() {
         for (Projectile projectile : live) {
@@ -68,6 +110,8 @@ public class ProjectileSystem {
         }
         live.clear();
         stuck.clear();
+        nextShotId = 0;
+        lastNpcHitZone = null;
     }
 
     /**
@@ -83,11 +127,13 @@ public class ProjectileSystem {
                     float dx, float dy, float dz, WeaponDefinition def, ItemType ammoUsed) {
         int pellets = Math.max(1, def.pellets);
         int spawned = 0;
+        int shotId = nextShotId++;
         for (int i = 0; i < pellets; i++) {
             if (live.size() >= MAX_LIVE) {
                 return spawned;
             }
             Projectile p = acquire();
+            p.shotId = shotId;
             p.kind = switch (def.category) {
                 case BOW -> Kind.ARROW;
                 case FIREARM -> Kind.BULLET;
@@ -141,6 +187,15 @@ public class ProjectileSystem {
         }
     }
 
+    /**
+     * Whether the fuse just crossed one of the rag's {@link #RAG_FLAME_INTERVAL}
+     * marks, which keys its flames to the bottle's own clock rather than to
+     * any extra state.
+     */
+    private static boolean ragFlameDue(float fuseBefore, float fuseAfter) {
+        return (int) (fuseBefore / RAG_FLAME_INTERVAL) != (int) (fuseAfter / RAG_FLAME_INTERVAL);
+    }
+
     private static void updateFacing(Projectile p) {
         p.yaw = (float) Math.toDegrees(Math.atan2(p.vx, -p.vz));
         float horiz = (float) Math.sqrt(p.vx * p.vx + p.vz * p.vz);
@@ -167,6 +222,7 @@ public class ProjectileSystem {
         p.stuck = false;
         p.stuckTime = 0;
         p.detonated = false;
+        p.shotId = 0;
         updateFacing(p);
         live.add(p);
         return true;
@@ -182,9 +238,17 @@ public class ProjectileSystem {
                 continue;
             }
             if (p.fuse > 0) {
+                float fuseBefore = p.fuse;
                 p.fuse -= dt;
+                if (p.kind == Kind.FIRE_BOMB && ragFlameDue(fuseBefore, p.fuse)) {
+                    g.particles.flame(p.x, p.y + RAG_HEIGHT, p.z);
+                }
                 if (p.fuse <= 0) {
-                    detonate(g, p);
+                    if (p.kind == Kind.FIRE_BOMB) {
+                        shatter(g, p, p.x, p.y, p.z);
+                    } else {
+                        detonate(g, p);
+                    }
                     it.remove();
                     release(p);
                     continue;
@@ -226,7 +290,13 @@ public class ProjectileSystem {
             // Entity hit.
             Entity hit = entityAt(g, p, px, py, pz);
             if (hit != null) {
-                if (onEntityHit(g, p, hit, px, py, pz)) {
+                // People are hurt by where a bullet or arrow went in, and this
+                // sample can be up to a sub-step past that point.
+                HitZone zone = null;
+                if ((p.kind == Kind.BULLET || p.kind == Kind.ARROW) && hit instanceof Npc n) {
+                    zone = HitZone.classify(n, entryY(n, p.x, p.y, p.z, px, py, pz));
+                }
+                if (onEntityHit(g, p, hit, zone, px, py, pz)) {
                     return true;
                 }
                 return false;
@@ -237,7 +307,7 @@ public class ProjectileSystem {
                     (int) Math.floor(pz));
             if (t.solid) {
                 onBlockHit(g, p, px, py, pz, t);
-                return p.kind != Kind.BOMB && p.kind != Kind.FIRE_BOMB;
+                return p.kind != Kind.BOMB;
             }
             p.x = px;
             p.y = py;
@@ -247,7 +317,7 @@ public class ProjectileSystem {
     }
 
     private Entity entityAt(Game g, Projectile p, float px, float py, float pz) {
-        if ((p.kind == Kind.BOMB || p.kind == Kind.FIRE_BOMB) && p.impactedEntity) {
+        if (p.kind == Kind.BOMB && p.impactedEntity) {
             return null;
         }
         for (Creature c : g.entities.creatures) {
@@ -270,16 +340,60 @@ public class ProjectileSystem {
     }
 
     private static boolean inAabb(Entity e, float px, float py, float pz) {
-        float hw = e.width / 2f + 0.1f;
+        float hw = e.width / 2f + HIT_BOX_PAD_XZ;
         return px > e.pos.x - hw && px < e.pos.x + hw
-                && py > e.pos.y - 0.05f && py < e.pos.y + e.height + 0.1f
+                && py > e.pos.y - HIT_BOX_BELOW && py < e.pos.y + e.height + HIT_BOX_ABOVE
                 && pz > e.pos.z - hw && pz < e.pos.z + hw;
     }
 
-    /** @return true when the projectile is consumed by the hit. */
-    private boolean onEntityHit(Game g, Projectile p, Entity victim,
+    /**
+     * World Y at which the segment {@code (x0,y0,z0) -> (x1,y1,z1)} enters
+     * {@code e}'s hit box, the box {@link #inAabb} tests, by the slab method.
+     * A start already inside the box is its own entry point. The end is the
+     * sample {@link #inAabb} just matched, so the segment always reaches the
+     * box; the result is clamped to the segment regardless.
+     *
+     * <p>{@link #step} samples a path every 0.45 blocks, so the first sample
+     * inside a body can be that far past the point the projectile actually
+     * went in. A steep shot through the top of a head would otherwise be
+     * judged by a point in the chest.
+     */
+    static float entryY(Entity e, float x0, float y0, float z0, float x1, float y1, float z1) {
+        float hw = e.width / 2f + HIT_BOX_PAD_XZ;
+        float dy = y1 - y0;
+        float enter = Math.max(slabEntry(x0, x1 - x0, e.pos.x - hw, e.pos.x + hw),
+                Math.max(slabEntry(y0, dy, e.pos.y - HIT_BOX_BELOW,
+                                e.pos.y + e.height + HIT_BOX_ABOVE),
+                        slabEntry(z0, z1 - z0, e.pos.z - hw, e.pos.z + hw)));
+        float t = Math.min(1f, Math.max(0f, enter));
+        return y0 + dy * t;
+    }
+
+    /**
+     * Segment parameter at which a coordinate moving from {@code start} by
+     * {@code delta} enters {@code [lo, hi]}; negative when it starts inside.
+     * No movement on this axis means the whole segment shares the end's
+     * coordinate, which is inside, so the axis sets no bound.
+     */
+    private static float slabEntry(float start, float delta, float lo, float hi) {
+        if (delta == 0f) {
+            return Float.NEGATIVE_INFINITY;
+        }
+        return Math.min((lo - start) / delta, (hi - start) / delta);
+    }
+
+    /**
+     * @param zone where a bullet or arrow entered an NPC victim; null for any
+     *             other projectile or victim, which keep plain impact damage
+     * @return true when the projectile is consumed by the hit.
+     */
+    private boolean onEntityHit(Game g, Projectile p, Entity victim, HitZone zone,
                                 float px, float py, float pz) {
-        if (p.kind == Kind.BOMB || p.kind == Kind.FIRE_BOMB) {
+        if (p.kind == Kind.FIRE_BOMB) {
+            // The bottle breaks on the body and the liquid runs to its feet.
+            return shatter(g, p, px, py, pz);
+        }
+        if (p.kind == Kind.BOMB) {
             // Bombs thud off targets and drop at their feet, still fused.
             p.x = px;
             p.y = Math.max(victim.pos.y + 0.05f, py);
@@ -296,7 +410,12 @@ public class ProjectileSystem {
             g.audio.playHurt();
             g.log("You are hit by " + (p.kind == Kind.ARROW ? "an arrow!" : "a shot!"));
         } else {
-            victim.hurt(p.damage, p.fromPlayer);
+            if (zone != null && victim instanceof Npc person) {
+                lastNpcHitZone = zone;
+                ProjectileLethality.applyHit(person, zone, p);
+            } else {
+                victim.hurt(p.damage, p.fromPlayer);
+            }
             victim.knockback(p.x - p.vx, p.z - p.vz, 2.2f);
             if (victim instanceof Creature c) {
                 c.fear = 1f;
@@ -345,26 +464,45 @@ public class ProjectileSystem {
                 g.particles.blockDust(t, px, py, pz, 3);
                 g.audio.playBulletImpact(px, py, pz);
             }
-            case BOMB, FIRE_BOMB -> {
+            case BOMB -> {
                 // Bombs stop against surfaces and keep cooking.
                 p.vx *= 0.1f;
                 p.vz *= 0.1f;
                 p.vy = 0;
             }
+            // The sample that struck is inside the block; the last free one
+            // is where the bottle broke, and the liquid runs down from there.
+            case FIRE_BOMB -> shatter(g, p, p.x, p.y, p.z);
         }
     }
 
+    /** A scrap bomb's fuse ran out: it kills everyone inside its lethal radius. */
     private void detonate(Game g, Projectile p) {
         if (p.detonated) {
             return;
         }
         p.detonated = true;
-        if (p.kind == Kind.FIRE_BOMB) {
-            g.explosions.explode(g, p.x, p.y, p.z, 1.6f, 4f, 0.9f, p.fromPlayer);
-            g.explosions.igniteNearby(g, p.x, p.y, p.z, 3, 6);
-        } else {
-            g.explosions.explode(g, p.x, p.y, p.z, 2.6f, 14f, 0f, p.fromPlayer);
+        g.explosions.explode(g, p.x, p.y, p.z, 2.6f, 14f, 0f, p.fromPlayer, true);
+    }
+
+    /**
+     * Breaks a fire bomb at {@code (x, y, z)}: no blast, no blast damage, no
+     * broken blocks, just burning liquid spilled along the way it was flying.
+     * It looks and sounds like a bottle breaking, glass and a splash of
+     * burning droplets over a crack and the whoosh of the liquid catching,
+     * and never like an explosion: no blast particles, no camera shake.
+     *
+     * @return true, the projectile is consumed
+     */
+    private boolean shatter(Game g, Projectile p, float x, float y, float z) {
+        if (!p.detonated) {
+            p.detonated = true;
+            g.particles.molotovShatter(x, y, z, p.vx, p.vz);
+            g.audio.playBulletImpact(x, y, z);
+            g.audio.playFuse(x, y, z);
+            g.liquidFire.spill(g, x, y, z, p.vx, p.vz, p.fromPlayer);
         }
+        return true;
     }
 
     /** Deterministic QA hook; normal gameplay keeps organic spread. */
@@ -441,5 +579,6 @@ public class ProjectileSystem {
         projectile.impactedEntity = false;
         projectile.detonated = false;
         projectile.yaw = projectile.pitch = 0;
+        projectile.shotId = 0;
     }
 }

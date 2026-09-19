@@ -321,3 +321,31 @@ budget with and without it. The assertion stops that test before its load
 timing, so `load` was not measured. The save gate has not been re-run on the
 reference machine and should be investigated there. Measurement details are in
 the [ragdoll validation record](engineering/RAGDOLL_VALIDATION.md#performance).
+
+## v0.8.0 rerun (lethal combat and molotov fire)
+
+0.8.0 adds no wall-clock budget. Body fragments reuse the ragdoll solver's fixed
+step and are covered by the existing ragdoll gate; liquid fire runs in the medium
+bucket `TickProfileTest` already measures. No existing baseline or budget changed.
+
+These figures come from the same **second machine** as the 0.7.4 rerun above, not
+the reference machine, and do not re-baseline anything. Eight of the nine
+`performanceTest` gates pass.
+
+| Benchmark | Measured | Budget | Result |
+| --- | ---: | ---: | --- |
+| Ragdoll, 12 live bodies | 0.382 ms | 1.00 ms | PASS |
+| Whole simulation cycle (`TickProfileTest`) | 0.149 ms | coarse multiple of recorded | PASS |
+| Medium bucket, fire included | 0.020 ms | coarse multiple of recorded | PASS |
+| `save` | 5.977 ms | 2.20 ms | **FAIL, as before this change** |
+
+The `save` failure is the same pre-existing gap recorded for 0.7.4 on this host:
+it exceeds the budget with and without this branch, and its assertion stops the
+test before the load timing. It still needs investigating on the reference
+machine.
+
+Allocation is checked in the default suite rather than here. At the worst case
+the caps allow — twelve people blown apart into 120 pieces, seven burning liquid
+pools and 220 block fires stepped together at 60 fps for twelve seconds — the
+fragment step allocated 24 bytes per frame against the 4 KiB allowance
+`RagdollAllocationTest` uses, and every hard limit held on every frame.
