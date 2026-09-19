@@ -1,9 +1,13 @@
 package com.veylon.gfx.model;
 
+import com.veylon.entity.BodyFragment;
 import com.veylon.entity.BodyPose;
 import com.veylon.entity.BodySkeleton;
 import com.veylon.entity.Creature;
 import com.veylon.entity.Npc;
+import com.veylon.entity.NpcAppearance;
+
+import java.util.List;
 
 /**
  * Procedural state-driven poses: walk/run cycles, stalking crouches, attack
@@ -151,6 +155,68 @@ public final class Animator {
             part.rotX = pose.boneRotX[b];
             part.rotY = pose.boneRotY[b];
             part.rotZ = pose.boneRotZ[b];
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // Body fragments
+    // ------------------------------------------------------------------
+
+    /**
+     * Poses the shared humanoid as one piece of a person blown apart: the rest
+     * pose, the look of the person it came from, and nothing but that piece.
+     *
+     * @return the part the piece must be drawn from; see {@link #isolatePart}
+     */
+    public static ModelPart poseFragment(EntityModel m, BodyFragment f) {
+        m.resetPose();
+        NpcAppearance a = f.appearance;
+        applyAppearance(m, a.archetype, a.raider, a.trader, a.sick, a.campIndex);
+        return isolatePart(m, f.rootPart, f.piece.excludedParts);
+    }
+
+    /**
+     * Hides every part outside {@code rootPart}'s subtree and every subtree
+     * named in {@code excluded}, and makes a part whose split tip is excluded
+     * draw its own half ({@link ModelPart#forceSplitDraw}) rather than the
+     * merged whole box that would still include the missing tip.
+     *
+     * <p>Run it after {@code resetPose} and {@link #applyAppearance}. It only
+     * ever hides, so an accessory the person was not wearing stays hidden.
+     * Because the ancestors are hidden too, and a hidden part draws nothing
+     * below it, the piece is drawn from the returned part, never from the model
+     * root. In the rest pose every ancestor is a pure translation by its pivot.
+     *
+     * @return the piece's root part
+     */
+    public static ModelPart isolatePart(EntityModel m, String rootPart, List<String> excluded) {
+        ModelPart keep = m.part(rootPart);
+        hideAllBut(m.root, keep);
+        hideExcluded(keep, excluded);
+        return keep;
+    }
+
+    private static void hideAllBut(ModelPart p, ModelPart keep) {
+        if (p == keep) {
+            return;
+        }
+        p.visible = false;
+        for (int i = 0; i < p.children.size(); i++) {
+            hideAllBut(p.children.get(i), keep);
+        }
+    }
+
+    private static void hideExcluded(ModelPart p, List<String> excluded) {
+        for (int i = 0; i < p.children.size(); i++) {
+            ModelPart c = p.children.get(i);
+            if (excluded.contains(c.name)) {
+                hideAllBut(c, null); // no part to keep: the whole subtree
+                if (p.isSplitTip(c)) {
+                    p.forceSplitDraw = true;
+                }
+            } else {
+                hideExcluded(c, excluded);
+            }
         }
     }
 

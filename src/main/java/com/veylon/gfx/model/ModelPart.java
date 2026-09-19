@@ -22,6 +22,13 @@ public class ModelPart {
     public float r, g, b;
     public float emissive;
     public boolean visible = true;
+    /**
+     * Draw this part's own half of a {@link #split} even while the chain is
+     * straight. Set when the tip is drawn somewhere else, as when a limb is cut
+     * at the joint; without it a hidden straight tip would still be drawn as
+     * part of this part's merged whole box. Cleared by {@link #resetPose}.
+     */
+    public boolean forceSplitDraw;
 
     // Pose, reset/overwritten by the animator.
     public float rotX, rotY, rotZ;
@@ -57,6 +64,19 @@ public class ModelPart {
         return straightChild != null && straightChild.rotX == 0 && straightChild.rotY == 0
                 && straightChild.rotZ == 0 && straightChild.poseX == 0
                 && straightChild.poseY == 0 && straightChild.poseZ == 0 && straightChild.scale == 1;
+    }
+
+    /**
+     * True when {@link #render} draws this part's original unsplit box and
+     * skips the tip's half: the chain is straight and nothing forces the halves.
+     */
+    public boolean drawsWholeBox() {
+        return !forceSplitDraw && straight();
+    }
+
+    /** True when {@code child} is the tip {@link #split} cut from this part's box. */
+    public boolean isSplitTip(ModelPart child) {
+        return child != null && child == straightChild;
     }
 
     public ModelPart(String name) {
@@ -106,6 +126,7 @@ public class ModelPart {
         poseX = poseY = poseZ = 0;
         scale = 1f;
         visible = true;
+        forceSplitDraw = false;
         for (ModelPart c : children) {
             c.resetPose();
         }
@@ -131,7 +152,7 @@ public class ModelPart {
         if (scale != 1f) {
             local.scale(scale);
         }
-        boolean merged = straight();
+        boolean merged = drawsWholeBox();
         if (sizeX > 0 && !skipBox) {
             if (merged) {
                 draw.set(local).translate(wholeX, wholeY, wholeZ).scale(wholeSizeX, wholeSizeY, wholeSizeZ);

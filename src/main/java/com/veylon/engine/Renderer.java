@@ -1,6 +1,7 @@
 package com.veylon.engine;
 
 import com.veylon.Game;
+import com.veylon.entity.BodyFragment;
 import com.veylon.entity.BodyPose;
 import com.veylon.entity.BodySkeleton;
 import com.veylon.entity.Carcass;
@@ -20,7 +21,9 @@ import com.veylon.gfx.SkyRenderer;
 import com.veylon.gfx.model.Animator;
 import com.veylon.gfx.model.CreatureModels;
 import com.veylon.gfx.model.EntityModel;
+import com.veylon.gfx.model.FragmentModels;
 import com.veylon.gfx.model.HeldItemModels;
+import com.veylon.gfx.model.ModelPart;
 import com.veylon.gfx.model.NpcModels;
 import com.veylon.item.ItemStack;
 import com.veylon.item.ItemType;
@@ -69,6 +72,11 @@ public class Renderer {
     private Mesh crackMesh;
     private final ChunkMesher mesher = new ChunkMesher();
     private final Matrix4f model = new Matrix4f();
+    /** A body fragment's own frame, kept while its root part and cut faces are drawn. */
+    private final Matrix4f fragmentBase = new Matrix4f();
+    private final Vector3f cutAt = new Vector3f();
+    private final Vector3f cutSize = new Vector3f();
+    private final Vector3f fragmentTint = new Vector3f();
     private final Matrix4f identity = new Matrix4f();
     private final Matrix4f projView = new Matrix4f();
     private final FrustumIntersection frustum = new FrustumIntersection();
@@ -420,6 +428,7 @@ public class Renderer {
         renderCarcasses(game);
         renderCorpses(game);
         renderRagdolls(game);
+        renderFragments(game);
 
         Vector3f camPos = game.camera.position;
         float entityRange = fogEnd + 12f;
@@ -668,6 +677,50 @@ public class Renderer {
         entityShader.set("uEmissive", 0f);
     }
 
+    /**
+     * Pieces of people blown apart, in flight and at rest. Same shader state
+     * block as the bodies: each piece is the shared humanoid isolated to one
+     * part subtree and drawn from that part, plus one dark cube per cut face.
+     */
+    private void renderFragments(Game game) {
+        Vector3f camPos = game.camera.position;
+        float range = fogEnd + 8f;
+        List<BodyFragment> live = game.fragments.live;
+        for (int i = 0; i < live.size(); i++) {
+            drawFragment(game, camPos, live.get(i), range);
+        }
+        List<BodyFragment> settled = game.fragments.settled;
+        for (int i = 0; i < settled.size(); i++) {
+            drawFragment(game, camPos, settled.get(i), range);
+        }
+        entityShader.set("uTintMul", 1f, 1f, 1f);
+        entityShader.set("uEmissive", 0f);
+    }
+
+    private void drawFragment(Game game, Vector3f camPos, BodyFragment f, float range) {
+        BodyFragment.Piece piece = f.piece;
+        float r = FragmentModels.radius(piece);
+        if (!entityVisible(camPos, f.pos.x, f.pos.y - r, f.pos.z, r, r * 2f, range)) {
+            return;
+        }
+        setEntityLight(game, f.pos.x, f.pos.y, f.pos.z);
+        entityShader.set("uTintMul", FragmentModels.tint(f, fragmentTint));
+        ModelPart root = Animator.poseFragment(NpcModels.get(), f);
+        FragmentModels.pieceTransform(f, fragmentBase);
+        FragmentModels.rootTransform(piece, fragmentBase, model);
+        drawPart(root, model);
+        // Parts leave their own emission set; a wound has none.
+        entityShader.set("uEmissive", 0f);
+        for (int c = 0; c < FragmentModels.cutCount(piece); c++) {
+            FragmentModels.cutCentre(piece, c, cutAt);
+            FragmentModels.cutSize(piece, c, cutSize);
+            // drawCube's cube stands on its base; lower it half its height to centre it.
+            model.set(fragmentBase).translate(cutAt.x, cutAt.y - cutSize.y * 0.5f, cutAt.z)
+                    .scale(cutSize);
+            drawCube(FragmentModels.CUT_R, FragmentModels.CUT_G, FragmentModels.CUT_B);
+        }
+    }
+
     private void drawBody(BodySkeleton skeleton, BodyPose pose, NpcAppearance appearance,
                           float x, float y, float z) {
         EntityModel npcModel = NpcModels.get();
@@ -789,7 +842,12 @@ public class Renderer {
     }
 
     private void drawModel(EntityModel entityModel, Matrix4f base) {
-        int submitted = entityModel.render(base, entityShader, centeredCubeMesh, true);
+        drawPart(entityModel.root, base);
+    }
+
+    /** Draws one part and everything visible below it; {@code base} is its parent's frame. */
+    private void drawPart(ModelPart part, Matrix4f base) {
+        int submitted = part.render(base, entityShader, centeredCubeMesh, true);
         drawCalls += submitted;
         trianglesRendered += (long) submitted * 12L;
     }
