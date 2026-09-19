@@ -98,6 +98,7 @@ final class WorldBootstrap {
         game.explosions.reset();
         game.settlementManager.reset();
         game.ragdolls.reset();
+        game.fragments.reset();
         game.particles.count = 0;
         reseedSimulation(seed);
     }

@@ -209,7 +209,7 @@ public class EntityManager {
         }
     }
 
-    /** Ages tracks and rots carcasses; called on the slow tick. */
+    /** Ages tracks and rots carcasses, corpses and severed pieces; called on the slow tick. */
     public void tickWorldDetritus(Game g, float dt) {
         for (Iterator<Track> it = tracks.iterator(); it.hasNext(); ) {
             Track t = it.next();
@@ -237,6 +237,9 @@ public class EntityManager {
                 it.remove();
             }
         }
+        // Pieces of a body blown apart rot on that clock too, and are dropped
+        // past the radius slowTick despawns corpses at.
+        g.fragments.slowTick(g, dt);
     }
 
     public Track nearestTrack(float x, float y, float z, float range) {
