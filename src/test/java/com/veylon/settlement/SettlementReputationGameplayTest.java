@@ -230,7 +230,10 @@ class SettlementReputationGameplayTest {
 
         Vec3i first = prepareKegCell(game, home.center, 0);
         Vec3i second = prepareKegCell(game, home.center, 1);
-        resident.pos.set(second.x() + 2.2f, second.y(), second.z() + 0.5f);
+        // Six and seven blocks from the kegs: outside a keg's 5.7-block lethal
+        // radius, so the resident lives to be hit by both stages, and inside
+        // its 9.1-block damage reach.
+        resident.pos.set(second.x() + 6.5f, second.y(), second.z() + 0.5f);
         game.player.pos.set(first.x() - 3f, first.y(), first.z() + 0.5f);
         game.player.inventory.clear();
         game.player.hotbarSel = 0;
@@ -249,7 +252,7 @@ class SettlementReputationGameplayTest {
         assertEquals(BlockType.AIR,
                 game.world.getBlock(second.x(), second.y(), second.z()),
                 "the adjacent keg inherits the player source through the real chain");
-        assertTrue(resident.health < resident.maxHealth,
+        assertTrue(resident.health < resident.maxHealth && !resident.dead,
                 "both chain stages resolve against the live resident");
         assertEquals(-18f, home.localReputation, 0.001f,
                 "one resident hit by the initial and chained blasts is penalized once");
