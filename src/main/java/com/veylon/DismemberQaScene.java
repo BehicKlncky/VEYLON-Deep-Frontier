@@ -1,5 +1,8 @@
 package com.veylon;
 
+import com.veylon.combat.ExplosionSystem;
+import com.veylon.combat.WeaponDefinition;
+import com.veylon.combat.WeaponRegistry;
 import com.veylon.entity.Npc;
 import com.veylon.entity.RagdollConstants;
 import com.veylon.settlement.NpcArchetype;
@@ -20,6 +23,14 @@ import java.util.Locale;
  * fronts of the pieces, their colours and their kit are what it sees.
  * {@code dismember_wall} is the same with a stone wall three blocks behind the
  * row, for pieces striking a wall and coming to rest against it.
+ *
+ * <p>{@code dismember_bomb} is the whole chain in production code: at once the
+ * player throws a real scrap bomb through {@code ProjectileSystem.fire} into a
+ * gap in a ring of five people, with a sixth standing outside the lethal
+ * radius. The fuse, the blast and the deaths run through the projectile,
+ * explosion and entity systems, the entity tick at its real 20 Hz, so the
+ * bomb goes off at 2.4 s and whoever it kills is blown apart by the death
+ * pipeline itself. Everyone faces the camera and stands still, as if talking.
  *
  * <p>Like {@code RagdollQaScene} it keeps the simulation paused and advances
  * the pieces in fixed steps tied to elapsed wall-clock seconds, snapped to a
@@ -53,19 +64,50 @@ final class DismemberQaScene {
     private static final int WALL_BEHIND = 3;
     private static final long SCENE_PARTICLE_SEED = 0x44495353454354L;
 
+    /**
+     * The bomb scene's people, around the point the bomb is thrown at: x and z
+     * offsets and archetype. None stands between the camera and that point,
+     * so the bomb reaches the ground there; the last stands outside the lethal
+     * radius.
+     */
+    private static final float[][] GROUP = {
+            {-2.0f, 0.3f}, {2.0f, 0.3f}, {-1.3f, -1.8f}, {1.4f, -1.7f}, {0.1f, -2.4f}, {3.6f, -4.0f},
+    };
+    private static final NpcArchetype[] GROUP_ROLES = {
+            NpcArchetype.GUARD, NpcArchetype.TRADER, NpcArchetype.SCOUT, NpcArchetype.BRUTE,
+            NpcArchetype.LEADER, NpcArchetype.FARMER,
+    };
+    /**
+     * Blocks from the staged site to the point the bomb is thrown at: beyond
+     * the scrap bomb's damage reach of the camera, so the blast neither hurts
+     * nor pushes the player the capture looks through.
+     */
+    private static final int BOMB_DISTANCE = 7;
+    /** Physics steps per entity tick: the scheduler's 20 Hz over the 60 Hz step. */
+    private static final int STEPS_PER_ENTITY_TICK = 3;
+    /** Keeps the bomb scene's people facing the camera and standing still. */
+    private static final float HOLD_STILL = 60f;
+    private static final long SCENE_THROW_SEED = 0x424f4d42L;
+
     private final Game game;
     private final List<Npc> row = new ArrayList<>();
     private boolean active;
+    private boolean bomb;
     private boolean blown;
     private boolean reportedRest;
     private double simulated;
+    private double blastAt;
+    private int steps;
 
     DismemberQaScene(Game game) {
         this.game = game;
     }
 
-    /** The row, on the flat clearing the harness has already built at {@code site}. */
-    void stage(Vec3i site, boolean wall) {
+    /**
+     * The scene named {@code scene}, on the flat clearing the harness has
+     * already built at {@code site}.
+     */
+    void stage(Vec3i site, String scene) {
         game.time.totalMinutes = (long) (15.8 * 60);
         game.weather.current = WeatherSystem.Weather.CLEAR;
         game.weather.next = WeatherSystem.Weather.CLEAR;
@@ -87,7 +129,7 @@ final class DismemberQaScene {
 
         int floor = site.y();
         int rowZ = site.z() - ROW_DISTANCE;
-        if (wall) {
+        if (scene.equals("dismember_wall")) {
             int wallZ = rowZ - WALL_BEHIND;
             for (int x = site.x() - 9; x <= site.x() + 9; x++) {
                 for (int y = floor; y < floor + 3; y++) {
@@ -95,25 +137,65 @@ final class DismemberQaScene {
                 }
             }
         }
-        row.clear();
-        for (int i = 0; i < ROW.length; i++) {
-            float x = site.x() + 0.5f + (i - (ROW.length - 1) * 0.5f) * ROW_SPACING;
-            Npc n = game.entities.spawnNpc(game.world, ROW[i].displayName, x, floor, rowZ + 0.5f);
-            n.archetype = ROW[i];
-            n.yaw = 180f; // facing the camera
-            n.vel.zero();
-            row.add(n);
-        }
-
         // A raised, paused viewpoint: the simulation never runs, so it stays put.
         game.player.pos.set(site.x() + 0.5f, floor + CAMERA_RISE, site.z() + 0.5f + CAMERA_BACK);
         game.camera.yaw = 0f;
         game.camera.pitch = 20f;
+
+        bomb = scene.equals("dismember_bomb");
+        row.clear();
+        if (bomb) {
+            stageGroup(site.x() + 0.5f, floor, site.z() - BOMB_DISTANCE + 0.5f);
+        } else {
+            for (int i = 0; i < ROW.length; i++) {
+                float x = site.x() + 0.5f + (i - (ROW.length - 1) * 0.5f) * ROW_SPACING;
+                Npc n = game.entities.spawnNpc(game.world, ROW[i].displayName, x, floor, rowZ + 0.5f);
+                n.archetype = ROW[i];
+                n.yaw = 180f; // facing the camera
+                n.vel.zero();
+                row.add(n);
+            }
+        }
         simulated = 0;
+        steps = 0;
         blown = false;
         reportedRest = false;
         active = true;
         update(0);
+    }
+
+    /**
+     * Stands the group around {@code (tx, floor, tz)} and throws a scrap bomb
+     * at that point from the player's eye, on the flatter of the two arcs that
+     * reach it.
+     */
+    private void stageGroup(float tx, int floor, float tz) {
+        for (int i = 0; i < GROUP.length; i++) {
+            NpcArchetype role = GROUP_ROLES[i];
+            Npc n = game.entities.spawnNpc(game.world, role.displayName,
+                    tx + GROUP[i][0], floor, tz + GROUP[i][1]);
+            n.archetype = role;
+            n.maxHealth = role.maxHealth;
+            n.health = role.maxHealth;
+            n.yaw = 180f;
+            n.interactFreeze = HOLD_STILL;
+        }
+        WeaponDefinition scrapBomb = WeaponRegistry.byId("scrap_bomb");
+        float ox = game.player.pos.x;
+        float oy = game.player.pos.y + game.player.eyeHeight();
+        float oz = game.player.pos.z;
+        float dx = tx - ox, dy = floor - oy, dz = tz - oz;
+        float reach = (float) Math.sqrt(dx * dx + dz * dz);
+        float speed = scrapBomb.projectileSpeed;
+        float k = scrapBomb.projectileGravity * reach * reach / (2f * speed * speed);
+        float slope = (reach - (float) Math.sqrt(reach * reach - 4f * k * (k + dy))) / (2f * k);
+        float norm = (float) Math.sqrt(1f + slope * slope);
+        game.projectiles.setRandomSeed(SCENE_THROW_SEED);
+        game.projectiles.fire(game, game.player, true, ox, oy, oz,
+                dx / reach / norm, slope / norm, dz / reach / norm, scrapBomb, null);
+        System.out.printf(Locale.ROOT, "[scene] dismember_bomb: %d people, bomb thrown %.2f blocks,"
+                        + " lethal radius %.2f%n", GROUP.length, reach,
+                BLAST_STRENGTH * ExplosionSystem.LETHAL_RADIUS_FACTOR);
     }
 
     /** Advances the staged moment the elapsed second maps to. */
@@ -122,6 +204,12 @@ final class DismemberQaScene {
             return;
         }
         double staged = Math.floor(elapsed / STAGE_GRID + 1e-6) * STAGE_GRID;
+        if (bomb) {
+            while (simulated < staged - 1e-6) {
+                stepBomb();
+            }
+            return;
+        }
         if (!blown && staged >= BLAST_AT - 1e-6) {
             blowApart();
         }
@@ -133,12 +221,40 @@ final class DismemberQaScene {
             game.fragments.update(game, RagdollConstants.FIXED_STEP);
             game.particles.update(RagdollConstants.FIXED_STEP, game.world);
             simulated += RagdollConstants.FIXED_STEP;
-            // Checked per step: a frame can run many steps, and the step is the fact.
-            if (!reportedRest && game.fragments.liveCount() == 0) {
-                reportedRest = true;
-                System.out.printf(Locale.ROOT, "[scene] dismember: all %d pieces at rest %.3f s after the blast%n",
-                        game.fragments.settledCount(), simulated);
-            }
+            reportRest(simulated);
+        }
+    }
+
+    /** One fixed step of everything a thrown bomb touches, in the frame's order. */
+    private void stepBomb() {
+        game.projectiles.update(game, RagdollConstants.FIXED_STEP);
+        if (++steps % STEPS_PER_ENTITY_TICK == 0) {
+            game.entities.fastTick(game, RagdollConstants.FIXED_STEP * STEPS_PER_ENTITY_TICK);
+        }
+        game.fragments.update(game, RagdollConstants.FIXED_STEP);
+        game.ragdolls.update(game, RagdollConstants.FIXED_STEP);
+        game.particles.update(RagdollConstants.FIXED_STEP, game.world);
+        simulated += RagdollConstants.FIXED_STEP;
+        if (!blown && game.fragments.liveCount() > 0) {
+            blown = true;
+            blastAt = simulated;
+            System.out.printf(Locale.ROOT, "[scene] dismember: %d bodies, %d pieces, %d standing,"
+                            + " %d ragdolls at %.3f s%n", GROUP.length - game.entities.npcCount(),
+                    game.fragments.liveCount(), game.entities.npcCount(), game.ragdolls.liveCount(),
+                    simulated);
+        }
+        if (blown) {
+            reportRest(simulated - blastAt);
+        }
+    }
+
+    /** Logs, once, the exact step at which the last piece settles. */
+    private void reportRest(double sinceBlast) {
+        // Checked per step: a frame can run many steps, and the step is the fact.
+        if (!reportedRest && game.fragments.liveCount() == 0) {
+            reportedRest = true;
+            System.out.printf(Locale.ROOT, "[scene] dismember: all %d pieces at rest %.3f s after the blast%n",
+                    game.fragments.settledCount(), sinceBlast);
         }
     }
 
