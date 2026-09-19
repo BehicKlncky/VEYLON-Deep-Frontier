@@ -75,7 +75,11 @@ public class EntityManager {
                 if (n.settled() || n.warParty) {
                     onSettledNpcDied(g, n);
                 }
-                if (reallyDied(n)) {
+                // A person killed inside a blast's lethal radius is blown apart
+                // by that blast; every other death falls as one body.
+                if (reallyDied(n) && n.dismemberOnDeath) {
+                    g.fragments.spawnFromNpc(g, n, n.blastX, n.blastY, n.blastZ, n.blastStrength);
+                } else if (reallyDied(n)) {
                     g.ragdolls.spawn(g, n);
                 }
                 it.remove();

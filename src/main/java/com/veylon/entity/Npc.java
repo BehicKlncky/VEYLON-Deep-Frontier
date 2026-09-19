@@ -113,6 +113,15 @@ public class Npc extends Entity {
      * Transient: not saved, reset only by a new {@code Npc} instance.
      */
     public int lastTorsoShotId = -1;
+    /**
+     * Set by a blast that killed this person inside its lethal radius, so the
+     * death pipeline blows the body apart instead of letting it fall as a
+     * ragdoll. The first fatal blast's record is kept. Transient: not saved;
+     * a dead NPC leaves the world on the next entity tick.
+     */
+    public boolean dismemberOnDeath;
+    /** Centre and power of that blast; meaningful only with {@link #dismemberOnDeath}. */
+    public float blastX, blastY, blastZ, blastStrength;
 
     public Npc(World world, String name) {
         super(world);

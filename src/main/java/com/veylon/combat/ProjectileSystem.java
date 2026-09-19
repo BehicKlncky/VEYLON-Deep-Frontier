@@ -446,11 +446,13 @@ public class ProjectileSystem {
             return;
         }
         p.detonated = true;
+        // A scrap bomb kills everyone inside its lethal radius; the fire bomb's
+        // small blast only hurts.
         if (p.kind == Kind.FIRE_BOMB) {
-            g.explosions.explode(g, p.x, p.y, p.z, 1.6f, 4f, 0.9f, p.fromPlayer);
+            g.explosions.explode(g, p.x, p.y, p.z, 1.6f, 4f, 0.9f, p.fromPlayer, false);
             g.explosions.igniteNearby(g, p.x, p.y, p.z, 3, 6);
         } else {
-            g.explosions.explode(g, p.x, p.y, p.z, 2.6f, 14f, 0f, p.fromPlayer);
+            g.explosions.explode(g, p.x, p.y, p.z, 2.6f, 14f, 0f, p.fromPlayer, true);
         }
     }
 
