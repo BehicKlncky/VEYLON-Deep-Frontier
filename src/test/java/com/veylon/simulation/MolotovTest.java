@@ -341,6 +341,39 @@ class MolotovTest {
     }
 
     @Test
+    void aPoolUnderCoverDoesNotLightWetGrassBesideIt() {
+        setWeather(Weather.RAIN);
+        // A stone roof with a block of headroom over x, z 296..304, grass out
+        // in the rain along its east side, and a plank under it.
+        fill(296, 304, 42, 42, 296, 304, BlockType.STONE);
+        fill(305, 308, 40, 40, 296, 304, BlockType.TALL_GRASS);
+        Vec3i plank = new Vec3i(300, 40, 300);
+        g.world.setBlock(plank.x(), plank.y(), plank.z(), BlockType.PLANK, false);
+        // The pool runs from under the roof out onto the wet grass.
+        g.liquidFire.spill(g, 303.5f, 40.5f, 300.5f, 0, 0, true);
+        assertNotNull(patchAt(304, 40, 300), "precondition: burning liquid under the roof's edge");
+        assertFalse(g.fire.isRainedOn(g, 304, 40, 300), "precondition: and sheltered there");
+        assertTrue(g.fire.isRainedOn(g, 305, 40, 300), "precondition: the grass beside it is not");
+
+        boolean plankCaught = false;
+        for (int tick = 0; tick < 16; tick++) {
+            tick(TICK);
+            for (Vec3i c : g.fire.burningCells()) {
+                assertFalse(g.fire.isRainedOn(g, c.x(), c.y(), c.z()),
+                        "the pool lit " + g.world.getBlock(c.x(), c.y(), c.z()) + " at " + c
+                                + " in the rain, tick " + tick);
+                plankCaught |= c.equals(plank);
+            }
+        }
+        assertTrue(plankCaught, "control: the pool still lights fuel under the roof");
+        for (int x = 305; x <= 308; x++) {
+            for (int z = 296; z <= 304; z++) {
+                assertEquals(BlockType.TALL_GRASS, g.world.getBlock(x, 40, z), "the wet grass is untouched");
+            }
+        }
+    }
+
+    @Test
     void aPatchLightsANeighbouringKegsFuseForWhoeverThrewIt() {
         Vec3i keg = new Vec3i(333, 40, 330);
         g.world.setBlock(keg.x(), keg.y(), keg.z(), BlockType.POWDER_KEG, false);

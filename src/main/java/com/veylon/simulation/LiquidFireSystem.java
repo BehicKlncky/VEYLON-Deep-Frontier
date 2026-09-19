@@ -32,7 +32,8 @@ import static com.veylon.simulation.LiquidFireConstants.*;
  * lights the fuse of a neighbouring powder keg, and burns down. Block fires it
  * starts spread through {@link FireSystem} on their own. Rain, storm and snow
  * put out a patch open to the sky after {@link LiquidFireConstants#RAIN_EXTINGUISH_SECONDS};
- * it neither burns nor ignites anything meanwhile.
+ * it neither burns nor ignites anything meanwhile. A patch under cover burns on,
+ * but does not light a block the rain is falling on.
  *
  * <p>Patches are not saved, like burning blocks: a save taken mid-burn loads
  * with the pool gone. A fire bomb still in the air is saved with the other
@@ -389,7 +390,12 @@ public class LiquidFireSystem implements MediumTickSystem {
         return true;
     }
 
-    /** Rolls for every flammable block in or beside the cell, and lights neighbouring kegs. */
+    /**
+     * Rolls for every flammable block in or beside the cell, and lights
+     * neighbouring kegs. A block the rain is falling on is too wet to catch,
+     * so a patch under cover never lights the grass just outside it, which the
+     * rain would only put out again.
+     */
     private void igniteTouching(Game g, Patch p) {
         float chance = IGNITE_CHANCE_PER_TICK * p.intensity;
         for (int[] o : TOUCHED) {
@@ -403,7 +409,8 @@ public class LiquidFireSystem implements MediumTickSystem {
                             FireConstants.KEG_FUSE_NOISE_STRENGTH, "fuse", false, null);
                     g.log("Flame catches a powder-keg fuse!");
                 }
-            } else if (t.flammable && rng.nextFloat() < chance && g.fire.ignite(g, bx, by, bz)) {
+            } else if (t.flammable && !g.fire.isRainedOn(g, bx, by, bz)
+                    && rng.nextFloat() < chance && g.fire.ignite(g, bx, by, bz)) {
                 totalPatchIgnitions++;
             }
         }
