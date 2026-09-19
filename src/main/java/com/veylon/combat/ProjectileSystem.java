@@ -75,6 +75,10 @@ public class ProjectileSystem {
     private static final float HIT_BOX_BELOW = 0.05f;
     /** How far above an entity's height its projectile hit box reaches. */
     private static final float HIT_BOX_ABOVE = 0.1f;
+    /** Seconds between flames shed by a fire bomb's burning rag in flight. */
+    private static final float RAG_FLAME_INTERVAL = 0.1f;
+    /** Height of the rag above the bottle's position: the top of its drawn cube. */
+    private static final float RAG_HEIGHT = 0.16f;
 
     public final List<Projectile> live = new ArrayList<>();
     public final List<Projectile> stuck = new ArrayList<>();
@@ -183,6 +187,15 @@ public class ProjectileSystem {
         }
     }
 
+    /**
+     * Whether the fuse just crossed one of the rag's {@link #RAG_FLAME_INTERVAL}
+     * marks, which keys its flames to the bottle's own clock rather than to
+     * any extra state.
+     */
+    private static boolean ragFlameDue(float fuseBefore, float fuseAfter) {
+        return (int) (fuseBefore / RAG_FLAME_INTERVAL) != (int) (fuseAfter / RAG_FLAME_INTERVAL);
+    }
+
     private static void updateFacing(Projectile p) {
         p.yaw = (float) Math.toDegrees(Math.atan2(p.vx, -p.vz));
         float horiz = (float) Math.sqrt(p.vx * p.vx + p.vz * p.vz);
@@ -225,7 +238,11 @@ public class ProjectileSystem {
                 continue;
             }
             if (p.fuse > 0) {
+                float fuseBefore = p.fuse;
                 p.fuse -= dt;
+                if (p.kind == Kind.FIRE_BOMB && ragFlameDue(fuseBefore, p.fuse)) {
+                    g.particles.flame(p.x, p.y + RAG_HEIGHT, p.z);
+                }
                 if (p.fuse <= 0) {
                     if (p.kind == Kind.FIRE_BOMB) {
                         shatter(g, p, p.x, p.y, p.z);
@@ -471,12 +488,18 @@ public class ProjectileSystem {
     /**
      * Breaks a fire bomb at {@code (x, y, z)}: no blast, no blast damage, no
      * broken blocks, just burning liquid spilled along the way it was flying.
+     * It looks and sounds like a bottle breaking, glass and a splash of
+     * burning droplets over a crack and the whoosh of the liquid catching,
+     * and never like an explosion: no blast particles, no camera shake.
      *
      * @return true, the projectile is consumed
      */
     private boolean shatter(Game g, Projectile p, float x, float y, float z) {
         if (!p.detonated) {
             p.detonated = true;
+            g.particles.molotovShatter(x, y, z, p.vx, p.vz);
+            g.audio.playBulletImpact(x, y, z);
+            g.audio.playFuse(x, y, z);
             g.liquidFire.spill(g, x, y, z, p.vx, p.vz, p.fromPlayer);
         }
         return true;

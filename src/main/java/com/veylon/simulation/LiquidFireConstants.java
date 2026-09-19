@@ -56,8 +56,6 @@ public final class LiquidFireConstants {
     public static final float IGNITE_CHANCE_PER_TICK = 0.35f;
     /** Seconds of rain that put out a patch open to the sky. */
     public static final float RAIN_EXTINGUISH_SECONDS = 1f;
-    /** Strength of the smoke puff a doused patch gives off. */
-    public static final float EXTINGUISH_SMOKE = 0.5f;
 
     /** Radius of the noise a bottle makes when it shatters; the fire bomb's own. */
     public static final float SPILL_NOISE_RADIUS = 40f;

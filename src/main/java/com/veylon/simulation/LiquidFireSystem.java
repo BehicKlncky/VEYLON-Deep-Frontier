@@ -94,6 +94,15 @@ public class LiquidFireSystem implements MediumTickSystem {
             return age;
         }
 
+        /**
+         * Share of this patch's burn still ahead of it: 1 when the liquid
+         * lands or is topped up, falling to 0 as it burns out.
+         */
+        public float lifeLeft() {
+            float total = age + burnLeft;
+            return total > 0f ? Math.min(1f, Math.max(0f, burnLeft / total)) : 0f;
+        }
+
         /** The bottle this liquid came from; later bottles have larger ids. */
         public int spillId() {
             return spillId;
@@ -362,7 +371,7 @@ public class LiquidFireSystem implements MediumTickSystem {
         if (g.fire.isRainedOn(g, p.x, p.y, p.z)) {
             p.wet += dt;
             if (p.wet >= RAIN_EXTINGUISH_SECONDS) {
-                g.particles.smoke(p.x + 0.5f, p.y + 0.2f, p.z + 0.5f, EXTINGUISH_SMOKE);
+                g.particles.steamPuff(p.x + 0.5f, p.y + 0.1f, p.z + 0.5f);
                 return false;
             }
         } else {

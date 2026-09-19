@@ -1,12 +1,15 @@
 package com.veylon;
 
+import com.veylon.engine.ParticleSystem;
 import com.veylon.entity.Affliction;
+import com.veylon.simulation.LiquidFireSystem;
 import com.veylon.simulation.WeatherSystem;
 import com.veylon.util.Vec3i;
 import com.veylon.world.Biome;
 import com.veylon.world.BlockType;
 import org.joml.Vector3f;
 
+import java.util.List;
 import java.util.Random;
 
 /**
@@ -45,6 +48,10 @@ final class AmbienceSystem {
     private static final float FIRE_EMBER_CHANCE = 0.5f;
     private static final float CAMPFIRE_PARTICLE_RANGE = 35f;
     private static final float CAMPFIRE_EMBER_CHANCE = 0.35f;
+    /** Seconds between smoke puffs from one patch of burning liquid, on average. */
+    private static final float LIQUID_SMOKE_INTERVAL = 0.3f;
+    /** Chance per pass that a patch the rain is soaking gives off a breath of steam. */
+    private static final float LIQUID_STEAM_CHANCE = 0.5f;
     private static final float BEACON_PARTICLE_RANGE = 55f;
     private static final float BEACON_SECOND_MOTE_CHANCE = 0.45f;
 
@@ -106,6 +113,7 @@ final class AmbienceSystem {
         emitPrecipitation(px, py, pz);
         emitWeatherEvents(px, py, pz);
         emitFires(px, py, pz);
+        emitLiquidFire(px, py, pz);
         emitBeacon(px, py, pz);
         emitPlayerEffects();
     }
@@ -162,6 +170,46 @@ final class AmbienceSystem {
                 if (rng.nextFloat() < CAMPFIRE_EMBER_CHANCE) {
                     game.particles.ember(p.x() + 0.5f, p.y() + 0.4f, p.z() + 0.5f);
                 }
+            }
+        }
+    }
+
+    /**
+     * Flames, embers and smoke off pools of burning liquid, or steam off one
+     * the rain is soaking. One or two flames per patch each pass, more at the
+     * centre of a spill; the whole pass stops at the particle splash ceiling,
+     * so pools can never crowd out blood or blast debris.
+     */
+    private void emitLiquidFire(float px, float py, float pz) {
+        Random rng = emitterRng;
+        ParticleSystem particles = game.particles;
+        List<LiquidFireSystem.Patch> patches = game.liquidFire.patches();
+        for (int i = 0; i < patches.size(); i++) {
+            LiquidFireSystem.Patch p = patches.get(i);
+            float x = p.x + 0.5f, z = p.z + 0.5f;
+            float dx = x - px, dy = p.y - py, dz = z - pz;
+            if (dx * dx + dy * dy + dz * dz >= FIRE_PARTICLE_RANGE * FIRE_PARTICLE_RANGE) {
+                continue;
+            }
+            if (particles.count >= ParticleSystem.SPLASH_LIMIT) {
+                return;
+            }
+            if (p.wet() > 0f) {
+                if (rng.nextFloat() < LIQUID_STEAM_CHANCE) {
+                    particles.steamPuff(x, p.y + 0.1f, z);
+                }
+                continue;
+            }
+            int flames = rng.nextFloat() < p.intensity() ? 2 : 1;
+            for (int f = 0; f < flames; f++) {
+                particles.liquidFlame(x, p.y, z, p.intensity(), p.lifeLeft());
+            }
+            if (rng.nextFloat() < FIRE_EMBER_CHANCE && particles.count < ParticleSystem.SPLASH_LIMIT) {
+                particles.ember(x, p.y + 0.1f, z);
+            }
+            if (rng.nextFloat() < EMITTER_INTERVAL / LIQUID_SMOKE_INTERVAL
+                    && particles.count < ParticleSystem.SPLASH_LIMIT) {
+                particles.smoke(x, p.y + 0.6f, z, 1f);
             }
         }
     }
