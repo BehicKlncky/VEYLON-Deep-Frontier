@@ -16,7 +16,9 @@ import java.util.Random;
 /**
  * Shared projectile simulation for player and NPC ranged attacks: arrows,
  * musket balls, pellets and thrown bombs. Substepped segment sweeps against
- * blocks and entity AABBs; strict caps so projectiles can never leak.
+ * blocks and entity AABBs; strict caps so projectiles can never leak. A bullet
+ * or arrow that hits an NPC is judged by the {@link HitZone} it entered through
+ * ({@link ProjectileLethality}); every other hit deals plain impact damage.
  */
 public class ProjectileSystem {
 
@@ -51,13 +53,42 @@ public class ProjectileSystem {
         public boolean detonated;
         /** Facing derived from velocity for rendering. */
         public float yaw, pitch;
+        /**
+         * The trigger pull or bow release this came from: every pellet of one
+         * {@link ProjectileSystem#fire} call shares it, which is how a
+         * blunderbuss shot counts once against a torso. Not persisted; only
+         * explosives survive a save and they never read it.
+         */
+        public int shotId;
     }
+
+    /** Horizontal padding of the projectile hit box beyond an entity's half-width. */
+    private static final float HIT_BOX_PAD_XZ = 0.1f;
+    /** How far below an entity's feet its projectile hit box reaches. */
+    private static final float HIT_BOX_BELOW = 0.05f;
+    /** How far above an entity's height its projectile hit box reaches. */
+    private static final float HIT_BOX_ABOVE = 0.1f;
 
     public final List<Projectile> live = new ArrayList<>();
     public final List<Projectile> stuck = new ArrayList<>();
     private static final int MAX_POOL = MAX_LIVE + MAX_STUCK;
     private final ArrayDeque<Projectile> pool = new ArrayDeque<>(MAX_POOL);
     private final Random rng = new Random();
+    /**
+     * Id the next {@link #fire} call hands its projectiles. It starts at 0, so
+     * the -1 an {@code Npc} holds before its first torso wound is never a real
+     * id until the counter wraps, about four billion shots into one world.
+     * Ids are only ever compared for equality, so the wrap itself is harmless;
+     * at worst the one shot that draws -1 counts as a repeat pellet against an
+     * unwounded torso.
+     */
+    private int nextShotId;
+    /**
+     * Non-persisted deterministic diagnostic: the zone of the most recent
+     * bullet or arrow hit on an NPC, null until one lands. Cleared with the
+     * world.
+     */
+    public HitZone lastNpcHitZone;
 
     public void reset() {
         for (Projectile projectile : live) {
@@ -68,6 +99,8 @@ public class ProjectileSystem {
         }
         live.clear();
         stuck.clear();
+        nextShotId = 0;
+        lastNpcHitZone = null;
     }
 
     /**
@@ -83,11 +116,13 @@ public class ProjectileSystem {
                     float dx, float dy, float dz, WeaponDefinition def, ItemType ammoUsed) {
         int pellets = Math.max(1, def.pellets);
         int spawned = 0;
+        int shotId = nextShotId++;
         for (int i = 0; i < pellets; i++) {
             if (live.size() >= MAX_LIVE) {
                 return spawned;
             }
             Projectile p = acquire();
+            p.shotId = shotId;
             p.kind = switch (def.category) {
                 case BOW -> Kind.ARROW;
                 case FIREARM -> Kind.BULLET;
@@ -167,6 +202,7 @@ public class ProjectileSystem {
         p.stuck = false;
         p.stuckTime = 0;
         p.detonated = false;
+        p.shotId = 0;
         updateFacing(p);
         live.add(p);
         return true;
@@ -226,7 +262,13 @@ public class ProjectileSystem {
             // Entity hit.
             Entity hit = entityAt(g, p, px, py, pz);
             if (hit != null) {
-                if (onEntityHit(g, p, hit, px, py, pz)) {
+                // People are hurt by where a bullet or arrow went in, and this
+                // sample can be up to a sub-step past that point.
+                HitZone zone = null;
+                if ((p.kind == Kind.BULLET || p.kind == Kind.ARROW) && hit instanceof Npc n) {
+                    zone = HitZone.classify(n, entryY(n, p.x, p.y, p.z, px, py, pz));
+                }
+                if (onEntityHit(g, p, hit, zone, px, py, pz)) {
                     return true;
                 }
                 return false;
@@ -270,14 +312,54 @@ public class ProjectileSystem {
     }
 
     private static boolean inAabb(Entity e, float px, float py, float pz) {
-        float hw = e.width / 2f + 0.1f;
+        float hw = e.width / 2f + HIT_BOX_PAD_XZ;
         return px > e.pos.x - hw && px < e.pos.x + hw
-                && py > e.pos.y - 0.05f && py < e.pos.y + e.height + 0.1f
+                && py > e.pos.y - HIT_BOX_BELOW && py < e.pos.y + e.height + HIT_BOX_ABOVE
                 && pz > e.pos.z - hw && pz < e.pos.z + hw;
     }
 
-    /** @return true when the projectile is consumed by the hit. */
-    private boolean onEntityHit(Game g, Projectile p, Entity victim,
+    /**
+     * World Y at which the segment {@code (x0,y0,z0) -> (x1,y1,z1)} enters
+     * {@code e}'s hit box, the box {@link #inAabb} tests, by the slab method.
+     * A start already inside the box is its own entry point. The end is the
+     * sample {@link #inAabb} just matched, so the segment always reaches the
+     * box; the result is clamped to the segment regardless.
+     *
+     * <p>{@link #step} samples a path every 0.45 blocks, so the first sample
+     * inside a body can be that far past the point the projectile actually
+     * went in. A steep shot through the top of a head would otherwise be
+     * judged by a point in the chest.
+     */
+    static float entryY(Entity e, float x0, float y0, float z0, float x1, float y1, float z1) {
+        float hw = e.width / 2f + HIT_BOX_PAD_XZ;
+        float dy = y1 - y0;
+        float enter = Math.max(slabEntry(x0, x1 - x0, e.pos.x - hw, e.pos.x + hw),
+                Math.max(slabEntry(y0, dy, e.pos.y - HIT_BOX_BELOW,
+                                e.pos.y + e.height + HIT_BOX_ABOVE),
+                        slabEntry(z0, z1 - z0, e.pos.z - hw, e.pos.z + hw)));
+        float t = Math.min(1f, Math.max(0f, enter));
+        return y0 + dy * t;
+    }
+
+    /**
+     * Segment parameter at which a coordinate moving from {@code start} by
+     * {@code delta} enters {@code [lo, hi]}; negative when it starts inside.
+     * No movement on this axis means the whole segment shares the end's
+     * coordinate, which is inside, so the axis sets no bound.
+     */
+    private static float slabEntry(float start, float delta, float lo, float hi) {
+        if (delta == 0f) {
+            return Float.NEGATIVE_INFINITY;
+        }
+        return Math.min((lo - start) / delta, (hi - start) / delta);
+    }
+
+    /**
+     * @param zone where a bullet or arrow entered an NPC victim; null for any
+     *             other projectile or victim, which keep plain impact damage
+     * @return true when the projectile is consumed by the hit.
+     */
+    private boolean onEntityHit(Game g, Projectile p, Entity victim, HitZone zone,
                                 float px, float py, float pz) {
         if (p.kind == Kind.BOMB || p.kind == Kind.FIRE_BOMB) {
             // Bombs thud off targets and drop at their feet, still fused.
@@ -296,7 +378,12 @@ public class ProjectileSystem {
             g.audio.playHurt();
             g.log("You are hit by " + (p.kind == Kind.ARROW ? "an arrow!" : "a shot!"));
         } else {
-            victim.hurt(p.damage, p.fromPlayer);
+            if (zone != null && victim instanceof Npc person) {
+                lastNpcHitZone = zone;
+                ProjectileLethality.applyHit(person, zone, p);
+            } else {
+                victim.hurt(p.damage, p.fromPlayer);
+            }
             victim.knockback(p.x - p.vx, p.z - p.vz, 2.2f);
             if (victim instanceof Creature c) {
                 c.fear = 1f;
@@ -441,5 +528,6 @@ public class ProjectileSystem {
         projectile.impactedEntity = false;
         projectile.detonated = false;
         projectile.yaw = projectile.pitch = 0;
+        projectile.shotId = 0;
     }
 }
