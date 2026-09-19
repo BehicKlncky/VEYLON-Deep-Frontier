@@ -22,10 +22,11 @@ Main.main
   └── new Game().run()
         ├── engine     Window, Input, Camera, Renderer, UiRenderer, AudioManager, ParticleSystem
         ├── world      World (+ Chunk, WorldGenerator), and Game as its BlockListener
-        ├── entity     Player, EntityManager, PlayerMovementSystem, PlayerTreatmentSystem
+        ├── entity     Player, EntityManager, PlayerMovementSystem, PlayerTreatmentSystem,
+        │              RagdollSystem, BodyFragmentSystem
         ├── combat     ProjectileSystem, ExplosionSystem, WorldNoise
         ├── simulation SimulationScheduler + cadence interfaces +
-        │              Time/Weather/Temperature/Water/Fire/Plant/
+        │              Time/Weather/Temperature/Water/Fire/LiquidFire/Plant/
         │              Event definitions/Season/ItemCondition
         ├── settlement SettlementManager (+ dormant simulation, planner, builder,
         │              counterattack director)
@@ -120,10 +121,11 @@ still uses. It **resets before it constructs**, in this order:
 
 1. Release GPU meshes of the outgoing world (`releaseWorldMeshes`).
 2. Reset every cross-world system: scheduler, audio, time, weather, temperature, fire,
-   water, events, plants, item conditions, noise, projectiles, explosions and
-   settlements.
-3. `reseedSimulation(seed)` — seeds all 15 simulation generators, each with a
-   distinct salt so their streams stay independent. Without this, a second
+   liquid fire, water, events, plants, item conditions, noise, projectiles, explosions,
+   settlements, ragdolls and body fragments.
+3. `reseedSimulation(seed)` — seeds every simulation and player-outcome
+   generator, eighteen of them, each with a distinct salt so their streams stay
+   independent. Without this, a second
    world in the same process inherits RNG state from the first, which is what
    made a settlement test intermittently fail. Presentation-only randomness
    (`AudioManager`, `NpcScreen`) is deliberately excluded.
@@ -169,8 +171,8 @@ while (!window.shouldClose())
    back through `interactionCommands` into combat/mining/interact.
 6. **Simulation** — when `simulate`: `time.advance`, then
    `scheduler.update(dt, this)` which drives the three tick buckets, then
-   per-frame systems (particles, projectiles, explosion fuses, noise decay,
-   ambient emitters).
+   per-frame systems (particles, ragdolls, body fragments, projectiles,
+   explosion fuses, noise decay, ambient emitters).
 7. **Camera and audio** follow the player eye; set the listener before `audio.update(dt)`.
 8. **Streaming** — `world.ensureChunks(...)` around the player, then
    `renderer.buildDirtyMeshes(...)` on a per-frame budget.
@@ -184,8 +186,8 @@ while (!window.shouldClose())
 | Bucket | Period | Drives |
 |---|---|---|
 | fast | 1/20 s | player needs, entity AI and movement, settlement fast tick |
-| medium | 1/2 s | weather, temperature, water, fire, shelter, smoke, ambience |
-| slow | 10 s | plants, events, faction, spawning, item spoilage, settlements |
+| medium | 1/2 s | weather, temperature, water, fire, liquid fire, shelter, smoke, ambience |
+| slow | 10 s | plants, events, faction, spawning, item spoilage, settlements, world detritus (carcasses, corpses, body fragments) |
 
 Stateful systems implement `SimulationSystem`; scheduled systems additionally
 declare `FastTickSystem`, `MediumTickSystem` or `SlowTickSystem`. These interfaces
@@ -235,8 +237,17 @@ it is what lets v2 saves load with identical terrain instead of silently
 regenerating under a newer generator.
 
 Transient state is deliberately **not** serialized: an in-flight reload is
-cancelled on load, and bow draw resets. If you add state, decide explicitly
-which side of that line it sits on.
+cancelled on load, and bow draw resets. Combat and fire add more of it. An
+NPC's torso wound count and the shot id that last wounded it, and the blast
+record a lethal explosion leaves on the body it killed, live on the `Npc` and
+die with it — a person who leaves the world, through a save, a load or a
+settlement going dormant, comes back unwounded at their stored health. Pools
+of burning liquid and burning blocks are not saved either: a save taken with
+the world alight loads with the fires out. What does survive is the pieces of
+people blown apart, once they have settled (`world.fragments`), and a fire
+bomb still in the air, which is saved with the other explosives and shatters
+where it lands. If you add state, decide explicitly which side of that line it
+sits on.
 
 ### Entity updates
 
@@ -611,3 +622,96 @@ it is not a perception or combat target, costs nothing against
 bookkeeping. It rots on the slow tick beside carcasses and is despawned past the
 same 170 m radius wildlife uses. Birds tumble and leave nothing, as they always
 have.
+
+## Lethal combat, body fragments and molotov fire (0.8.0)
+
+Three rules changed what combat leaves behind, and they meet in
+`EntityManager.fastTick`, which still fires every consequence of a death where
+it always did and then decides what the body becomes.
+
+**Where a shot lands decides what it costs.** A bullet or an arrow that enters
+an `Npc` is judged by `HitZone`, the height above the feet at which the
+projectile's segment crossed into the hit box — the slab intersection, not the
+sub-step sample, because `step` samples every 0.45 blocks and a steep shot
+through the top of a head would otherwise be judged by a point in the chest. A
+sleeping NPC lies down, so every hit on one is a torso hit. `ProjectileLethality`
+holds the whole table: head kills outright, a torso hit adds three wound units
+for a bullet and two for an arrow, six kills, and a non-lethal torso hit costs
+at least half the victim's maximum health for a bullet and a third for an arrow.
+Wounds count once per trigger pull — every pellet of one blunderbuss shot
+carries the same `shotId` — and everything goes through `Entity.hurt`, so
+attribution, reputation and the death pipeline see an ordinary hit. The switch
+over `ProjectileSystem.Kind` has no default: a new projectile kind does not
+compile until it is given a row or listed among the kinds that deal no impact
+damage. The player and creatures keep the plain damage model.
+
+**A lethal blast kills and dismembers.** `ExplosionSystem.explode` takes a
+`lethalToHumans` flag; a scrap bomb and every powder keg, including one set off
+by a blast that is not itself lethal, pass it. Every `Npc` whose body centre is
+within `power × LETHAL_RADIUS_FACTOR` (1.5, so 3.9 blocks for a scrap bomb and
+5.7 for a keg) dies through the ordinary damage path whatever its health and
+whatever stands between, and carries a transient record of the blast that killed
+it. Everyone further out, every creature and the player take the existing
+falloff damage. A fire bomb is not a bomb for this rule.
+
+**`BodyFragmentSystem` is the ragdoll solver's rigid-body twin.** A body with a
+blast record is split at its joints into ten pieces — torso, head, upper arms,
+forearms, thighs, shins — instead of being handed to `RagdollSystem`. Each piece
+starts where the living model drew it, leaves with an impulse inversely
+proportional to its mass, and then falls with the same numbers a ragdoll uses,
+stepped from the same per-frame `simulate` gate at the same fixed 1/60 s. It
+sweeps the world-axis box of its *turned* collision box, so a limb that lands
+lying down rests on its lowest corner, and a grounded piece feels gravity's
+torque about that corner. No generator was added: what the blast does not decide
+comes from a hash of the piece's position, the way `RagdollSystem.positionBias`
+picks a side. At most 120 pieces fly and 600 lie about; over either cap the
+oldest gives way. Pieces rot on the corpse clock beside carcasses and corpses in
+`EntityManager.tickWorldDetritus`, and the step allocates nothing.
+
+**A fire bomb is a molotov.** It shatters on the first block or body it touches,
+its fuse only a fallback for one that never lands, and makes no blast, no blast
+damage and no broken blocks. `LiquidFireSystem` runs the pool it spills on the
+medium tick beside `FireSystem`: a priority flood from the cell the bottle broke
+over, biased along the throw, that only ever runs sideways and down, never into
+a solid or water cell, at most 22 cells per bottle and 160 in the world. Each
+patch burns whoever stands in it once per tick, lights the fuse of a
+neighbouring keg, and rolls to set the flammable blocks it touches alight
+**through `FireSystem.ignite`** — which is what keeps one ceiling over both
+kinds of flame: block fires from bottles, blasts, lightning and spread all
+compete for the same `FireSystem.MAX_ACTIVE_FIRES` (220), while the pools have
+their own cap.
+
+**Rain is one predicate.** `FireSystem.isRainedOn` — precipitation falling and
+sky light above `RAIN_EXPOSURE_SKYLIGHT` in the cell above — decides for burning
+blocks, campfires and pools alike. An exposed burning block holds still and goes
+out after two seconds without being consumed; an exposed pool goes out after
+one. Shelter needs headroom: the sky light is sampled one cell up, and the top
+of a column is always fully lit, so a roof resting directly on a block does not
+shelter it. A patch under cover burns on, but does not light a block the rain is
+falling on, which the rain would only put out again.
+
+| State | Persisted | Where |
+| --- | --- | --- |
+| Settled body fragments (piece, position, orientation, decay, appearance) | yes | `world.fragments`, one record per piece, oldest first |
+| Pieces still in flight | no — a save settles them first, so they come to rest rather than being lost | — |
+| Pools of burning liquid, burning blocks | no — a save taken mid-burn loads with the fires out | — |
+| A fire bomb still in the air | yes, with the other explosives; it shatters where it lands | active explosives |
+| Torso wounds, the last shot id, the blast record | no — they live on the `Npc` and die with it | — |
+
+`world.fragments` is a new optional stable-ID section in the v3 extension
+envelope, not a new version of `world.bodies`, so the frozen v3 body and the
+bodies layout are untouched and an older build skips it by its length instead of
+refusing the save: it opens the world with the pieces absent. Its records are
+entirely numeric, the piece and the archetype travelling as bounds-checked
+ordinals, and a piece the reader would refuse is left out on write, so one bad
+piece of debris can never cost the save.
+
+Drawing reuses what the bodies already use. A piece is the shared humanoid model
+with everything outside its own part subtree hidden, drawn from that part
+because a hidden part draws nothing below it, plus one dark cut face per severed
+end. `ModelPart.split` draws a straight limb as its original single box, so
+hiding a forearm would still have drawn the whole arm; `forceSplitDraw`, cleared
+by `resetPose`, makes a part draw only its own half. A pool is a thin emissive
+sheet per cell with its own shimmer phase, and its flames, embers, smoke and
+steam come from the existing particle emitters, under the same splash ceiling
+rain uses, so a pool can never crowd out blood or blast debris.
