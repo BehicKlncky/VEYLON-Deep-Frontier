@@ -74,6 +74,10 @@ class SimulationSystemContractTest {
         int fz = (int) game.player.pos.z + 5;
         int fy = game.world.surfaceHeight(fx, fz) + 1;
         game.world.setBlock(fx, fy, fz, BlockType.LOG, true);
+        // The storm puts the first fire out and leaves the log to light again.
+        game.fire.ignite(game, fx, fy, fz);
+        game.fire.mediumTick(game, FireConstants.RAIN_EXTINGUISH_SECONDS);
+        assertTrue(game.fire.totalExtinguished > 0, "precondition: the storm has put a fire out");
         game.fire.ignite(game, fx, fy, fz);
         assertTrue(game.fire.count() > 0, "precondition: something is burning");
         int hx = (int) game.player.pos.x + 2;
@@ -125,6 +129,8 @@ class SimulationSystemContractTest {
                         hx + 0.5f, hy + 0.5f, hz + 0.5f), 1e-6f,
                 "cached heat-source positions do not carry into the next world");
         assertEquals(0, game.fire.count(), "burning cells do not carry over");
+        assertEquals(0, game.fire.totalIgnitions, "fire statistics do not carry over");
+        assertEquals(0, game.fire.totalExtinguished);
         assertTrue(game.events.active.isEmpty(), "active events do not carry over");
         assertEquals(0, game.events.totalEventsTriggered);
 
