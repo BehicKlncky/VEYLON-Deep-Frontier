@@ -89,6 +89,7 @@ final class WorldBootstrap {
         game.weather.reset();
         game.temperature.reset();
         game.fire.reset();
+        game.liquidFire.reset();
         game.water.reset();
         game.events.reset();
         game.plants.reset();
@@ -142,6 +143,7 @@ final class WorldBootstrap {
         game.weather.setRandomSeed(seed ^ 0x574541544852L);
         game.water.setRandomSeed(seed ^ 0x5741544552L);
         game.fire.setRandomSeed(seed ^ 0x4649524553L);
+        game.liquidFire.setRandomSeed(seed ^ 0x4c4951464952L);
         game.plants.setRandomSeed(seed ^ 0x504c414e5453L);
         game.events.setRandomSeed(seed ^ 0x4556454e5453L);
         // Player-outcome rolls. These collaborators outlive a world, so they

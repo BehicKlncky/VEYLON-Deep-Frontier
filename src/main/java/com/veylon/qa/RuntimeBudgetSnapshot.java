@@ -10,6 +10,7 @@ import com.veylon.entity.Npc;
 import com.veylon.settlement.CounterattackDirector;
 import com.veylon.settlement.SettlementManager;
 import com.veylon.simulation.FireSystem;
+import com.veylon.simulation.LiquidFireConstants;
 
 /**
  * Read-only occupancy snapshot for the bounded runtime systems introduced by
@@ -28,6 +29,7 @@ public record RuntimeBudgetSnapshot(
         int kegFuses,
         int kegFuseAttributions,
         int fires,
+        int liquidFirePatches,
         int particles,
         int pendingGenerationChunks,
         int pendingGenerationEdits) {
@@ -57,6 +59,7 @@ public record RuntimeBudgetSnapshot(
                 game.world.kegFuses.size(),
                 game.world.kegFusePlayerAttribution.size(),
                 game.fire.count(),
+                game.liquidFire.count(),
                 game.particles.count,
                 game.world.pendingGenerationChunkCount(),
                 game.world.pendingGenerationEditCount());
@@ -82,6 +85,7 @@ public record RuntimeBudgetSnapshot(
                 && kegFuses <= ExplosionSystem.MAX_ACTIVE_FUSES
                 && kegFuseAttributions <= kegFuses
                 && fires <= FireSystem.MAX_ACTIVE_FIRES
+                && liquidFirePatches <= LiquidFireConstants.MAX_PATCHES
                 && particles <= ParticleSystem.MAX;
     }
 
@@ -102,6 +106,7 @@ public record RuntimeBudgetSnapshot(
                 + " fuses={timers=" + kegFuses
                 + ",attribution=" + kegFuseAttributions + "}"
                 + " fires=" + fires
+                + " liquidFire=" + liquidFirePatches
                 + " particles=" + particles
                 + " generation={chunks=" + pendingGenerationChunks
                 + ",edits=" + pendingGenerationEdits + "}";
@@ -121,6 +126,7 @@ public record RuntimeBudgetSnapshot(
                 + " noise=" + WorldNoise.MAX_EVENTS
                 + " fuses=" + ExplosionSystem.MAX_ACTIVE_FUSES
                 + " fire=" + FireSystem.MAX_ACTIVE_FIRES
+                + " liquidFire=" + LiquidFireConstants.MAX_PATCHES
                 + " particles=" + ParticleSystem.MAX
                 + " chain=" + ExplosionSystem.MAX_CHAIN
                 + " blockEdits=" + ExplosionSystem.MAX_BLOCKS;

@@ -19,6 +19,10 @@ import java.util.Random;
  * blocks and entity AABBs; strict caps so projectiles can never leak. A bullet
  * or arrow that hits an NPC is judged by the {@link HitZone} it entered through
  * ({@link ProjectileLethality}); every other hit deals plain impact damage.
+ * A scrap bomb stops against whatever it hits and goes off when its fuse ends;
+ * a fire bomb is a bottle that shatters on the first thing it hits and spills
+ * burning liquid ({@code LiquidFireSystem}), its fuse only a fallback for one
+ * that never lands.
  */
 public class ProjectileSystem {
 
@@ -42,14 +46,17 @@ public class ProjectileSystem {
         public Entity owner;
         /** Recoverable ammo item for arrows. */
         public ItemType ammoItem;
-        /** Bomb fuse seconds; explodes when it reaches zero. */
+        /**
+         * Bomb fuse seconds; a scrap bomb explodes when it reaches zero, and a
+         * fire bomb that has not hit anything yet shatters where it is.
+         */
         public float fuse;
         /** Arrows stuck in terrain wait for pickup. */
         public boolean stuck;
         public float stuckTime;
-        /** Bombs stop after their first entity impact and ignore further bodies. */
+        /** Scrap bombs stop after their first entity impact and ignore further bodies. */
         public boolean impactedEntity;
-        /** Guards exactly-once fuse resolution. */
+        /** Guards exactly-once resolution: a detonation or a shatter. */
         public boolean detonated;
         /** Facing derived from velocity for rendering. */
         public float yaw, pitch;
@@ -220,7 +227,11 @@ public class ProjectileSystem {
             if (p.fuse > 0) {
                 p.fuse -= dt;
                 if (p.fuse <= 0) {
-                    detonate(g, p);
+                    if (p.kind == Kind.FIRE_BOMB) {
+                        shatter(g, p, p.x, p.y, p.z);
+                    } else {
+                        detonate(g, p);
+                    }
                     it.remove();
                     release(p);
                     continue;
@@ -279,7 +290,7 @@ public class ProjectileSystem {
                     (int) Math.floor(pz));
             if (t.solid) {
                 onBlockHit(g, p, px, py, pz, t);
-                return p.kind != Kind.BOMB && p.kind != Kind.FIRE_BOMB;
+                return p.kind != Kind.BOMB;
             }
             p.x = px;
             p.y = py;
@@ -289,7 +300,7 @@ public class ProjectileSystem {
     }
 
     private Entity entityAt(Game g, Projectile p, float px, float py, float pz) {
-        if ((p.kind == Kind.BOMB || p.kind == Kind.FIRE_BOMB) && p.impactedEntity) {
+        if (p.kind == Kind.BOMB && p.impactedEntity) {
             return null;
         }
         for (Creature c : g.entities.creatures) {
@@ -361,7 +372,11 @@ public class ProjectileSystem {
      */
     private boolean onEntityHit(Game g, Projectile p, Entity victim, HitZone zone,
                                 float px, float py, float pz) {
-        if (p.kind == Kind.BOMB || p.kind == Kind.FIRE_BOMB) {
+        if (p.kind == Kind.FIRE_BOMB) {
+            // The bottle breaks on the body and the liquid runs to its feet.
+            return shatter(g, p, px, py, pz);
+        }
+        if (p.kind == Kind.BOMB) {
             // Bombs thud off targets and drop at their feet, still fused.
             p.x = px;
             p.y = Math.max(victim.pos.y + 0.05f, py);
@@ -432,28 +447,39 @@ public class ProjectileSystem {
                 g.particles.blockDust(t, px, py, pz, 3);
                 g.audio.playBulletImpact(px, py, pz);
             }
-            case BOMB, FIRE_BOMB -> {
+            case BOMB -> {
                 // Bombs stop against surfaces and keep cooking.
                 p.vx *= 0.1f;
                 p.vz *= 0.1f;
                 p.vy = 0;
             }
+            // The sample that struck is inside the block; the last free one
+            // is where the bottle broke, and the liquid runs down from there.
+            case FIRE_BOMB -> shatter(g, p, p.x, p.y, p.z);
         }
     }
 
+    /** A scrap bomb's fuse ran out: it kills everyone inside its lethal radius. */
     private void detonate(Game g, Projectile p) {
         if (p.detonated) {
             return;
         }
         p.detonated = true;
-        // A scrap bomb kills everyone inside its lethal radius; the fire bomb's
-        // small blast only hurts.
-        if (p.kind == Kind.FIRE_BOMB) {
-            g.explosions.explode(g, p.x, p.y, p.z, 1.6f, 4f, 0.9f, p.fromPlayer, false);
-            g.explosions.igniteNearby(g, p.x, p.y, p.z, 3, 6);
-        } else {
-            g.explosions.explode(g, p.x, p.y, p.z, 2.6f, 14f, 0f, p.fromPlayer, true);
+        g.explosions.explode(g, p.x, p.y, p.z, 2.6f, 14f, 0f, p.fromPlayer, true);
+    }
+
+    /**
+     * Breaks a fire bomb at {@code (x, y, z)}: no blast, no blast damage, no
+     * broken blocks, just burning liquid spilled along the way it was flying.
+     *
+     * @return true, the projectile is consumed
+     */
+    private boolean shatter(Game g, Projectile p, float x, float y, float z) {
+        if (!p.detonated) {
+            p.detonated = true;
+            g.liquidFire.spill(g, x, y, z, p.vx, p.vz, p.fromPlayer);
         }
+        return true;
     }
 
     /** Deterministic QA hook; normal gameplay keeps organic spread. */

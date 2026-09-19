@@ -105,14 +105,20 @@ class ActiveExplosivePersistenceTest {
             loaded.explosions.tickFuses(loaded, 0.05f);
         }
         assertEquals(0, loaded.projectiles.liveCount(),
-                "both restored projectiles detonate and leave the bounded live pool");
+                "both restored projectiles resolve and leave the bounded live pool");
+        // A load regenerates only the chunks holding saved block edits, the
+        // keg's here, and no frame streams in the rest, so the bottle meets
+        // no ground and breaks on its fuse. MolotovTest checks that a restored
+        // one still breaks on impact.
+        assertEquals(1, loaded.noise.countCategory("molotov"),
+                "the fire bomb breaks exactly once, with no blast");
         assertTrue(loaded.world.kegFuses.isEmpty(), "the restored keg fuse is cleaned up");
         assertTrue(loaded.world.kegFusePlayerAttribution.isEmpty());
         assertEquals(BlockType.AIR, loaded.world.getBlock(keg.x(), keg.y(), keg.z()));
         assertTrue(loaded.world.changedBlocks.containsKey(keg),
                 "the resolved placed keg remains a persisted world delta");
-        assertEquals(3, loaded.noise.countCategory("explosion"),
-                "two thrown bombs and one keg each resolve exactly once");
+        assertEquals(2, loaded.noise.countCategory("explosion"),
+                "the scrap bomb and the keg each explode exactly once");
 
         Path resolved = directory.resolve("resolved-explosives.sav");
         assertTrue(SaveSystem.save(loaded, resolved));

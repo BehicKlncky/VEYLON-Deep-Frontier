@@ -337,25 +337,6 @@ public class ExplosionSystem {
         n.lastKnownAge = 0;
     }
 
-    /** Deterministic, bounded ignition used by fire bombs after their small blast. */
-    public int igniteNearby(Game g, float x, float y, float z, int radius, int limit) {
-        int ignited = 0;
-        int cx = (int) Math.floor(x), cy = (int) Math.floor(y), cz = (int) Math.floor(z);
-        for (int dy = -radius; dy <= radius && ignited < limit; dy++) {
-            for (int dx = -radius; dx <= radius && ignited < limit; dx++) {
-                for (int dz = -radius; dz <= radius && ignited < limit; dz++) {
-                    if (dx * dx + dy * dy + dz * dz > radius * radius) {
-                        continue;
-                    }
-                    if (g.fire.ignite(g, cx + dx, cy + dy, cz + dz)) {
-                        ignited++;
-                    }
-                }
-            }
-        }
-        return ignited;
-    }
-
     /** Collects fallout; applying it per block caused dozens of duplicate penalties. */
     private void collectBlockConsequence(Game g, int x, int y, int z,
                                          BlockType t, boolean byPlayer) {

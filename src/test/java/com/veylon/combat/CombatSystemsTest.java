@@ -295,8 +295,9 @@ class CombatSystemsTest {
         assertEquals(1, g.projectiles.liveCount(), "wall impact preserves the fuse");
         assertTrue(g.projectiles.live.getFirst().fuse > 0);
 
+        // A fire bomb breaks on impact instead; MolotovTest covers it.
         g.projectiles.fire(g, g.player, true, 311.5f, 44f, 311.5f,
-                0, -1, 0, WeaponRegistry.byId("fire_bomb"), null);
+                0, -1, 0, WeaponRegistry.byId("scrap_bomb"), null);
         for (int i = 0; i < 40; i++) {
             g.projectiles.update(g, 0.02f);
         }
@@ -319,21 +320,30 @@ class CombatSystemsTest {
         float scrapDamage = scrapBefore - scrapVictim.health;
         assertEquals(0, g.fire.count(), "scrap bomb is the direct-damage profile");
 
+        // The fire bomb is a molotov: no blast at all, only liquid that lights
+        // what it touches over the following medium ticks.
         g.entities.creatures.clear();
         g.fire.reset();
+        g.weather.current = g.weather.next = com.veylon.simulation.WeatherSystem.Weather.CLEAR;
+        g.weather.blend = 1f;
         for (int dz = -2; dz <= 2; dz++) {
-            g.world.setBlock(343, 41, 340 + dz, BlockType.LOG, false);
+            g.world.setBlock(342, 40, 340 + dz, BlockType.LOG, false);
         }
         Creature fireVictim = g.entities.spawnCreature(g.world, Creature.CreatureType.THORNHORN,
-                341.5f, 40.1f, 340.5f);
+                344.5f, 40.1f, 340.5f);
         float fireBefore = fireVictim.health;
         ProjectileSystem.Projectile fireBomb = fusedAt(
                 ProjectileSystem.Kind.FIRE_BOMB, 340.5f, 41f, 340.5f);
         g.projectiles.live.add(fireBomb);
         g.projectiles.update(g, 0.02f);
-        float fireDamage = fireBefore - fireVictim.health;
-        assertTrue(g.fire.count() > 0, "fire bomb deterministically starts bounded fires");
-        assertTrue(scrapDamage > fireDamage, "scrap bomb trades ignition for direct damage");
+        assertEquals(0, g.projectiles.liveCount(), "the fuse fallback breaks the bottle");
+        assertEquals(1, g.noise.countCategory("explosion"), "only the scrap bomb exploded");
+        assertEquals(fireBefore, fireVictim.health, "the fire bomb deals no blast damage");
+        assertTrue(scrapDamage > 0, "the scrap bomb does");
+        for (int i = 0; i < 6 && g.fire.count() == 0; i++) {
+            g.liquidFire.mediumTick(g, 0.5f);
+        }
+        assertTrue(g.fire.count() > 0, "the spilled liquid sets the logs beside it alight");
     }
 
     private static ProjectileSystem.Projectile fusedAt(ProjectileSystem.Kind kind,

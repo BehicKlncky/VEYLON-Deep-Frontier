@@ -255,7 +255,7 @@ class BlastLethalityTest {
     }
 
     @Test
-    void fireBombBlastIsNotLethal() {
+    void fireBombIsNotLethal() {
         Npc tough = person(g, NpcArchetype.LEADER, 332.5f, 330.5f);
         Npc fragile = person(g, NpcArchetype.CAPTIVE, 330.5f, 330.5f);
         fragile.health = 1f;
@@ -269,12 +269,17 @@ class BlastLethalityTest {
         fireBomb.fromPlayer = true;
         g.projectiles.live.add(fireBomb);
         g.projectiles.update(g, 0.02f);
-        assertEquals(1, g.noise.countCategory("explosion"), "precondition: the fire bomb went off");
+        assertEquals(1, g.noise.countCategory("molotov"), "precondition: the fire bomb broke");
+        assertEquals(0, g.noise.countCategory("explosion"), "a molotov has no blast");
+        assertEquals(tough.maxHealth, tough.health, "so nobody is hurt the moment it breaks");
+        assertFalse(fragile.dead);
 
-        assertTrue(tough.health < tough.maxHealth, "the fire bomb's blast still hurts");
+        // Standing in the burning liquid can still finish someone.
+        g.liquidFire.mediumTick(g, 0.5f);
+        assertTrue(tough.health < tough.maxHealth, "the liquid burns");
         assertFalse(tough.dead, "but does not kill a person one block away");
         assertFalse(tough.dismemberOnDeath);
-        assertTrue(fragile.dead, "precondition: its damage can still finish someone");
+        assertTrue(fragile.dead, "precondition: its burn can still finish someone");
         assertFalse(fragile.dismemberOnDeath, "and that death is an ordinary one");
 
         g.entities.fastTick(g, 0.05f);

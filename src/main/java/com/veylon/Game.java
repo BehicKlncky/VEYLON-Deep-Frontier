@@ -140,6 +140,7 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
     public final TemperatureSystem temperature = new TemperatureSystem();
     public final WaterSystem water = new WaterSystem();
     public final FireSystem fire = new FireSystem();
+    public final com.veylon.simulation.LiquidFireSystem liquidFire = new com.veylon.simulation.LiquidFireSystem();
     public final PlantSystem plants = new PlantSystem();
     public final EventSystem events = new EventSystem();
     public final SeasonSystem seasons = new SeasonSystem();
@@ -935,6 +936,7 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
         temperature.mediumTick(this, dt);
         water.mediumTick(this, dt);
         fire.mediumTick(this, dt);
+        liquidFire.mediumTick(this, dt);
         environment.mediumTick(dt);
         ambience.updateAmbienceMix();
     }
