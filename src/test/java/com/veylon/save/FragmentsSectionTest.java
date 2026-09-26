@@ -143,8 +143,9 @@ class FragmentsSectionTest {
         settle(original);
         Path save = directory.resolve("without-fragments.sav");
         assertTrue(SaveSystem.save(original, save));
-        Files.write(save, CreativeSaveSections.replace(Files.readAllBytes(save),
-                FragmentsSection.ID, null));
+        // Written before v0.8.0: neither this section nor the newer world.remains.
+        byte[] older = CreativeSaveSections.replace(Files.readAllBytes(save), FragmentsSection.ID, null);
+        Files.write(save, CreativeSaveSections.replace(older, RemainsSection.ID, null));
 
         // Loaded over a live world holding pieces of its own, at rest and in flight.
         Game live = arena(9002L);

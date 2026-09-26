@@ -38,7 +38,9 @@ public class Carcass {
      * blew the animal apart; null for a whole carcass. Set once by
      * {@code BodyFragmentSystem}; the piece links back through
      * {@link BodyFragment#harvest} for as long as the record is in the world.
-     * Transient until the save format carries it.
+     * A save stores the link, and the lodged arrows with it, in
+     * {@code world.remains}; a build or save without that section loads the
+     * record as a whole carcass.
      */
     public BodyFragment remains;
 

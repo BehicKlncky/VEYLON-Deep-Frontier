@@ -618,6 +618,32 @@ public class BodyFragmentSystem implements SimulationSystem {
     }
 
     /**
+     * Lays a torso read from a save back down with the harvest record it
+     * carried, tying the two together again as {@link #spawnFromCreature} tied
+     * them, and puts the record back under the torso. The record must already
+     * be in the world's carcass list; nothing here creates one, so a load can
+     * never add a reward.
+     *
+     * @throws IllegalArgumentException when the piece is not the core of a
+     *         body that leaves this record's kind of carcass, or either side is
+     *         already tied to something
+     */
+    public void restoreSettled(BodyFragment torso, Carcass record) {
+        if (torso.definition.parent != -1 || torso.definition.family.creature != record.type
+                || !record.type.leavesCarcass()) {
+            throw new IllegalArgumentException("the " + torso.definition + " piece cannot carry a "
+                    + record.type + " carcass");
+        }
+        if (torso.harvest != null || record.remains != null) {
+            throw new IllegalArgumentException("a torso carries one harvest record and a record one torso");
+        }
+        torso.harvest = record;
+        record.remains = torso;
+        restoreSettled(torso);
+        followTorso(torso);
+    }
+
+    /**
      * Adds a piece to the ground, first removing the oldest piece that
      * carries no harvest record when the settled cap is full.
      */
