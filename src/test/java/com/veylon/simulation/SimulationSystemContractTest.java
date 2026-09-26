@@ -7,6 +7,7 @@ import org.junit.jupiter.api.Test;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -29,6 +30,8 @@ class SimulationSystemContractTest {
 
         assertInstanceOf(FastTickSystem.class, game.settlementManager,
                 "settlements are driven from Game.fastTick");
+        assertInstanceOf(FastTickSystem.class, game.combustion,
+                "living bodies on fire are driven from Game.fastTick");
 
         for (Object mediumSystem : List.of(game.weather, game.temperature, game.water, game.fire,
                 game.liquidFire)) {
@@ -127,6 +130,20 @@ class SimulationSystemContractTest {
         assertTrue(game.fragments.liveCount() > 0 && game.fragments.settledCount() > 0,
                 "precondition: pieces are both flying and lying in the world");
 
+        // A deer lit twice over and the player alight.
+        var torch = game.entities.spawnCreature(game.world, com.veylon.entity.Creature
+                .CreatureType.DEER, game.player.pos.x + 2f, game.player.pos.y, game.player.pos.z);
+        game.combustion.ignite(game, torch, com.veylon.entity.CombustionSource.DIRECT_HIT, 1f, true, 0,
+                torch.pos.x, torch.pos.y, torch.pos.z);
+        game.combustion.ignite(game, game.player, com.veylon.entity.CombustionSource.DIRECT_HIT, 1f,
+                false, 0, game.player.pos.x, game.player.pos.y, game.player.pos.z);
+        game.combustion.fastTick(game, SimulationScheduler.FAST_DT);
+        game.combustion.extinguish(torch);
+        game.combustion.ignite(game, torch, com.veylon.entity.CombustionSource.DIRECT_HIT, 1f, true, 0,
+                torch.pos.x, torch.pos.y, torch.pos.z);
+        assertTrue(game.combustion.burningBodies(game) >= 2 && game.combustion.totalIgnitions >= 3,
+                "precondition: bodies are burning");
+
         game.newWorld(31_415L, true);
 
         assertEquals(8 * 60, game.time.totalMinutes, 1e-6,
@@ -161,6 +178,11 @@ class SimulationSystemContractTest {
                 "spill ids start again from zero in the next world");
         assertTrue(game.events.active.isEmpty(), "active events do not carry over");
         assertEquals(0, game.events.totalEventsTriggered);
+        assertEquals(0, game.combustion.burningBodies(game), "no body carries a fire into the next world");
+        assertFalse(game.player.combustion.burning() || game.player.combustion.scorch() > 0f);
+        assertEquals(0, game.combustion.totalIgnitions, "fire statistics do not carry over");
+        assertEquals(0, game.combustion.totalBurnouts + game.combustion.totalDoused
+                + game.combustion.totalRainedOut);
 
         assertEquals(0, game.ragdolls.liveCount(),
                 "a falling body does not carry into the next world");
@@ -206,14 +228,16 @@ class SimulationSystemContractTest {
         game.newWorld(2_718L, true);
         game.time.advance(5_000);
         game.weather.current = WeatherSystem.Weather.RAIN;
+        game.combustion.totalIgnitions = 3;
 
         for (SimulationSystem system : List.of(game.time, game.weather, game.temperature,
                 game.water, game.fire, game.liquidFire, game.plants, game.events, game.itemConditions,
-                game.settlementManager, game.ragdolls, game.fragments)) {
+                game.settlementManager, game.ragdolls, game.fragments, game.combustion)) {
             system.reset();
         }
 
         assertEquals(8 * 60, game.time.totalMinutes, 1e-6);
         assertEquals(WeatherSystem.Weather.CLEAR, game.weather.current);
+        assertEquals(0, game.combustion.totalIgnitions);
     }
 }
