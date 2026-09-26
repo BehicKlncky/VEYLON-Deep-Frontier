@@ -3,7 +3,11 @@ package com.veylon.save;
 import com.veylon.Game;
 import com.veylon.entity.BodyFragment;
 import com.veylon.entity.Npc;
+import com.veylon.entity.NpcAppearance;
 import com.veylon.entity.RagdollConstants;
+import com.veylon.gfx.model.Animator;
+import com.veylon.gfx.model.ModelPart;
+import com.veylon.gfx.model.NpcModels;
 import com.veylon.settlement.NpcArchetype;
 import com.veylon.world.BlockType;
 import com.veylon.world.Chunk;
@@ -23,6 +27,7 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -75,6 +80,33 @@ class FragmentsSectionTest {
         assertSame(NpcArchetype.CAPTIVE, after.getLast().appearance.archetype);
         assertTrue(after.stream().noneMatch(f -> Math.abs(f.orientation.w) > 0.9999f),
                 "precondition: no piece lies unturned, so the orientation is really compared");
+    }
+
+    @Test
+    void thePlayersRemainsKeepTheirPlainCamplessLookThroughTheUnchangedFormat() throws IOException {
+        Game original = arena(1337L);
+        original.player.pos.set(X, GROUND, Z);
+        original.player.killBy(false);
+        assertTrue(original.player.recordBlastDeath(X + 1f, GROUND + 0.5f, Z, KEG));
+        assertEquals(10, original.fragments.spawnPlayerRemains(original, original.player).size());
+        settle(original);
+
+        Path save = directory.resolve("remains.sav");
+        assertTrue(SaveSystem.save(original, save));
+        Game loaded = new Game();
+        assertTrue(SaveSystem.load(loaded, save));
+        assertEquals(10, loaded.fragments.settledCount());
+        for (BodyFragment f : loaded.fragments.settled) {
+            assertEquals(NpcAppearance.NEUTRAL_CAMP_INDEX, f.appearance.campIndex,
+                    "version 1 keeps the camp index as it is, so the remains stay campless");
+            assertNull(f.appearance.archetype);
+        }
+        BodyFragment torso = loaded.fragments.settled.stream()
+                .filter(f -> f.piece == BodyFragment.Piece.TORSO).findFirst().orElseThrow();
+        ModelPart top = Animator.poseFragment(torso);
+        assertFalse(top.find("friendlyBadge").visible, "a loaded player's torso wears no camp badge either");
+        assertTrue(top.find("vest").visible);
+        NpcModels.get().resetPose();
     }
 
     @Test
