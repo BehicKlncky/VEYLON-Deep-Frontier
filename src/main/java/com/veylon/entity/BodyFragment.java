@@ -1,68 +1,50 @@
 package com.veylon.entity;
 
+import org.joml.Matrix4f;
 import org.joml.Quaternionf;
 import org.joml.Vector3f;
 
 import java.util.List;
+import java.util.Locale;
 
 /**
- * One piece of a person blown apart at the joints: a loose rigid box carrying
- * the look of the person it came from.
+ * One piece of a body blown apart at the joints: a loose rigid box carrying
+ * the look of the body it came from.
  *
- * <p>State only; {@link BodyFragmentSystem} moves it. {@link #pos} is the
- * centre of the piece's collision box, and a point {@code p} of the humanoid
- * model in its standing rest pose (model coordinates, feet at the origin,
- * forward -Z) that belongs to this piece is drawn at
- * {@code pos + orientation × (p − restCentre)}. At spawn the orientation is the
- * dead person's heading, so every piece starts exactly where the living model
- * drew it.
+ * <p>State only; {@link BodyFragmentSystem} moves it. What the piece is comes
+ * from its {@link #definition} in its body's {@link FragmentAnatomy}; the pose
+ * the body died in is {@link #pose}, an immutable snapshot every piece of that
+ * body shares. {@link #pos} is the centre of the piece's collision box, and a
+ * point {@code q} of the model as posed at death that belongs to this piece is
+ * drawn at {@code pos + orientation × poseRotation⁻¹ × (q − poseCentre)}
+ * ({@link #modelToWorld}). {@link #placeAt} turns the posed model to the dead
+ * body's heading, so every piece starts exactly where the living model drew
+ * it.
+ *
+ * <p>A piece placed with the rest pose — every human piece today, and every
+ * piece read from a {@code world.fragments} version 1 record — has
+ * {@code poseRotation} the identity and {@code poseCentre} its rest centre, so
+ * the rule above is the one this class always had: a rest-pose model point
+ * {@code p} is drawn at {@code pos + orientation × (p − restCentre)}.
  */
 public class BodyFragment {
 
     /**
-     * The ten pieces of dismemberment (assumption A6), each rooted at the
-     * {@code ModelPart} that anchors it in {@code NpcModels.build()}.
+     * The ten pieces of a person (assumption A6), in the order of
+     * {@link FragmentAnatomy#humanoid()}'s pieces: the ordinal is the piece id
+     * {@code world.fragments} version 1 stores, so append only.
      *
-     * <p>Every number is that builder's own: pivots are summed down the part
-     * tree, and the arm and leg boxes are halved at the elbow and knee exactly
-     * as {@code ModelPart.split} halves them. The collision box of the head
-     * piece is the {@code head} box hung below the box-less {@code neck} pivot.
-     * The ordinal is the piece id; append only if these ever reach a save.
+     * <p>Every number is the humanoid table's, which repeats
+     * {@code NpcModels.build()}: pivots summed down the part tree, arm and leg
+     * boxes halved at the elbow and knee exactly as {@code ModelPart.split}
+     * halves them, and the head piece's collision box the {@code head} box hung
+     * below the box-less {@code neck} pivot.
      */
     public enum Piece {
-        TORSO("torso", "torso", List.of("neck", "arm_l", "arm_r"),
-                0, Model.HIP_Y, Model.HIP_Y + Model.TORSO_BOX_Y,
-                Model.TORSO_W, Model.TORSO_H, Model.TORSO_D),
-        HEAD("neck", "head", List.of(),
-                0, Model.NECK_Y, Model.NECK_Y + Model.HEAD_PIVOT_Y + Model.HEAD_BOX_Y,
-                Model.HEAD_SIZE, Model.HEAD_SIZE, Model.HEAD_SIZE),
-        UPPER_ARM_L("arm_l", "arm_l", List.of("forearm_l"),
-                -Model.SHOULDER_X, Model.SHOULDER_Y,
-                Model.SHOULDER_Y + Model.ARM_BOX_Y + Model.ARM_H * 0.25f,
-                Model.ARM_W, Model.ARM_H * 0.5f, Model.ARM_D),
-        UPPER_ARM_R("arm_r", "arm_r", List.of("forearm_r"),
-                Model.SHOULDER_X, Model.SHOULDER_Y,
-                Model.SHOULDER_Y + Model.ARM_BOX_Y + Model.ARM_H * 0.25f,
-                Model.ARM_W, Model.ARM_H * 0.5f, Model.ARM_D),
-        FOREARM_L("forearm_l", "forearm_l", List.of(),
-                -Model.SHOULDER_X, Model.ELBOW_Y, Model.ELBOW_Y - Model.ARM_H * 0.25f,
-                Model.ARM_W, Model.ARM_H * 0.5f, Model.ARM_D),
-        FOREARM_R("forearm_r", "forearm_r", List.of(),
-                Model.SHOULDER_X, Model.ELBOW_Y, Model.ELBOW_Y - Model.ARM_H * 0.25f,
-                Model.ARM_W, Model.ARM_H * 0.5f, Model.ARM_D),
-        THIGH_L("leg_l", "leg_l", List.of("shin_l"),
-                -Model.LEG_X, Model.HIP_Y, Model.HIP_Y + Model.LEG_BOX_Y + Model.LEG_H * 0.25f,
-                Model.LEG_W, Model.LEG_H * 0.5f, Model.LEG_D),
-        THIGH_R("leg_r", "leg_r", List.of("shin_r"),
-                Model.LEG_X, Model.HIP_Y, Model.HIP_Y + Model.LEG_BOX_Y + Model.LEG_H * 0.25f,
-                Model.LEG_W, Model.LEG_H * 0.5f, Model.LEG_D),
-        SHIN_L("shin_l", "shin_l", List.of(),
-                -Model.LEG_X, Model.KNEE_Y, Model.KNEE_Y - Model.LEG_H * 0.25f,
-                Model.LEG_W, Model.LEG_H * 0.5f, Model.LEG_D),
-        SHIN_R("shin_r", "shin_r", List.of(),
-                Model.LEG_X, Model.KNEE_Y, Model.KNEE_Y - Model.LEG_H * 0.25f,
-                Model.LEG_W, Model.LEG_H * 0.5f, Model.LEG_D);
+        TORSO, HEAD, UPPER_ARM_L, UPPER_ARM_R, FOREARM_L, FOREARM_R, THIGH_L, THIGH_R, SHIN_L, SHIN_R;
 
+        /** This piece in the humanoid table; its id is this ordinal. */
+        public final FragmentPiece definition;
         /** The part whose subtree this piece draws. */
         public final String rootPart;
         /** The part whose box is this piece's collision box. */
@@ -87,73 +69,69 @@ public class BodyFragment {
         /** True when the root pivot is a joint the blast cut through. */
         public final boolean severed;
 
-        Piece(String rootPart, String boxPart, List<String> excludedParts,
-              float pivotX, float pivotY, float centreY, float sx, float sy, float sz) {
-            this.rootPart = rootPart;
-            this.boxPart = boxPart;
-            this.excludedParts = excludedParts;
-            // Every human box hangs straight below or above its pivot.
-            this.pivotX = pivotX;
-            this.pivotY = pivotY;
-            this.pivotZ = 0;
-            this.centreX = pivotX;
-            this.centreY = centreY;
-            this.centreZ = 0;
-            this.halfX = sx * 0.5f;
-            this.halfY = sy * 0.5f;
-            this.halfZ = sz * 0.5f;
-            this.halfWidth = Math.max(BodyFragmentConstants.MIN_HALF_EXTENT, Math.max(sx, sz) * 0.5f);
-            this.halfHeight = Math.max(BodyFragmentConstants.MIN_HALF_EXTENT, sy * 0.5f);
-            this.volume = sx * sy * sz;
-            this.mass = volume * BodyFragmentConstants.DENSITY;
-            this.inverseMass = 1f / mass;
-            this.severed = !"torso".equals(rootPart);
+        Piece() {
+            definition = FragmentAnatomy.humanoid().piece(ordinal());
+            if (!definition.name.equals(name().toLowerCase(Locale.ROOT))) {
+                throw new IllegalStateException("legacy piece " + name() + " maps to humanoid piece "
+                        + definition.name + "; world.fragments v1 ids would change");
+            }
+            rootPart = definition.rootPart;
+            boxPart = definition.boxPart;
+            excludedParts = definition.excludedParts;
+            pivotX = definition.pivotX;
+            pivotY = definition.pivotY;
+            pivotZ = definition.pivotZ;
+            centreX = definition.centreX;
+            centreY = definition.centreY;
+            centreZ = definition.centreZ;
+            halfX = definition.halfX;
+            halfY = definition.halfY;
+            halfZ = definition.halfZ;
+            halfWidth = definition.halfWidth;
+            halfHeight = definition.halfHeight;
+            volume = definition.volume;
+            mass = definition.mass;
+            inverseMass = definition.inverseMass;
+            severed = definition.severed;
         }
     }
 
-    /** {@code NpcModels.build()}'s numbers, named. Pivots are relative to the model origin. */
-    private static final class Model {
-        static final float HIP_Y = 0.86f;
-        static final float TORSO_BOX_Y = 0.31f;
-        static final float TORSO_W = 0.46f, TORSO_H = 0.62f, TORSO_D = 0.26f;
-        /** {@code neck} hangs 0.58 above the torso pivot. */
-        static final float NECK_Y = HIP_Y + 0.58f;
-        /** {@code head} is built at 0.64 and then moved under the neck: 0.64 − 0.58. */
-        static final float HEAD_PIVOT_Y = 0.64f - 0.58f;
-        static final float HEAD_BOX_Y = 0.14f;
-        static final float HEAD_SIZE = 0.26f;
-        static final float SHOULDER_X = 0.30f;
-        static final float SHOULDER_Y = HIP_Y + 0.55f;
-        static final float ARM_BOX_Y = -0.26f;
-        static final float ARM_W = 0.13f, ARM_H = 0.55f, ARM_D = 0.15f;
-        /** {@code split} pivots the lower half at the unsplit box centre. */
-        static final float ELBOW_Y = SHOULDER_Y + ARM_BOX_Y;
-        static final float LEG_X = 0.115f;
-        static final float LEG_BOX_Y = -0.43f;
-        static final float LEG_W = 0.16f, LEG_H = 0.86f, LEG_D = 0.18f;
-        static final float KNEE_Y = HIP_Y + LEG_BOX_Y;
+    private static final Piece[] PIECES = Piece.values();
 
-        private Model() {
-        }
-    }
-
+    /** What this piece is, in its body family's table. */
+    public final FragmentPiece definition;
+    /**
+     * The legacy human identity, the {@code world.fragments} version 1 id;
+     * null for a piece of any other body.
+     */
     public final Piece piece;
-    /** The model part whose subtree this piece draws; {@code piece.rootPart}. */
+    /** The pose the body died in, shared by all its pieces; its family's rest pose when none was captured. */
+    public final FragmentPose pose;
+    /** The model part whose subtree this piece draws; {@code definition.rootPart}. */
     public final String rootPart;
     /** Rest-pose offset of the root pivot from the model origin. */
     public final float restPivotX, restPivotY, restPivotZ;
-    /** Rest-pose offset of the collision box centre ({@link #pos}) from the model origin. */
+    /** Rest-pose offset of the collision box centre from the model origin. */
     public final float restCentreX, restCentreY, restCentreZ;
-    /** Box half sizes along the piece's own axes. */
+    /**
+     * Box half sizes along the piece's own axes: the definition's, times the
+     * scale the box was drawn with at death ({@link FragmentPose#pieceScale},
+     * 1 in the rest pose).
+     */
     public final float halfX, halfY, halfZ;
     /**
      * The sweep box for the current orientation: the world-axis extents of the
-     * turned box, horizontal ones merged into one half width. At the rest
-     * orientation this is exactly {@code piece.halfWidth} and
-     * {@code piece.halfHeight}.
+     * turned box, horizontal ones merged into one half width. In the rest pose
+     * and orientation this is exactly {@code definition.halfWidth} and
+     * {@code definition.halfHeight}.
      */
     public float halfWidth, halfHeight;
     public final float inverseMass;
+    /** Collision box centre in the model space of {@link #pose}. */
+    public final Vector3f poseCentre = new Vector3f();
+    /** Collision box orientation in the model space of {@link #pose}; the identity at rest. */
+    public final Quaternionf poseRotation = new Quaternionf();
+    private final Quaternionf poseRotationInverse = new Quaternionf();
     /** Captured from the person who died; each piece has its own copy. */
     public final NpcAppearance appearance = new NpcAppearance();
 
@@ -175,27 +153,90 @@ public class BodyFragment {
     /** Last measured settle energy, for tests and the debug overlay. */
     public float energy;
 
+    /** A human piece in the standing rest pose, as {@code world.fragments} version 1 restores it. */
     public BodyFragment(Piece piece) {
-        this.piece = piece;
-        this.rootPart = piece.rootPart;
-        this.restPivotX = piece.pivotX;
-        this.restPivotY = piece.pivotY;
-        this.restPivotZ = piece.pivotZ;
-        this.restCentreX = piece.centreX;
-        this.restCentreY = piece.centreY;
-        this.restCentreZ = piece.centreZ;
-        this.halfX = piece.halfX;
-        this.halfY = piece.halfY;
-        this.halfZ = piece.halfZ;
-        this.halfWidth = piece.halfWidth;
-        this.halfHeight = piece.halfHeight;
-        this.inverseMass = piece.inverseMass;
+        this(piece.definition, piece.definition.anatomy.restPose());
     }
 
-    /** Where a rest-pose model point of this piece currently is in the world. */
+    /**
+     * A piece of any body, in the pose that body died in.
+     *
+     * @throws IllegalArgumentException when the pose belongs to another body family
+     */
+    public BodyFragment(FragmentPiece definition, FragmentPose pose) {
+        if (pose.anatomy != definition.anatomy) {
+            throw new IllegalArgumentException("a " + pose.anatomy.family + " pose cannot place the "
+                    + definition + " piece");
+        }
+        this.definition = definition;
+        this.piece = definition.family == BodyFamily.HUMANOID ? PIECES[definition.id] : null;
+        this.pose = pose;
+        this.rootPart = definition.rootPart;
+        this.restPivotX = definition.pivotX;
+        this.restPivotY = definition.pivotY;
+        this.restPivotZ = definition.pivotZ;
+        this.restCentreX = definition.centreX;
+        this.restCentreY = definition.centreY;
+        this.restCentreZ = definition.centreZ;
+        // The box as drawn at death; the pose's scale is 1 except for breathing.
+        float scale = pose.pieceScale(definition.id);
+        this.halfX = definition.halfX * scale;
+        this.halfY = definition.halfY * scale;
+        this.halfZ = definition.halfZ * scale;
+        this.halfWidth = Math.max(BodyFragmentConstants.MIN_HALF_EXTENT, Math.max(halfX, halfZ));
+        this.halfHeight = Math.max(BodyFragmentConstants.MIN_HALF_EXTENT, halfY);
+        this.inverseMass = definition.inverseMass;
+        pose.pieceCentre(definition.id, poseCentre);
+        pose.pieceRotation(definition.id, poseRotation);
+        poseRotationInverse.set(poseRotation).conjugate();
+    }
+
+    /**
+     * Puts the piece where the living model drew it: the body's feet at
+     * {@code (x, y, z)}, turned by {@code yaw} radians about Y — the draw
+     * transform's {@code rotateY(toRadians(-entity.yaw))}. Sets {@link #pos}
+     * and {@link #orientation} only; the caller refits the sweep box.
+     */
+    public BodyFragment placeAt(float x, float y, float z, float yaw) {
+        orientation.rotationY(yaw);
+        orientation.transform(poseCentre.x, poseCentre.y, poseCentre.z, pos).add(x, y, z);
+        orientation.mul(poseRotation);
+        return this;
+    }
+
+    /** Where a point of the model, as posed at death, that belongs to this piece is now. */
     public Vector3f modelToWorld(float x, float y, float z, Vector3f dest) {
-        orientation.transform(x - restCentreX, y - restCentreY, z - restCentreZ, dest);
+        poseRotationInverse.transform(x - poseCentre.x, y - poseCentre.y, z - poseCentre.z, dest);
+        orientation.transform(dest);
         return dest.add(pos);
+    }
+
+    /** Where a joint of this piece is now; for {@code definition.rootJoint}, the cut. */
+    public Vector3f jointToWorld(int joint, Vector3f dest) {
+        pose.jointOrigin(joint, dest);
+        return modelToWorld(dest.x, dest.y, dest.z, dest);
+    }
+
+    /**
+     * The matrix taking a point of the model, as posed at death, to where this
+     * piece has it now: {@code translate(pos) × rotate(orientation) ×
+     * rotate(poseRotation⁻¹) × translate(−poseCentre)}.
+     */
+    public Matrix4f modelTransform(Matrix4f dest) {
+        return dest.translation(pos).rotate(orientation).rotate(poseRotationInverse)
+                .translate(-poseCentre.x, -poseCentre.y, -poseCentre.z);
+    }
+
+    /**
+     * The frame the root part is drawn in — the parent matrix to hand
+     * {@code ModelPart.render} for {@link #rootPart} once the model carries
+     * {@link #pose}: {@link #modelTransform} times the pose frame of the root
+     * part's parent. In the rest pose that frame is the translation by the
+     * pivots above the root part.
+     */
+    public Matrix4f rootTransform(Matrix4f dest) {
+        modelTransform(dest);
+        return pose.mulJointFrame(definition.anatomy.joint(definition.rootJoint).parent, dest);
     }
 
     public double distSqTo(float x, float y, float z) {

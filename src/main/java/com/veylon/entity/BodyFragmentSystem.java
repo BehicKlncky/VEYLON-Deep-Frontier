@@ -1,7 +1,6 @@
 package com.veylon.entity;
 
 import com.veylon.Game;
-import com.veylon.entity.BodyFragment.Piece;
 import com.veylon.simulation.SimulationSystem;
 import com.veylon.world.World;
 import org.joml.Matrix3f;
@@ -75,7 +74,8 @@ public class BodyFragmentSystem implements SimulationSystem {
     // ------------------------------------------------------------------
 
     /**
-     * Blows a person apart at the joints.
+     * Blows a person apart at the joints: the humanoid table's pieces, in the
+     * standing rest pose.
      *
      * <p>Each piece starts where the standing model drew it, turned to the
      * person's heading, and leaves with the person's own velocity plus
@@ -90,17 +90,21 @@ public class BodyFragmentSystem implements SimulationSystem {
     public List<BodyFragment> spawnFromNpc(Game g, Npc n,
                                            float blastX, float blastY, float blastZ,
                                            float strength) {
-        Piece[] pieces = Piece.values();
-        List<BodyFragment> spawned = new ArrayList<>(pieces.length);
+        FragmentAnatomy anatomy = FragmentAnatomy.humanoid();
+        FragmentPose pose = anatomy.restPose();
+        List<FragmentPiece> pieces = anatomy.pieces;
+        List<BodyFragment> spawned = new ArrayList<>(pieces.size());
         float yaw = (float) Math.toRadians(-n.yaw);
         float power = strength > 0 && Float.isFinite(strength) ? strength : 0;
         float reach = Math.max(1e-3f, power * BodyFragmentConstants.FALLOFF_RANGE);
 
         // The body's mass centre, which the blast spins every piece about.
         Vector3f massCentre = new Vector3f();
+        Vector3f centre = new Vector3f();
         float totalMass = 0;
-        for (Piece p : pieces) {
-            massCentre.add(p.centreX * p.mass, p.centreY * p.mass, p.centreZ * p.mass);
+        for (FragmentPiece p : pieces) {
+            pose.pieceCentre(p.id, centre);
+            massCentre.add(centre.x * p.mass, centre.y * p.mass, centre.z * p.mass);
             totalMass += p.mass;
         }
         massCentre.div(totalMass);
@@ -111,11 +115,10 @@ public class BodyFragmentSystem implements SimulationSystem {
         Vector3f tangent = new Vector3f();
         Vector3f bitangent = new Vector3f();
         Vector3f joint = new Vector3f();
-        for (Piece p : pieces) {
-            BodyFragment f = new BodyFragment(p);
+        for (FragmentPiece p : pieces) {
+            BodyFragment f = new BodyFragment(p, pose);
             f.appearance.capture(n);
-            f.orientation.rotationY(yaw);
-            f.orientation.transform(p.centreX, p.centreY, p.centreZ, f.pos).add(n.pos);
+            f.placeAt(n.pos.x, n.pos.y, n.pos.z, yaw);
             fitExtents(f);
             pushFree(g.world, f);
 
@@ -138,7 +141,7 @@ public class BodyFragmentSystem implements SimulationSystem {
             }
             tangent.normalize();
             bitangent.set(dir).cross(tangent);
-            int salt = p.ordinal() * 8;
+            int salt = p.id * 8;
             float scatter = blastSpeed * BodyFragmentConstants.TANGENT_JITTER;
             f.vel.set(n.vel)
                     .fma(blastSpeed, dir)
@@ -154,7 +157,7 @@ public class BodyFragmentSystem implements SimulationSystem {
                     BodyFragmentConstants.SPIN_JITTER * hash(f.pos, salt + 4));
             clampLength(f.angularVelocity, RagdollConstants.MAX_ANGULAR_SPEED);
             // Stagger the drips so ten pieces do not shed in lockstep.
-            f.dripTimer = RagdollConstants.DRIP_INTERVAL * p.ordinal() / pieces.length;
+            f.dripTimer = RagdollConstants.DRIP_INTERVAL * p.id / pieces.size();
 
             if (live.size() >= BodyFragmentConstants.MAX_LIVE_FRAGMENTS) {
                 settleOldest(g);
@@ -164,7 +167,7 @@ public class BodyFragmentSystem implements SimulationSystem {
             totalSpawned++;
 
             if (p.severed) {
-                f.modelToWorld(p.pivotX, p.pivotY, p.pivotZ, joint);
+                f.jointToWorld(p.rootJoint, joint);
                 float speed = f.vel.length();
                 if (speed > 1e-4f) {
                     g.particles.bloodBurst(joint.x, joint.y, joint.z, f.vel.x / speed,

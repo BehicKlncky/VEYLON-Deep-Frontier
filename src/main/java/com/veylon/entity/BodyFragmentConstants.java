@@ -78,6 +78,18 @@ public final class BodyFragmentConstants {
     public static final float FLAT_BAND = 0.15f;
     /** Smallest collision half extent, so a thin piece still sweeps a real box. */
     public static final float MIN_HALF_EXTENT = 0.05f;
+    /**
+     * A split half whose longest side is shorter than this stays merged with
+     * the part it was split from instead of flying as its own piece: a deer's
+     * tail tip or a hare's lower leg would be a few centimetres of debris.
+     * {@link FragmentAnatomy} enforces it for every body.
+     */
+    public static final float MIN_SEPARATE_PIECE = 0.10f;
+    /**
+     * A wound covers this fraction of the severed piece's cross-section, so a
+     * rim of the piece's own colour is left round it.
+     */
+    public static final float CUT_INSET = 0.8f;
     /** Clearance kept when a turning piece is lifted off the face it rests on. */
     public static final float LIFT_SKIN = 1e-4f;
 

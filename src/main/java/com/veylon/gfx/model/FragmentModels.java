@@ -1,13 +1,15 @@
 package com.veylon.gfx.model;
 
+import com.veylon.entity.BodyFamily;
 import com.veylon.entity.BodyFragment;
 import com.veylon.entity.BodyFragment.Piece;
+import com.veylon.entity.BodyFragmentConstants;
+import com.veylon.entity.FragmentAnatomy;
+import com.veylon.entity.FragmentCut;
+import com.veylon.entity.FragmentPiece;
 import com.veylon.entity.RagdollConstants;
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
-
-import java.util.ArrayList;
-import java.util.List;
 
 /**
  * Draw geometry for the pieces of a person blown apart: where each piece's
@@ -20,9 +22,11 @@ import java.util.List;
  * they contribute is the sum of their pivots, the <em>anchor</em>, and the
  * piece draws exactly where the whole model would have drawn it.
  *
- * <p>Everything is computed once from {@link NpcModels}' pivots and boxes and
- * {@link Piece}'s table, both fixed at build time. It is plain CPU data, so the
- * renderer reads it without allocating and tests check it without GL.
+ * <p>Everything is computed once from the humanoid {@link FragmentAnatomy}'s
+ * pieces — anchors and the wounds each cut leaves — and {@link NpcModels}'
+ * clothing, all fixed at build time; {@link AnatomyModels#modelOf} checks the
+ * table against the model first. It is plain CPU data, so the renderer reads
+ * it without allocating and tests check it without GL.
  */
 public final class FragmentModels {
 
@@ -37,7 +41,7 @@ public final class FragmentModels {
      * A cut face covers this fraction of the severed limb's cross-section, so
      * a rim of the piece's own colour is left round the wound.
      */
-    public static final float CUT_INSET = 0.8f;
+    public static final float CUT_INSET = BodyFragmentConstants.CUT_INSET;
     /**
      * Added to a piece's box half-diagonal for view culling, for the
      * accessories that reach past the box: a slung spear, a crest, a pack.
@@ -65,37 +69,18 @@ public final class FragmentModels {
     private static final float[] RADIUS = new float[PIECES];
 
     static {
-        ModelPart root = NpcModels.get().root;
-        List<List<float[]>> cuts = new ArrayList<>();
-        for (int i = 0; i < PIECES; i++) {
-            cuts.add(new ArrayList<>());
-        }
+        ModelPart root = AnatomyModels.modelOf(BodyFamily.HUMANOID).root;
         for (Piece p : Piece.values()) {
-            ANCHOR[p.ordinal()] = new float[3];
-            if (!anchor(root, p.rootPart, 0, 0, 0, ANCHOR[p.ordinal()])) {
-                throw new IllegalStateException("no model part " + p.rootPart + " for " + p);
-            }
+            FragmentPiece d = p.definition;
+            ANCHOR[p.ordinal()] = new float[] {d.anchorX, d.anchorY, d.anchorZ};
             RADIUS[p.ordinal()] = (float) Math.sqrt(p.halfX * p.halfX + p.halfY * p.halfY
                     + p.halfZ * p.halfZ) + CULL_MARGIN;
-        }
-        // Every piece but the torso was cut from exactly one neighbour, at its
-        // own root pivot. The neighbour is the piece that excludes it; the legs
-        // hang off the model root, which is the hip at the torso's lower face.
-        for (Piece child : Piece.values()) {
-            if (!child.severed) {
-                continue;
+            // Every piece but the torso was cut from one neighbour at its own
+            // root pivot; the table lists each cut on both sides.
+            CUTS[p.ordinal()] = new float[d.cuts.size()][];
+            for (int i = 0; i < d.cuts.size(); i++) {
+                CUTS[p.ordinal()][i] = standProud(root, p, d.cuts.get(i));
             }
-            Piece parent = Piece.TORSO;
-            for (Piece p : Piece.values()) {
-                if (p.excludedParts.contains(child.rootPart)) {
-                    parent = p;
-                }
-            }
-            cuts.get(parent.ordinal()).add(cutFace(root, parent, child));
-            cuts.get(child.ordinal()).add(cutFace(root, child, child));
-        }
-        for (int i = 0; i < PIECES; i++) {
-            CUTS[i] = cuts.get(i).toArray(new float[0][]);
         }
     }
 
@@ -155,41 +140,15 @@ public final class FragmentModels {
     }
 
     /**
-     * A wound on {@code piece} where {@code severed} was cut away at its root
-     * pivot. It lies on the face of {@code piece}'s box that the joint is
-     * farthest beyond, relative to the box's half size; it covers the severed
-     * limb's cross-section, less {@link #CUT_INSET}, kept on that face; and it
-     * runs from the face out to {@link #CUT_PROUD} beyond the outermost always
-     * drawn surface over it.
+     * A wound from the table, which lies flat on a face of {@code piece}'s
+     * box, given depth: it runs from the face out to {@link #CUT_PROUD} beyond
+     * the outermost always drawn surface over it.
      */
-    private static float[] cutFace(ModelPart root, Piece piece, Piece severed) {
-        float[] joint = {severed.pivotX, severed.pivotY, severed.pivotZ};
-        float[] centre = {piece.centreX, piece.centreY, piece.centreZ};
-        float[] half = {piece.halfX, piece.halfY, piece.halfZ};
-        int axis = 0;
-        float best = -1;
-        for (int a = 0; a < 3; a++) {
-            float beyond = Math.abs(joint[a] - centre[a]) / half[a];
-            if (beyond > best) {
-                best = beyond;
-                axis = a;
-            }
-        }
-        float side = joint[axis] >= centre[axis] ? 1f : -1f;
-        float face = centre[axis] + side * half[axis];
-
-        // The limb keeps its depth along Z; its width lies along the other face axis.
-        float[] out = new float[6];
-        for (int a = 0; a < 3; a++) {
-            if (a == axis) {
-                continue;
-            }
-            float limb = a == 2 ? severed.halfZ * 2f : severed.halfX * 2f;
-            float size = Math.min(limb, half[a] * 2f) * CUT_INSET;
-            float reach = half[a] - size * 0.5f;
-            out[a] = Math.clamp(joint[a], centre[a] - reach, centre[a] + reach);
-            out[3 + a] = size;
-        }
+    private static float[] standProud(ModelPart root, Piece piece, FragmentCut cut) {
+        int axis = cut.axis;
+        float side = cut.side;
+        float[] out = {cut.centreX, cut.centreY, cut.centreZ, cut.sizeX, cut.sizeY, cut.sizeZ};
+        float face = out[axis];
 
         float outer = face;
         float[] min = new float[3];
