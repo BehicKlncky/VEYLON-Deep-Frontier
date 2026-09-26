@@ -349,6 +349,29 @@ builds still load new saves (dropping only the new remains).
 6. **Balance consequence to surface to the user:** a Survival player inside 3.9 blocks of their
    own scrap bomb, or 5.7 of a keg, now dies. This follows R1 and is not softened here.
 
+### 8.1 As built in milestone 03
+
+- **Record.** The record stays the v0.8.0 fields, moved from `Npc` to `Entity`:
+  `dismemberOnDeath`, `blastX/Y/Z`, `blastStrength` (names kept, so every v0.8.0 caller and
+  test still reads them). Only `Entity.recordBlastDeath(x, y, z, strength)` sets it, and it
+  refuses (returns false) unless the body is `dead` with `health <= 0` and has no record yet.
+  `Entity.clearBlastDeath()` forgets it; `Npc.killBy` moved to `Entity.killBy`.
+- **Gate.** `ExplosionSystem.explode(..., boolean lethalToLiving)` (renamed from
+  `lethalToHumans`); `insideLethalRadius(Entity, ...)` and `killOutright(Game, Entity, ...)` are
+  typed on `Entity`. The existing skip of `e.dead` and of an invulnerable player runs first, so a
+  Creative player is never killed, recorded, flashed or thrown. Numbers unchanged.
+- **Consequences in `killOutright`.** NPC: `playerHitNpcs` + `lastKnown` (unchanged). Creature:
+  `fear = 1`, `bleedTimer ≥ 12`, as for a survivable hit. Player: `Player.hurt` via `killBy`
+  (armour bypassed, no armour wear, no bleed roll), `damageFlash = 1`, `renderer.addShake`.
+  Knockback as before for everyone.
+- **Player record lifetime.** Spent by `BodyFragmentSystem.spawnPlayerRemains` at the death
+  transition; also cleared by `Game.respawn` and every `Player.restoreCreativeBody`, so a record
+  can never survive into a later, non-blast death.
+- **Stale targets.** `EntityManager.forgetTarget` clears every NPC `combatTarget` and creature
+  `targetEntity` that pointed at a body leaving the world (any death or departure, not only
+  blasts). Target acquisition was already re-queried each tick through `nearestCreature` /
+  `nearestNpc`, which skip dead bodies.
+
 ## 9. Death, rewards and one-body harvest
 
 - Death routing stays in `EntityManager.fastTick` (NPC, creature) and the `Game.frame` player
@@ -370,6 +393,51 @@ builds still load new saves (dropping only the new remains).
   arrows lost as today; its fragments are visual only.
 - Player remains: spawned once at the real death transition from humanoid geometry with an
   explicit neutral appearance; independent of the live `Player`, which respawns as today.
+
+### 9.1 As built in milestone 03
+
+- **Routing.** `EntityManager.fastTick`: NPC → `fragments.spawnFromNpc(g, n,
+  fragments.deathPose(n), blast…)`; creature (`onCreatureDied`, after credit, bird meat and the
+  harvest log) → `fragments.spawnFromCreature(g, c, fragments.deathPose(c), blast…)`; otherwise
+  the ragdoll as before. Player: `Game.enterDeathIfDue()` (extracted from `frame`, package
+  private) performs the unchanged `AppState.DEATH` transition and calls
+  `fragments.spawnPlayerRemains(this, player)`.
+- **Death pose.** `BodyFragmentSystem.DeathPoses` (interface, `of(Creature)`, `of(Npc)`), set once
+  by `Game`'s constructor to `AnatomyModels.deathPoses(() -> totalTime)`. Without a source (bare
+  fixture) a body uses its rest pose. `spawnFromNpc(g, n, x, y, z, strength)` keeps its v0.8.0
+  meaning — the standing rest pose — for QA scenes and fixtures; production deaths use the
+  explicit-pose overload. Player remains use `FragmentAnatomy.humanoid().restPose()` and
+  `NpcAppearance.setNeutral()` (no archetype, no raider/trader/sick look,
+  `NEUTRAL_CAMP_INDEX` 2 = the plain gatherer vest every unlisted archetype wears).
+- **Launch.** One generic `launch(Game, Entity, FragmentPose, …)` for every family. The blast
+  speed divides by `max(mass, MIN_LAUNCH_MASS)`, `MIN_LAUNCH_MASS` = 1.25 kg (*new tuning*):
+  below every human piece (lightest 1.39 kg), so people launch exactly as before, while a wing or
+  a hare leg now leaves at most `9 × strength / 1.25` (18.7 m/s scrap bomb, 27.4 m/s keg) instead
+  of the 42 m/s clamp. Heavy pieces keep the inverse-mass rule, so a thornhorn torso still barely
+  moves (the v0.8.0 tuning question, unchanged).
+- **Harvest record.** `Carcass.remains` (torso piece) ↔ `BodyFragment.harvest` (carcass), both
+  transient references; `Carcass.fragmented()`, `Carcass.atRest()`. Created by
+  `spawnFromCreature` for `CreatureType.leavesCarcass()` (all but BIRD, the rule
+  `RagdollSystem` now also reads), with species yield and lodged arrows. Its position follows the
+  torso on every step and at rest — `(torso.x, torso.y − halfHeight, torso.z)`, the ground under
+  the torso, which is also where a carcass drawn without a solved pose stands. The torso is
+  piece 0. **Deviation from §9:** the record exists at once, but `EntityManager.nearestCarcass`
+  (harvest, the F prompt, scavenging) skips it until the torso settles — the same "still
+  falling" rule a ragdoll's carcass has — and `InteractPromptBuilder` shows "The *species* is
+  still falling" meanwhile.
+- **Lifetime.** Settled cap: `admitSettled` evicts the oldest piece without a record (fallback,
+  unreachable while `MAX_ANCHORED_REMAINS < MAX_SETTLED_FRAGMENTS`: release the record to a
+  whole carcass rather than orphan it). `slowTick`: a torso whose record is still in
+  `entities.carcasses` is neither rotted nor distance-culled and copies the record's decay;
+  once the record has left the list the torso is removed if the record rotted (`decay <= 0`),
+  otherwise released to ordinary decay (emptied, or cleared by other code). Over
+  `MAX_ANCHORED_REMAINS` (60) at creation, the oldest record and its torso are removed together.
+- **Rendering and saving before 04/05.** `Renderer.renderCarcasses` skips fragmented records.
+  `Renderer.drawFragment` skips pieces with `piece == null` (every animal piece) — **animal
+  remains are invisible until 04**. `FragmentsSection.readable` leaves animal pieces out of
+  `world.fragments` v1 (unchanged format); a fragmented record is saved as an ordinary carcass
+  and loads as a whole carcass in the fixed sprawl — one body, reward kept — until 05 persists
+  the link. Player remains are human pieces and are saved in v1 with the neutral look.
 
 ## 10. Combustion model
 
@@ -515,7 +583,8 @@ Saving never extinguishes a live burn: `SaveSystem.write` only settles ragdolls 
 | `PANIC_REPLAN_COOLDOWN` | 0.25 s | bounded replanning |
 | `PANIC_RECOVERY` | 1.5 s | brief settling after extinction |
 | `MIN_SEPARATE_PIECE` | 0.10 m | section 7 |
-| `MAX_ANCHORED_REMAINS` | 60 | section 9 |
+| `MAX_ANCHORED_REMAINS` | 60 | section 9 (as built: `BodyFragmentConstants`) |
+| `MIN_LAUNCH_MASS` | 1.25 kg | section 9.1; added in 03 |
 | Combustion salt / panic salt | `0x4255524e494eL` / `0x50414e494353L` | distinct from every existing salt in the source tree |
 
 Worked outcomes with these values (0.5 s of pool contact at intensity 1, then a full
@@ -562,7 +631,9 @@ Presentation (*proposed*, 10 may retune with captures):
 Replace, keeping unrelated coverage:
 
 - `BlastLethalityTest.creaturesAndPlayerKeepTheExistingExplosionModel` (03): becomes the
-  all-living lethal-radius contract.
+  all-living lethal-radius contract. *Done:* replaced by
+  `creaturesAndThePlayerInsideTheLethalRadiusDieAndComeApartToo`; the per-family matrix is
+  `AllLivingBlastDeathTest`.
 - `BlastLethalityTest.blastKillsBecomeTenFragmentsNotARagdoll` and
   `BodyFragmentPhysicsTest.anNpcSplitsIntoExactlyTenPiecesAtItsJoints` stay true for humans;
   species counts come from the definitions (02/03).
@@ -578,7 +649,7 @@ Replace, keeping unrelated coverage:
 | Milestone | Consumes | Produces for later milestones |
 | --- | --- | --- |
 | 02 anatomy (done) | §3.2, §7; `BodySkeleton.of`/`humanoid`, `CreatureModels.of`, `NpcModels.get`, `EntityModel.part`, `ModelPart` pivot/box/split fields, `BodyFragment.Piece`, `FragmentModels` | `BodyFamily`, `FragmentAnatomy`, `FragmentPiece`, `FragmentCut`, `FragmentPose`, `AnatomyModels` (§7.1; exact API in the progress file); tests over `CreatureType.values()` + humanoid. |
-| 03 blast deaths | §8, §9; 02 definitions | Shared `Entity` blast record, generalized `ExplosionSystem` gate, `BodyFragmentSystem` spawn for any family, anchored `Carcass`, player-remains spawn at the `Game.frame` death transition. |
+| 03 blast deaths (done) | §8, §9; 02 definitions | Shared `Entity` blast record, generalized `ExplosionSystem` gate, `BodyFragmentSystem` spawn for any family, anchored `Carcass`, player-remains spawn at the `Game.frame` death transition (§8.1, §9.1). |
 | 04 fragment rendering | 02 definitions, 03 fragments | Definition-driven model selection and isolation in `Renderer.drawFragment`, cut faces per family, bounds from full geometry, suppressed intact carcass, all-species QA scene. |
 | 05 persistence | §7 save strategy, 03 remains ids | New optional section for species/player remains and anchored harvest; `world.fragments` v1 untouched; literal v1 fixture. |
 | 06 combustion state | §5, §6, §10, §11, §15 | `Entity.combustion`, `CombustionSystem` (expose/ignite/extinguish/query/snapshot), fast-tick wiring, medical-BURN gating, reset/seed in `WorldBootstrap`. |

@@ -23,7 +23,8 @@ Checkpoints by milestone (filled in by the following milestone):
 | Milestone | Commits |
 | --- | --- |
 | 01 | `8f7c50fb24b4621a9dc00f3786720f4fa9495fa0` — `docs(combat): record all-living combat and fire contract` |
-| 02 | reported in the milestone 02 handoff; record here in 03 |
+| 02 | `52ff25b05069cd229dab711cf47239842a1c996f` — `feat(entity): define where every kind of body comes apart`; `63de0ddb70edf982814ab78a9a70cb1faac85fbf` — `test(entity): pin where every body comes apart and that it reassembles`; `eb151dc7ab003206485b0b5e6f837c1ea96edcf0` — `docs(combat): record species fragment anatomy` |
+| 03 | reported in the milestone 03 handoff; record here in 04 |
 
 ## Status
 
@@ -31,7 +32,7 @@ Checkpoints by milestone (filled in by the following milestone):
 | --- | --- | --- |
 | 01 | Source audit, baseline, contract | **Complete** (documentation only) |
 | 02 | Species-aware fragment anatomy | **Complete** (definitions and pose API; no new gameplay) |
-| 03 | All-living blast deaths | Not started |
+| 03 | All-living blast deaths | **Complete** (gameplay; animal pieces not drawn or saved until 04/05) |
 | 04 | Species fragment rendering | Not started |
 | 05 | Fragment save compatibility | Not started |
 | 06 | Shared body combustion | Not started |
@@ -42,8 +43,10 @@ Checkpoints by milestone (filled in by the following milestone):
 | 11 | End-to-end validation | Not started |
 | 12 | Merge and push | Not started |
 
-No new gameplay behaviour exists yet: creatures and the player still fall whole, and a human
-blast death spawns the same ten pieces as before. Nothing in this file claims otherwise.
+Since 03, a lethal blast kills and blows apart every living body (all six species, every NPC
+family, a Survival player) in the simulation. Animal pieces are **not drawn** until 04 and **not
+saved** until 05; nothing in this file claims final visuals or persistence. No fire behaviour
+has changed yet.
 
 ## Milestone 01 — source audit and contract (2026-09-26)
 
@@ -323,3 +326,124 @@ Continue on the same branch; the 02 commit is reported in the handoff message.
   pieces need bounds from their full geometry (antlers, horns, raider spear).
 - `FragmentModels.pieceTransform` assumes the rest pose; `BodyFragment.modelTransform` is its
   posed generalization.
+
+## Milestone 03 — all-living blast deaths (2026-09-26)
+
+### Start state
+
+- Branch `feature/all-living-dismemberment-combustion`, tip `eb151dc` (milestone 02); the three 02
+  checkpoints are recorded in the table above. Working tree clean apart from the user's
+  untracked `.agents/` and `AGENTS.md`, which stay untracked.
+- Same host and portable Temurin 25.0.4.1+1 JDK; Gradle 9.1.0, `--no-daemon --console=plain`.
+
+### Commands and results
+
+All from the repository root in PowerShell with the portable JDK on `PATH`. Logs are in the
+git-ignored `build/` directory.
+
+| Command | Result |
+| --- | --- |
+| `.\gradlew.bat compileJava compileTestJava` | BUILD SUCCESSFUL (`build/all-living-m03-compile.log`). |
+| `.\gradlew.bat test --tests *BlastLethalityTest --tests *BodyFragment* --tests *Fragment* --tests *DeathRagdollTest --tests *CombatFireIntegrationTest --tests *GameLoopIntegrationTest --tests *RuntimeBoundsTest --tests *SimulationSystemContractTest --tests *MolotovTest --tests *FireWeatherTest --tests *CreativeHazardsTest --tests *EntityEcologyTest` (production code changed, old tests untouched) | 233 tests, **1 failed**: `BlastLethalityTest.creaturesAndPlayerKeepTheExistingExplosionModel`, the assertion contract §17 said 03 must replace. Every other existing fragment, ragdoll, blast, fire, save and game-loop test passed unmodified (`build/all-living-m03-legacy.log`). |
+| `.\gradlew.bat test --tests *SpeciesFragmentPhysicsTest` | First attempt did not compile (a test message typed as a non-String); fixed. Then **43 tests, 0 failures** (`build/all-living-m03-species.log`). |
+| `.\gradlew.bat test --tests *AllLivingBlastDeathTest --tests *BlastLethalityTest --tests *RuntimeBoundsTest --tests *SpeciesFragmentPhysicsTest` | First attempt did not compile (the same kind of typo in `BlastLethalityTest`); fixed. Then **126 tests, 0 failures**: 68 + 11 + 4 + 43 (`build/all-living-m03-new.log`). |
+| Mutation check: `MIN_LAUNCH_MASS` set to 0.01 and the settled-cap exemption disabled, then `test --tests *SpeciesFragmentPhysicsTest` | **9 of 43 failed as intended** (six launch-floor cases, the centred-blast case, the settled-cap case, the anchored-cap case) (`build/all-living-m03-mutation.log`). Both files were restored from copies and checked. |
+| `.\gradlew.bat build` | **BUILD SUCCESSFUL in 4 m 26 s. 1090 tests in 125 classes, 0 failures, 0 errors, 0 skipped**; `javadoc` and `check` executed (`build/all-living-m03-build.log`). Base after 02 was 979 in 123. |
+
+Not run: `performanceTest` (the per-step change is one null check; the per-frame allocation
+tests and `RuntimeBoundsTest`'s fragment allocation budget passed) and **native QA**. The only
+renderer changes are two skips (fragmented carcasses; pieces with no human id); no scene stages
+an animal blast yet and nothing new is drawn, so there was nothing to capture. The skips
+themselves are not exercised by headless tests.
+
+Launch evidence printed by `noPieceIsThrownFasterThanTheLaunchFloorAllows` (point-blank keg, 0.3
+blocks from the body; speeds include the 4.5 m/s upward bias and the sideways scatter; the
+blast-speed ceiling `9 × 3.8 / 1.25` is 27.4 m/s): fastest piece deer 27.0, wolf 26.3, bird
+27.4, hare 26.5, thornhorn 25.8, gloomstalker 27.6 m/s. Without the floor every piece under about
+0.56 kg would have left at the 42 m/s clamp.
+
+### What was built
+
+Decisions and exact symbols are in contract §8.1 and §9.1.
+
+| Path | Change |
+| --- | --- |
+| `entity/Entity.java` | Blast record moved here from `Npc` (`dismemberOnDeath`, `blastX/Y/Z`, `blastStrength`); `killBy(boolean)` moved here; new `recordBlastDeath(x, y, z, strength)` (refuses unless really dead and unrecorded) and `clearBlastDeath()`. |
+| `entity/Npc.java` | Record and `killBy` removed (inherited). |
+| `combat/ExplosionSystem.java` | `lethalToHumans` → `lethalToLiving`; gate, `insideLethalRadius` and `killOutright` typed on `Entity`; per-kind consequences; the Creative skip still runs first. Numbers unchanged. |
+| `entity/BodyFragmentSystem.java` | `DeathPoses` interface, `setDeathPoses`, `deathPose(Creature)`, `deathPose(Npc)`; `spawnFromNpc(g, n, pose, …)` overload (the old signature is the rest pose); `spawnFromCreature(g, c, pose, …)`; `spawnPlayerRemains(g, player)`; generic private `launch`; launch-mass floor; one anchored carcass per harvestable animal (`anchorHarvest`, public static `anchoredRemains(List<Carcass>)`); the record follows the torso; the settled cap and slow tick keep anchored torsos; `MAX_ANCHORED_REMAINS` eviction removes record and torso together. |
+| `entity/BodyFragmentConstants.java` | `MIN_LAUNCH_MASS` 1.25, `MAX_ANCHORED_REMAINS` 60; cap comments. |
+| `entity/BodyFragment.java` | `harvest` (carcass link). |
+| `entity/Carcass.java` | `remains` (torso link), `fragmented()`, `atRest()`. |
+| `entity/Creature.java` | `CreatureType.leavesCarcass()` (all but BIRD); `RagdollSystem` uses it. |
+| `entity/EntityManager.java` | Creature and NPC blast deaths routed to fragments with the death pose; `forgetTarget` clears stale `combatTarget`/`targetEntity`; `nearestCarcass` skips remains still in flight. |
+| `entity/NpcAppearance.java` | `NEUTRAL_CAMP_INDEX`, `setNeutral()`. |
+| `entity/Player.java` | `restoreCreativeBody` clears the blast record. |
+| `gfx/model/AnatomyModels.java` | `deathPoses(DoubleSupplier clock)`. |
+| `Game.java` | Constructor wires the pose source (`totalTime`); death transition extracted to package-private `enterDeathIfDue()` (spawns player remains); `respawn()` package-private and clears the record. 980 lines of the 1000-line budget. |
+| `InteractPromptBuilder.java` | "The *species* is still falling" for remains in flight. |
+| `engine/Renderer.java` | Skips fragmented carcasses; **temporarily** skips pieces with `piece == null`. |
+| `save/FragmentsSection.java` | **Temporarily** leaves animal pieces out of v1. |
+| `qa/RuntimeBudgetSnapshot.java` | `anchoredRemains` component, hard limit and both summaries (smoke output gains `anchoredRemains=`). |
+| `src/test/.../AllLivingBlastDeathTest.java` (new) | 68 tests: per target (6 species, camp member, wandering trader, raider, villager, settlement trader, captive, patrol, bounty hunter, counterattacker, Survival player) inside and once only, the inclusive boundary against the adjacent float outside with a non-lethal twin, cover, Creative; a thrown bomb vs a wolf (credit, record, target clearing, harvest once), chained kegs with the player's death transition and respawn, an airborne bird, non-blast deaths. |
+| `src/test/.../entity/SpeciesFragmentPhysicsTest.java` (new) | 43 tests: per species pieces and placement, launch floor, floor, wall, water; one record per body, harvestable only at rest, settled cap, anchored cap, release and rot, despawn radius. |
+| `BlastLethalityTest` | Superseded test replaced by `creaturesAndThePlayerInsideTheLethalRadiusDieAndComeApartToo`; helper parameter renamed. |
+| `RuntimeBoundsTest` | The stress fills the anchored cap; the final despawn assertion now keeps exactly the anchored torsos. |
+| docs | contract §8.1, §9.1, §15, §17, §18; `ARCHITECTURE.md` lethal-blast and fragment paragraphs; `DEVELOPING.md` (renamed flag, `Entity.killBy`, `recordBlastDeath`). |
+
+### Limitations
+
+- **Animal remains are invisible** in the running game until 04 (`drawFragment` skip), and the
+  fragmented carcass is never drawn, so an animal blown apart vanishes apart from its blood
+  bursts; the F prompt and harvest still work at the torso's resting place.
+- **Animal remains are not saved** until 05. A save keeps the record as an ordinary carcass,
+  which loads as a whole carcass in the fixed sprawl at the torso's ground point: one body,
+  reward and arrows kept, pieces lost. Human pieces and player remains are saved in
+  `world.fragments` v1 as before (the player's with the neutral look), in the rest pose: box
+  placement is exact, the captured pose and breathing scale (≤ 1.2 %) are not kept.
+- NPC deaths now start from the captured pose. The existing human draw path still draws
+  rest-pose geometry oriented by the piece's `orientation` (which includes the pose rotation),
+  so each box is where its collision box is; only intra-piece articulation and breathing scale
+  are not shown. 04 replaces the path.
+- **Player remains while dead:** the world stays paused behind the death overlay (unchanged
+  gate), so the remains wait at the death spot and fall once play resumes after respawn. During
+  the overlay the camera stays at the player's eye, inside the rest-pose head piece. The remains
+  are distance-culled like any piece if the player respawns more than 170 blocks away. Not
+  visually checked; 04/10 should capture it.
+- The neutral look still shows the friendly badge (`Animator.applyAppearance` shows it for any
+  non-hostile look). No field marks player remains apart from an NPC's pieces.
+- Heavy torsos still barely move (a thornhorn torso gets about 0.14 m/s from a scrap bomb before
+  the upward bias); the floor only caps light pieces. This is the open v0.8.0 tuning question.
+- `CreatureAI.update` still has no `dead` guard (assigned to 06/09): a creature killed by a blast
+  in the frame gets one more AI and physics step before its pieces spawn where it then stands.
+- Contract §8.6 now applies: a Survival player inside 3.9 blocks of their own scrap bomb (5.7 of
+  a keg) dies and comes apart.
+- Release-facing texts still say "Only people are dismembered" (`README.md` known limitations,
+  `COMBAT_LETHALITY_AND_MOLOTOV.md`, `docs/releases/v0.8.0.md`); 11 owns them once 04 and 05
+  have landed.
+
+### Handoff to milestone 04
+
+- Draw every piece from its definition: replace the `f.piece == null` early return in
+  `Renderer.drawFragment` with the sequence in the 02 handoff (`AnatomyModels.modelOf`,
+  `resetPose`, appearance for the humanoid, `applyPose(m, f.pose)`, `isolatePart`,
+  `f.rootTransform`), and move human pieces onto it so the captured pose shows.
+- Keep `renderCarcasses` skipping `c.fragmented()`. The anchored torso is `carcass.remains`
+  (piece 0); the record lies at `(torso.x, torso.y − halfHeight, torso.z)`.
+- Player remains are humanoid pieces with `NpcAppearance.setNeutral()` (archetype null,
+  campIndex `NEUTRAL_CAMP_INDEX` 2). Decide whether the badge should show; if a marker is
+  needed, add it to `BodyFragment` and have 05 persist it.
+- Add a QA scene that blows up each species and a Survival player through the production entry
+  points: `explosions.explode(..., true)`, then `entities.fastTick` / `Game.enterDeathIfDue`.
+
+### Handoff to milestone 05
+
+- Persist in the new optional section (contract §7): animal pieces (family ordinal, piece id,
+  position, orientation, decay; pose optional) and the record link (`Carcass.remains` ↔
+  `BodyFragment.harvest`, both object references now, so a stable remains id is needed), and
+  restore the anchored torso's exemptions. `restoreSettled` already applies the settled cap
+  through `admitSettled`, which passes over anchored torsos.
+- Until then `FragmentsSection.readable` returns false for `piece == null`; remove that once the
+  new section writes animal pieces. `world.fragments` v1 must stay byte-identical for people.
+- `SaveSystem.write` settles ragdolls and fragments before it writes carcasses, so a record's
+  saved position is always its rested torso's ground point.

@@ -117,8 +117,9 @@ several helpers and each one needed its own gate.
    must also be classified in `ProjectileSystem.step`, which is where
    `HitZone.classify` is called with the entry point of the hit.
 3. Decide whether it is a *bomb* for `ExplosionSystem`: a blast that passes
-   `lethalToHumans` kills and dismembers every person inside
-   `power × LETHAL_RADIUS_FACTOR`. The fire bomb deliberately is not one.
+   `lethalToLiving` kills and dismembers every living body inside
+   `power × LETHAL_RADIUS_FACTOR`, a Creative player excepted. The fire bomb
+   deliberately is not one.
 
 ### A new way for AI to notice the player
 
@@ -463,14 +464,14 @@ Contributor rules this feature adds:
 
 - **Give a new projectile kind a row in the torso-wound table**, as "How to
   add…" describes. The table is the only place a person's wound cost lives.
-- **Kill people through the damage path, never by writing `dead`.**
-  `Npc.killBy` hurts for more than the remaining health, so `health <= 0`,
+- **Kill bodies through the damage path, never by writing `dead`.**
+  `Entity.killBy` hurts for more than the remaining health, so `health <= 0`,
   `lastHitByPlayer` and `EntityManager.reallyDied` all agree and the death
   pipeline treats a head shot or a blast exactly like any other kill.
 - **What kills a body decides how it falls.** `dismemberOnDeath` is set only by
-  a lethal blast, and only on a body that blast killed; everything else
-  ragdolls. Nothing may set it on a living NPC, and a second blast never
-  overwrites the first one's record.
+  a lethal blast, through `Entity.recordBlastDeath`, and only on a body that
+  blast killed; everything else ragdolls. Nothing may set it on a living body,
+  and a second blast never overwrites the first one's record.
 - **Light fires through `FireSystem.ignite`.** It is what holds every block
   fire — from bottles, blasts, lightning and spread alike — under one
   `MAX_ACTIVE_FIRES`, and what refuses a cell that is already burning.
