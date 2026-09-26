@@ -5,6 +5,7 @@ import com.veylon.item.EquipSlot;
 import com.veylon.item.Inventory;
 import com.veylon.item.ItemStack;
 import com.veylon.item.ItemType;
+import com.veylon.simulation.FireConstants;
 import com.veylon.simulation.ShelterSystem;
 import com.veylon.util.MathUtil;
 import com.veylon.world.Biome;
@@ -264,6 +265,8 @@ public class Player extends Entity {
         woundClean = false;
         // A Creative body never dies, so it has no blast death to come apart from.
         clearBlastDeath();
+        // Nor does it burn: a fire it carried into Creative is forgotten, not paused.
+        combustion.clear();
         resetFallState();
     }
 
@@ -465,9 +468,16 @@ public class Player extends Entity {
     private void tickAfflictions(Game g, float dt) {
         var it = afflictions.entrySet().iterator();
         boolean bleedEnded = false;
+        // While the player is alight the flames are the only burn damage, so the
+        // burn injury neither hurts nor heals until they are out (read from the
+        // previous fast tick's fire, which runs after the needs).
+        boolean aflame = combustion.burning();
         while (it.hasNext()) {
             var e = it.next();
             Affliction a = e.getKey();
+            if (a == Affliction.BURN && aflame) {
+                continue;
+            }
             float left = e.getValue() - dt;
             switch (a) {
                 case BLEEDING -> health -= BLEEDING_DAMAGE_PER_SECOND * dt;
@@ -527,6 +537,23 @@ public class Player extends Entity {
         addAffliction(Affliction.SICKNESS, TOXIC_FOG_SICKNESS_SECONDS);
         g.log("The toxic fog claws at your lungs... SICKNESS takes hold.");
         return true;
+    }
+
+    /**
+     * The burn injury active flames leave behind, given by
+     * {@link CombustionSystem} once per burn episode. Its length is rolled here
+     * with the other injuries, and a shorter roll never shortens a burn already
+     * carried.
+     */
+    void inflictBurnInjury(Game g) {
+        if (abilities.invulnerable() || dead) {
+            return;
+        }
+        if (!has(Affliction.BURN)) {
+            g.log("The flames sear you - BURNS! Treat them with a herbal poultice.");
+        }
+        addAffliction(Affliction.BURN, FireConstants.BURN_AFFLICTION_SECONDS_MIN
+                + rng.nextFloat() * FireConstants.BURN_AFFLICTION_SECONDS_RANGE);
     }
 
     /** Smoke exposure converts to the smoke affliction. */

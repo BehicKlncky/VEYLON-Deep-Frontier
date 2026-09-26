@@ -34,6 +34,11 @@ public abstract class Entity {
     public boolean dismemberOnDeath;
     /** Centre and power of that blast; meaningful only with {@link #dismemberOnDeath}. */
     public float blastX, blastY, blastZ, blastStrength;
+    /**
+     * This body's fire, if it is alight: one per body, advanced only by
+     * {@link CombustionSystem} and read-only everywhere else. Transient.
+     */
+    public final BodyCombustion combustion = new BodyCombustion();
 
     protected float fallDist;
     protected final World world;

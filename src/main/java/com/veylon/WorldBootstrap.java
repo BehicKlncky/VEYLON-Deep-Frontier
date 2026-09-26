@@ -100,6 +100,8 @@ final class WorldBootstrap {
         game.settlementManager.reset();
         game.ragdolls.reset();
         game.fragments.reset();
+        // Fires live on the bodies a new world replaces; only the tallies stay here.
+        game.combustion.reset();
         game.particles.count = 0;
         reseedSimulation(seed);
     }

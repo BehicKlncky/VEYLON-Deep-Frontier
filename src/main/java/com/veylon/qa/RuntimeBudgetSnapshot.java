@@ -35,7 +35,9 @@ public record RuntimeBudgetSnapshot(
         int particles,
         int pendingGenerationChunks,
         int pendingGenerationEdits,
-        int anchoredRemains) {
+        int anchoredRemains,
+        int burningBodies,
+        int livingBodies) {
 
     public static RuntimeBudgetSnapshot capture(Game game) {
         int pathNodes = 0;
@@ -66,7 +68,9 @@ public record RuntimeBudgetSnapshot(
                 game.particles.count,
                 game.world.pendingGenerationChunkCount(),
                 game.world.pendingGenerationEditCount(),
-                BodyFragmentSystem.anchoredRemains(game.entities.carcasses));
+                BodyFragmentSystem.anchoredRemains(game.entities.carcasses),
+                game.combustion.burningBodies(game),
+                game.entities.npcs.size() + game.entities.creatures.size() + 1);
     }
 
     /** True when every collection with a hard runtime ceiling is within it. */
@@ -91,7 +95,8 @@ public record RuntimeBudgetSnapshot(
                 && fires <= FireSystem.MAX_ACTIVE_FIRES
                 && liquidFirePatches <= LiquidFireConstants.MAX_PATCHES
                 && particles <= ParticleSystem.MAX
-                && anchoredRemains <= BodyFragmentConstants.MAX_ANCHORED_REMAINS;
+                && anchoredRemains <= BodyFragmentConstants.MAX_ANCHORED_REMAINS
+                && burningBodies <= livingBodies;
     }
 
     /** Compact live occupancy used verbatim by smoke output and failure logs. */
@@ -115,7 +120,8 @@ public record RuntimeBudgetSnapshot(
                 + " particles=" + particles
                 + " generation={chunks=" + pendingGenerationChunks
                 + ",edits=" + pendingGenerationEdits + "}"
-                + " anchoredRemains=" + anchoredRemains;
+                + " anchoredRemains=" + anchoredRemains
+                + " burning=" + burningBodies + "/" + livingBodies;
     }
 
     public static String hardLimitSummary() {

@@ -94,7 +94,19 @@ public class FireSystem implements MediumTickSystem {
      * and burning blocks share this test, and so should any other flame.
      */
     public boolean isRainedOn(Game g, int x, int y, int z) {
-        return g.weather.isPrecip() && g.world.skyLight(x, y + 1, z) > RAIN_EXPOSURE_SKYLIGHT;
+        return isPrecipitationReaching(g, x, y + 1, z);
+    }
+
+    /**
+     * Whether precipitation reaches into the open cell at x,y,z: it is
+     * raining, storming or snowing and nothing opaque stands above the cell.
+     * {@link #isRainedOn} asks it of the cell above a block; a burning body
+     * asks it of the cell its head is in, so a roof over the head shelters it.
+     * An unloaded column reads as open sky, so callers deciding anything about
+     * a place check that its column is loaded.
+     */
+    public boolean isPrecipitationReaching(Game g, int x, int y, int z) {
+        return g.weather.isPrecip() && g.world.skyLight(x, y, z) > RAIN_EXPOSURE_SKYLIGHT;
     }
 
     public Vec3i nearestBurning(float x, float y, float z, float range) {

@@ -128,6 +128,7 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
     public final EntityManager entities = new EntityManager();
     public final com.veylon.entity.RagdollSystem ragdolls = new com.veylon.entity.RagdollSystem();
     public final com.veylon.entity.BodyFragmentSystem fragments = new com.veylon.entity.BodyFragmentSystem();
+    public final com.veylon.entity.CombustionSystem combustion = new com.veylon.entity.CombustionSystem();
     public final FactionSystem faction = new FactionSystem();
     // 0.3.0 world-expansion systems.
     public final com.veylon.combat.WorldNoise noise = new com.veylon.combat.WorldNoise();
@@ -917,6 +918,7 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
         log("You died. The frontier reclaims you... (respawned at the crash site)");
         player.dead = false;
         player.clearBlastDeath();
+        combustion.clear(player);
         player.health = 55;
         player.hunger = Math.max(player.hunger, 50);
         player.thirst = Math.max(player.thirst, 50);
@@ -937,6 +939,7 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
     @Override
     public void fastTick(float dt) {
         player.tickNeeds(this, dt);
+        combustion.fastTick(this, dt);
         entities.fastTick(this, dt);
         settlementManager.fastTick(this, dt);
     }
