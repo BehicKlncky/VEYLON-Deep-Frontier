@@ -42,7 +42,7 @@ runs. All are inert when unset. Everything below is handled by `QaHarness`;
 | `VEYLON_SEED` | Fixed world seed (a non-numeric value is hashed) |
 | `VEYLON_GAME_MODE=survival\|creative` | Initial mode for automated world runs only; absent means Survival. Invalid values fail explicitly. Ignored for normal title sessions and frontend-only captures. |
 | `VEYLON_SMOKE=<seconds>` | Release smoke gate: save/load, fire, storm, a fortress approach, then a pass/fail report. Throws on failure |
-| `VEYLON_SCENE=<name>` | Stage a deterministic benchmark scene (`day`, `pinefog`, `nightfire`, `ruin`, `toxic`, `ao_shadow`, `phase4`, `ashwolf`, `silhouette30`, `vfx_blood`, `vfx_mining`, `vfx_beacon`, `death_ragdoll_showcase`, `death_ragdoll_sequence`, `dismember_showcase`, `dismember_wall`, `dismember_bomb` (a real scrap bomb thrown into a group of six, one outside the lethal radius; it goes off at 2.4 s), `molotov_ground`, `molotov_tree` and `molotov_rain` (a real fire bomb thrown at 0.5 s onto a dry clearing at dusk, beside a round tree that catches, or with rain from 3 s that puts the pool out; shots `0.7,1.2,3,7,11`, `1,4,10,20` and `2,3.5,5`), `movement`, `inventory`, `ui_cycle`, `held_*`, and `creative_flight` with `VEYLON_GAME_MODE=creative`, which flies east at Shift speed and prints a `[flight]` streaming report at 29 s) |
+| `VEYLON_SCENE=<name>` | Stage a deterministic benchmark scene (`day`, `pinefog`, `nightfire`, `ruin`, `toxic`, `ao_shadow`, `phase4`, `ashwolf`, `silhouette30`, `vfx_blood`, `vfx_mining`, `vfx_beacon`, `death_ragdoll_showcase`, `death_ragdoll_sequence`, `dismember_showcase`, `dismember_wall`, `dismember_bomb` (a real scrap bomb thrown into a group of six, one outside the lethal radius; it goes off at 2.4 s), `dismember_species`, `dismember_species_wall` and `dismember_species_close` (every species, a guard and the player's remains blown apart at 1 s; open meadow, a step and a wall, and a close view of the small bodies), `molotov_ground`, `molotov_tree` and `molotov_rain` (a real fire bomb thrown at 0.5 s onto a dry clearing at dusk, beside a round tree that catches, or with rain from 3 s that puts the pool out; shots `0.7,1.2,3,7,11`, `1,4,10,20` and `2,3.5,5`), `movement`, `inventory`, `ui_cycle`, `held_*`, and `creative_flight` with `VEYLON_GAME_MODE=creative`, which flies east at Shift speed and prints a `[flight]` streaming report at 29 s) |
 | `VEYLON_SHOT="5,10"` | Capture screenshots at those elapsed seconds |
 | `VEYLON_FRONTEND=<name>` | Pin a front-end screen (`options`, `audio`, `loading`, `death`, `victory`, `glyphs`, `newworld`). `newworld-save` shows the replace-save notice without writing a save. `pause` and `gamemode` stage a Survival world with the pause menu or the mode confirmation open; `pause-creative`, `gamemode-creative` and `victory-creative` stage a Creative world; `catalog`, `catalog-tools`, `catalog-search` (query "iron") and `catalog-inventory` open the Creative catalog; `worldcontrols` and `worldcontrols-held` open the Creative world controls, the second with dusk, a frozen clock, a locked storm and paused spawning already applied |
 | `VEYLON_RESOLUTION=1920x1080` | Framebuffer override |
@@ -160,7 +160,11 @@ transfers, equipping) keeps the Survival rule in both modes and needs no gate.
    pieces core first. `AnatomyModels.validate` and `FragmentAnatomyModelTest`
    hold the table to the model and put the pieces back together; a split half
    shorter than `BodyFragmentConstants.MIN_SEPARATE_PIECE` must stay with its
-   parent piece.
+   parent piece. Drawing the pieces needs nothing more: `FragmentModels`
+   derives wound depths and culling bounds from the table and the model, and
+   `SpeciesFragmentDrawTest` covers every `BodyFamily`. Add the type to the
+   row in `SpeciesDismemberQaScene` and capture it (see the lethal combat QA
+   section below).
 5. Add spawn rules to `EntityManager` (biome, time of day, density cap).
 6. Only touch `CreatureAI` if it needs behaviour the existing states don't
    cover.
@@ -445,6 +449,15 @@ shows the same moment on every run.
   people apart at one second, the second with a stone wall three blocks behind
   them. `dismember_bomb` (`VEYLON_SHOT=2.2,4,9`) throws a real scrap bomb into
   a group of six, one of them outside the lethal radius; it goes off at 2.4 s.
+- `dismember_species`, `dismember_species_wall` and `dismember_species_close`
+  (`VEYLON_SHOT=0.5,1,3,8`, plus `1.3` in a second run with its own
+  `VEYLON_CAPTURE_TAG` for pieces in flight) stand a hare, a bird in flight, a
+  gloomstalker, the player's remains, a guard, a wolf, a deer and a thornhorn
+  in a row, each in its own pose and heading, and blow them all apart at one
+  second. The second scene adds a stone step and a wall behind the row, the
+  third views the small end of the row from close by. The living clock is
+  pinned, so the 0.5 s and 1 s shots must show the same bodies — the second
+  with blood and, where the player's remains appear, nothing else changed.
 - `molotov_ground`, `molotov_tree` and `molotov_rain`
   (`VEYLON_SHOT=0.7,1.2,3,7,11`, `1,4,10,20` and `2,3.5,5`) throw a real fire
   bomb onto a dry clearing at dusk, beside a tree that catches, and with rain
@@ -456,9 +469,9 @@ shots in one run would round to the same filename (`VEYLON_SHOT` names files by
 whole seconds, so 1.2 and 1.6 overwrite each other).
 
 Run `gradlew test --tests '*ProjectileHitZone*' --tests '*BlastLethality*'
---tests '*BodyFragment*' --tests '*Fragment*' --tests '*Molotov*' --tests
-'*FireWeather*' --tests '*LiquidFire*' --tests '*CombatFireIntegration*'` while
-working on any of this.
+--tests '*BodyFragment*' --tests '*Fragment*' --tests '*Dismember*' --tests
+'*Molotov*' --tests '*FireWeather*' --tests '*LiquidFire*' --tests
+'*CombatFireIntegration*'` while working on any of this.
 
 Contributor rules this feature adds:
 
@@ -485,3 +498,11 @@ Contributor rules this feature adds:
 - **Cap every new pile of debris and prove it.** Pieces, pools and their
   remembered (NPC, spill) pairs each have a hard cap with a `RuntimeBoundsTest`
   case that reaches it exactly and cannot pass it.
+- **Draw a piece only through `Animator.poseFragment` and the
+  `FragmentModels` frames.** `poseFragment` picks the piece's own body's shared
+  model, resets whatever the last body left on it, puts on a person's look and
+  applies the pose the body died in; `rootFrame`, `pieceFrame` and `cutFrame`
+  place it, its wounds and a thin piece's ground contact. Posing a shared model
+  any other way leaves a missing leg or a raider's hood on the next body drawn
+  from it. `SpeciesFragmentDrawTest` checks a piece's first frame against the
+  living body and a live body drawn after a piece against one drawn alone.

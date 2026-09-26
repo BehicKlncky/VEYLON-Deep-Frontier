@@ -672,7 +672,12 @@ torque about that corner. No generator was added: what the blast does not decide
 comes from a hash of the piece's position, the way `RagdollSystem.positionBias`
 picks a side. At most 120 pieces fly and 600 lie about; over either cap the
 oldest gives way. Pieces rot on the corpse clock beside carcasses and corpses in
-`EntityManager.tickWorldDetritus`, and the step allocates nothing.
+`EntityManager.tickWorldDetritus`, and the step allocates nothing. Each piece is
+drawn from its own body's shared model — the humanoid for a person or the
+player's remains (a plain, campless look), the species' model for an animal —
+posed as the body died and cut down to its own parts by `Animator.poseFragment`,
+with its wounds on the faces of its collision box (`FragmentModels`). An animal's
+harvest record is never drawn as a whole carcass; its torso piece is the body.
 
 **A fire bomb is a molotov.** It shatters on the first block or body it touches,
 its fuse only a fallback for one that never lands, and makes no blast, no blast

@@ -308,7 +308,7 @@ and `FragmentAnatomy` refuses a table that breaks it in either direction. Piece 
   (the hare's hips) is cut on the face the severed piece leaves through instead of the face it
   is nearest. The cross-section laid on the face is the severed piece's size across the way it
   points from its joint. The table stores a flat rectangle on the face; the renderer adds depth
-  and stands it proud of clothing (`FragmentModels.CUT_PROUD` over the vest).
+  and stands it proud of clothing (`FragmentModels.CUT_PROUD` over the vest; §7.2).
 - **Death pose.** Not bones only: `FragmentPose` holds each joint's `ModelPart` transform
   (rotation, pose offset, scale) as the living animation drew it, so the root, the torso part
   and the ears are included. Each piece's rigid frame is its box part's frame in that pose, so a
@@ -327,6 +327,57 @@ unknown version of a known ID (`FragmentsSection.read`: "unsupported fragments s
 version"). Therefore keep `world.fragments` v1 byte-identical for human pieces and put species
 pieces, player remains and anchored-harvest links in a **new optional section ID**, so v0.8.0
 builds still load new saves (dropping only the new remains).
+
+### 7.2 As built in milestone 04 (drawing the pieces)
+
+- **Which model.** `Animator.poseFragment(BodyFragment)` draws a piece from
+  `AnatomyModels.modelOf(f.definition.family)`: the humanoid for a person or the player's
+  remains, the species' `CreatureModels` model for an animal, with that species' own colours,
+  glow and accessories. The two-argument form refuses any other model. Each draw runs
+  `resetPose` → for the humanoid `Animator.applyAppearance(m, f.appearance)` →
+  `AnatomyModels.applyPose(m, f.pose)` → `Animator.isolatePart`. Every live, corpse, ragdoll,
+  carcass and piece draw starts with `resetPose` (and a person's with the look), so hidden
+  parts, forced split halves, joint transforms and the vest colour never carry over to the next
+  body; tint and emission are shader uniforms set per draw, and wounds are drawn with emission 0.
+- **Frames.** `FragmentModels.rootFrame(f)` is `f.rootTransform` lowered by `contactDrop`, so
+  every box is drawn where the living model drew it at death and then where the simulation has
+  the piece. `pieceFrame(f)` = translate(pos − drop) × rotate(orientation) × scale(pieceScale)
+  × translate(−restCentre) is the collision box's own frame; wounds (rest-pose model space) are
+  placed in it with `cutFrame`, so they lie on the faces of the box as drawn and tumble with it.
+  A wound on a piece cut at its own box part covers that joint in every pose; a head cut at a
+  box-less neck keeps its stump under the head, where the neck met it.
+- **Wound depth.** The table's rectangle, unchanged across the face (sizes come from the
+  severed piece's cross-section: a 1.6 × 8 cm wing socket, a head-sized stump where a head sat
+  on its box-less connector), from the face to `CUT_PROUD` (1 cm) beyond the outermost *shell*
+  over it: a box of the piece standing at most `SHELL_REACH` (3 cm, new) beyond that face and
+  overlapping the wound. A person's shells are the vest only, because every other kit part comes
+  and goes with the look; this reproduces the pre-04 human wounds exactly. Any part of an animal
+  may be one; in practice only the hare's haunch is (2 cm over the tail stump). A box reaching
+  further, a shoulder pad over an arm's stump, lies over the joint and is ignored. The wound's
+  inner face is back-facing against the box face and its outer face is 1 cm in front of it, so
+  there is no depth fighting.
+- **Culling bound.** Per family and piece, once: the largest of the collision box's
+  half-diagonal, each wound's far corner, and for every part below the box part
+  |pivot − box centre| + Σ|pivots below| + |box offset| + box half-diagonal, which holds however
+  those joints turn (antlers, horns, ears, the raider's spear at its slung angle), times
+  `pose.pieceScale`, about the drawn centre. A table in which a drawn box does not hang below
+  its piece's box part fails when `FragmentModels` loads.
+- **Ground contact.** The fragment sweep never shrinks below `MIN_HALF_EXTENT` (0.05), so a piece
+  thinner than that (bird wings and tail, hare legs, gloomstalker legs and tail, the deer's tail)
+  rests up to 4 cm above the floor. `contactDrop` = (0.05 − the turned box's vertical half
+  extent) × clamp(1 − |vel| / `CONTACT_SPEED`, 0, 1), `CONTACT_SPEED` = 1 m/s (new): drawn at
+  the bottom of its sweep box when slow, not moved while fast. Every piece leaves a body faster
+  than `UPWARD_BIAS` (4.5 m/s), so separation is untouched. Horizontal inflation is not
+  compensated: a thin piece resting against a wall may stand up to 2.5 cm off it.
+- **Player remains.** `NpcAppearance.NEUTRAL_CAMP_INDEX` is now −2 (was 2 in 03): no camp, so
+  `applyAppearance` shows no camp badge (it now needs `campIndex >= 0`), and `floorMod(−2, 4) = 2`
+  keeps the plain gatherer vest. `world.fragments` v1 stores the index as an int, so the look
+  survives a save with no format change; a v0.8.0 build reading such a save draws the badge.
+- **One harvest representation.** `Renderer.renderCarcasses` keeps skipping
+  `Carcass.fragmented()`; the anchored torso piece is the body, the record lies at the drawn
+  torso's lowest point, and `EntityManager.nearestCarcass` finds it once the torso is at rest.
+- **QA.** `SpeciesDismemberQaScene` (`dismember_species`, `dismember_species_wall`,
+  `dismember_species_close`), registered in `QaHarness.applyBenchmarkScene`.
 
 ## 8. Lethal-blast rules
 
@@ -408,7 +459,8 @@ builds still load new saves (dropping only the new remains).
   meaning — the standing rest pose — for QA scenes and fixtures; production deaths use the
   explicit-pose overload. Player remains use `FragmentAnatomy.humanoid().restPose()` and
   `NpcAppearance.setNeutral()` (no archetype, no raider/trader/sick look,
-  `NEUTRAL_CAMP_INDEX` 2 = the plain gatherer vest every unlisted archetype wears).
+  `NEUTRAL_CAMP_INDEX` 2 = the plain gatherer vest every unlisted archetype wears; 04 changed
+  it to −2, the same vest without a camp badge, §7.2).
 - **Launch.** One generic `launch(Game, Entity, FragmentPose, …)` for every family. The blast
   speed divides by `max(mass, MIN_LAUNCH_MASS)`, `MIN_LAUNCH_MASS` = 1.25 kg (*new tuning*):
   below every human piece (lightest 1.39 kg), so people launch exactly as before, while a wing or
@@ -433,8 +485,8 @@ builds still load new saves (dropping only the new remains).
   otherwise released to ordinary decay (emptied, or cleared by other code). Over
   `MAX_ANCHORED_REMAINS` (60) at creation, the oldest record and its torso are removed together.
 - **Rendering and saving before 04/05.** `Renderer.renderCarcasses` skips fragmented records.
-  `Renderer.drawFragment` skips pieces with `piece == null` (every animal piece) — **animal
-  remains are invisible until 04**. `FragmentsSection.readable` leaves animal pieces out of
+  `Renderer.drawFragment` skipped pieces with `piece == null` (every animal piece) until 04,
+  which draws every family (§7.2). `FragmentsSection.readable` leaves animal pieces out of
   `world.fragments` v1 (unchanged format); a fragmented record is saved as an ordinary carcass
   and loads as a whole carcass in the fixed sprawl — one body, reward kept — until 05 persists
   the link. Player remains are human pieces and are saved in v1 with the neutral look.
@@ -585,6 +637,8 @@ Saving never extinguishes a live burn: `SaveSystem.write` only settles ragdolls 
 | `MIN_SEPARATE_PIECE` | 0.10 m | section 7 |
 | `MAX_ANCHORED_REMAINS` | 60 | section 9 (as built: `BodyFragmentConstants`) |
 | `MIN_LAUNCH_MASS` | 1.25 kg | section 9.1; added in 03 |
+| `FragmentModels.SHELL_REACH` | 0.03 m | section 7.2; added in 04 (vest and haunch are 0.02) |
+| `FragmentModels.CONTACT_SPEED` | 1 m/s | section 7.2; added in 04, well under the 4.5 m/s launch bias |
 | Combustion salt / panic salt | `0x4255524e494eL` / `0x50414e494353L` | distinct from every existing salt in the source tree |
 
 Worked outcomes with these values (0.5 s of pool contact at intensity 1, then a full
@@ -650,7 +704,7 @@ Replace, keeping unrelated coverage:
 | --- | --- | --- |
 | 02 anatomy (done) | §3.2, §7; `BodySkeleton.of`/`humanoid`, `CreatureModels.of`, `NpcModels.get`, `EntityModel.part`, `ModelPart` pivot/box/split fields, `BodyFragment.Piece`, `FragmentModels` | `BodyFamily`, `FragmentAnatomy`, `FragmentPiece`, `FragmentCut`, `FragmentPose`, `AnatomyModels` (§7.1; exact API in the progress file); tests over `CreatureType.values()` + humanoid. |
 | 03 blast deaths (done) | §8, §9; 02 definitions | Shared `Entity` blast record, generalized `ExplosionSystem` gate, `BodyFragmentSystem` spawn for any family, anchored `Carcass`, player-remains spawn at the `Game.frame` death transition (§8.1, §9.1). |
-| 04 fragment rendering | 02 definitions, 03 fragments | Definition-driven model selection and isolation in `Renderer.drawFragment`, cut faces per family, bounds from full geometry, suppressed intact carcass, all-species QA scene. |
+| 04 fragment rendering (done) | 02 definitions, 03 fragments | Definition-driven model selection and isolation in `Renderer.drawFragment`, cut faces per family, bounds from full geometry, suppressed intact carcass, all-species QA scene (§7.2). |
 | 05 persistence | §7 save strategy, 03 remains ids | New optional section for species/player remains and anchored harvest; `world.fragments` v1 untouched; literal v1 fixture. |
 | 06 combustion state | §5, §6, §10, §11, §15 | `Entity.combustion`, `CombustionSystem` (expose/ignite/extinguish/query/snapshot), fast-tick wiring, medical-BURN gating, reset/seed in `WorldBootstrap`. |
 | 07 sources | §4, §10; 06 API | Fast-tick swept contact for patches, burning cells, campfires, torches; direct-hit ignition; `damageNear`/`burnOccupants` stop hurting; `Burn.byPlayer`; attack de-dup per burn episode. |

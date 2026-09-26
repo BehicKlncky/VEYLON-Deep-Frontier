@@ -24,7 +24,8 @@ Checkpoints by milestone (filled in by the following milestone):
 | --- | --- |
 | 01 | `8f7c50fb24b4621a9dc00f3786720f4fa9495fa0` — `docs(combat): record all-living combat and fire contract` |
 | 02 | `52ff25b05069cd229dab711cf47239842a1c996f` — `feat(entity): define where every kind of body comes apart`; `63de0ddb70edf982814ab78a9a70cb1faac85fbf` — `test(entity): pin where every body comes apart and that it reassembles`; `eb151dc7ab003206485b0b5e6f837c1ea96edcf0` — `docs(combat): record species fragment anatomy` |
-| 03 | reported in the milestone 03 handoff; record here in 04 |
+| 03 | `86ed85c14184ed22d710edbc80d1dda2cb7348c1` — `feat(combat): blow apart every living body a lethal blast kills`; `6bd61f8e1a9bc06e2de07b0edabbb967f5aa90d6` — `test(combat): pin lethal blasts and one body for every living thing`; `7d6c4aec43df0fcd2fb6af94cc8031cc64ff0d17` — `docs(combat): record all-living blast deaths` |
+| 04 | reported in the milestone 04 handoff; record here in 05 |
 
 ## Status
 
@@ -33,7 +34,7 @@ Checkpoints by milestone (filled in by the following milestone):
 | 01 | Source audit, baseline, contract | **Complete** (documentation only) |
 | 02 | Species-aware fragment anatomy | **Complete** (definitions and pose API; no new gameplay) |
 | 03 | All-living blast deaths | **Complete** (gameplay; animal pieces not drawn or saved until 04/05) |
-| 04 | Species fragment rendering | Not started |
+| 04 | Species fragment rendering | **Complete** (presentation; animal pieces still not saved until 05) |
 | 05 | Fragment save compatibility | Not started |
 | 06 | Shared body combustion | Not started |
 | 07 | Connect all fire sources | Not started |
@@ -44,9 +45,9 @@ Checkpoints by milestone (filled in by the following milestone):
 | 12 | Merge and push | Not started |
 
 Since 03, a lethal blast kills and blows apart every living body (all six species, every NPC
-family, a Survival player) in the simulation. Animal pieces are **not drawn** until 04 and **not
-saved** until 05; nothing in this file claims final visuals or persistence. No fire behaviour
-has changed yet.
+family, a Survival player) in the simulation; since 04 every piece is drawn as its own body's
+anatomy. Animal pieces are **not saved** until 05; nothing in this file claims persistence. No
+fire behaviour has changed yet.
 
 ## Milestone 01 — source audit and contract (2026-09-26)
 
@@ -447,3 +448,134 @@ Decisions and exact symbols are in contract §8.1 and §9.1.
   new section writes animal pieces. `world.fragments` v1 must stay byte-identical for people.
 - `SaveSystem.write` settles ragdolls and fragments before it writes carcasses, so a record's
   saved position is always its rested torso's ground point.
+
+## Milestone 04 — species fragment rendering (2026-09-26)
+
+### Start state
+
+- Branch `feature/all-living-dismemberment-combustion`, tip `7d6c4ae` (milestone 03); the three
+  03 checkpoints are recorded in the table above. `git fetch origin`: `main` = `origin/main` =
+  `3704f4d`, nothing incoming. Working tree clean apart from the user's untracked `.agents/` and
+  `AGENTS.md`, which stay untracked.
+- Same host and portable Temurin 25.0.4.1+1 JDK; Gradle 9.1.0, `--no-daemon --console=plain`.
+
+### Commands and results
+
+All from the repository root in PowerShell with the portable JDK on `PATH`. Logs are in the
+git-ignored `build/` directory.
+
+| Command | Result |
+| --- | --- |
+| `.\gradlew.bat compileJava compileTestJava` | BUILD SUCCESSFUL (`build/all-living-m04-compile.log`). |
+| `.\gradlew.bat test --tests *BodyFragment* --tests *Fragment* --tests *DeathRagdollTest --tests *BlastLethalityTest --tests *AllLivingBlastDeathTest --tests *SerializedEnumOrderTest --tests *CreativeBodyTest` (existing tests, `FragmentGeometryTest` moved to the new API) | 292 tests, **1 failed**: `FragmentGeometryTest.everyPieceIsDrawnWhereTheSimulationHasItTurnedTheWayItTurned`, 3 mm off. The first `contactDrop` read the piece's stored sweep height, which that test (like any caller that turns a piece without refitting) leaves stale. Fixed by working the sweep height out from the orientation (`build/all-living-m04-legacy.log`, the failing run). |
+| `.\gradlew.bat test --tests *SpeciesFragmentDrawTest --tests *FragmentGeometryTest --tests *FragmentsSectionTest --tests *FragmentIsolationTest` | First run: 7 of 62 failed, all in the new test: six wound-rigidity checks off by ≈ 1.2e-4 (float rounding at world coordinates near 310; the check now runs near the origin) and the bird's separation check (its lowered wing was drawn inside the floor and 03's spawn push-out lifted it 5 cm; the fixture now stands bodies clear of the floor). Then **all green; draw preparation 0 bytes/frame** for 120 pieces of every family (`build/all-living-m04-new.log`). |
+| Mutation check (scratch script: one mutation at a time in `Animator`/`FragmentModels`, then `test --tests *SpeciesFragmentDrawTest --tests *FragmentsSectionTest`, file restored and diffed) | **All six caught**: pose not applied (separation and bound tests fail for all 7 families); no contact drop (ground-contact test fails for deer, bird, hare, gloomstalker); no `resetPose` (reset, separation and ownership tests); badge rule removed (both player-remains tests); animal shells ignored (hare tail stump test); humanoid-style bound (box + 0.3 m) — only a reach test that mirrored the implementation failed, so that test was dropped; the containment test holds for the derived bound (`build/all-living-m04-mutation.log`). |
+| `.\gradlew.bat test --tests *SpeciesDismemberQaSceneTest --tests *SpeciesFragmentDrawTest` | **45 tests, 0 failures**; each scene logs `8 bodies, 81 pieces {HUMANOID=20, DEER=11, WOLF=12, BIRD=7, HARE=7, THORNHORN=12, STALKER=12}, 5 harvest records on torsos, 0 carcasses drawn whole` (`build/all-living-m04-scene.log`). |
+| Temporary probe `com.veylon.M04UprightProbeTest` (deleted, not committed) | Settled pieces of `dismember_species_close`, see limitations (`build/all-living-m04-upright-probe.log`). |
+| `.\gradlew.bat installDist`, then five native capture runs (below) | BUILD SUCCESSFUL; 14 captures, every capture `glErrors=0 khrErrors=0`. |
+| `.\gradlew.bat build` | **BUILD SUCCESSFUL in 7 m 46 s. 1136 tests in 127 classes, 0 failures, 0 errors, 0 skipped**; `javadoc` and `check` executed (`build/all-living-m04-build.log`). Base after 03 was 1090 in 125. |
+
+Not run: `performanceTest` (the per-frame preparation is held at 0 bytes by the new allocation
+test; wall-clock cost was not measured and this host is not the reference machine).
+
+### What was built
+
+Decisions are recorded in contract §7.2.
+
+| Path | Change |
+| --- | --- |
+| `gfx/model/Animator.java` | `poseFragment(BodyFragment)` resolves the family's model; `poseFragment(EntityModel, BodyFragment)` refuses another model and runs `resetPose` → look (humanoid) → `AnatomyModels.applyPose` → `isolatePart`. `applyAppearance(EntityModel, NpcAppearance)` overload. The camp badge needs `campIndex >= 0`. |
+| `gfx/model/FragmentModels.java` | Rewritten for every family, keyed by `FragmentPiece`: `rootFrame(f, dest)`, `pieceFrame(f, dest)`, `cutFrame(p, i, pieceFrame, dest)`, `cutCount/cutCentre/cutSize(p, …)`, `radius(p)`, `radius(f)`, `contactDrop(f)`, `rot`, `tint`; new `SHELL_REACH` 0.03, `CONTACT_SPEED` 1 m/s. Removed the `Piece`-keyed `anchor`, `rootTransform`, `pieceTransform`, `radius`, `cut*` and `CULL_MARGIN`. |
+| `engine/Renderer.java` | `drawFragment` draws every family through the above; culls the full-geometry sphere about the drawn centre; `drawBody` uses the appearance overload. |
+| `entity/NpcAppearance.java` | `NEUTRAL_CAMP_INDEX` 2 → −2 (no camp, same vest). |
+| `SpeciesDismemberQaScene.java` (new), `QaHarness.java` | Scenes `dismember_species`, `dismember_species_wall`, `dismember_species_close`. `QaHarness` is 1479 of its 1500-line budget. |
+| `src/test/.../gfx/SpeciesFragmentDrawTest.java` (new) | 40 tests: model and part ownership per family, species palette kept, wrong model refused; first frame through the production spawn equals the living body box for box (7 families × 4 headings × 5 creature poses or 16 person poses); wounds rigid on their box faces through tumbles; limb stumps cover their joints in every pose; wing and neck wound sizes, hare haunch; bound contains every box and wound in every pose, look and tumble; settled pieces on the floor and the harvest record under the drawn torso (6 species); live bodies after pieces, corpse after a piece, piece after piece, wolf vs deer models; player remains look; allocation. |
+| `src/test/.../SpeciesDismemberQaSceneTest.java` (new) | 5 tests: every body comes apart once per scene, five fragmented records and none whole, camera player untouched, wall stops the pieces; two runs match exactly. |
+| `FragmentGeometryTest`, `FragmentsSectionTest` | Moved to the `FragmentPiece` API with every human assertion kept; new `thePlayersRemainsKeepTheirPlainCamplessLookThroughTheUnchangedFormat`. |
+| docs | contract §7.1 pointer, §7.2 (new), §9.1, §15, §18; `ARCHITECTURE.md` fragment paragraph; `DEVELOPING.md` scene list, QA section, focused test command, creature step 4, contributor rule. |
+
+### Visual QA
+
+- **Environment.** Windows 11 Pro x64 10.0.26200; NVIDIA GeForce RTX 3060 Ti, driver 610.88,
+  OpenGL 3.3.0 with KHR_debug; framebuffer 1280 × 720, default graphics settings.
+- **Commands.** After `.\gradlew.bat installDist`, per run in PowerShell:
+  `$env:VEYLON_SEED='20260919'; $env:VEYLON_SCENE='<scene>'; $env:VEYLON_SHOT='<shots>';
+  $env:VEYLON_CAPTURE_TAG='<tag>'; java --enable-native-access=ALL-UNNAMED -Xmx2G
+  '-Dveylon.dataDir=build/qa/all-living-m04' -cp 'build/install/veylon/lib/*' com.veylon.Main`
+  with (`dismember_species`, `0.5,1,3,8`, `species_open`), (`dismember_species_wall`,
+  `0.5,1,3,8`, `species_wall`), (`dismember_species_close`, `0.5,1,3,8`, `species_close`),
+  (`dismember_species_wall`, `1.3`, `species_wall_flight`), (`dismember_species_close`, `1.3`,
+  `species_close_flight`). The isolated data directory keeps saves and settings away from the
+  user's.
+- **Captures** (git-ignored, not committed): `build/qa/all-living-m04/screenshots/` —
+  `species_open_{0,1,3,8}s.png`, `species_wall_{0,1,3,8}s.png`, `species_close_{0,1,3,8}s.png`,
+  `species_wall_flight_1s.png`, `species_close_flight_1s.png`; run logs beside them. A first
+  round placed the hare and bird behind the left HUD panels and hid the wall scene's pieces
+  behind a ledge; the row was moved right and the ledge replaced by a step that rises away from
+  the camera before the captures above were taken.
+- **Inspected in the images:**
+  - *No duplicate limbs or intact bodies:* every 1 s shot shows each body once, then only
+    pieces; the scene logs 0 carcasses drawn whole.
+  - *No rest-pose pop:* the 0.5 s and 1 s shots show the same poses (bird mid-beat in the air,
+    hare mid-hop, gloomstalker crouched, guard mid-stride, lunging wolf, grazing deer, tossing
+    thornhorn); the 1 s shot adds only blood and the player's remains.
+  - *Wings and tails:* the bird's wings fly as thin boards in `species_close_flight_1s`; tails
+    are too small to tell apart at these distances (headless coverage only).
+  - *Ground contact:* settled pieces lie on the grass and the step top, with none seen
+    hovering or sunk; exact contact is headless evidence.
+  - *Cut surfaces:* dark red faces are visible on human heads and limbs, the hare and
+    gloomstalker torsos, and the thornhorn torso.
+  - *Species look:* the deer keeps its glow spots and antlers, the gloomstalker its quills, and
+    each species its colours.
+  - *Player's remains:* plain vest with no badge, beside a guard wearing the teal badge.
+  - *Long pieces:* none disappeared, but culling at the frustum edge was not exercised on
+    purpose; the bound is headless evidence.
+- **Not visually verified:** individual wound faces at large scale (thornhorn neck stump, hare
+  tail stump over the haunch, wing sockets), the deer tail's contact lowering, the real player's
+  death transition and the view from inside the death overlay (the scene uses a stand-in),
+  macOS.
+
+### Limitations
+
+- **Upright legs (physics, not drawing).** In `dismember_species_close` all 8 deer leg pieces
+  and one gloomstalker upper leg came to rest standing on end (long axis within 0.01 of
+  vertical); human and most gloomstalker legs lie flat. `BodyFragmentSystem.spin` gives a piece
+  standing exactly on its end no toppling torque inside `FLAT_BAND`, and a grazing deer's legs
+  start vertical with little spin. They are supported, not floating. Left for a physics tuning
+  pass (with the torso-speed question), not changed here.
+- A piece the living model drew inside a block (a bird flapping close to the ground) is pushed
+  out by 03's spawn push-out, so it can move a few centimetres in its first frame.
+- Accessories are outside the collision box (contract §7): antlers, horns or a slung spear can
+  dip into the ground when a piece lies on them.
+- Horizontal sweep inflation is not compensated: a thin piece against a wall may stand up to
+  2.5 cm off it.
+- Wounds keep the rest table's place on their box: a head hung off a box-less neck keeps its
+  stump under the head rather than exactly at the neck joint of a posed death.
+- A v0.8.0 build loading a save with player remains draws their camp badge (vest unchanged).
+- The QA scenes stage each death through the kill, record and spawn entry points, not
+  `ExplosionSystem` (one explosion per body would kill neighbours first and leave craters);
+  the blast gate itself is covered by `AllLivingBlastDeathTest`.
+- Animal pieces are still not saved (05); release-facing "Only people are dismembered" texts
+  are unchanged (11).
+
+### Handoff to milestone 05
+
+- Everything the renderer needs from a restored piece: `f.definition` (family + piece id),
+  `f.pose` (the family's `restPose()` is drawn correctly; saving the captured pose would also
+  keep intra-piece articulation — 7 floats per joint through `FragmentPose.Recorder`),
+  `f.appearance` (humanoid only), `pos`, `orientation`, `decay`, `settled`, and the `harvest` link.
+  `contactDrop` and the bounds are derived, so no presentation state needs saving.
+  `restoreSettled` refits the sweep box.
+- Player remains already round-trip through `world.fragments` v1 with `NEUTRAL_CAMP_INDEX` −2
+  (`FragmentsSectionTest.thePlayersRemainsKeepTheirPlainCamplessLookThroughTheUnchangedFormat`).
+- `SpeciesDismemberQaScene` stages 81 pieces of all seven families and five anchored records in
+  a headless `Game` (`SpeciesDismemberQaSceneTest.arena`), a ready fixture for a round-trip test.
+- Keep green: `SpeciesFragmentDrawTest`, `SpeciesDismemberQaSceneTest`, `FragmentsSectionTest`,
+  `FragmentGeometryTest`, `FragmentIsolationTest`, `FragmentAnatomyModelTest`.
+
+### Handoff to milestone 10
+
+- Attach body-fire presentation to pieces with `FragmentModels.pieceFrame` (collision box
+  frame) and `FragmentModels.radius(f)` about `(pos.x, pos.y − contactDrop(f), pos.z)`.
+- Any new draw from a shared model must start with `resetPose` (and a person's look), as
+  `Animator.poseFragment` does.
