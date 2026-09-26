@@ -9,7 +9,10 @@ import com.veylon.combat.WeaponDefinition;
 import com.veylon.combat.WeaponRegistry;
 import com.veylon.combat.WorldNoise;
 import com.veylon.engine.ParticleSystem;
+import com.veylon.entity.BodyFragment;
 import com.veylon.entity.BodyFragmentConstants;
+import com.veylon.entity.BodyFragmentSystem;
+import com.veylon.entity.Creature;
 import com.veylon.entity.Npc;
 import com.veylon.entity.RagdollConstants;
 import com.veylon.item.ItemType;
@@ -135,8 +138,13 @@ class RuntimeBoundsTest {
                 "simulation without chunk generation cannot grow pending edits");
         assertEquals(0, game.fragments.liveCount(), "flying body pieces settle");
         game.entities.tickWorldDetritus(game, 0.05f);
-        assertEquals(0, game.fragments.settledCount(),
-                "body pieces left far behind the player are reclaimed");
+        assertEquals(BodyFragmentConstants.MAX_ANCHORED_REMAINS, game.fragments.settledCount(),
+                "body pieces left far behind the player are reclaimed, except the torsos "
+                        + "that still carry a harvest record");
+        for (BodyFragment f : game.fragments.settled) {
+            assertTrue(f.harvest != null && game.entities.carcasses.contains(f.harvest),
+                    "every piece kept is a torso whose carcass is still in the world");
+        }
     }
 
     /**
@@ -443,7 +451,8 @@ class RuntimeBoundsTest {
     /**
      * Seventy-five people blown apart on the spot: the first twelve fill the
      * live cap, every later one pushes the oldest ten pieces to the ground, and
-     * the ground fills its own cap and starts dropping the oldest.
+     * the ground fills its own cap and starts dropping the oldest. Then more
+     * deer than harvest records of remains may exist, which fills that cap too.
      */
     private static void stressBodyFragments(Game game) {
         Npc victim = game.entities.spawnNpc(game.world, "QA victim",
@@ -460,6 +469,20 @@ class RuntimeBoundsTest {
                 "the exact live fragment cap is reachable");
         assertEquals(BodyFragmentConstants.MAX_SETTLED_FRAGMENTS, game.fragments.settledCount(),
                 "the exact settled fragment cap is reachable");
+
+        // Then more deer blown apart than harvest records may lie in the world.
+        for (int i = 0; i < BodyFragmentConstants.MAX_ANCHORED_REMAINS + 4; i++) {
+            Creature deer = game.entities.spawnCreature(game.world, Creature.CreatureType.DEER,
+                    victim.pos.x, victim.pos.y, victim.pos.z + 2f);
+            game.entities.creatures.remove(deer);
+            game.fragments.spawnFromCreature(game, deer, game.fragments.deathPose(deer),
+                    deer.pos.x + 1f, deer.pos.y + 0.5f, deer.pos.z, 3.8f);
+            assertFragmentCaps(game);
+        }
+        assertEquals(BodyFragmentConstants.MAX_ANCHORED_REMAINS,
+                BodyFragmentSystem.anchoredRemains(game.entities.carcasses),
+                "the exact anchored remains cap is reachable");
+        assertEquals(BodyFragmentConstants.MAX_ANCHORED_REMAINS, game.entities.carcasses.size());
     }
 
     /**
@@ -502,6 +525,9 @@ class RuntimeBoundsTest {
                 "live body pieces over their cap: " + game.fragments.liveCount());
         assertTrue(game.fragments.settledCount() <= BodyFragmentConstants.MAX_SETTLED_FRAGMENTS,
                 "settled body pieces over their cap: " + game.fragments.settledCount());
+        int anchored = BodyFragmentSystem.anchoredRemains(game.entities.carcasses);
+        assertTrue(anchored <= BodyFragmentConstants.MAX_ANCHORED_REMAINS,
+                "harvest records of remains over their cap: " + anchored);
     }
 
     private static void stressMissions(Game game) {
