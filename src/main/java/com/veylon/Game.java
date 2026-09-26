@@ -320,7 +320,11 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
     public Game() { this(new AudioManager()); }
 
     /** Allows headless command tests to observe sound requests without a native device. */
-    Game(AudioManager audio) { this.audio = java.util.Objects.requireNonNull(audio, "audio"); }
+    Game(AudioManager audio) {
+        this.audio = java.util.Objects.requireNonNull(audio, "audio");
+        // Bodies come apart in the pose last drawn, on the clock the living are animated by.
+        fragments.setDeathPoses(com.veylon.gfx.model.AnatomyModels.deathPoses(() -> totalTime));
+    }
 
     public void run() {
         qa.applyResolutionOverride();
@@ -524,11 +528,7 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
         audio.setListener(camera.position.x, camera.position.y, camera.position.z, camera.yaw);
         audio.update(dt);
 
-        if (player.dead && !player.abilities.invulnerable() && appState == AppState.PLAYING) {
-            appState = AppState.DEATH;
-            deathTimer = 3f;
-            closeScreens();
-        }
+        enterDeathIfDue();
 
         // Stream chunks and rebuild meshes near the player.
         world.ensureChunks((int) player.pos.x, (int) player.pos.z, renderer.renderRadius(), 2);
@@ -899,13 +899,24 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
         return crates.transferPlayerItemToCrate(slot);
     }
 
-    private void respawn() {
+    /** The player's one death transition; a lethal blast's also leaves the player's remains. */
+    void enterDeathIfDue() {
+        if (player.dead && !player.abilities.invulnerable() && appState == AppState.PLAYING) {
+            appState = AppState.DEATH;
+            deathTimer = 3f;
+            fragments.spawnPlayerRemains(this, player);
+            closeScreens();
+        }
+    }
+
+    void respawn() {
         if (player.abilities.invulnerable()) {
             player.restoreCreativeBody();
             return;
         }
         log("You died. The frontier reclaims you... (respawned at the crash site)");
         player.dead = false;
+        player.clearBlastDeath();
         player.health = 55;
         player.hunger = Math.max(player.hunger, 50);
         player.thirst = Math.max(player.thirst, 50);

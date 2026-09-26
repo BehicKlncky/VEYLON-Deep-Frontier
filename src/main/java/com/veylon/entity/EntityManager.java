@@ -46,6 +46,7 @@ public class EntityManager {
             if (c.dead) {
                 onCreatureDied(g, c);
                 it.remove();
+                forgetTarget(c);
             }
         }
         for (Iterator<Npc> it = npcs.iterator(); it.hasNext(); ) {
@@ -76,13 +77,36 @@ public class EntityManager {
                     onSettledNpcDied(g, n);
                 }
                 // A person killed inside a blast's lethal radius is blown apart
-                // by that blast; every other death falls as one body.
+                // by that blast, from the pose they died in; every other death
+                // falls as one body.
                 if (reallyDied(n) && n.dismemberOnDeath) {
-                    g.fragments.spawnFromNpc(g, n, n.blastX, n.blastY, n.blastZ, n.blastStrength);
+                    g.fragments.spawnFromNpc(g, n, g.fragments.deathPose(n),
+                            n.blastX, n.blastY, n.blastZ, n.blastStrength);
                 } else if (reallyDied(n)) {
                     g.ragdolls.spawn(g, n);
                 }
                 it.remove();
+                forgetTarget(n);
+            }
+        }
+    }
+
+    /**
+     * Clears every AI's hold on a body that has just left the world, dead or
+     * departed, so nothing keeps it as a target. Allocation free; runs once
+     * per departure.
+     */
+    private void forgetTarget(Entity gone) {
+        for (int i = 0; i < npcs.size(); i++) {
+            Npc n = npcs.get(i);
+            if (n.combatTarget == gone) {
+                n.combatTarget = null;
+            }
+        }
+        for (int i = 0; i < creatures.size(); i++) {
+            Creature c = creatures.get(i);
+            if (c.targetEntity == gone) {
+                c.targetEntity = null;
             }
         }
     }
@@ -165,13 +189,16 @@ public class EntityManager {
     }
 
     /**
-     * Every consequence of an animal dying, fired on the tick it died.
+     * Every consequence of an animal dying, fired on the tick it died, then
+     * exactly one body: the pieces of a blast death, or a ragdoll.
      *
-     * <p>The carcass itself is the one thing that waits: the body falls first,
-     * and {@code RagdollSystem} builds the carcass where it comes to rest, with
-     * the lodged arrows carried across. Reputation, loot and the log lines must
-     * not wait — quest credit that lagged a second behind the kill would read
-     * as a bug.
+     * <p>For a whole body the carcass is the one thing that waits: the body
+     * falls first, and {@code RagdollSystem} builds the carcass where it comes
+     * to rest, with the lodged arrows carried across. A body blown apart gets
+     * its one carcass at once, tied to its torso ({@code BodyFragmentSystem}).
+     * Reputation, loot and the log lines must not wait — quest credit that
+     * lagged a second behind the kill would read as a bug — and none of them
+     * depends on which body the animal leaves.
      */
     private void onCreatureDied(Game g, Creature c) {
         if (c.lastHitByPlayer) {
@@ -187,7 +214,10 @@ public class EntityManager {
             g.log("The " + c.type.displayName + " is down. Harvest the carcass with [F]"
                     + (g.playerHasKnife() ? "." : " (a knife would yield far more)."));
         }
-        if (reallyDied(c)) {
+        if (reallyDied(c) && c.dismemberOnDeath) {
+            g.fragments.spawnFromCreature(g, c, g.fragments.deathPose(c),
+                    c.blastX, c.blastY, c.blastZ, c.blastStrength);
+        } else if (reallyDied(c)) {
             g.ragdolls.spawn(g, c);
         }
     }
@@ -260,10 +290,14 @@ public class EntityManager {
         return best;
     }
 
+    /** The nearest carcass at rest within {@code range}: one whose remains are still flying is not a carcass yet. */
     public Carcass nearestCarcass(float x, float y, float z, float range) {
         Carcass best = null;
         double bestD = range * range;
         for (Carcass c : carcasses) {
+            if (!c.atRest()) {
+                continue;
+            }
             double dx = c.pos.x - x, dy = c.pos.y - y, dz = c.pos.z - z;
             double d = dx * dx + dy * dy + dz * dz;
             if (d < bestD) {

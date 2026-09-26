@@ -3,6 +3,7 @@ package com.veylon.combat;
 import com.veylon.Game;
 import com.veylon.entity.BodyFragment;
 import com.veylon.entity.Creature;
+import com.veylon.entity.FragmentAnatomy;
 import com.veylon.entity.Npc;
 import com.veylon.item.ItemType;
 import com.veylon.settlement.HumanFaction;
@@ -26,8 +27,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * A scrap bomb or a powder keg kills every person whose body centre is inside
  * {@code power × LETHAL_RADIUS_FACTOR}, whatever their health and whatever
  * stands between, and blows the body apart instead of letting it fall. People
- * further out, creatures and the player keep the ordinary falloff damage, and
- * every consequence of a death still fires once, on the tick of the death.
+ * further out keep the ordinary falloff damage, and every consequence of a
+ * death still fires once, on the tick of the death.
+ *
+ * <p>The same rule holds for creatures and a Survival player; this class
+ * keeps the people's side and one mixed check, and {@code
+ * AllLivingBlastDeathTest} covers every body family.
  *
  * <p>Blasts go off at the height of a standing person's body centre, so the
  * distances below are the horizontal distances the rule measures.
@@ -348,35 +353,38 @@ class BlastLethalityTest {
     }
 
     @Test
-    void creaturesAndPlayerKeepTheExistingExplosionModel() {
-        Game twin = arena();
+    void creaturesAndThePlayerInsideTheLethalRadiusDieAndComeApartToo() {
         Creature[] beasts = beasts(g);
-        Creature[] twinBeasts = beasts(twin);
+        Creature tough = beasts[0];
+        Creature fragile = beasts[1];
 
         scrapBlast(g, true);
-        scrapBlast(twin, false);
 
-        assertEquals(twinBeasts[0].health, beasts[0].health, 0f,
-                "a creature inside the lethal radius takes the ordinary damage");
-        assertFalse(beasts[0].dead);
-        assertEquals(twinBeasts[0].bleedTimer, beasts[0].bleedTimer, 0f);
-        assertEquals(twinBeasts[0].vel.x, beasts[0].vel.x, 0f);
-        assertTrue(beasts[1].dead, "precondition: that damage can still kill a creature");
-        assertEquals(twin.player.health, g.player.health, 0f,
-                "the player inside the lethal radius takes the ordinary damage");
-        assertTrue(g.player.health < g.player.maxHealth && !g.player.dead);
+        for (Creature c : beasts) {
+            assertTrue(c.dead && c.health <= 0, c.type + " inside the lethal radius dies outright");
+            assertTrue(c.dismemberOnDeath, c.type + " is marked to be blown apart");
+            assertEquals(BX, c.blastX, 0f, c.type + ": the record holds the blast that killed");
+            assertEquals(SCRAP_POWER, c.blastStrength, 0f, c.type + ": and its power");
+            assertTrue(c.lastHitByPlayer, c.type + ": the kill is the thrower's");
+        }
+        assertTrue(tough.maxHealth > SCRAP_DAMAGE * 10, "precondition: health plays no part");
+        assertTrue(g.player.dead && g.player.health <= 0, "a Survival player inside it dies too");
+        assertTrue(g.player.dismemberOnDeath, "and is marked for the death transition to blow apart");
 
         g.entities.fastTick(g, 0.05f);
-        assertEquals(1, g.ragdolls.liveCount(), "a creature killed by a blast falls whole");
-        assertEquals(0, g.fragments.liveCount());
+        int pieces = FragmentAnatomy.of(tough.type).pieces.size()
+                + FragmentAnatomy.of(fragile.type).pieces.size();
+        assertEquals(pieces, g.fragments.liveCount(), "each animal comes apart at its own joints");
+        assertEquals(0, g.ragdolls.liveCount(), "and none falls whole");
+        assertEquals(2, g.entities.carcasses.size(), "each leaves one harvest record");
     }
 
     // ------------------------------------------------------------------
 
     /** A scrap bomb's blast at {@code (BX, BY, BZ)}, thrown by the player. */
-    private static void scrapBlast(Game game, boolean lethalToHumans) {
+    private static void scrapBlast(Game game, boolean lethalToLiving) {
         game.explosions.explode(game, BX, BY, BZ, SCRAP_POWER, SCRAP_DAMAGE, 0f, true,
-                lethalToHumans);
+                lethalToLiving);
     }
 
     /** The damage the blast dealt before the lethal radius, at feet distance {@code d}, in the open. */

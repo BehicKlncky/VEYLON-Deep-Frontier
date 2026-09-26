@@ -132,8 +132,18 @@ public class BodyFragment {
     /** Collision box orientation in the model space of {@link #pose}; the identity at rest. */
     public final Quaternionf poseRotation = new Quaternionf();
     private final Quaternionf poseRotationInverse = new Quaternionf();
-    /** Captured from the person who died; each piece has its own copy. */
+    /**
+     * Captured from the person who died, or the neutral look for the
+     * player's remains; each piece has its own copy. Unused by other bodies.
+     */
     public final NpcAppearance appearance = new NpcAppearance();
+    /**
+     * The harvest record this piece carries, while it is the torso of an
+     * animal blown apart and that record is in the world; null otherwise.
+     * Such a piece is kept past the settled cap and the despawn radius, and
+     * goes when its carcass rots away.
+     */
+    public Carcass harvest;
 
     public final Vector3f pos = new Vector3f();
     public final Vector3f vel = new Vector3f();

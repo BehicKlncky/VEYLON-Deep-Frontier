@@ -39,6 +39,11 @@ public class Creature extends Entity {
             this.g = g;
             this.b = b;
         }
+
+        /** Whether a dead body of this kind leaves a carcass to harvest; a bird is too small. */
+        public boolean leavesCarcass() {
+            return this != BIRD;
+        }
     }
 
     public enum CreatureState {

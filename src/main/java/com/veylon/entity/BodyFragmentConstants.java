@@ -16,10 +16,24 @@ public final class BodyFragmentConstants {
     }
 
     // ---- Population --------------------------------------------------
-    /** Pieces in flight at once: twelve bodies of ten. Over it the oldest settles. */
+    /**
+     * Pieces in flight at once: twelve people of ten, or ten of the largest
+     * bodies of twelve. Over it the oldest settles.
+     */
     public static final int MAX_LIVE_FRAGMENTS = 120;
-    /** Pieces lying in the world. Over it the oldest is removed. */
+    /**
+     * Pieces lying in the world. Over it the oldest is removed, passing over
+     * the torsos that carry a harvest record.
+     */
     public static final int MAX_SETTLED_FRAGMENTS = 600;
+    /**
+     * Animals blown apart whose harvest record is still in the world. Over it
+     * the oldest such carcass and its torso are removed together, so a record
+     * is never left without its remains or remains without their record. It
+     * is far below {@link #MAX_SETTLED_FRAGMENTS}, so the settled cap always
+     * has an unanchored piece to remove.
+     */
+    public static final int MAX_ANCHORED_REMAINS = 60;
 
     // ---- Launch ------------------------------------------------------
     /**
@@ -44,6 +58,17 @@ public final class BodyFragmentConstants {
      * {@link RagdollConstants#MAX_POINT_SPEED}.
      */
     public static final float DENSITY = 260f;
+    /**
+     * The least mass the blast impulse is divided by. A bird's wing (0.16 kg)
+     * or a hare's leg (0.08 kg) would otherwise leave at many times a
+     * person's forearm speed, every one of them clamped to
+     * {@link RagdollConstants#MAX_POINT_SPEED}. Below this mass a piece
+     * leaves as fast as a piece of this mass would: at most
+     * {@code IMPULSE_BASE × strength / MIN_LAUNCH_MASS}, 18.7 m/s from a scrap
+     * bomb and 27.4 m/s from a keg. It is under a person's lightest piece
+     * (the forearm, 1.39 kg), so people fly exactly as before.
+     */
+    public static final float MIN_LAUNCH_MASS = 1.25f;
     /**
      * Sideways scatter as a fraction of a piece's blast speed. It is always
      * perpendicular to the blast direction, so it spreads the pieces without

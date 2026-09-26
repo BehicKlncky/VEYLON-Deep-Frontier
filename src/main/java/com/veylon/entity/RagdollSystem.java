@@ -64,8 +64,7 @@ public class RagdollSystem implements SimulationSystem {
      */
     public Ragdoll spawn(Game g, Creature c) {
         BodySkeleton skeleton = BodySkeleton.of(c.type);
-        Ragdoll r = new Ragdoll(skeleton, c.type,
-                c.type != Creature.CreatureType.BIRD);
+        Ragdoll r = new Ragdoll(skeleton, c.type, c.type.leavesCarcass());
         r.stuckArrows = c.stuckArrows;
         r.stuckArrowType = c.stuckArrowType;
         return begin(g, r, c, Math.max(0.6f, c.type.height));

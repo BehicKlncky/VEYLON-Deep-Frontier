@@ -262,6 +262,8 @@ public class Player extends Entity {
         fatigue = wetness = smokeExposure = damageFlash = 0;
         afflictions.clear();
         woundClean = false;
+        // A Creative body never dies, so it has no blast death to come apart from.
+        clearBlastDeath();
         resetFallState();
     }
 

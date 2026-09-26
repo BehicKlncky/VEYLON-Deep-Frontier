@@ -140,8 +140,14 @@ final class FragmentsSection {
                 -MAX_QUATERNION_COMPONENT, MAX_QUATERNION_COMPONENT);
     }
 
-    /** Whether {@link #read} would accept this piece's record. */
+    /**
+     * Whether {@link #read} would accept this piece's record. Only a person's
+     * pieces have a version 1 id; an animal's piece is left out.
+     */
     private static boolean readable(BodyFragment f) {
+        if (f.piece == null) {
+            return false;
+        }
         float qx = f.orientation.x, qy = f.orientation.y, qz = f.orientation.z;
         float qw = f.orientation.w;
         return inRange(f.pos.x, MAX_HORIZONTAL) && inRange(f.pos.y, MAX_VERTICAL)

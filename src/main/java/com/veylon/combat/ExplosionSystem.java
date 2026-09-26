@@ -24,18 +24,19 @@ import java.util.Set;
  * single batched world edit, bounded chain reactions between powder kegs,
  * optional fire ignition, world noise and reputation consequences.
  *
- * <p>A blast that is lethal to humans (a scrap bomb or any powder keg) kills
- * every {@link Npc} whose body centre is within
- * {@code power × }{@link #LETHAL_RADIUS_FACTOR} outright, whatever its health
- * and whatever stands between, and marks it to be blown apart rather than
- * fall. Everyone further out, every creature and the player take the ordinary
- * falloff damage.
+ * <p>A lethal blast (a scrap bomb or any powder keg) kills every living body
+ * whose body centre is within {@code power × }{@link #LETHAL_RADIUS_FACTOR}
+ * outright, whatever its health and whatever stands between, and marks it to
+ * be blown apart rather than fall: every NPC, every creature, flying or not,
+ * and the player unless the player is invulnerable (Creative), which is
+ * checked before anything is killed or recorded. Every body further out takes
+ * the ordinary falloff damage.
  */
 public class ExplosionSystem {
 
     /**
-     * Radius, as a multiple of a lethal blast's power, inside which a person
-     * dies outright: 3.9 blocks for a scrap bomb, 5.7 for a powder keg.
+     * Radius, as a multiple of a lethal blast's power, inside which a living
+     * body dies outright: 3.9 blocks for a scrap bomb, 5.7 for a powder keg.
      */
     public static final float LETHAL_RADIUS_FACTOR = 1.5f;
     /** Power, damage and ignition chance of every powder keg detonation. */
@@ -125,8 +126,8 @@ public class ExplosionSystem {
     }
 
     /**
-     * Detonates an explosion that is not lethal to humans: everyone in range
-     * takes the falloff damage. Any powder keg it sets off is still lethal.
+     * Detonates an explosion that is not lethal: every body in range takes
+     * the falloff damage. Any powder keg it sets off is still lethal.
      *
      * @param power        blast power (~radius in blocks for block damage)
      * @param entityDamage max damage at the center
@@ -145,19 +146,19 @@ public class ExplosionSystem {
      * @param entityDamage   max damage at the center
      * @param igniteChance   0..1 chance to ignite exposed flammable blocks
      * @param byPlayer       attribution for reputation and stats
-     * @param lethalToHumans whether every NPC inside the lethal radius dies
-     *                       outright and is blown apart; kegs this sets off
-     *                       are lethal either way
+     * @param lethalToLiving whether every living body inside the lethal radius
+     *                       dies outright and is blown apart; kegs this sets
+     *                       off are lethal either way
      */
     public void explode(Game g, float x, float y, float z, float power,
                         float entityDamage, float igniteChance, boolean byPlayer,
-                        boolean lethalToHumans) {
+                        boolean lethalToLiving) {
         chainBudget = MAX_CHAIN;
         playerHitNpcs.clear();
         playerPropertyDamage.clear();
         playerDamagedLegacyCamp = false;
         try {
-            detonate(g, x, y, z, power, entityDamage, igniteChance, byPlayer, lethalToHumans);
+            detonate(g, x, y, z, power, entityDamage, igniteChance, byPlayer, lethalToLiving);
             // Sympathetic detonations run from a bounded queue, never recursively.
             while (!chainQueue.isEmpty() && chainBudget > 0) {
                 chainBudget--;
@@ -180,7 +181,7 @@ public class ExplosionSystem {
 
     private void detonate(Game g, float x, float y, float z, float power,
                           float entityDamage, float igniteChance, boolean byPlayer,
-                          boolean lethalToHumans) {
+                          boolean lethalToLiving) {
         int r = (int) Math.ceil(power);
 
         // --- Entities: falloff + occlusion + knockback ---
@@ -194,13 +195,15 @@ public class ExplosionSystem {
         }
         float entityRange = power * 2.4f;
         for (Entity e : victims) {
+            // Creative immunity comes first: nothing below may kill, record or
+            // shake an invulnerable player.
             if (e.dead || e instanceof Player p && p.abilities.invulnerable()) {
                 continue;
             }
             double d = Math.sqrt(e.distSqTo(x, y, z));
             float falloff = (float) (1.0 - d / entityRange);
-            if (lethalToHumans && e instanceof Npc n && insideLethalRadius(n, x, y, z, power)) {
-                killOutright(n, x, y, z, power, byPlayer);
+            if (lethalToLiving && insideLethalRadius(e, x, y, z, power)) {
+                killOutright(g, e, x, y, z, power, byPlayer, Math.max(0f, falloff));
                 e.knockback(x, z, 3f + Math.max(0f, falloff) * 5f);
                 continue;
             }
@@ -303,38 +306,44 @@ public class ExplosionSystem {
     }
 
     /**
-     * Whether {@code n}'s body centre, not its feet, is within
-     * {@code power × }{@link #LETHAL_RADIUS_FACTOR} of the blast.
+     * Whether {@code e}'s body centre, not its feet, is within
+     * {@code power × }{@link #LETHAL_RADIUS_FACTOR} of the blast, boundary
+     * included.
      */
-    private static boolean insideLethalRadius(Npc n, float x, float y, float z, float power) {
-        double dx = n.pos.x - x;
-        double dy = n.pos.y + n.height * 0.5f - y;
-        double dz = n.pos.z - z;
+    private static boolean insideLethalRadius(Entity e, float x, float y, float z, float power) {
+        double dx = e.pos.x - x;
+        double dy = e.pos.y + e.height * 0.5f - y;
+        double dz = e.pos.z - z;
         double radius = power * LETHAL_RADIUS_FACTOR;
         return dx * dx + dy * dy + dz * dz <= radius * radius;
     }
 
     /**
-     * Kills a person caught inside the lethal radius through the ordinary
-     * damage path, so the death pipeline sees a real death with the right
-     * attribution, and records the blast so it blows the body apart. Cover
-     * and falloff play no part. Reputation and alerting follow exactly as for
-     * a survivable blast hit.
+     * Kills a living body caught inside the lethal radius through the
+     * ordinary damage path, so the death pipeline sees a real death with the
+     * right attribution, and records the blast so it blows the body apart —
+     * only when that call is what killed it. Cover, falloff and a player's
+     * armour play no part. Every other consequence follows exactly as for a
+     * survivable blast hit: reputation and alerting for a person, fright for
+     * an animal, the flash and the shake for the player.
      */
-    private void killOutright(Npc n, float x, float y, float z, float power, boolean byPlayer) {
-        n.killBy(byPlayer);
-        if (n.dead && !n.dismemberOnDeath) {
-            n.dismemberOnDeath = true;
-            n.blastX = x;
-            n.blastY = y;
-            n.blastZ = z;
-            n.blastStrength = power;
+    private void killOutright(Game g, Entity e, float x, float y, float z, float power,
+                              boolean byPlayer, float falloff) {
+        e.killBy(byPlayer);
+        e.recordBlastDeath(x, y, z, power);
+        if (e instanceof Npc n) {
+            if (byPlayer && n.settled()) {
+                playerHitNpcs.add(n);
+            }
+            n.lastKnown.set(x, y, z);
+            n.lastKnownAge = 0;
+        } else if (e instanceof Creature c) {
+            c.fear = 1f;
+            c.bleedTimer = Math.max(c.bleedTimer, 12f);
+        } else if (e instanceof Player p) {
+            p.damageFlash = 1f;
+            g.renderer.addShake(Math.min(1f, falloff));
         }
-        if (byPlayer && n.settled()) {
-            playerHitNpcs.add(n);
-        }
-        n.lastKnown.set(x, y, z);
-        n.lastKnownAge = 0;
     }
 
     /** Collects fallout; applying it per block caused dozens of duplicate penalties. */

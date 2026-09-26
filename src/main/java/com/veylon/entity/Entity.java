@@ -22,6 +22,18 @@ public abstract class Entity {
     public boolean horizontalCollision;
     /** True if the most recent damage came from the player (controls drops). */
     public boolean lastHitByPlayer;
+    /**
+     * Set by a blast that killed this body inside its lethal radius, so the
+     * death pipeline blows it apart instead of letting it fall whole. Only
+     * {@link #recordBlastDeath} sets it, and only for the first blast that
+     * really killed the body. Transient: never saved; an NPC or creature
+     * leaves the world on its next entity tick, and the player's record is
+     * spent by its death transition and cleared whenever the player lives
+     * again.
+     */
+    public boolean dismemberOnDeath;
+    /** Centre and power of that blast; meaningful only with {@link #dismemberOnDeath}. */
+    public float blastX, blastY, blastZ, blastStrength;
 
     protected float fallDist;
     protected final World world;
@@ -70,6 +82,42 @@ public abstract class Entity {
         if (health <= 0) {
             dead = true;
         }
+    }
+
+    /**
+     * Kills this body through the ordinary damage path, so {@code dead},
+     * {@code health <= 0} and {@code lastHitByPlayer} are set exactly as by any
+     * fatal hit and the death pipeline treats it as a real death. A body the
+     * damage path refuses (a Creative player) is left untouched.
+     */
+    public void killBy(boolean byPlayer) {
+        hurt(health + 1f, byPlayer);
+    }
+
+    /**
+     * Records the blast that just killed this body, so it is blown apart.
+     *
+     * <p>Refused, returning false, unless the body really died — dead with
+     * no health left, not merely removed from the world — and carries no
+     * record yet. So a body killed earlier by anything else is never marked,
+     * and the first fatal blast's record is never overwritten.
+     */
+    public boolean recordBlastDeath(float x, float y, float z, float strength) {
+        if (!dead || health > 0 || dismemberOnDeath) {
+            return false;
+        }
+        dismemberOnDeath = true;
+        blastX = x;
+        blastY = y;
+        blastZ = z;
+        blastStrength = strength;
+        return true;
+    }
+
+    /** Forgets a blast record; for a body that lives again (the player). */
+    public void clearBlastDeath() {
+        dismemberOnDeath = false;
+        blastX = blastY = blastZ = blastStrength = 0;
     }
 
     public void knockback(float fromX, float fromZ, float strength) {

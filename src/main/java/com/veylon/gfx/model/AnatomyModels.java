@@ -1,6 +1,7 @@
 package com.veylon.gfx.model;
 
 import com.veylon.entity.BodyFamily;
+import com.veylon.entity.BodyFragmentSystem;
 import com.veylon.entity.Creature;
 import com.veylon.entity.FragmentAnatomy;
 import com.veylon.entity.FragmentPiece;
@@ -11,6 +12,7 @@ import java.util.EnumSet;
 import java.util.IdentityHashMap;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.DoubleSupplier;
 
 /**
  * Where the simulation's fragment tables meet the models they describe.
@@ -177,6 +179,25 @@ public final class AnatomyModels {
         FragmentPose pose = record(model, FragmentAnatomy.humanoid());
         model.resetPose();
         return pose;
+    }
+
+    /**
+     * The death-pose source bodies are blown apart in: each body captured as
+     * the living model draws it at {@code clock}'s time, which should be the
+     * clock the renderer animates the living with.
+     */
+    public static BodyFragmentSystem.DeathPoses deathPoses(DoubleSupplier clock) {
+        return new BodyFragmentSystem.DeathPoses() {
+            @Override
+            public FragmentPose of(Creature c) {
+                return captureCreature(c, clock.getAsDouble());
+            }
+
+            @Override
+            public FragmentPose of(Npc n) {
+                return captureNpc(n, clock.getAsDouble());
+            }
+        };
     }
 
     /**

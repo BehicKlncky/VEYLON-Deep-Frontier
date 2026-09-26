@@ -6,6 +6,8 @@ import com.veylon.combat.ExplosionSystem;
 import com.veylon.combat.ProjectileSystem;
 import com.veylon.combat.WorldNoise;
 import com.veylon.engine.ParticleSystem;
+import com.veylon.entity.BodyFragmentConstants;
+import com.veylon.entity.BodyFragmentSystem;
 import com.veylon.entity.Npc;
 import com.veylon.settlement.CounterattackDirector;
 import com.veylon.settlement.SettlementManager;
@@ -32,7 +34,8 @@ public record RuntimeBudgetSnapshot(
         int liquidFirePatches,
         int particles,
         int pendingGenerationChunks,
-        int pendingGenerationEdits) {
+        int pendingGenerationEdits,
+        int anchoredRemains) {
 
     public static RuntimeBudgetSnapshot capture(Game game) {
         int pathNodes = 0;
@@ -62,7 +65,8 @@ public record RuntimeBudgetSnapshot(
                 game.liquidFire.count(),
                 game.particles.count,
                 game.world.pendingGenerationChunkCount(),
-                game.world.pendingGenerationEditCount());
+                game.world.pendingGenerationEditCount(),
+                BodyFragmentSystem.anchoredRemains(game.entities.carcasses));
     }
 
     /** True when every collection with a hard runtime ceiling is within it. */
@@ -86,7 +90,8 @@ public record RuntimeBudgetSnapshot(
                 && kegFuseAttributions <= kegFuses
                 && fires <= FireSystem.MAX_ACTIVE_FIRES
                 && liquidFirePatches <= LiquidFireConstants.MAX_PATCHES
-                && particles <= ParticleSystem.MAX;
+                && particles <= ParticleSystem.MAX
+                && anchoredRemains <= BodyFragmentConstants.MAX_ANCHORED_REMAINS;
     }
 
     /** Compact live occupancy used verbatim by smoke output and failure logs. */
@@ -109,7 +114,8 @@ public record RuntimeBudgetSnapshot(
                 + " liquidFire=" + liquidFirePatches
                 + " particles=" + particles
                 + " generation={chunks=" + pendingGenerationChunks
-                + ",edits=" + pendingGenerationEdits + "}";
+                + ",edits=" + pendingGenerationEdits + "}"
+                + " anchoredRemains=" + anchoredRemains;
     }
 
     public static String hardLimitSummary() {
@@ -129,6 +135,7 @@ public record RuntimeBudgetSnapshot(
                 + " liquidFire=" + LiquidFireConstants.MAX_PATCHES
                 + " particles=" + ParticleSystem.MAX
                 + " chain=" + ExplosionSystem.MAX_CHAIN
-                + " blockEdits=" + ExplosionSystem.MAX_BLOCKS;
+                + " blockEdits=" + ExplosionSystem.MAX_BLOCKS
+                + " anchoredRemains=" + BodyFragmentConstants.MAX_ANCHORED_REMAINS;
     }
 }

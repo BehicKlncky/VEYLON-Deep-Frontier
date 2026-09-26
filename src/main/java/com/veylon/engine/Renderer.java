@@ -710,6 +710,10 @@ public class Renderer {
         Vector3f camPos = game.camera.position;
         float range = fogEnd + 8f;
         for (Carcass c : game.entities.carcasses) {
+            if (c.fragmented()) {
+                // The record of an animal blown apart: its pieces are the body.
+                continue;
+            }
             var t = c.type;
             if (!entityVisible(camPos, c.pos.x, c.pos.y, c.pos.z,
                     Math.max(0.5f, t.width), t.height + 0.5f, range)) {
@@ -797,6 +801,11 @@ public class Renderer {
 
     private void drawFragment(Game game, Vector3f camPos, BodyFragment f, float range) {
         BodyFragment.Piece piece = f.piece;
+        if (piece == null) {
+            // An animal's piece: the draw path below is the humanoid's.
+            // Species pieces get their own in the fragment-rendering milestone.
+            return;
+        }
         float r = FragmentModels.radius(piece);
         if (!entityVisible(camPos, f.pos.x, f.pos.y - r, f.pos.z, r, r * 2f, range)) {
             return;
