@@ -26,7 +26,8 @@ Checkpoints by milestone (filled in by the following milestone):
 | 02 | `52ff25b05069cd229dab711cf47239842a1c996f` — `feat(entity): define where every kind of body comes apart`; `63de0ddb70edf982814ab78a9a70cb1faac85fbf` — `test(entity): pin where every body comes apart and that it reassembles`; `eb151dc7ab003206485b0b5e6f837c1ea96edcf0` — `docs(combat): record species fragment anatomy` |
 | 03 | `86ed85c14184ed22d710edbc80d1dda2cb7348c1` — `feat(combat): blow apart every living body a lethal blast kills`; `6bd61f8e1a9bc06e2de07b0edabbb967f5aa90d6` — `test(combat): pin lethal blasts and one body for every living thing`; `7d6c4aec43df0fcd2fb6af94cc8031cc64ff0d17` — `docs(combat): record all-living blast deaths` |
 | 04 | `290c388d017bfb5371d40d181837fd7c52f5aff0` — `feat(gfx): draw every body's pieces as its own anatomy`; `4baef52c995b2dcd956a19dd4eb64d47fa6ce500` — `feat(qa): stage every kind of body blown apart for captures`; `42d9572f6feb4edab950618271c01fda3e711430` — `test(gfx): pin every body's pieces as drawn, and the capture scenes`; `a203df9ad3900c2a93c1d213b96d0c2d0251e75f` — `docs(combat): record species fragment rendering` |
-| 05 | reported in the milestone 05 handoff; record here in 06 |
+| 05 | `f3c553d356f767e0b7bd04c3205ab536d7c10dbd` — `feat(save): keep every body's remains and harvest record in a save`; `08f1b0d9d3ad0cb9c0bb5c5dc1a4aecd55d57db8` — `test(save): pin how every body's remains survive a save`; `e8b825a0570e4785ebd828064c71ef906f0f557f` — `docs(combat): record remains persistence` |
+| 06 | reported in the milestone 06 handoff; record here in 07 |
 
 ## Status
 
@@ -37,7 +38,7 @@ Checkpoints by milestone (filled in by the following milestone):
 | 03 | All-living blast deaths | **Complete** (gameplay; animal pieces not drawn or saved until 04/05) |
 | 04 | Species fragment rendering | **Complete** (presentation; animal pieces still not saved until 05) |
 | 05 | Fragment save compatibility | **Complete** (`world.remains` v1; `world.fragments` v1 unchanged) |
-| 06 | Shared body combustion | Not started |
+| 06 | Shared body combustion | **Complete** (state, rules, fast-tick wiring; no production source connected until 07) |
 | 07 | Connect all fire sources | Not started |
 | 08 | NPC and animal fire panic | Not started |
 | 09 | Combustion lifecycle | Not started |
@@ -48,7 +49,9 @@ Checkpoints by milestone (filled in by the following milestone):
 Since 03, a lethal blast kills and blows apart every living body (all six species, every NPC
 family, a Survival player) in the simulation; since 04 every piece is drawn as its own body's
 anatomy; since 05 every settled piece, the pose its body died in and an animal's harvest record
-survive a save (`world.remains`). No fire behaviour has changed yet.
+survive a save (`world.remains`). Since 06 every living body can carry one fire
+(`Entity.combustion`, advanced by `CombustionSystem` on the fast tick), but no game source sets
+one alight yet: fire damage in play is still the legacy medium-tick contact until 07.
 
 ## Milestone 01 — source audit and contract (2026-09-26)
 
@@ -669,3 +672,134 @@ Decisions, the byte layout and the compatibility matrix are in contract §14.1.
   entry points for pieces; a new per-piece field that must persist needs a `world.remains`
   version bump (older builds reject a newer version of a known section and with it the save) or a
   new section ID beside it (older builds skip it) — see contract §14.1.
+
+## Milestone 06 — shared body combustion (2026-09-26)
+
+### Start state
+
+- Branch `feature/all-living-dismemberment-combustion`, tip `e8b825a` (milestone 05); the three 05
+  checkpoints are now recorded in the table above. Working tree clean apart from the user's
+  untracked `.agents/` and `AGENTS.md`, which stay untracked.
+- Same host and portable Temurin 25.0.4.1+1 JDK; Gradle 9.1.0, `--no-daemon --console=plain`.
+- Read: `AGENTS.md`, the pack's `00_BASE_KNOWLEDGE.md` and `06_SHARED_BODY_COMBUSTION.md` (and
+  07–10 for the interfaces they expect), contract §4–§6, §10–§16, and this file.
+- Predecessors checked in source: 05's `RemainsSection` and `V3ExtensionSections` write nothing
+  about combustion (none added); 03's `Entity.recordBlastDeath` refuses a body that is not dead
+  with no health left, so a burn death cannot acquire a blast record; no combustion class existed.
+- Source anchors inspected before choosing the owner: `Entity.hurt`, `Player.hurt` (Creative
+  gate), `Player.tickNeeds`/`tickAfflictions` (BURN 0.18/s, direct `health -=`),
+  `PlayerTreatmentSystem` (poultice cures `BURN`), `FireSystem.damageNear`/`isRainedOn`,
+  `LiquidFireSystem.burnOccupants`/`standsIn`, `SimulationScheduler`, `Game.fastTick`/`mediumTick`/
+  `respawn`/`enterDeathIfDue`, `SleepSystem.tickSleep` (no extra ticks; a red flash above 0.5
+  wakes the player), `WorldBootstrap`, `VoxelPhysics.refreshEnvironment`, `World.skyLight`
+  (1.0 for an unloaded column, heightmap = top opaque block), `EntityManager.fastTick`.
+
+### Commands and results
+
+All from the repository root in PowerShell with the portable JDK on `PATH`. Logs are in the
+git-ignored `build/` directory.
+
+| Command | Result |
+| --- | --- |
+| `.\gradlew.bat compileJava compileTestJava` | BUILD SUCCESSFUL (`build/all-living-m06-compile.log`). |
+| `.\gradlew.bat test` (production wiring in place, every existing test unmodified) | **BUILD SUCCESSFUL in 4 m 47 s: 1149 tests in 129 classes, 0 failures** (`build/all-living-m06-legacy.log`): the fast-tick insertion, the `CreatureAI` dead guard, `isRainedOn` delegating and the two snapshot components changed no existing outcome. |
+| `.\gradlew.bat test --tests com.veylon.entity.BodyCombustionTest` | 121 tests, 0 failures, at the first run (`build/all-living-m06-body.log`). |
+| `.\gradlew.bat test --tests com.veylon.CombustionIntegrationTest --tests com.veylon.simulation.SimulationSystemContractTest --tests com.veylon.entity.BodyCombustionTest` | 6 + 3 + 121 tests, 0 failures (`build/all-living-m06-new.log`), after one compile fix in the new test (`long` ragdoll counter). |
+| Mutation check (scratch PowerShell script, one production mutation at a time, the three classes above, each file restored and its hash compared with a backup) | **All 21 caught** (`build/all-living-m06-mutation.log`; every file's hash matched its backup afterwards): BURN still hurting while alight (1 test fails), Creative keeping the fire (1), the `CreatureAI` dead guard removed (1), the combustion tick unwired from `Game.fastTick` (5), refresh adding fuel on top (27), environment outranking the player (1), no point tie-break (1), any water putting the fire out (7), head rain asked through `isRainedOn` (9), dead bodies ticked (13), no `dt` clamp (1), the injury every tick after a second (1), the player credited with their own fire (1), heat never decaying (13), a Creative player able to burn (13), afterburn at the contact rate (15), respawn keeping the fire (1), a new world keeping the tallies (1), `ignite` not refusing a torso under water (13), fuel draining during contact (53), shallow water draining like dry ground (7). |
+| `.\gradlew.bat test --tests com.veylon.entity.CombustionAllocationTest --tests com.veylon.entity.BodyCombustionTest -i` | Passed. **Nobody burning: 0 bytes per fast tick; 40 people and 35 animals all burning: 1280 bytes per fast tick** (`build/all-living-m06-alloc.log`). A throwaway probe (deleted, not committed) split that: the feed loop 0, the rain predicate 0, and each `World.getChunk` cache miss 80 bytes (its `Map<Long, Chunk>` boxes the key) — 16 chunk changes between consecutive bodies per tick. That lookup is what every entity's physics already does per tick; the allowance is the ragdoll and fragment steps' 4 KB. A first draft with a 256-byte allowance failed on exactly this. |
+| `.\gradlew.bat build` | **BUILD SUCCESSFUL in 5 m 24 s. 1278 tests in 132 classes, 0 failures, 0 errors, 0 skipped**; `javadoc` (doclint) and `check` executed (`build/all-living-m06-build.log`). Base after 05 was 1149 in 129. |
+
+Not run: `performanceTest` (this host is not the reference machine and its durable-save gate
+fails regardless; no wall-clock number for the combustion tick exists — contract §16's 0.2 ms
+target is unmeasured) and native QA (nothing is drawn differently: body flames are milestone 10).
+
+### What was built
+
+Rules, API, cadence, damage equation and the reasons for each change from the proposals are in
+contract §10.1 (with §11 and §13 notes).
+
+| Path | Change |
+| --- | --- |
+| `entity/BodyCombustion.java` (new) | Per-body state: fire, fuel, peak, heat, soak, episode seconds, scorch, contact, owner, last exposure point, one pending candidate. Public getters, package-private mutators; derived `intensity()`. |
+| `entity/CombustionSource.java` (new) | `DIRECT_HIT`, `LIQUID`, `BLOCK_FIRE`, `CAMPFIRE`, `TORCH` in dominance order, each with heat gain, fuel granted and nominal intensity. |
+| `entity/CombustionConstants.java` (new) | Contract §15 values plus `IMMERSION_FRACTION`, `SCORCH_SECONDS`, `AFTERBURN_FLASH`, `MAX_BURN_SECONDS`, `TIMER_EPSILON`. |
+| `entity/CombustionSystem.java` (new) | `FastTickSystem`: `expose`, `ignite`, `extinguish`, `clear`, `isBurning`, `burningBodies`, `isLivingBody`, `canBurn`, `fastTick`; immersion and head-rain rules; diagnostic counters. |
+| `entity/Entity.java` | `public final BodyCombustion combustion`. |
+| `entity/Player.java` | `inflictBurnInjury(Game)` (duration from the player's affliction stream); `tickAfflictions` skips `BURN` while alight; `restoreCreativeBody` clears the fire. |
+| `Game.java` | `combustion` field; `fastTick` runs it between needs and entities; `respawn` clears the player's fire. 983 of 1000 lines. |
+| `WorldBootstrap.java` | `game.combustion.reset()` in `resetForNewWorld`. |
+| `ai/CreatureAI.java` | `update` returns at once for a dead creature (contract §2.4 gap). |
+| `simulation/FireSystem.java` | New shared predicate `isPrecipitationReaching(g, x, y, z)`; `isRainedOn` delegates to it for the cell above (behaviour unchanged). |
+| `qa/RuntimeBudgetSnapshot.java` | `burningBodies`, `livingBodies`, hard limit `burningBodies <= livingBodies`, smoke `burning=N/M`. |
+| `src/test/.../entity/BodyCombustionTest.java` (new) | 121 tests: 8 cases × 13 families (6 species from `CreatureType.values()`, camp member, wandering trader, raider, settlement resident, captive, war party, Survival player), Creative immunity × the 12 non-player families, and 5 single tests. Cases: liquid ignition and contact rate, afterburn length/fade/budget/burnout, refresh without stacking within the cap and a weaker flame taking over, reignition as a new episode, heat build-up and graze decay, torso-deep versus hip-deep water, open versus roofed rain, burn death. Plus: Creative switch forgets the fire and Survival starts clear, all 120 orders of five contacts give one owner/point/damage, refused inputs, dt clamp, 3000-tick randomized bounds, a full particle budget, and 90 frames of identical movement for a burning and an unburned player. |
+| `src/test/.../CombustionIntegrationTest.java` (new) | 6 tests through `Game`: equal fires and health under two frame partitions of 3.125 s (tolerance 1e-4; a hare dies in both), medium/slow ticks never advance a fire and the first fast tick burns at the contact rate, a burn death falls whole that tick without a last AI step, the player's burn death spawns no remains and respawn clears the fire, delayed kill credit (three birds: player-lit, wild, taken over), the medical burn budget and the poultice, the runtime budget count. |
+| `src/test/.../entity/CombustionAllocationTest.java` (new) | An idle crowd at the NPC cap plus 35 animals costs under 64 bytes per fast tick (measured 0); the same crowd all burning — contact, afterburn, shallow water under a roof, a herd doused by rain and relit — stays under 4 KB (measured 1280, all chunk-key boxing). |
+| `SimulationSystemContractTest` | Combustion is a fast-tick system, resets through the interface, and a new world carries no burning body or tally. |
+| docs | contract §5, §6, §10.1 (new), §11, §13, §15, §16, §18; `ARCHITECTURE.md` reset list, tick table, transient state, persistence table and a paragraph on body fire. |
+
+### Evidence of the decisions
+
+- **Immersion at 0.6 of body height.** Water is whole cells and `VoxelPhysics` samples the
+  body-centre cell. A person (1.75, torso box from 0.86 m) standing on the floor of a one-cell
+  pool has the centre (0.875 m) under water but only legs and hips wet; the proposal would have
+  put them out. The test pins: persons and the player keep burning in one cell of water with a 3×
+  drain; every species is put out there; everyone is put out and cannot be lit in two cells.
+- **Rain at the head cell through a new predicate.** `isRainedOn(x, y, z)` samples the cell above
+  a block, and the column top is always lit, so asking it of a head cell under a two-high ceiling
+  reports rain. Mutation 09 (asking `isRainedOn` of the head cell) fails the roofed-rain case for
+  every family.
+- **Package `entity`.** Package-private mutators make the read-only view a compiler fact, not a
+  convention; nothing outside `entity` can set a fire except through the commands.
+
+### Limitations
+
+- **No production source ignites a body yet** (07). `FireSystem.damageNear` and
+  `LiquidFireSystem.burnOccupants` still hurt on the medium tick and roll `BURN` at 50 %; 07 must
+  remove or reroute them as it connects the sources, or damage doubles.
+- Attack/crime notification per burn episode is not implemented (07 owns it; contract §10
+  "Attribution and crime").
+- Panic does not exist; `hasExposure()`/`exposureX/Y/Z()` are ready for it (08).
+- Death leaves the fire state frozen on the dead body (`burning()` keeps its last value;
+  `isBurning` is false); nothing transfers it to ragdolls or fragments yet (09). Settlement
+  deactivation and load create fresh bodies, so their fires are gone, but no explicit
+  deactivation policy has been audited (09).
+- A body in exposed rain in constant contact with a flame that the rain does not stop (only a
+  campfire could be one, in 07) is put out every 1.5 s and relit by heat: contact does not reset
+  `soak`.
+- `scorch`, `AFTERBURN_FLASH` and the log lines are placeholders for 10's presentation.
+
+### Handoff to milestone 07
+
+- Report contacts with `g.combustion.expose(entity, CombustionSource.KIND, intensity, byPlayer,
+  sourceId, x, y, z)` from inside the fast tick, **before** `CombustionSystem` resolves them: add
+  the source sampling at the start of `CombustionSystem.fastTick` (or a call just before it in
+  `Game.fastTick`, which has 17 lines left), never from the medium tick, so contact is sampled at
+  20 Hz. A contact reported during a frame waits for the next fast tick.
+- Direct molotov hits: `g.combustion.ignite(g, victim, CombustionSource.DIRECT_HIT, 1f,
+  p.fromPlayer, <id>, x, y, z)` in `ProjectileSystem.onEntityHit`; it refuses a torso under water
+  (returns false) and lights at once, the next fast tick dealing contact damage.
+- Use `CombustionSource.X.nominalIntensity` except for liquid patches (`Patch.intensity()`); pass
+  a stable `sourceId` (spill id, packed cell) because it breaks ties.
+- Remove the `hurt`, `damageFlash` and `BURN` roll from `FireSystem.damageNear` and
+  `LiquidFireSystem.burnOccupants` when their sources move to `expose`; the combustion tick now
+  owns all burn damage and the injury (`Player.inflictBurnInjury`). Contract §17 lists the tests
+  that assert the legacy medium-tick numbers.
+- `CombustionSystem.isLivingBody`/`canBurn` decide eligibility; do not add species lists.
+- Attack notifications: once per burn episode per NPC — a new field on `BodyCombustion` reset in
+  its `ignite` is the natural place (package `entity`).
+- Keep green: `BodyCombustionTest`, `CombustionIntegrationTest`, `CombustionAllocationTest`,
+  `SimulationSystemContractTest`, `MolotovTest`, `FireWeatherTest`, `CombatFireIntegrationTest`.
+
+### Handoff to milestones 08–10
+
+- 08 (panic): read `g.combustion.isBurning(n)` (alive and burning), `n.combustion.intensity()`,
+  `inContact()`, and `hasExposure()` + `exposureX/Y/Z()` for the flee direction. AI runs after the
+  combustion tick in the same fast tick, so it sees this tick's fire. There is no recovery timer
+  on the state: keep panic intent on the actor (contract §12).
+- 09 (lifecycle): a dead body's `combustion` keeps `burning()`, `intensity()`, `scorch()` and
+  `burnSeconds()` as they were when it died (the tick never touches a dead body) — the natural
+  residue snapshot source. `CombustionSystem.clear(e)` forgets everything; `extinguish(e)` keeps
+  the scorch. `Game.respawn` and `Player.restoreCreativeBody` already clear the player.
+- 10 (presentation): read-only getters only; `scorch()` grows with `intensity × dt / 10 s` and never
+  falls. The player's red flash (1 on contact ticks, ≥ 0.5 × intensity in afterburn) is the only
+  feedback so far.

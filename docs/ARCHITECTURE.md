@@ -122,7 +122,8 @@ still uses. It **resets before it constructs**, in this order:
 1. Release GPU meshes of the outgoing world (`releaseWorldMeshes`).
 2. Reset every cross-world system: scheduler, audio, time, weather, temperature, fire,
    liquid fire, water, events, plants, item conditions, noise, projectiles, explosions,
-   settlements, ragdolls and body fragments.
+   settlements, ragdolls, body fragments and body combustion (its tallies; each body's fire
+   lives on the body and goes with it).
 3. `reseedSimulation(seed)` — seeds every simulation and player-outcome
    generator, eighteen of them, each with a distinct salt so their streams stay
    independent. Without this, a second
@@ -185,7 +186,7 @@ while (!window.shouldClose())
 
 | Bucket | Period | Drives |
 |---|---|---|
-| fast | 1/20 s | player needs, entity AI and movement, settlement fast tick |
+| fast | 1/20 s | player needs, living bodies on fire, entity AI and movement, settlement fast tick |
 | medium | 1/2 s | weather, temperature, water, fire, liquid fire, shelter, smoke, ambience |
 | slow | 10 s | plants, events, faction, spawning, item spoilage, settlements, world detritus (carcasses, corpses, body fragments) |
 
@@ -238,10 +239,12 @@ regenerating under a newer generator.
 
 Transient state is deliberately **not** serialized: an in-flight reload is
 cancelled on load, and bow draw resets. Combat and fire add more of it. An
-NPC's torso wound count and the shot id that last wounded it, and the blast
-record a lethal explosion leaves on the body it killed, live on the entity and
-die with it — a person who leaves the world, through a save, a load or a
-settlement going dormant, comes back unwounded at their stored health. Pools
+NPC's torso wound count and the shot id that last wounded it, the blast
+record a lethal explosion leaves on the body it killed, and a living body's
+fire (`Entity.combustion`) live on the entity and die with it — a person who
+leaves the world, through a save, a load or a settlement going dormant, comes
+back unwounded and not burning at their stored health. Saving leaves a body
+that is burning in the live world burning. Pools
 of burning liquid and burning blocks are not saved either: a save taken with
 the world alight loads with the fires out. What does survive is the remains of
 every body blown apart once they have settled — people, animals and the
@@ -703,6 +706,25 @@ of a column is always fully lit, so a roof resting directly on a block does not
 shelter it. A patch under cover burns on, but does not light a block the rain is
 falling on, which the rain would only put out again.
 
+**A living body burns on its own clock.** Every `Entity` carries one
+`BodyCombustion`, read-only outside the `entity` package; `CombustionSystem`
+(`Game.combustion`) is its only writer and runs on the fast tick between the
+player's needs and entity AI, so AI reads this tick's fire and a body the fire
+kills is routed whole in the same tick (a dead creature no longer gets an AI step,
+as a dead NPC never did). Flame sources report contacts (`expose`) or set a body
+alight at once (`ignite`); each body keeps only the strongest contact of a tick,
+so flames never stack, and one fire with one afterburn timer that later contacts
+refresh up to a cap. Damage goes through `Entity.hurt` with the fire owner's
+credit, at a contact rate while a flame touches the body and a lower afterburn
+rate as the fire fades; a burn death falls whole. Water over most of the body
+puts it out, water to the hips only shortens it, and rain puts it out when it
+reaches the head — `FireSystem.isPrecipitationReaching` asked of the head's cell,
+the same predicate `isRainedOn` asks of the cell above a block, so any roof over
+the head shelters. The Survival player's medical burn injury is separate: it
+comes once per fire, after a second alight, and neither hurts nor heals while
+the flames burn. A Creative player never catches. The rules, numbers and API
+are in [the combat and fire contract](engineering/ALL_LIVING_COMBAT_FIRE_CONTRACT.md) §10.1.
+
 | State | Persisted | Where |
 | --- | --- | --- |
 | Settled pieces of every body (family, piece, position, orientation, decay, appearance, the pose it died in) | yes | `world.remains`, one record per piece, oldest first; one pose per body |
@@ -711,7 +733,7 @@ falling on, which the rain would only put out again.
 | Pieces still in flight | no — a save settles them first, so they come to rest rather than being lost | — |
 | Pools of burning liquid, burning blocks | no — a save taken mid-burn loads with the fires out | — |
 | A fire bomb still in the air | yes, with the other explosives; it shatters where it lands | active explosives |
-| Torso wounds, the last shot id, the blast record | no — they live on the entity and die with it | — |
+| Torso wounds, the last shot id, the blast record, a living body's fire | no — they live on the entity and die with it | — |
 
 `world.fragments` (0.8.0) and `world.remains` are optional stable-ID sections in
 the v3 extension envelope, so the frozen v3 body and the bodies layout are

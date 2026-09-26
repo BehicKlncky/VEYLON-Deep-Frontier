@@ -204,8 +204,8 @@ flashes; burning bodies, ragdolls and fragments (R8). There is no lava. Light le
 | Fragment physics, caps, settling, decay | `BodyFragmentSystem` (extended, not duplicated) | One step, one sweep, one set of caps for every family. |
 | Harvest yield and lodged arrows of a blasted animal | the existing `Carcass` record, flagged as fragmented and anchored to its torso fragment by a stable remains id | Section 9. |
 | Player remains | `BodyFragmentSystem` pieces with an explicit neutral player appearance | Never references the live `Player`. |
-| Active combustion per body | one embedded state object per `Entity` (`Entity.combustion`, class `BodyCombustion`) | Dies with the entity; no registry to purge; bounded by the entity lists. |
-| Combustion rules, exposure resolution, damage | `simulation/CombustionSystem` owned by `Game`, reset and seeded in `WorldBootstrap` | Tuning in `simulation/CombustionConstants`. |
+| Active combustion per body | one embedded state object per `Entity` (`Entity.combustion`, class `entity/BodyCombustion`) | Dies with the entity; no registry to purge; bounded by the entity lists. As built in 06 (§10.1). |
+| Combustion rules, exposure resolution, damage | `entity/CombustionSystem` owned by `Game` (`Game.combustion`), reset in `WorldBootstrap`; no random stream | Tuning in `entity/CombustionConstants` and `entity/CombustionSource`. Package `entity`, not the proposed `simulation`, so the state's mutators are package-private (§10.1). |
 | Panic intent (goal, timers, recovery) | embedded per `Npc`/`Creature` (or inside `BodyCombustion`) | Written only by AI; seeded panic stream on `EntityManager` or the combustion system. |
 | Burn visuals, scorch rendering, audio | presentation layer (`AmbienceSystem`/`ParticleSystem`/`Renderer`/`AudioManager`) reading a read-only snapshot | Presentation never writes gameplay state. |
 | Death-time visual residue | a bounded list owned by the presentation or fragment/ragdoll layer (09) | Snapshot values only, no entity references. |
@@ -244,6 +244,10 @@ gives the same state up to the frame-vs-fast-tick placement of direct hits.
 Sweep: the body box is swept linearly from the previous sample position to the current one;
 a segment longer than 2 blocks (teleport, respawn, load) samples only its end. Maximum sampling
 gap: one fast tick (0.05 s).
+
+As built in 06 (§10.1): steps 1–3 are wired, with source sampling in step 2 left to 07 (which
+adds it before resolution) and the `dead` guard in `CreatureAI.update`. A `dt` above `FAST_DT`
+advances one `FAST_DT`, so "only ever advances by `FAST_DT` steps" holds for direct callers too.
 
 ## 7. Fragment identity strategy
 
@@ -550,6 +554,142 @@ and pass it to cells they spread to.
 **Death and removal.** Dead or removed bodies leave combustion immediately (their state is not
 ticked). What remains visible after death is presentation residue only (09/10).
 
+### 10.1 As built in milestone 06 (state, rules, API)
+
+**Production ignition is not connected yet.** 06 built the state, the rules and the fast-tick
+wiring. No game system reports a contact: until 07 connects the sources of §4, the legacy
+medium-tick contact damage (`FireSystem.damageNear`, `LiquidFireSystem.burnOccupants`, each still
+rolling `Affliction.BURN` at 50 %) is the only fire damage in play, and a body burns only when a
+test or a QA scene calls `ignite`/`expose`. 06's tests prove the mechanics, not the sources.
+
+**Owner and types** (package `entity`, all transient, none saved):
+
+| Symbol | Role |
+| --- | --- |
+| `Entity.combustion` | `public final BodyCombustion`, one per body, created with it and garbage with it. |
+| `BodyCombustion` | The state. Public getters only; every mutator and field is package-private, so AI, sources and presentation (other packages) can only read it. |
+| `CombustionSource` | `DIRECT_HIT`, `LIQUID`, `BLOCK_FIRE`, `CAMPFIRE`, `TORCH`. Declaration order is the dominance order. Per kind: `heatGainPerSecond` (infinite = lights on first contact, `ignitesOnContact()`), `fuelSeconds` granted, `nominalIntensity`. Not a save format: its order may change with the rules. |
+| `CombustionConstants` | Tuning (§15). |
+| `CombustionSystem` | `Game.combustion`, a `FastTickSystem`. Rules, commands, queries; diagnostic counters `totalIgnitions`, `totalBurnouts`, `totalDoused`, `totalRainedOut` (`reset()` zeroes them, called from `WorldBootstrap.resetForNewWorld`). No `Random`: every rule is deterministic. |
+
+**State fields** (`BodyCombustion`; bounds enforced by the rules and checked by a 3000-tick
+randomized test):
+
+| Field (getter) | Meaning | Range |
+| --- | --- | --- |
+| `burning` | alight | — |
+| `fuel` | seconds of afterburn left | [0, `MAX_FUEL_SECONDS` 8] |
+| `peakIntensity` | strongest contact intensity this episode | (0, 1] while burning, 0 otherwise |
+| `intensity()` | derived, not stored: `floor + (peak − floor) × clamp(fuel / FADE_SECONDS, 0, 1)` with `floor = min(MIN_INTENSITY, peak)`; 0 when not burning | [0, 1] |
+| `heat` | ignition progress of a body that is not burning | [0, 1] |
+| `soak` | seconds of exposed rain on a burning body's head | [0, 1.5) |
+| `burnSeconds` | seconds alight in the current, or else the last, episode | [0, `MAX_BURN_SECONDS` 600] |
+| `scorch` | presentation input; grows by `I × dt / SCORCH_SECONDS` while burning, never falls; kept by `extinguish`, cleared only by `clear` | [0, 1] |
+| `contact` (`inContact()`) | a flame touched the body on the last fast tick | — |
+| `owner`, `ownerByPlayer`, `ownerSourceId` | the contact that last lit or refreshed the fire; null / false / 0 when not burning | — |
+| `exposed` (`hasExposure()`), `exposureX/Y/Z` | where the last applied contact touched the body (08's heat-avoidance input) | finite |
+| pending candidate (package-private) | the strongest contact offered since the last fast tick: kind, intensity, byPlayer, sourceId, point | one per body, never a list |
+
+**Commands and queries** (`CombustionSystem`, public):
+
+| Method | Effect |
+| --- | --- |
+| `expose(e, kind, intensity, byPlayer, sourceId, x, y, z)` | Offers a contact for the next fast tick; returns false for a body that cannot burn or a contact that is not a flame. The only entry point 07's sources should need for contact. |
+| `ignite(g, e, kind, intensity, byPlayer, sourceId, x, y, z)` | Alight **now** (a body already burning is refreshed and taken over instead, never lit twice) and the same contact is offered for the next fast tick, so the first tick costs contact damage. Also refuses a torso under water. For direct hits (07) and QA staging. |
+| `extinguish(e)` | Flames out now; returns whether it was burning. Scorch, exposure point and `burnSeconds` stay. |
+| `clear(e)` | Forgets everything including scorch: a new life (`Game.respawn`; `Player.restoreCreativeBody` calls the state's own `clear`). |
+| `isBurning(e)` | Alive **and** burning. `BodyCombustion.burning()` alone keeps the value the body died with (09's residue input). |
+| `burningBodies(g)` | Count for `RuntimeBudgetSnapshot`. |
+| `isLivingBody(e)`, `canBurn(e)` (static) | `Player`, `Npc` or `Creature` of any species; `canBurn` adds alive and not the invulnerable player. |
+
+`expose` and `ignite` refuse a null or dead body, the invulnerable (Creative) player, a null kind,
+an intensity that is non-finite or ≤ 0, and a non-finite point; an intensity above 1 is clamped to
+1. `extinguish` and `clear` act on any body and ignore null.
+
+**Cadence** (`Game.fastTick`): `player.tickNeeds` → `combustion.fastTick` → `entities.fastTick`
+(AI, physics, death routing) → `settlementManager.fastTick`. Bodies are ticked player first, then
+creatures, then NPCs, in list order. No medium or slow tick advances a fire, so a medium tick
+cannot re-apply a fast tick's time. A non-finite or non-positive `dt` is ignored; a larger one
+advances exactly one `FAST_DT`. `CreatureAI.update` now returns at once for a dead creature, as
+`NpcAI.update` already did, so a body the fire kills in step 2 is routed and removed in step 3 of
+the same tick without a last AI step.
+
+**One body, one fast tick**, in order:
+
+1. Dead: drop the candidate, clear `contact`, stop (the state is frozen as it died).
+2. Invulnerable player: `clear`, stop.
+3. Idle (not burning, no heat, no candidate): stop. This is the whole cost for a body that has
+   never been near a flame.
+4. Water: in a loaded column, `wet` = share of the body's height inside `WATER` cells of the column
+   under its centre (≤ 3 lookups). `wet ≥ IMMERSION_FRACTION` (0.6): `extinguish` (counts
+   `totalDoused` if it was burning), candidate dropped, stop.
+5. Candidate: `contact = true`, exposure point recorded. Burning → `refresh`. Not burning → heat
+   to 1 for an immediate kind, else `heat += heatGainPerSecond × intensity × dt` (capped at 1);
+   at heat ≥ 1 − 1e-4 → `ignite` (`totalIgnitions`). No candidate and not burning → heat decays
+   by `HEAT_DECAY_PER_SECOND × dt`. Still not burning: stop — **heating up does no damage**.
+6. Rain: in a loaded column, if `FireSystem.isPrecipitationReaching(g, x, headCell, z)` (head
+   cell `floor(pos.y + height − 0.01)`): `soak += dt`, and at `RAIN_EXTINGUISH_SECONDS` (1.5)
+   `extinguish` (`totalRainedOut`), stop. Otherwise `soak` decays by `dt`.
+7. Damage (below), at the intensity before this tick's fuel drain. A body killed here stops.
+8. `burnSeconds += dt`; the Survival player crossing `BURN_INJURY_AFTER_SECONDS` gets the medical
+   burn (§11); `scorch` grows.
+9. No contact this tick: `fuel -= dt × (wet > 0 ? SHALLOW_WATER_DRAIN : 1)`; at ≤ 1e-4 →
+   `extinguish` (`totalBurnouts`). Fuel never drains on a contact tick.
+
+**Damage equation** (per fast tick):
+
+```
+dmg = (contact ? CONTACT_DPS : AFTERBURN_DPS)[player 6 / 2 | NPC 10 / 3 | creature 12 / 2.5] × I × dt
+NPC, creature:  Entity.hurt(dmg, ownerByPlayer)
+player:         Player.hurt(dmg, false)   (Creative gate, no armour, no bleed);
+                damageFlash = max(damageFlash, contact ? 1 : AFTERBURN_FLASH 0.5 × I)
+```
+
+Every creature species shares the creature rates; the family test is `instanceof`, never a
+species list. A burn death is an ordinary whole-body death: no blast record, the ragdoll path in
+`EntityManager`, the player's death transition without remains. Kill credit is `ownerByPlayer` at
+the killing tick, carried by `hurt` into `lastHitByPlayer`, so a body that leaves the flame and
+dies in its afterburn still credits whoever owned its fire (test: a bird's meat).
+
+**Refresh and dominance.** Refresh sets `fuel = min(MAX_FUEL, max(fuel, grant))`, raises the
+peak, and hands the fire to the new contact (a weaker kind can take the fire over, and so the
+credit; its grant only raises fuel to its own value). With the current grants refresh never goes
+past 6 s; `MAX_FUEL_SECONDS` 8 is the hard ceiling for any grant. Candidates compare by kind
+(declaration order), then intensity, then player over environment, then lower `sourceId`, then
+the lower point (x, then y, then z) — so contacts reported in any order leave the same winner,
+exposure point included (a test runs all 120 orders of five contacts). Contacts never add up:
+eight simultaneous flames burn like one.
+
+**Ignition tick.** A contact's first fast tick lights an immediate kind and deals contact damage
+in that tick. `ignite` lights during the frame; the next fast tick deals contact damage. Measured:
+villager contact tick −0.5, player −0.3, creature −0.6.
+
+**Player feedback** is damage, the red flash, and one log line each when the player catches fire,
+is put out by water or rain, or burns out. Nothing touches movement, sprint, velocity, camera or
+input (§13): a test moves a burning and an unburned player with the same 90 commands and compares
+position, velocity, sprint, crouch, speed multiplier and `canSprint` every frame.
+
+**Changes from the proposals above** (reasons in the progress file):
+
+- Package `entity`, not `simulation`; `Entity.combustion` is `public final`, its mutators
+  package-private.
+- Immersion is **the share of body height under water ≥ 0.6** in the centre column, not "water in
+  the body-centre cell". Water is whole cells: a person standing in one cell of water (1 of 1.75
+  blocks — legs and hips; the torso box starts at 0.86 m) would count as immersed by the centre
+  cell. At 0.6 a person or the player keeps burning there with a 3× drain, and every animal
+  standing in one cell of water (0.67–1.0 of its height) is put out.
+- Rain is sampled with the new shared predicate `FireSystem.isPrecipitationReaching` in the head
+  cell (`isRainedOn(x, y, z)` now delegates to it for the cell above a block, unchanged). The
+  block rule's "a roof resting directly on a block does not shelter it" artefact would have
+  counted a person under a two-high ceiling as rained on; a body is sheltered by anything opaque
+  above its head. `soak` only runs while burning and resets on ignition and extinction.
+- The combustion salt `0x4255524e494eL` is **not used**: combustion draws no random numbers. The
+  one roll, the burn injury's length, is the player's own affliction stream (§11), which is where
+  `Player` keeps every injury roll.
+- Unloaded columns: water and rain rules are skipped (an unloaded column reads as air and open sky),
+  so a body there burns down normally.
+- `TIMER_EPSILON` (1e-4) slack on fuel, soak, heat and injury thresholds makes tick counts exact.
+
 ## 11. Medical BURN versus active combustion
 
 - `Affliction.BURN` stays the medical injury; active combustion is not an affliction.
@@ -564,6 +704,18 @@ ticked). What remains visible after death is presentation residue only (09/10).
   stamina penalty applies whenever BURN is present (it is not damage).
 - The herbal poultice (`PlayerTreatmentSystem`) cures the injury only; it never extinguishes.
 - NPCs and creatures have no afflictions: combustion damage is their only burn damage.
+
+As built in 06: `Player.inflictBurnInjury(Game)` (package-private, called by `CombustionSystem`
+when `burnSeconds` crosses 1.0 s, so once per episode) rolls `BURN_AFFLICTION_SECONDS_MIN` 60 +
+`RANGE` 40 × the player's affliction stream and logs only when the injury is new;
+`Player.tickAfflictions` skips `BURN` entirely — no damage, no countdown — while
+`combustion.burning()` is true. `tickNeeds` runs before the combustion tick, so it reads the
+previous tick's fire: the injury resumes on the first tick after the flames go out. Measured on
+the player (test `theBurnInjuryWaitsOutTheFlamesAndThePoulticeOnlyTreatsTheInjury`): 0.5 s in a
+pool then the full afterburn cost 13.08 health against a calm twin (formula 13.05), the injury
+came at exactly 1.0 s, its seconds did not move while alight, and afterwards it cost 0.18/s. A
+poultice mid-flame cured the injury, the flames burned on, and no second injury came that
+episode. Until 07 removes them, the legacy contact paths still add their own 50 % `BURN` roll.
 
 ## 12. Panic policy (NPCs and animals only)
 
@@ -596,7 +748,9 @@ ticked). What remains visible after death is presentation residue only (09/10).
   log text and presentation (10).
 - Creative: `CombustionSystem` clears and skips the player's state while invulnerable; the
   lethal gate skips the player before any record; no player remains are spawned. Returning to
-  Survival starts with a clear state.
+  Survival starts with a clear state. As built in 06: `Player.restoreCreativeBody` clears the
+  fire too, so the switch to Creative forgets it at once, and every command refuses the
+  invulnerable player.
 
 ## 14. Persistence and transient state
 
@@ -725,8 +879,12 @@ species and both sides are free).
 | `CONTACT_DPS` NPC / creature / player | 10 / 12 / 6 | equals the legacy pool rates, so pool lethality is unchanged |
 | `AFTERBURN_DPS` NPC / creature / player | 3.0 / 2.5 / 2.0 | survivable afterburn for sturdy bodies |
 | `SHALLOW_WATER_DRAIN` | 3 × | feet in water help, torso immersion ends it |
-| `RAIN_BODY_EXTINGUISH` | 1.5 s exposed | between the patch (1 s) and block (2 s) values |
-| `BURN_INJURY_AFTER` | 1.0 s | section 11 |
+| `IMMERSION_FRACTION` | 0.6 of body height (added in 06) | §10.1: a person in one cell of water is not immersed, every animal is |
+| `RAIN_BODY_EXTINGUISH` | 1.5 s exposed | between the patch (1 s) and block (2 s) values; as built `RAIN_EXTINGUISH_SECONDS` |
+| `BURN_INJURY_AFTER` | 1.0 s | section 11; as built `BURN_INJURY_AFTER_SECONDS` |
+| `SCORCH_SECONDS` | 10 s at intensity 1 (added in 06) | presentation input only; 10 may retune |
+| `AFTERBURN_FLASH` | 0.5 × intensity (added in 06) | least red flash kept during afterburn; contact ticks flash 1 |
+| `MAX_BURN_SECONDS` | 600 (added in 06) | keeps an endless campfire contact finite |
 | `PANIC_GOAL_INTERVAL` | 0.6 s + seeded 0–0.6 s | irregular, not per frame |
 | `PANIC_GOAL_DISTANCE` | 4–8 blocks (birds 6–10 horizontal, climb 3–6) | |
 | `PANIC_SPREAD` | ± 70° | crowds do not mirror each other |
@@ -739,7 +897,7 @@ species and both sides are free).
 | `MIN_LAUNCH_MASS` | 1.25 kg | section 9.1; added in 03 |
 | `FragmentModels.SHELL_REACH` | 0.03 m | section 7.2; added in 04 (vest and haunch are 0.02) |
 | `FragmentModels.CONTACT_SPEED` | 1 m/s | section 7.2; added in 04, well under the 4.5 m/s launch bias |
-| Combustion salt / panic salt | `0x4255524e494eL` / `0x50414e494353L` | distinct from every existing salt in the source tree |
+| Combustion salt / panic salt | `0x4255524e494eL` / `0x50414e494353L` | distinct from every existing salt in the source tree; the combustion salt is unused since 06 (no random stream) |
 
 Worked outcomes with these values (0.5 s of pool contact at intensity 1, then a full
 afterburn): villager (30) survives with ≈ 10 after ≈ 6 s of visible burning; captive (24)
@@ -756,7 +914,11 @@ Gameplay (enforced by tests; wall-clock numbers only in opt-in `performanceTest`
   (≤ 160 AABB tests) plus the cells under its swept, source-inflated box (≤ 5 × 5 × 5 = 125
   lookups at the 2-block sweep limit); never generates chunks, never scans `campfireFuel`
   world-wide. *Proposed* wall-clock target: ≤ 0.2 ms per fast tick with 40 NPCs, 35 creatures,
-  160 patches and 220 burning cells on the reference host.
+  160 patches and 220 burning cells on the reference host. As built in 06 (no sources yet,
+  `CombustionAllocationTest`): an idle crowd of 75 allocates 0 bytes per fast tick; the same crowd
+  all burning allocates 1280, all of it `World.getChunk` boxing its map key when consecutive
+  bodies change chunk (80 bytes a miss, the lookup every entity's physics already makes), held
+  under the ragdoll/fragment steps' 4 KB. The wall-clock target is unmeasured.
 - Existing caps unchanged: `MAX_LIVE_FRAGMENTS` 120, `MAX_SETTLED_FRAGMENTS` 600,
   `RagdollConstants.MAX_LIVE` 12, `FireSystem.MAX_ACTIVE_FIRES` 220,
   `LiquidFireConstants.MAX_PATCHES` 160 (22 per spill), `MAX_TRACKED_NPC_SPILLS` 64,
@@ -765,6 +927,9 @@ Gameplay (enforced by tests; wall-clock numbers only in opt-in `performanceTest`
   per body, 120 live fragments hold 10 bodies in flight.
 - New collections must be capped and covered by `RuntimeBoundsTest`; extend
   `RuntimeBudgetSnapshot` with burning bodies (≤ living bodies) and anchored remains (≤ 60).
+  As built: `anchoredRemains` (03); `burningBodies` and `livingBodies` (06, hard limit
+  `burningBodies <= livingBodies`, smoke line `burning=N/M`). 06 adds no collection: one fixed
+  state object per body, one pending contact per body, four `int` counters.
 - Panic: ≤ 1 goal per actor per 0.25 s; path work within existing `Pathfinder` limits.
 - Eviction and caps never undo a death or skip a living body's combustion; only presentation
   degrades.
@@ -806,7 +971,7 @@ Replace, keeping unrelated coverage:
 | 03 blast deaths (done) | §8, §9; 02 definitions | Shared `Entity` blast record, generalized `ExplosionSystem` gate, `BodyFragmentSystem` spawn for any family, anchored `Carcass`, player-remains spawn at the `Game.frame` death transition (§8.1, §9.1). |
 | 04 fragment rendering (done) | 02 definitions, 03 fragments | Definition-driven model selection and isolation in `Renderer.drawFragment`, cut faces per family, bounds from full geometry, suppressed intact carcass, all-species QA scene (§7.2). |
 | 05 persistence (done) | §7 save strategy, 03 remains ids | `world.remains` v1 for every family's settled pieces, their poses and the anchored harvest links (with lodged arrows); `world.fragments` v1 unchanged and pinned by a literal fixture (§14.1). |
-| 06 combustion state | §5, §6, §10, §11, §15 | `Entity.combustion`, `CombustionSystem` (expose/ignite/extinguish/query/snapshot), fast-tick wiring, medical-BURN gating, reset/seed in `WorldBootstrap`. |
+| 06 combustion state (done) | §5, §6, §10, §11, §15 | `Entity.combustion` (`BodyCombustion`), `CombustionSource`, `CombustionSystem` (`expose`/`ignite`/`extinguish`/`clear`/`isBurning`/`burningBodies`, read-only getters), fast-tick wiring, `CreatureAI` dead guard, medical-BURN gating, reset in `WorldBootstrap`, `FireSystem.isPrecipitationReaching`, `RuntimeBudgetSnapshot.burningBodies` (§10.1). |
 | 07 sources | §4, §10; 06 API | Fast-tick swept contact for patches, burning cells, campfires, torches; direct-hit ignition; `damageNear`/`burnOccupants` stop hurting; `Burn.byPlayer`; attack de-dup per burn episode. |
 | 08 panic | §12; 06 snapshot, 07 ignition | Panic hooks in `NpcAI.update`/`CreatureAI.update`, per-actor intent, seeded stream, NPC screen closure, bird flight escape. |
 | 09 lifecycle | §6, §9, §14 | Dead guard before creature AI, residue snapshot at death, resets on load/new world/respawn/Creative/deactivation, pause and sleep behaviour. |
