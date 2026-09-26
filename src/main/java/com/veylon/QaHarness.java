@@ -56,6 +56,7 @@ final class QaHarness {
     private final RainQaScene rainScene;
     private final RagdollQaScene ragdollScene;
     private final DismemberQaScene dismemberScene;
+    private final SpeciesDismemberQaScene speciesDismemberScene;
     private final MolotovQaScene molotovScene;
     private final HudQaScene hudScene;
 
@@ -103,6 +104,7 @@ final class QaHarness {
         rainScene = new RainQaScene(game);
         ragdollScene = new RagdollQaScene(game);
         dismemberScene = new DismemberQaScene(game);
+        speciesDismemberScene = new SpeciesDismemberQaScene(game);
         molotovScene = new MolotovQaScene(game);
         hudScene = new HudQaScene(game);
     }
@@ -267,6 +269,7 @@ final class QaHarness {
         rainScene.update(elapsed);
         ragdollScene.update(elapsed);
         dismemberScene.update(elapsed);
+        speciesDismemberScene.update(elapsed);
         molotovScene.update(elapsed);
         hudScene.update(elapsed);
     }
@@ -710,6 +713,11 @@ final class QaHarness {
                 site = moveBenchmarkToBiome(Biome.MEADOW);
                 clearBenchmarkStage(site, 10, 18);
                 dismemberScene.stage(site, normalized);
+            }
+            case "dismember_species", "dismember_species_wall", "dismember_species_close" -> {
+                site = moveBenchmarkToBiome(Biome.MEADOW);
+                clearBenchmarkStage(site, 12, 18);
+                speciesDismemberScene.stage(site, normalized);
             }
             case "molotov_ground", "molotov_tree", "molotov_rain" -> {
                 site = moveBenchmarkToBiome(Biome.MEADOW);
