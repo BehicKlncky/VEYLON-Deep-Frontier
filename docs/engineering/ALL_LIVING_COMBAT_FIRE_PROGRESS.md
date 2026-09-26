@@ -25,7 +25,8 @@ Checkpoints by milestone (filled in by the following milestone):
 | 01 | `8f7c50fb24b4621a9dc00f3786720f4fa9495fa0` — `docs(combat): record all-living combat and fire contract` |
 | 02 | `52ff25b05069cd229dab711cf47239842a1c996f` — `feat(entity): define where every kind of body comes apart`; `63de0ddb70edf982814ab78a9a70cb1faac85fbf` — `test(entity): pin where every body comes apart and that it reassembles`; `eb151dc7ab003206485b0b5e6f837c1ea96edcf0` — `docs(combat): record species fragment anatomy` |
 | 03 | `86ed85c14184ed22d710edbc80d1dda2cb7348c1` — `feat(combat): blow apart every living body a lethal blast kills`; `6bd61f8e1a9bc06e2de07b0edabbb967f5aa90d6` — `test(combat): pin lethal blasts and one body for every living thing`; `7d6c4aec43df0fcd2fb6af94cc8031cc64ff0d17` — `docs(combat): record all-living blast deaths` |
-| 04 | reported in the milestone 04 handoff; record here in 05 |
+| 04 | `290c388d017bfb5371d40d181837fd7c52f5aff0` — `feat(gfx): draw every body's pieces as its own anatomy`; `4baef52c995b2dcd956a19dd4eb64d47fa6ce500` — `feat(qa): stage every kind of body blown apart for captures`; `42d9572f6feb4edab950618271c01fda3e711430` — `test(gfx): pin every body's pieces as drawn, and the capture scenes`; `a203df9ad3900c2a93c1d213b96d0c2d0251e75f` — `docs(combat): record species fragment rendering` |
+| 05 | reported in the milestone 05 handoff; record here in 06 |
 
 ## Status
 
@@ -35,7 +36,7 @@ Checkpoints by milestone (filled in by the following milestone):
 | 02 | Species-aware fragment anatomy | **Complete** (definitions and pose API; no new gameplay) |
 | 03 | All-living blast deaths | **Complete** (gameplay; animal pieces not drawn or saved until 04/05) |
 | 04 | Species fragment rendering | **Complete** (presentation; animal pieces still not saved until 05) |
-| 05 | Fragment save compatibility | Not started |
+| 05 | Fragment save compatibility | **Complete** (`world.remains` v1; `world.fragments` v1 unchanged) |
 | 06 | Shared body combustion | Not started |
 | 07 | Connect all fire sources | Not started |
 | 08 | NPC and animal fire panic | Not started |
@@ -46,8 +47,8 @@ Checkpoints by milestone (filled in by the following milestone):
 
 Since 03, a lethal blast kills and blows apart every living body (all six species, every NPC
 family, a Survival player) in the simulation; since 04 every piece is drawn as its own body's
-anatomy. Animal pieces are **not saved** until 05; nothing in this file claims persistence. No
-fire behaviour has changed yet.
+anatomy; since 05 every settled piece, the pose its body died in and an animal's harvest record
+survive a save (`world.remains`). No fire behaviour has changed yet.
 
 ## Milestone 01 — source audit and contract (2026-09-26)
 
@@ -579,3 +580,92 @@ Decisions are recorded in contract §7.2.
   frame) and `FragmentModels.radius(f)` about `(pos.x, pos.y − contactDrop(f), pos.z)`.
 - Any new draw from a shared model must start with `resetPose` (and a person's look), as
   `Animator.poseFragment` does.
+
+## Milestone 05 — remains persistence (2026-09-26)
+
+### Start state
+
+- Branch `feature/all-living-dismemberment-combustion`, tip `a203df9` (milestone 04); the four
+  04 checkpoints are recorded in the table above. Working tree clean apart from the user's
+  untracked `.agents/` and `AGENTS.md`, which stay untracked.
+- Same host and portable Temurin 25.0.4.1+1 JDK; Gradle 9.1.0, `--no-daemon --console=plain`.
+- Read: `AGENTS.md`, the pack's `00_BASE_KNOWLEDGE.md` and `05_FRAGMENT_SAVE_COMPATIBILITY.md`,
+  the `veylon-save-compatibility` skill, contract §7, §9, §14, and this file.
+- Predecessors checked in source before editing: `BodyFamily`, `FragmentAnatomy`,
+  `FragmentPose.Recorder` (02); `Carcass.remains` ↔ `BodyFragment.harvest`, `spawnFromCreature`,
+  `spawnPlayerRemains`, `SaveSystem.save` settling fragments first, and
+  `FragmentsSection.readable` leaving animal pieces out (03); `NEUTRAL_CAMP_INDEX` −2 (04).
+
+### Commands and results
+
+All from the repository root in PowerShell with the portable JDK on `PATH`. Logs are in the
+git-ignored `build/` directory.
+
+| Command | Result |
+| --- | --- |
+| `.\gradlew.bat compileJava compileTestJava` | BUILD SUCCESSFUL (`build/all-living-m05-compile.log`). |
+| `.\gradlew.bat test --tests com.veylon.save.* --tests *BodyFragment* --tests *Fragment* --tests *SerializedEnumOrderTest --tests *GameLoopIntegrationTest --tests *SpeciesDismemberQaSceneTest --tests *AllLivingBlastDeathTest --tests *RuntimeBoundsTest` (production code changed, existing tests untouched) | 344 tests, **1 failed**: `FragmentsSectionTest.saveWithoutTheSectionLoadsWithNoFragments`, which imitated a save from before 0.8.0 by removing `world.fragments` only; `world.remains` then restored the pieces. Its fixture now removes both sections, as such a save has neither; its assertions are unchanged. Every other save, migration, fragment, blast and game-loop test passed unmodified (`build/all-living-m05-legacy.log`). |
+| `.\gradlew.bat test --tests *RemainsSectionTest --tests *RemainsPersistenceTest --tests *FragmentsSectionTest --tests *SerializedEnumOrderTest` | **26 tests, 0 failures** (9 + 2 + 8 + 7) on the final code (`build/all-living-m05-new.log`). The new tests passed at their first run; the mutation checks below are the evidence that they can fail. |
+| Mutation check (scratch PowerShell script: one mutation at a time in `RemainsSection` / `V3ExtensionSections`, then the remains, persistence and fragment test classes; each file restored and its hash compared with a backup) | **All 15 caught** (`build/all-living-m05-mutation.log`, `…-mutation2.log`): reader ignores `world.remains` (6 tests fail), records never re-tied (6), writer drops captured poses (2), arrows not restored (3), unknown family read as a person (1), no unit-quaternion check, no piece-scale check, no duplicate-link check, no leaves-a-carcass check, no torso/species check (each fails the malformed-section test; its cases were rewritten so each breaks exactly one rule), `world.fragments` not validated beside `world.remains` (`FragmentsSectionTest.corruptOrOversizedSectionIsRejected`), writer writes no links (5), another joint table dropped or read as this build's (1 each). |
+| `.\gradlew.bat build` | **BUILD SUCCESSFUL in 5 m 6 s. 1149 tests in 129 classes, 0 failures, 0 errors, 0 skipped**; `javadoc` and `check` executed (`build/all-living-m05-build.log`). Base after 04 was 1136 in 127. |
+
+Not run: `performanceTest` (no per-frame path changed; a save writes one more section, 16 bytes
+in a world without remains; this host is not the reference machine and its durable-save gate
+fails regardless) and native QA (nothing is drawn differently; the tests compare every loaded
+piece's `FragmentModels.rootFrame` — the frame the renderer draws it in — with the saved
+piece's, to 1e-5).
+
+### What was built
+
+Decisions, the byte layout and the compatibility matrix are in contract §14.1.
+
+| Path | Change |
+| --- | --- |
+| `save/RemainsSection.java` (new) | `world.remains` v1: a pose table (one entry per pose object, rest = 0 joints), piece records (pose index, piece id, position, unit orientation, decay, look), harvest links (piece index, carcass index, lodged arrows and their kind). Bounded reader that validates everything before touching the world; malformed → `IOException`; unknown family or piece id → skipped; another build's joint table → the family's rest pose. |
+| `save/FragmentsSection.java` | `parse(byte[])` validates without restoring (`read` = parse + restore); `placementReadable` and `readQuaternion` shared with `RemainsSection`. The v1 bytes are unchanged. |
+| `save/V3ExtensionSections.java` | Writes `world.remains` after `world.fragments`; collects both payloads and resolves them after the envelope loop in `readSettledPieces` (remains when present, v1 otherwise; v1 always validated). |
+| `entity/BodyFragmentSystem.java` | Public `restoreSettled(BodyFragment torso, Carcass record)`: ties a loaded torso to its record, refits, admits and puts the record under the torso; `IllegalArgumentException` unless the piece is the core of the record's species and both sides are free. |
+| `entity/Carcass.java` | `remains` Javadoc: now saved. |
+| `src/test/.../save/RemainsSectionTest.java` (new) | 9 tests: every species, a person and the player's remains round-trip with family, piece, place, orientation, rot, look, every pose joint, box size, drawn frame and rot tint equal, one pose per body, records re-tied with meat, hide, rot and arrows (deer partly taken), and a second save of the loaded world writes identical bytes; a save without `world.remains` loads as v0.8.0 would; a hand-composed literal v0.8.0 `world.fragments` payload loads (directly and through the whole reader) and the writer still produces it byte for byte; a mid-flight save (deer, wolf, person); 600 pieces with 60 anchored records; loading another world and then the first again; the writer's rest-pose fallback; unknown families, pieces and joint tables; 44 malformed payloads, each rejected directly and by the full load with the live world, its pieces, records and links untouched. |
+| `src/test/.../RemainsPersistenceTest.java` (new) | 2 production-path tests: a keg kills a wolf (three iron arrows lodged) and a deer through `ExplosionSystem` and `EntityManager.fastTick`; the wolf is torn by hand after one load and skinned after another (`WorldInteractions.interactWithNearbyCarcass`), three repeated loads in between: exactly one wolf's meat, hide and arrows in total, and the emptied record releases its torso. The player killed by a keg, saved during the death screen and after respawning: the remains stay at the death spot with the plain look, the loaded dead player does not come apart again, and the player comes back as respawned. |
+| `SerializedEnumOrderTest` | Pins `CreatureType` (persisted by the base body but never pinned), `BodyFamily` and every family's piece names; the humanoid list equals the v1 `Piece` order. |
+| `FragmentsSectionTest` | `saveWithoutTheSectionLoadsWithNoFragments` removes both sections (see above). |
+| docs | contract §7.1 pointer, §9.1, §14.1 (new), §18; `ARCHITECTURE.md` transient-state paragraph, persistence table and section paragraph (also: the blast record lives on the entity since 03, not the `Npc`); `DEVELOPING.md` creature step 4 and the enum pitfall. |
+
+### Limitations
+
+- **A v0.8.0 build reading a new save** was not run (no v0.8.0 binary in the suite): by its
+  source it skips `world.remains` by length and loads people in the rest pose (a player's remains
+  with a camp badge), no animal pieces, and each record as a whole carcass without its arrows.
+- A **whole** carcass still loses its lodged arrows on save, as it always has: the base carcass
+  record never stored them, and only the anchored record's link carries them now.
+- People are written twice (v1 and `world.remains`): at most 600 × 47 bytes of duplication.
+- A pose outside the reader's bounds is saved as the rest pose; none of the live animation's
+  poses comes near them (angles within a turn, offsets ≤ 0.62 m, scale ≈ 1 ± 0.012).
+- Loading keeps a record's saved meat, hide and rot and re-derives its position from the torso
+  (the same floats, since the save laid the torso down first).
+- Release-facing texts (README save-format paragraph, CHANGELOG, "Only people are
+  dismembered") are unchanged; 11 owns them.
+
+### Handoff to milestone 06
+
+- Nothing in 05 touches combustion. Keep new combustion state out of every save section
+  (contract §14, R6): `SaveSystem.save` writes base v3 plus the sections in
+  `V3ExtensionSections.write`; add nothing there. A load runs `Game.newWorld` → `WorldBootstrap`
+  resets before any section is read, so a system reset there is cleared on load too.
+- Remains and records after a load are ordinary settled pieces and carcasses:
+  `BodyFragment.settled` is true, `Carcass.atRest()` is true, `Carcass.remains`/`BodyFragment.harvest`
+  are re-tied. Dead bodies and remains never burn as living bodies (contract §10).
+- Keep green: `RemainsSectionTest`, `RemainsPersistenceTest`, `FragmentsSectionTest`,
+  `SerializedEnumOrderTest`, and the save package (`com.veylon.save.*`).
+
+### Handoff to milestone 09
+
+- Loading a save written while the player was dead restores the remains once; the blast record
+  is transient, so the death transition after the load spawns nothing
+  (`RemainsPersistenceTest.thePlayersRemainsStayWhereThePlayerFellAndNeverComeApartTwice`).
+  Death-time visual residue must stay out of the save like combustion.
+- `BodyFragmentSystem.restoreSettled(f)` and `restoreSettled(torso, record)` are the only load
+  entry points for pieces; a new per-piece field that must persist needs a `world.remains`
+  version bump (older builds reject a newer version of a known section and with it the save) or a
+  new section ID beside it (older builds skip it) — see contract §14.1.

@@ -326,7 +326,7 @@ Save strategy for 05: the base reader skips unknown section IDs by length
 unknown version of a known ID (`FragmentsSection.read`: "unsupported fragments section
 version"). Therefore keep `world.fragments` v1 byte-identical for human pieces and put species
 pieces, player remains and anchored-harvest links in a **new optional section ID**, so v0.8.0
-builds still load new saves (dropping only the new remains).
+builds still load new saves (dropping only the new remains). Built as planned in 05: §14.1.
 
 ### 7.2 As built in milestone 04 (drawing the pieces)
 
@@ -486,10 +486,11 @@ builds still load new saves (dropping only the new remains).
   `MAX_ANCHORED_REMAINS` (60) at creation, the oldest record and its torso are removed together.
 - **Rendering and saving before 04/05.** `Renderer.renderCarcasses` skips fragmented records.
   `Renderer.drawFragment` skipped pieces with `piece == null` (every animal piece) until 04,
-  which draws every family (§7.2). `FragmentsSection.readable` leaves animal pieces out of
-  `world.fragments` v1 (unchanged format); a fragmented record is saved as an ordinary carcass
-  and loads as a whole carcass in the fixed sprawl — one body, reward kept — until 05 persists
-  the link. Player remains are human pieces and are saved in v1 with the neutral look.
+  which draws every family (§7.2). `FragmentsSection.readable` still leaves animal pieces out of
+  `world.fragments` v1 (unchanged format); since 05 they, the poses and the record links are
+  saved in `world.remains` (§14.1). Only a save without that section — v0.8.0's, or one re-saved
+  by it — still loads a fragmented record as a whole carcass in the fixed sprawl: one body,
+  reward kept. Player remains are human pieces with the neutral look, in both sections.
 
 ## 10. Combustion model
 
@@ -609,6 +610,105 @@ ticked). What remains visible after death is presentation residue only (09/10).
 
 Saving never extinguishes a live burn: `SaveSystem.write` only settles ragdolls and fragments.
 
+### 14.1 As built in milestone 05 (remains persistence)
+
+**Sections.** Both live in the v3 extension envelope (`V3ExtensionSections`), after
+`world.bodies`; the frozen v3 body is unchanged.
+
+| ID | Version | Holds | Written | Read |
+| --- | --- | --- | --- | --- |
+| `world.fragments` | 1, unchanged | people's settled pieces by legacy `BodyFragment.Piece` ordinal, rest pose | always, byte for byte as v0.8.0 wrote the same pieces (pinned against a hand-composed literal) | always validated; restored only when `world.remains` is absent |
+| `world.remains` | 1, **new ID** | every settled piece of every family, the poses they died in, the harvest links | always, after `world.fragments` | authoritative when present |
+
+A new ID rather than `world.fragments` version 2, because the v1 reader refuses any other
+version of its section — and with it the whole save — while every reader skips an unknown ID
+by its length. People are therefore written twice (at most 600 × 47 bytes of duplication).
+`V3ExtensionSections.readSettledPieces` resolves the two after the envelope loop, so the result
+does not depend on the order sections appear in; the carcasses a link points at come from the
+v3 body, read before any section.
+
+**Layout of `world.remains` v1** (all numeric, big-endian `DataOutputStream`):
+
+```text
+int version = 1
+int poses (<= 600);  per pose:  int BodyFamily ordinal, int joints (0 = the family's rest pose,
+                                otherwise the table's joint count),
+                                joints x 7 floats: rotX, rotY, rotZ, poseX, poseY, poseZ, scale
+int pieces (<= 600); per piece: int pose index, int FragmentPiece.id, 3 floats position,
+                                4 floats orientation (unit quaternion), float decay,
+                                appearance as world.bodies writes it (int, 3 booleans, int)
+int links (<= 60);   per link:  int piece index, int carcass index (v3 body order),
+                                int lodged arrows (<= 1024), int arrow item (0 = none, else ordinal + 1)
+```
+
+- **Identity** is (`BodyFamily` ordinal, `FragmentPiece.id`), both append only and pinned in
+  `SerializedEnumOrderTest` (family order and every family's piece names); a person's piece id
+  is its v1 ordinal. The family comes from the pose entry, so nothing can be read as a person's
+  piece unless its pose says `HUMANOID`.
+- **Pose**: stored once per pose object — the pieces of one body share one, and share one again
+  after loading; a rest-valued pose is stored as 0 joints and loads as `anatomy.restPose()`.
+  Bounds: angles ±40 rad, offsets ±4 m, joint scale and every piece's derived scale in
+  [0.5, 2] (live breathing is about ±1.2 %). The collision box follows the stored scale, so the
+  loaded box and its drawn frame equal the saved ones.
+- **Settled order** is kept, so the settled cap evicts after a load what it would have evicted
+  before the save. Pieces keep position (exact), orientation (normalised on write, ≤ 1e-6),
+  decay, look, family, piece and therefore cuts; the sweep box is refit by `restoreSettled`.
+- **Harvest link**: re-ties `Carcass.remains` ↔ `BodyFragment.harvest` through
+  `BodyFragmentSystem.restoreSettled(torso, record)` and puts the record back under the torso.
+  Only a torso whose record is in the carcass list and tied back to it is written. The link also
+  carries `stuckArrows`/`stuckArrowType`, which the base carcass record never stored: an
+  anchored record now keeps its arrows across a save; a **whole** carcass still loses them, as
+  it always has (pre-existing, unchanged). Meat, hide and rot stay in the v3 carcass record, so
+  a partly harvested animal comes back partly harvested; a load never creates a carcass.
+- **Player remains** are humanoid pieces with the neutral look (`NEUTRAL_CAMP_INDEX` −2) in both
+  sections. Nothing refers to the `Player`, whose health and position are saved independently;
+  the blast record stays transient, so a player loaded dead does not come apart again.
+
+**Policy for what a reader cannot use** (documented in the `RemainsSection` class comment):
+
+- *Malformed* fails the whole load (the live world is untouched: a live-session load proves the
+  payload on a throwaway `Game` first): counts over their caps or negative, indexes out of range,
+  a negative family or piece id, non-finite or out-of-bound numbers, a quaternion whose squared
+  length is more than 1e-3 from 1, a pose drawing a piece out of scale, two links to one torso or
+  one record, a record on a limb, on another species or on a body that leaves no carcass,
+  trailing or missing bytes, an unknown section version.
+- *Unknown but well formed* is skipped, bounded by the same caps: a family ordinal past
+  `BodyFamily` (its pieces are read, checked and dropped; a link to one leaves its record a whole
+  carcass, arrows kept); a piece id past its family's list (dropped). A known family whose pose
+  lists another joint count — a table from another build — keeps its pieces in the family's rest
+  pose, as version 1 people load. Piece and link records are fixed-size, so skipping never loses
+  the stream position.
+- *Writer*: a piece the reader would refuse is left out (as v1 does); a pose the reader would
+  refuse is written as the family's rest pose (the piece keeps its place, not its articulation).
+  Pieces in flight are never written.
+
+**Settle-before-save** is unchanged: `SaveSystem.save` settles ragdolls and fragments before it
+writes, so a mid-flight save writes each piece where it lands, once, and the anchored record
+where its torso lands. **Load** runs `newWorld` (`WorldBootstrap` resets both fragment lists and
+clears carcasses) before any section, so loading another world keeps none of the last one's
+pieces or links.
+
+**Compatibility matrix** (verified by tests unless marked):
+
+| Save | Loaded by this build |
+| --- | --- |
+| v2, or v3 without either section (before 0.8.0) | no pieces (`SaveMigrationTest`, `HistoricalV020SaveCompatibilityTest`, `FragmentsSectionTest`) |
+| v0.8.0 (`world.fragments` only), or this build's save re-saved by v0.8.0 | people in the rest pose at their saved place; no animal pieces; each animal's record a whole carcass in the fixed sprawl — one body, same meat and hide (`RemainsSectionTest`) |
+| this build | everything above, animals and poses included |
+
+| Save | Loaded by an older build |
+| --- | --- |
+| this build, by v0.8.0 | skips `world.remains` by length: people in the rest pose (a player's remains wear the camp badge there, §7.2), animal pieces absent, records whole carcasses. *Source reasoning, not run* — no v0.8.0 binary is exercised by the suite. |
+
+**APIs** (package `save` is package-private): `RemainsSection` (`ID`, `VERSION`, `write(Game)`,
+`read(byte[], Game)`, `MAX_PIECES` 600, `MAX_POSES` 600, `MAX_LINKS` 60, `MAX_POSE_JOINTS` 64,
+`MAX_POSE_ANGLE` 40, `MAX_POSE_OFFSET` 4, `MIN_POSE_SCALE`/`MAX_POSE_SCALE` 0.5/2,
+`QUATERNION_TOLERANCE` 1e-3, `MAX_STUCK_ARROWS` 1024); `FragmentsSection.parse(byte[])`
+(validate without restoring), `placementReadable`, `readQuaternion`;
+`V3ExtensionSections.readSettledPieces`; public `BodyFragmentSystem.restoreSettled(BodyFragment,
+Carcass)` (throws `IllegalArgumentException` unless the piece is the core of the record's
+species and both sides are free).
+
 ## 15. Proposed tuning (all values proposed)
 
 | Constant | Value | Why |
@@ -705,7 +805,7 @@ Replace, keeping unrelated coverage:
 | 02 anatomy (done) | §3.2, §7; `BodySkeleton.of`/`humanoid`, `CreatureModels.of`, `NpcModels.get`, `EntityModel.part`, `ModelPart` pivot/box/split fields, `BodyFragment.Piece`, `FragmentModels` | `BodyFamily`, `FragmentAnatomy`, `FragmentPiece`, `FragmentCut`, `FragmentPose`, `AnatomyModels` (§7.1; exact API in the progress file); tests over `CreatureType.values()` + humanoid. |
 | 03 blast deaths (done) | §8, §9; 02 definitions | Shared `Entity` blast record, generalized `ExplosionSystem` gate, `BodyFragmentSystem` spawn for any family, anchored `Carcass`, player-remains spawn at the `Game.frame` death transition (§8.1, §9.1). |
 | 04 fragment rendering (done) | 02 definitions, 03 fragments | Definition-driven model selection and isolation in `Renderer.drawFragment`, cut faces per family, bounds from full geometry, suppressed intact carcass, all-species QA scene (§7.2). |
-| 05 persistence | §7 save strategy, 03 remains ids | New optional section for species/player remains and anchored harvest; `world.fragments` v1 untouched; literal v1 fixture. |
+| 05 persistence (done) | §7 save strategy, 03 remains ids | `world.remains` v1 for every family's settled pieces, their poses and the anchored harvest links (with lodged arrows); `world.fragments` v1 unchanged and pinned by a literal fixture (§14.1). |
 | 06 combustion state | §5, §6, §10, §11, §15 | `Entity.combustion`, `CombustionSystem` (expose/ignite/extinguish/query/snapshot), fast-tick wiring, medical-BURN gating, reset/seed in `WorldBootstrap`. |
 | 07 sources | §4, §10; 06 API | Fast-tick swept contact for patches, burning cells, campfires, torches; direct-hit ignition; `damageNear`/`burnOccupants` stop hurting; `Burn.byPlayer`; attack de-dup per burn episode. |
 | 08 panic | §12; 06 snapshot, 07 ignition | Panic hooks in `NpcAI.update`/`CreatureAI.update`, per-actor intent, seeded stream, NPC screen closure, bird flight escape. |

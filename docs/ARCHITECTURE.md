@@ -239,12 +239,14 @@ regenerating under a newer generator.
 Transient state is deliberately **not** serialized: an in-flight reload is
 cancelled on load, and bow draw resets. Combat and fire add more of it. An
 NPC's torso wound count and the shot id that last wounded it, and the blast
-record a lethal explosion leaves on the body it killed, live on the `Npc` and
+record a lethal explosion leaves on the body it killed, live on the entity and
 die with it — a person who leaves the world, through a save, a load or a
 settlement going dormant, comes back unwounded at their stored health. Pools
 of burning liquid and burning blocks are not saved either: a save taken with
-the world alight loads with the fires out. What does survive is the pieces of
-people blown apart, once they have settled (`world.fragments`), and a fire
+the world alight loads with the fires out. What does survive is the remains of
+every body blown apart once they have settled — people, animals and the
+player, in the pose each died in, with an animal's harvest record still tied
+to its torso (`world.remains`, beside the older `world.fragments`) — and a fire
 bomb still in the air, which is saved with the other explosives and shatters
 where it lands. If you add state, decide explicitly which side of that line it
 sits on.
@@ -703,19 +705,32 @@ falling on, which the rain would only put out again.
 
 | State | Persisted | Where |
 | --- | --- | --- |
-| Settled body fragments (piece, position, orientation, decay, appearance) | yes | `world.fragments`, one record per piece, oldest first |
+| Settled pieces of every body (family, piece, position, orientation, decay, appearance, the pose it died in) | yes | `world.remains`, one record per piece, oldest first; one pose per body |
+| An animal's harvest record tied to its torso, and the arrows lodged in it | yes | the carcass in the v3 body; the tie and the arrows in `world.remains` |
+| People's settled pieces, for older builds | yes, unchanged | `world.fragments` version 1, read only when `world.remains` is absent |
 | Pieces still in flight | no — a save settles them first, so they come to rest rather than being lost | — |
 | Pools of burning liquid, burning blocks | no — a save taken mid-burn loads with the fires out | — |
 | A fire bomb still in the air | yes, with the other explosives; it shatters where it lands | active explosives |
-| Torso wounds, the last shot id, the blast record | no — they live on the `Npc` and die with it | — |
+| Torso wounds, the last shot id, the blast record | no — they live on the entity and die with it | — |
 
-`world.fragments` is a new optional stable-ID section in the v3 extension
-envelope, not a new version of `world.bodies`, so the frozen v3 body and the
-bodies layout are untouched and an older build skips it by its length instead of
-refusing the save: it opens the world with the pieces absent. Its records are
-entirely numeric, the piece and the archetype travelling as bounds-checked
-ordinals, and a piece the reader would refuse is left out on write, so one bad
-piece of debris can never cost the save.
+`world.fragments` (0.8.0) and `world.remains` are optional stable-ID sections in
+the v3 extension envelope, so the frozen v3 body and the bodies layout are
+untouched. Only people had pieces in 0.8.0, and its reader refuses any version
+of `world.fragments` but 1 — and with it the whole save — so the pieces of every
+body went into a new ID instead: `world.fragments` is still written, byte for byte
+as before, and a 0.8.0 build skips `world.remains` by its length and opens the
+world with its people's pieces in the standing rest pose, without the animals'
+pieces, and with each animal's record as an ordinary whole carcass. This build
+reads `world.remains` when it is there and `world.fragments` otherwise,
+whichever order they come in. Records are entirely numeric: a piece is its body
+family's ordinal plus its id in that family's list, both append only
+(`SerializedEnumOrderTest` pins them), and a person's id is its `world.fragments`
+ordinal. A piece the reader would refuse is left out on write, so one bad piece
+of debris can never cost the save; a malformed section fails the whole load,
+while a body family this build does not know is skipped rather than read as
+anything else. The exact layout and policy are in the `RemainsSection` class
+comment and in
+[the combat and fire contract](engineering/ALL_LIVING_COMBAT_FIRE_CONTRACT.md) §14.1.
 
 Drawing reuses what the bodies already use. A piece is the shared humanoid model
 with everything outside its own part subtree hidden, drawn from that part

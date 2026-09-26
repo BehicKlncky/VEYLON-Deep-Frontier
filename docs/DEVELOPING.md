@@ -164,7 +164,12 @@ transfers, equipping) keeps the Survival rule in both modes and needs no gate.
    derives wound depths and culling bounds from the table and the model, and
    `SpeciesFragmentDrawTest` covers every `BodyFamily`. Add the type to the
    row in `SpeciesDismemberQaScene` and capture it (see the lethal combat QA
-   section below).
+   section below). The family's ordinal and its pieces' ids are what
+   `world.remains` saves, so append the family, pin it and its piece names in
+   `SerializedEnumOrderTest`, and only ever append pieces afterwards. A save
+   stores each pose joint by joint: changing a family's joint table later makes
+   older saves load that family's pieces in its rest pose (in place, without
+   their articulation) unless `RemainsSection` learns the old layout.
 5. Add spawn rules to `EntityManager` (biome, time of day, density cap).
 6. Only touch `CreatureAI` if it needs behaviour the existing states don't
    cover.
@@ -233,8 +238,9 @@ transfers, equipping) keeps the Survival rule in both modes and needs no gate.
 ## Common pitfalls
 
 **Reordering an enum breaks every save.** `BlockType`, `ItemType`, `Affliction`,
-`Biome`, `SettlementType`, `NpcArchetype` and the creature/NPC state enums are
-persisted by ordinal. Append only. `SerializedEnumOrderTest` will catch you.
+`Biome`, `SettlementType`, `NpcArchetype`, `CreatureType`, `BodyFamily` and the
+creature/NPC state enums are persisted by ordinal, and so is each body family's
+fragment piece list. Append only. `SerializedEnumOrderTest` will catch you.
 
 **Bulk block edits with `notify = true` are quadratic.** Each notified
 `setBlock` triggers listener work. For anything larger than a few blocks, pass
