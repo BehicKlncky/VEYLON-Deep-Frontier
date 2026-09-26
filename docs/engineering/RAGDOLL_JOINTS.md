@@ -8,7 +8,10 @@ final pose. Birds leave no corpse.
 ## Adding a species
 
 Build the visual tree in `CreatureModels`, then describe it in
-`BodySkeleton.buildCreature`. The humanoid uses the same format.
+`BodySkeleton.buildCreature`. The humanoid uses the same format. Blast remains
+need a third description, the fragment table in `FragmentAnatomy`: its joints
+repeat the model's pivots and boxes, and every piece it cuts off must be cut at
+a skeleton bone (`FragmentAnatomyModelTest` checks both).
 
 - List joints in parent-first order, at most 12. `part` names a real model
   part. `parent = TORSO (-1)` attaches to the rigid torso; otherwise it is an

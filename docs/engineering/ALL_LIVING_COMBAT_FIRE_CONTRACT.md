@@ -199,7 +199,8 @@ flashes; burning bodies, ragdolls and fragments (R8). There is no lava. Light le
 | Data | Owner (proposed name) | Notes |
 | --- | --- | --- |
 | Lethal-blast death record | `Entity` (shared transient record replacing `Npc.dismemberOnDeath` / `blastX/Y/Z/Strength`) | Set once, only on the alive → dead transition caused by the lethal kill. |
-| Species fragment definitions | immutable static tables keyed by body family (02), built once from `CreatureModels`/`NpcModels`/`BodySkeleton` | No per-frame rebuilding; no references to live model instances. |
+| Species fragment definitions | `entity/FragmentAnatomy` per `entity/BodyFamily` (pieces `FragmentPiece`, wounds `FragmentCut`), built once when the class loads (02) | Explicit joint tables repeating the model builders' numbers, because `entity` must not import `gfx`; `gfx/model/AnatomyModels.validate` holds them to the real models. No per-frame rebuilding; no references to live model instances. |
+| Death pose | `entity/FragmentPose`, one immutable snapshot shared by a body's pieces (02) | Captured by `gfx/model/AnatomyModels.captureCreature`/`captureNpc`; §7.1. |
 | Fragment physics, caps, settling, decay | `BodyFragmentSystem` (extended, not duplicated) | One step, one sweep, one set of caps for every family. |
 | Harvest yield and lodged arrows of a blasted animal | the existing `Carcass` record, flagged as fragmented and anchored to its torso fragment by a stable remains id | Section 9. |
 | Player remains | `BodyFragmentSystem` pieces with an explicit neutral player appearance | Never references the live `Player`. |
@@ -274,10 +275,51 @@ Resulting cut sets (*proposed*, validated in 02):
 
 Maximum 12 pieces per body. A piece's collision box is its own box (plus merged halves), never
 a bone radius; `BodyFragmentConstants.MIN_HALF_EXTENT` may inflate the sweep only, and 04 must
-keep rendered contact consistent with it. Death pose: a bounded CPU snapshot
-(≤ `BodySkeleton.MAX_BONES` local rotations per body) captured at the death transition, owned
-by the fragment, never a shared mutable model; computing it must not consume gameplay random
-streams.
+keep rendered contact consistent with it. Death pose: a bounded CPU snapshot captured at the
+death transition, owned by the fragment, never a shared mutable model; computing it must not
+consume gameplay random streams. (02 widened it from bone rotations to one full part transform
+per anatomy joint; see §7.1.)
+
+### 7.1 As built in milestone 02
+
+The cut sets above are confirmed exactly, including the deer's merged tail tip and the hare's
+whole legs and tail; `MIN_SEPARATE_PIECE` is `BodyFragmentConstants.MIN_SEPARATE_PIECE` = 0.10
+and `FragmentAnatomy` refuses a table that breaks it in either direction. Piece names and order:
+
+| Family | Pieces (id order) |
+| --- | --- |
+| `HUMANOID` | torso, head, upper_arm_l, upper_arm_r, forearm_l, forearm_r, thigh_l, thigh_r, shin_l, shin_r (= `BodyFragment.Piece` ordinals) |
+| `DEER` | torso, head, upper_leg_fl/fr/bl/br, lower_leg_fl/fr/bl/br, tail |
+| `WOLF`, `THORNHORN`, `STALKER` | as the deer, then tail, tail_tip |
+| `HARE` | torso, head, leg_fl, leg_fr, leg_bl, leg_br, tail |
+| `BIRD` | torso, head, tail, wing0_l, wing0_r, wing1_l, wing1_r |
+
+- **Identity.** A piece is (`BodyFamily` ordinal, `FragmentPiece.id`); both append only. The
+  family enum is `HUMANOID` then the six `CreatureType`s in their order. Nothing persists it yet;
+  05 decides the byte encoding and pins the order in `SerializedEnumOrderTest`.
+- **Joints.** A table lists every model part a piece is cut at, hangs from or flies as, plus
+  every part the living `Animator` moves (the wolf's and hare's ears), parent first, at most
+  `FragmentAnatomy.MAX_JOINTS` = 24. The model root belongs to the core piece; `neck` and
+  `head_joint` belong to the head piece. Accessories are not listed and ride with their parent
+  part through the model subtree.
+- **Collision box.** The box part's own box, grown by the split halves merged into it; mass is
+  that volume × `DENSITY`. Box-less parts never become pieces.
+- **Wounds.** Unchanged human rule, with one extension: a joint buried inside its parent's box
+  (the hare's hips) is cut on the face the severed piece leaves through instead of the face it
+  is nearest. The cross-section laid on the face is the severed piece's size across the way it
+  points from its joint. The table stores a flat rectangle on the face; the renderer adds depth
+  and stands it proud of clothing (`FragmentModels.CUT_PROUD` over the vest).
+- **Death pose.** Not bones only: `FragmentPose` holds each joint's `ModelPart` transform
+  (rotation, pose offset, scale) as the living animation drew it, so the root, the torso part
+  and the ears are included. Each piece's rigid frame is its box part's frame in that pose, so a
+  running leg or a beating wing leaves the body where it was drawn. The collision box follows
+  the captured scale (breathing, ≤ 1.2 %).
+- **Capture clock.** 03 should capture with `Game.totalTime`, the clock the renderer animates the
+  living with, so separation shows no jump. That clock is presentation time, so the initial
+  orientation of time-animated joints (wing beat, tail wag, idle sway, attack swing, breathing)
+  depends on it. It feeds only debris placement: no random stream is drawn and no death, loot,
+  yield or credit depends on it, and headless tests fix `totalTime`. Debris was already not
+  bit-reproducible across live runs, because projectiles integrate frame time.
 
 Save strategy for 05: the base reader skips unknown section IDs by length
 (`V3ExtensionSections`, "Unknown stable IDs are intentionally skipped") but throws on an
@@ -535,7 +577,7 @@ Replace, keeping unrelated coverage:
 
 | Milestone | Consumes | Produces for later milestones |
 | --- | --- | --- |
-| 02 anatomy | §3.2, §7; `BodySkeleton.of`/`humanoid`, `CreatureModels.of`, `NpcModels.get`, `EntityModel.part`, `ModelPart` pivot/box/split fields, `BodyFragment.Piece`, `FragmentModels` | Immutable per-family definitions (piece id, owned parts/boxes, exclusions, parent cut, rest transforms, extents, mass, cut surfaces) and the death-pose snapshot API; tests over `CreatureType.values()` + humanoid. |
+| 02 anatomy (done) | §3.2, §7; `BodySkeleton.of`/`humanoid`, `CreatureModels.of`, `NpcModels.get`, `EntityModel.part`, `ModelPart` pivot/box/split fields, `BodyFragment.Piece`, `FragmentModels` | `BodyFamily`, `FragmentAnatomy`, `FragmentPiece`, `FragmentCut`, `FragmentPose`, `AnatomyModels` (§7.1; exact API in the progress file); tests over `CreatureType.values()` + humanoid. |
 | 03 blast deaths | §8, §9; 02 definitions | Shared `Entity` blast record, generalized `ExplosionSystem` gate, `BodyFragmentSystem` spawn for any family, anchored `Carcass`, player-remains spawn at the `Game.frame` death transition. |
 | 04 fragment rendering | 02 definitions, 03 fragments | Definition-driven model selection and isolation in `Renderer.drawFragment`, cut faces per family, bounds from full geometry, suppressed intact carcass, all-species QA scene. |
 | 05 persistence | §7 save strategy, 03 remains ids | New optional section for species/player remains and anchored harvest; `world.fragments` v1 untouched; literal v1 fixture. |

@@ -152,8 +152,16 @@ transfers, equipping) keeps the Survival rule in both modes and needs no gate.
    `BodySkeleton.rigid` and tumbles as one piece, which is a legitimate choice
    for something tiny rather than an oversight. All rest directions, including
    the skitterwing's sideways wings, are supported.
-4. Add spawn rules to `EntityManager` (biome, time of day, density cap).
-5. Only touch `CreatureAI` if it needs behaviour the existing states don't
+4. Describe how it comes apart in `FragmentAnatomy`: append a `BodyFamily`
+   constant (the build fails until `BodyFamily.of` and the table switch cover the
+   new type), list the model's joints parent first with the builder's own pivots
+   and boxes, including any part the living animation moves, and declare the
+   pieces core first. `AnatomyModels.validate` and `FragmentAnatomyModelTest`
+   hold the table to the model and put the pieces back together; a split half
+   shorter than `BodyFragmentConstants.MIN_SEPARATE_PIECE` must stay with its
+   parent piece.
+5. Add spawn rules to `EntityManager` (biome, time of day, density cap).
+6. Only touch `CreatureAI` if it needs behaviour the existing states don't
    cover.
 
 ### An NPC role
