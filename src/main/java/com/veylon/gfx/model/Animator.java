@@ -1,9 +1,11 @@
 package com.veylon.gfx.model;
 
+import com.veylon.entity.BodyFamily;
 import com.veylon.entity.BodyFragment;
 import com.veylon.entity.BodyPose;
 import com.veylon.entity.BodySkeleton;
 import com.veylon.entity.Creature;
+import com.veylon.entity.FragmentPiece;
 import com.veylon.entity.Npc;
 import com.veylon.entity.NpcAppearance;
 
@@ -163,16 +165,38 @@ public final class Animator {
     // ------------------------------------------------------------------
 
     /**
-     * Poses the shared humanoid as one piece of a person blown apart: the rest
-     * pose, the look of the person it came from, and nothing but that piece.
+     * Poses the shared model of the piece's own body — the humanoid for a
+     * person or the player, the species' model for an animal — as that one
+     * piece; see {@link #poseFragment(EntityModel, BodyFragment)}.
+     *
+     * @return the part the piece must be drawn from
+     */
+    public static ModelPart poseFragment(BodyFragment f) {
+        return poseFragment(AnatomyModels.modelOf(f.definition.family), f);
+    }
+
+    /**
+     * Poses a shared model as one piece of a body blown apart: everything the
+     * last body drawn from it left behind is reset, a person's piece puts on
+     * the look it carries, the joints take the pose the body died in, and all
+     * but the piece is hidden. Draw the returned part in
+     * {@link FragmentModels#rootFrame}.
      *
      * @return the part the piece must be drawn from; see {@link #isolatePart}
+     * @throws IllegalArgumentException when {@code m} is not the model of the
+     *         piece's body family
      */
     public static ModelPart poseFragment(EntityModel m, BodyFragment f) {
+        FragmentPiece piece = f.definition;
+        if (m != AnatomyModels.modelOf(piece.family)) {
+            throw new IllegalArgumentException("a " + piece + " piece is not drawn with this model");
+        }
         m.resetPose();
-        NpcAppearance a = f.appearance;
-        applyAppearance(m, a.archetype, a.raider, a.trader, a.sick, a.campIndex);
-        return isolatePart(m, f.rootPart, f.piece.excludedParts);
+        if (piece.family == BodyFamily.HUMANOID) {
+            applyAppearance(m, f.appearance);
+        }
+        AnatomyModels.applyPose(m, f.pose);
+        return isolatePart(m, piece.rootPart, piece.excludedParts);
     }
 
     /**
@@ -181,11 +205,11 @@ public final class Animator {
      * draw its own half ({@link ModelPart#forceSplitDraw}) rather than the
      * merged whole box that would still include the missing tip.
      *
-     * <p>Run it after {@code resetPose} and {@link #applyAppearance}. It only
-     * ever hides, so an accessory the person was not wearing stays hidden.
-     * Because the ancestors are hidden too, and a hidden part draws nothing
-     * below it, the piece is drawn from the returned part, never from the model
-     * root. In the rest pose every ancestor is a pure translation by its pivot.
+     * <p>Run it after {@code resetPose}, the look and the pose. It only ever
+     * hides, so an accessory the person was not wearing stays hidden. Because
+     * the ancestors are hidden too, and a hidden part draws nothing below it,
+     * the piece is drawn from the returned part, never from the model root,
+     * in the frame its ancestors had in the pose the body died in.
      *
      * @return the piece's root part
      */
@@ -283,6 +307,11 @@ public final class Animator {
         }
     }
 
+    /** Puts on a look carried off a person, or the neutral look of the player's remains. */
+    public static void applyAppearance(EntityModel m, NpcAppearance a) {
+        applyAppearance(m, a.archetype, a.raider, a.trader, a.sick, a.campIndex);
+    }
+
     /**
      * Vest colour and accessory visibility for the shared humanoid.
      *
@@ -351,8 +380,10 @@ public final class Animator {
         ModelPart raiderSpear = m.part("raiderSpear");
         raiderSpear.visible = scavengerLook;
         raiderSpear.rotZ = 0.62f; // slung diagonally across the back
+        // The camp badge; a look with no camp (NpcAppearance.NEUTRAL_CAMP_INDEX,
+        // the player's remains) has none to wear.
         m.part("friendlyBadge").visible = !scavengerLook && !headhunter && !trader
-                && a != com.veylon.settlement.NpcArchetype.CAPTIVE;
+                && a != com.veylon.settlement.NpcArchetype.CAPTIVE && campIndex >= 0;
 
         // 0.3.0 archetype accessories.
         boolean archer = a == com.veylon.settlement.NpcArchetype.ARCHER

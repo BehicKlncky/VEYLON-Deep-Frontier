@@ -6,6 +6,7 @@ import com.veylon.entity.BodyPose;
 import com.veylon.entity.BodySkeleton;
 import com.veylon.entity.Carcass;
 import com.veylon.entity.Creature;
+import com.veylon.entity.FragmentPiece;
 import com.veylon.entity.HumanCorpse;
 import com.veylon.entity.Npc;
 import com.veylon.entity.NpcAppearance;
@@ -76,10 +77,8 @@ public class Renderer {
     private Mesh crackMesh;
     private final ChunkMesher mesher = new ChunkMesher();
     private final Matrix4f model = new Matrix4f();
-    /** A body fragment's own frame, kept while its root part and cut faces are drawn. */
+    /** A body fragment's collision box frame, kept while its cut faces are drawn. */
     private final Matrix4f fragmentBase = new Matrix4f();
-    private final Vector3f cutAt = new Vector3f();
-    private final Vector3f cutSize = new Vector3f();
     private final Vector3f fragmentTint = new Vector3f();
     private final Matrix4f identity = new Matrix4f();
     private final Matrix4f projView = new Matrix4f();
@@ -780,9 +779,12 @@ public class Renderer {
     }
 
     /**
-     * Pieces of people blown apart, in flight and at rest. Same shader state
-     * block as the bodies: each piece is the shared humanoid isolated to one
-     * part subtree and drawn from that part, plus one dark cube per cut face.
+     * Pieces of bodies blown apart — people, the player's remains and animals
+     * — in flight and at rest. Same shader state block as the bodies: each
+     * piece is its own body's shared model, in the pose the body died in,
+     * isolated to one part subtree and drawn from that part, plus one dark
+     * cube per cut face. An animal's harvest record is not drawn as a carcass
+     * as well ({@link #renderCarcasses}); its torso piece is the body.
      */
     private void renderFragments(Game game) {
         Vector3f camPos = game.camera.position;
@@ -800,30 +802,24 @@ public class Renderer {
     }
 
     private void drawFragment(Game game, Vector3f camPos, BodyFragment f, float range) {
-        BodyFragment.Piece piece = f.piece;
-        if (piece == null) {
-            // An animal's piece: the draw path below is the humanoid's.
-            // Species pieces get their own in the fragment-rendering milestone.
-            return;
-        }
-        float r = FragmentModels.radius(piece);
-        if (!entityVisible(camPos, f.pos.x, f.pos.y - r, f.pos.z, r, r * 2f, range)) {
+        // The bound holds everything the piece owns, antlers and slung spears
+        // included, about the centre it is drawn at.
+        float r = FragmentModels.radius(f);
+        float y = f.pos.y - FragmentModels.contactDrop(f);
+        if (!entityVisible(camPos, f.pos.x, y - r, f.pos.z, r, r * 2f, range)) {
             return;
         }
         setEntityLight(game, f.pos.x, f.pos.y, f.pos.z);
         entityShader.set("uTintMul", FragmentModels.tint(f, fragmentTint));
-        ModelPart root = Animator.poseFragment(NpcModels.get(), f);
-        FragmentModels.pieceTransform(f, fragmentBase);
-        FragmentModels.rootTransform(piece, fragmentBase, model);
-        drawPart(root, model);
+        // Resets whatever the last body left on the shared model before posing it.
+        ModelPart root = Animator.poseFragment(f);
+        drawPart(root, FragmentModels.rootFrame(f, model));
         // Parts leave their own emission set; a wound has none.
         entityShader.set("uEmissive", 0f);
+        FragmentModels.pieceFrame(f, fragmentBase);
+        FragmentPiece piece = f.definition;
         for (int c = 0; c < FragmentModels.cutCount(piece); c++) {
-            FragmentModels.cutCentre(piece, c, cutAt);
-            FragmentModels.cutSize(piece, c, cutSize);
-            // drawCube's cube stands on its base; lower it half its height to centre it.
-            model.set(fragmentBase).translate(cutAt.x, cutAt.y - cutSize.y * 0.5f, cutAt.z)
-                    .scale(cutSize);
+            FragmentModels.cutFrame(piece, c, fragmentBase, model);
             drawCube(FragmentModels.CUT_R, FragmentModels.CUT_G, FragmentModels.CUT_B);
         }
     }
@@ -833,8 +829,7 @@ public class Renderer {
         EntityModel npcModel = NpcModels.get();
         Animator.poseBody(npcModel, skeleton, pose);
         // resetPose inside poseBody makes every archetype accessory visible again.
-        Animator.applyAppearance(npcModel, appearance.archetype, appearance.raider,
-                appearance.trader, appearance.sick, appearance.campIndex);
+        Animator.applyAppearance(npcModel, appearance);
         bodyTransform(x, y, z, pose);
         drawModel(npcModel, model);
     }

@@ -13,10 +13,14 @@ import com.veylon.settlement.NpcArchetype;
 public final class NpcAppearance {
 
     /**
-     * The camp index of the plain look: the gatherer's brown vest, which is
-     * also the vest of every archetype without one of its own.
+     * The camp index of the plain look: no camp at all. It is negative, which
+     * no person's index is, so the look wears no camp badge; its vest,
+     * {@code floorMod(-2, 4) = 2}, is the gatherer's plain brown one, which is
+     * also the vest of every archetype without one of its own. Saves store
+     * the index as it is, so the look survives {@code world.fragments}
+     * version 1 unchanged.
      */
-    public static final int NEUTRAL_CAMP_INDEX = 2;
+    public static final int NEUTRAL_CAMP_INDEX = -2;
 
     public NpcArchetype archetype;
     public boolean raider;
@@ -25,9 +29,10 @@ public final class NpcAppearance {
     public int campIndex;
 
     /**
-     * A person of no role or faction: no archetype, no raider, trader or
-     * sick look, the plain vest. The look of a body that has no NPC to copy,
-     * which is the player's remains; the player has no appearance of its own.
+     * A person of no role, faction or camp: no archetype, no raider, trader
+     * or sick look, the plain vest and no camp badge. The look of a body that
+     * has no NPC to copy, which is the player's remains; the player has no
+     * appearance of its own.
      */
     public NpcAppearance setNeutral() {
         archetype = null;
