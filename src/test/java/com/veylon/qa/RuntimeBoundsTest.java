@@ -247,6 +247,84 @@ class RuntimeBoundsTest {
                 + " byte allowance");
     }
 
+    /**
+     * Every body the world can hold alight at once — people at the settlement
+     * cap and a herd — and every burning death it can remember, each body
+     * blown apart into pieces sharing its fire: the flames drawn in a frame
+     * never pass their cap, every burning body still shows some, and no
+     * residue tracking grows past its own.
+     */
+    @Test
+    void burningCrowdsAndTheirRemainsNeverPassTheFlameCap() {
+        Game game = flatArena(20260716L);
+        float feet = 40.1f;
+        List<com.veylon.entity.Entity> living = new ArrayList<>();
+        for (int i = 0; i < SettlementManager.MAX_ACTIVE_NPCS; i++) {
+            living.add(game.entities.spawnNpc(game.world, "QA torch", 292.5f + (i % 10) * 3f, feet,
+                    292.5f + (i / 10) * 3f));
+        }
+        Creature.CreatureType[] species = Creature.CreatureType.values();
+        for (int i = 0; i < 35; i++) {
+            living.add(game.entities.spawnCreature(game.world, species[i % species.length],
+                    292.5f + (i % 12) * 3f, feet, 310.5f + (i / 12) * 4f));
+        }
+        for (com.veylon.entity.Entity e : living) {
+            e.maxHealth = e.health = 1_000f;
+            game.combustion.ignite(game, e, com.veylon.entity.CombustionSource.DIRECT_HIT, 1f, false, 1,
+                    e.pos.x, e.pos.y, e.pos.z);
+        }
+        game.combustion.fastTick(game, SimulationScheduler.FAST_DT);
+        // Thirty-two more burning people blown apart: every residue the system tracks.
+        for (int i = 0; i < com.veylon.entity.CombustionConstants.MAX_BURN_RESIDUES; i++) {
+            Npc n = game.entities.spawnNpc(game.world, "QA pyre", 326.5f + (i % 8) * 3f, feet, 326.5f + (i / 8) * 3f);
+            game.combustion.ignite(game, n, com.veylon.entity.CombustionSource.DIRECT_HIT, 1f, false, 2,
+                    n.pos.x, n.pos.y, n.pos.z);
+            game.combustion.fastTick(game, SimulationScheduler.FAST_DT);
+            game.entities.npcs.remove(n);
+            n.killBy(false);
+            n.recordBlastDeath(n.pos.x, n.pos.y + 0.5f, n.pos.z + 1.5f, 2.6f);
+            game.fragments.spawnFromNpc(game, n, game.fragments.deathPose(n), n.blastX, n.blastY, n.blastZ,
+                    n.blastStrength);
+        }
+        assertEquals(com.veylon.entity.CombustionConstants.MAX_BURN_RESIDUES, game.burnResidues.trackedCount());
+        // Forty unaffiliated people exceed the legacy-NPC cap the world keeps; the fire's own limits are what is tested.
+        RuntimeBudgetSnapshot snapshot = RuntimeBudgetSnapshot.capture(game);
+        assertTrue(snapshot.burningBodies() <= snapshot.livingBodies(), snapshot.occupancySummary());
+        assertTrue(snapshot.burnResidues() <= com.veylon.entity.CombustionConstants.MAX_BURN_RESIDUES);
+
+        com.veylon.gfx.BodyFlames flames = new com.veylon.gfx.BodyFlames();
+        com.veylon.gfx.BodyFireLook look = new com.veylon.gfx.BodyFireLook();
+        org.joml.Matrix4f frame = new org.joml.Matrix4f();
+        for (int f = 0; f < 60; f++) {
+            float bodies = living.size();
+            for (BodyFragment piece : game.fragments.live) {
+                bodies += piece.burn != null && piece.burn.flame() > 0f ? piece.burnShare : 0f;
+            }
+            flames.begin(bodies, 1f, 1f);
+            int showing = 0;
+            for (com.veylon.entity.Entity e : living) {
+                com.veylon.gfx.model.ModelPart root = e instanceof Npc n
+                        ? com.veylon.gfx.model.BodyPosing.npc(n, f / 60.0, frame)
+                        : com.veylon.gfx.model.BodyPosing.creature((Creature) e, f / 60.0, frame);
+                com.veylon.entity.BodyFamily family = e instanceof Creature c
+                        ? com.veylon.entity.BodyFamily.of(c.type) : com.veylon.entity.BodyFamily.HUMANOID;
+                showing += flames.add(com.veylon.gfx.model.FlameAnchors.of(family), root, frame, look.living(e),
+                        0, 1f, 12f, 0f, 0f) > 0 ? 1 : 0;
+            }
+            for (BodyFragment piece : game.fragments.live) {
+                com.veylon.gfx.model.ModelPart root = com.veylon.gfx.model.BodyPosing.fragment(piece, frame);
+                flames.add(com.veylon.gfx.model.FlameAnchors.of(piece.definition.family), root, frame,
+                        look.remains(piece.burn), piece.definition.id + 1, piece.burnShare, 12f, 0f, 0f);
+            }
+            assertTrue(flames.count <= com.veylon.gfx.BodyFlames.MAX_INSTANCES,
+                    "frame " + f + " drew " + flames.count + " flames");
+            assertEquals(living.size(), showing, "frame " + f + ": every burning body shows flames");
+            game.fragments.update(game, 1f / 60f);
+            game.burnResidues.update(game, 1f / 60f);
+            assertTrue(game.burnResidues.trackedCount() <= com.veylon.entity.CombustionConstants.MAX_BURN_RESIDUES);
+        }
+    }
+
     @Test
     void repeatedPathQueriesStayBudgetedAndNeverLoadChunks() {
         Game game = new Game();
