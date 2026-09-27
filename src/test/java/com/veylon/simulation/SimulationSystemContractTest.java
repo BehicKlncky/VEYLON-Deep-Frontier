@@ -56,6 +56,8 @@ class SimulationSystemContractTest {
         assertInstanceOf(SimulationSystem.class, game.ragdolls);
         // Severed pieces are driven beside them, for the same reason.
         assertInstanceOf(SimulationSystem.class, game.fragments);
+        // So are the flames the dead leave on those bodies.
+        assertInstanceOf(SimulationSystem.class, game.burnResidues);
     }
 
     @Test
@@ -145,6 +147,17 @@ class SimulationSystemContractTest {
                 torch.pos.x, torch.pos.y, torch.pos.z);
         assertTrue(game.combustion.burningBodies(game) >= 2 && game.combustion.totalIgnitions >= 3,
                 "precondition: bodies are burning");
+        // And one burned to death, its body still aflame on the ground.
+        var burned = game.entities.spawnCreature(game.world, com.veylon.entity.Creature
+                .CreatureType.HARE, game.player.pos.x - 2f, game.player.pos.y, game.player.pos.z);
+        game.combustion.ignite(game, burned, com.veylon.entity.CombustionSource.DIRECT_HIT, 1f, false, 0,
+                burned.pos.x, burned.pos.y, burned.pos.z);
+        burned.health = 0.01f;
+        game.combustion.fastTick(game, SimulationScheduler.FAST_DT);
+        game.entities.fastTick(game, SimulationScheduler.FAST_DT);
+        game.burnResidues.update(game, 0.016f);
+        assertTrue(game.burnResidues.trackedCount() > 0 && game.burnResidues.totalCaptured > 0,
+                "precondition: remains are burning");
 
         game.newWorld(31_415L, true);
 
@@ -185,6 +198,8 @@ class SimulationSystemContractTest {
         assertEquals(0, game.combustion.totalIgnitions, "fire statistics do not carry over");
         assertEquals(0, game.combustion.totalBurnouts + game.combustion.totalDoused
                 + game.combustion.totalRainedOut);
+        assertEquals(0, game.burnResidues.trackedCount(), "no remains carry a fire into the next world");
+        assertEquals(0, game.burnResidues.totalCaptured + game.burnResidues.totalEvicted);
 
         assertEquals(0, game.ragdolls.liveCount(),
                 "a falling body does not carry into the next world");
@@ -234,7 +249,7 @@ class SimulationSystemContractTest {
 
         for (SimulationSystem system : List.of(game.time, game.weather, game.temperature,
                 game.water, game.fire, game.liquidFire, game.plants, game.events, game.itemConditions,
-                game.settlementManager, game.ragdolls, game.fragments, game.combustion)) {
+                game.settlementManager, game.ragdolls, game.fragments, game.combustion, game.burnResidues)) {
             system.reset();
         }
 

@@ -168,6 +168,8 @@ class GameLoopIntegrationTest {
         game.sleeping = true;
         game.openCrate = new com.veylon.item.Inventory(4);
         game.openCratePos = new Vec3i(1, 2, 3);
+        game.activeNpc = game.entities.spawnNpc(game.world, "Speaker",
+                game.player.pos.x + 2, game.player.pos.y, game.player.pos.z);
         int fx = (int) game.player.pos.x + 3;
         int fz = (int) game.player.pos.z + 3;
         int fy = game.world.surfaceHeight(fx, fz) + 1;
@@ -229,6 +231,7 @@ class GameLoopIntegrationTest {
         assertEquals(0, game.fragments.liveCount(), "flying body pieces do not survive");
         assertEquals(0, game.fragments.settledCount(), "body pieces on the ground do not survive");
         assertEquals(Game.UiMode.NONE, game.uiMode);
+        assertNull(game.activeNpc, "the last world's speaker is not kept");
         assertFalse(game.simPaused);
         assertFalse(game.sleeping);
         assertFalse(game.drawingBow);
