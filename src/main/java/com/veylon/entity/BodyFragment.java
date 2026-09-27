@@ -144,6 +144,16 @@ public class BodyFragment {
      * goes when its carcass rots away.
      */
     public Carcass harvest;
+    /**
+     * The fire the body died with, shared by every piece of that body; null
+     * when it died neither burning nor scorched. Never saved.
+     */
+    public BurnResidue burn;
+    /**
+     * This piece's part of {@link #burn}, by mass: the body's pieces add up to
+     * 1, so a body blown apart burns no more than it did whole.
+     */
+    public float burnShare;
 
     public final Vector3f pos = new Vector3f();
     public final Vector3f vel = new Vector3f();

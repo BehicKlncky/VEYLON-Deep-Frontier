@@ -122,6 +122,9 @@ public final class SaveSystem {
         // back as a settled corpse instead of losing one.
         g.ragdolls.settleAll(g);
         g.fragments.settleAll(g);
+        // Body fire, fire panic and the flames remains died with are transient
+        // too, and saving touches none of them: they burn on in this session,
+        // and a load builds every body and remains without them.
         Path target = savePath.toAbsolutePath();
         Path temporary = null;
         try {

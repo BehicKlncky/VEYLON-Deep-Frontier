@@ -307,6 +307,11 @@ public class Player extends Entity {
             restoreCreativeBody();
             return;
         }
+        if (dead) {
+            // Up to ten fast ticks can follow a death within one frame before its
+            // transition: a dead body neither heals nor keeps taking injury damage.
+            return;
+        }
 
         applyPendingFallDamage(g);
         tickHungerAndThirst(g, dt);

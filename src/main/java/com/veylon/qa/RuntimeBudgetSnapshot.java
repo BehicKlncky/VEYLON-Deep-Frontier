@@ -8,6 +8,7 @@ import com.veylon.combat.WorldNoise;
 import com.veylon.engine.ParticleSystem;
 import com.veylon.entity.BodyFragmentConstants;
 import com.veylon.entity.BodyFragmentSystem;
+import com.veylon.entity.CombustionConstants;
 import com.veylon.entity.Npc;
 import com.veylon.settlement.CounterattackDirector;
 import com.veylon.settlement.SettlementManager;
@@ -37,7 +38,8 @@ public record RuntimeBudgetSnapshot(
         int pendingGenerationEdits,
         int anchoredRemains,
         int burningBodies,
-        int livingBodies) {
+        int livingBodies,
+        int burnResidues) {
 
     public static RuntimeBudgetSnapshot capture(Game game) {
         int pathNodes = 0;
@@ -70,7 +72,8 @@ public record RuntimeBudgetSnapshot(
                 game.world.pendingGenerationEditCount(),
                 BodyFragmentSystem.anchoredRemains(game.entities.carcasses),
                 game.combustion.burningBodies(game),
-                game.entities.npcs.size() + game.entities.creatures.size() + 1);
+                game.entities.npcs.size() + game.entities.creatures.size() + 1,
+                game.burnResidues.trackedCount());
     }
 
     /** True when every collection with a hard runtime ceiling is within it. */
@@ -96,7 +99,8 @@ public record RuntimeBudgetSnapshot(
                 && liquidFirePatches <= LiquidFireConstants.MAX_PATCHES
                 && particles <= ParticleSystem.MAX
                 && anchoredRemains <= BodyFragmentConstants.MAX_ANCHORED_REMAINS
-                && burningBodies <= livingBodies;
+                && burningBodies <= livingBodies
+                && burnResidues <= CombustionConstants.MAX_BURN_RESIDUES;
     }
 
     /** Compact live occupancy used verbatim by smoke output and failure logs. */
@@ -121,7 +125,8 @@ public record RuntimeBudgetSnapshot(
                 + " generation={chunks=" + pendingGenerationChunks
                 + ",edits=" + pendingGenerationEdits + "}"
                 + " anchoredRemains=" + anchoredRemains
-                + " burning=" + burningBodies + "/" + livingBodies;
+                + " burning=" + burningBodies + "/" + livingBodies
+                + " burnResidues=" + burnResidues;
     }
 
     public static String hardLimitSummary() {
@@ -142,6 +147,7 @@ public record RuntimeBudgetSnapshot(
                 + " particles=" + ParticleSystem.MAX
                 + " chain=" + ExplosionSystem.MAX_CHAIN
                 + " blockEdits=" + ExplosionSystem.MAX_BLOCKS
-                + " anchoredRemains=" + BodyFragmentConstants.MAX_ANCHORED_REMAINS;
+                + " anchoredRemains=" + BodyFragmentConstants.MAX_ANCHORED_REMAINS
+                + " burnResidues=" + CombustionConstants.MAX_BURN_RESIDUES;
     }
 }

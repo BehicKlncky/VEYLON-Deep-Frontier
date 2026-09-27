@@ -29,6 +29,11 @@ import java.util.List;
  * torso stays while the record does, and the record's rot takes the torso
  * with it.
  *
+ * <p>A body that dies alight or scorched leaves one {@link BurnResidue} that
+ * all its pieces share ({@link BodyFragment#burn}, each its mass's share), so
+ * its flames go on where its torso flies and are never counted per piece; a
+ * piece leaving the world lets go of it.
+ *
  * <p>Each piece sweeps the world-axis box of its <em>turned</em> collision box,
  * so a limb that lands lying down rests on its lowest corner instead of
  * hovering at its standing height or sinking into the floor. Turning is
@@ -224,6 +229,8 @@ public class BodyFragmentSystem implements SimulationSystem {
         }
         massCentre.div(totalMass);
         new Quaternionf().rotationY(yaw).transform(massCentre).add(body.pos);
+        // One fire for the whole body, shared by its pieces by mass.
+        BurnResidue burn = g.burnResidues.capture(body);
 
         Vector3f dir = new Vector3f();
         Vector3f lever = new Vector3f();
@@ -232,6 +239,9 @@ public class BodyFragmentSystem implements SimulationSystem {
         Vector3f joint = new Vector3f();
         for (FragmentPiece p : pieces) {
             BodyFragment f = new BodyFragment(p, pose);
+            f.burn = burn;
+            f.burnShare = p.mass / totalMass;
+            BurnResidue.hold(burn);
             f.placeAt(body.pos.x, body.pos.y, body.pos.z, yaw);
             fitExtents(f);
             pushFree(g.world, f);
@@ -371,6 +381,20 @@ public class BodyFragmentSystem implements SimulationSystem {
         if (!live.remove(f)) {
             settled.remove(f);
         }
+        dropBurn(f);
+    }
+
+    /** A piece leaving the world lets go of its body's fire; the last piece to go releases it. */
+    private static void dropBurn(BodyFragment f) {
+        BurnResidue.letGo(f.burn);
+        f.burn = null;
+    }
+
+    /** Keeps the body's fire where its core piece is. */
+    private static void anchorBurn(BodyFragment f) {
+        if (f.burn != null && f.definition.parent == -1) {
+            f.burn.anchor(f.pos.x, f.pos.y, f.pos.z);
+        }
     }
 
     // ------------------------------------------------------------------
@@ -429,6 +453,7 @@ public class BodyFragmentSystem implements SimulationSystem {
         if (f.harvest != null) {
             followTorso(f);
         }
+        anchorBurn(f);
 
         f.energy = f.vel.lengthSquared() + f.angularVelocity.lengthSquared();
         f.quietSteps = f.grounded && f.energy < BodyFragmentConstants.SETTLE_ENERGY
@@ -657,7 +682,7 @@ public class BodyFragmentSystem implements SimulationSystem {
     private void evictOldestSettled() {
         for (int i = 0; i < settled.size(); i++) {
             if (settled.get(i).harvest == null) {
-                settled.remove(i);
+                dropBurn(settled.remove(i));
                 return;
             }
         }
@@ -667,6 +692,7 @@ public class BodyFragmentSystem implements SimulationSystem {
         BodyFragment oldest = settled.removeFirst();
         oldest.harvest.remains = null;
         oldest.harvest = null;
+        dropBurn(oldest);
     }
 
     private void settleOldest(Game g) {
@@ -697,6 +723,7 @@ public class BodyFragmentSystem implements SimulationSystem {
         if (f.harvest != null) {
             followTorso(f);
         }
+        anchorBurn(f);
         admitSettled(f);
     }
 
@@ -724,7 +751,7 @@ public class BodyFragmentSystem implements SimulationSystem {
                 }
                 f.harvest = null;
                 if (record.decay <= 0) {
-                    settled.remove(i);
+                    dropBurn(settled.remove(i));
                     continue;
                 }
             }
@@ -736,7 +763,7 @@ public class BodyFragmentSystem implements SimulationSystem {
                 gone = dx * dx + dz * dz > far;
             }
             if (gone) {
-                settled.remove(i);
+                dropBurn(settled.remove(i));
             }
         }
     }

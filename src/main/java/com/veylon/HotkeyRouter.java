@@ -165,6 +165,9 @@ final class HotkeyRouter {
         game.uiMode = game.uiMode == mode ? Game.UiMode.NONE : mode;
         if (game.uiMode == Game.UiMode.NONE) {
             game.closeScreens();
+        } else if (game.uiMode != Game.UiMode.NPC) {
+            // Another screen replaced the conversation: its speaker is let go.
+            game.activeNpc = null;
         }
     }
 }

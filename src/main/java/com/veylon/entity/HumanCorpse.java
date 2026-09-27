@@ -21,6 +21,11 @@ public class HumanCorpse {
     public final BodyPose pose = new BodyPose();
     /** Real seconds until the body is gone; matches {@link Carcass}. */
     public float decay = RagdollConstants.CORPSE_DECAY;
+    /**
+     * The fire the person died with, handed on from the ragdoll; null when
+     * they died neither burning nor scorched. Never saved.
+     */
+    public BurnResidue burn;
 
     public HumanCorpse(float x, float y, float z) {
         pos.set(x, y, z);

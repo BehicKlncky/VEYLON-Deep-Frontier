@@ -166,6 +166,20 @@ public final class FirePanic {
         return true;
     }
 
+    /**
+     * Ends a person's panic at once, recovery and all, without touching their
+     * plans: for a person leaving the world ({@code EntityManager.depart}),
+     * who takes no panic with them and comes back, if ever, as a new body.
+     */
+    public static void forget(Npc n) {
+        n.panic.clear();
+    }
+
+    /** Ends an animal's panic at once, as {@link #forget(Npc)} does for a person. */
+    public static void forget(Creature c) {
+        c.panic.clear();
+    }
+
     // ------------------------------------------------------------------
     // Start, recovery and the fresh decision after
     // ------------------------------------------------------------------

@@ -33,6 +33,11 @@ public class Ragdoll {
     public int stuckArrows;
     public ItemType stuckArrowType;
     public final NpcAppearance appearance = new NpcAppearance();
+    /**
+     * The fire the body died with, if any, handed on to the corpse or carcass
+     * it settles into; null when it died neither burning nor scorched.
+     */
+    public BurnResidue burn;
 
     // ---- Point masses ----------------------------------------------
     public final float[] px = new float[MAX_POINTS];

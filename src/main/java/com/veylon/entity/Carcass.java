@@ -43,6 +43,12 @@ public class Carcass {
      * record as a whole carcass.
      */
     public BodyFragment remains;
+    /**
+     * The fire a whole animal died with, handed on from its ragdoll; null when
+     * it died neither burning nor scorched, and always for the record of
+     * remains, whose torso piece carries it instead. Never saved.
+     */
+    public BurnResidue burn;
 
     public Carcass(Creature.CreatureType type, float x, float y, float z) {
         this.type = type;

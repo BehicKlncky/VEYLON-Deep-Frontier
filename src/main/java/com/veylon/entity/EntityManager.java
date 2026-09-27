@@ -2,6 +2,7 @@ package com.veylon.entity;
 
 import com.veylon.Game;
 import com.veylon.ai.CreatureAI;
+import com.veylon.ai.FirePanic;
 import com.veylon.ai.NpcAI;
 import com.veylon.item.ItemType;
 import com.veylon.world.Biome;
@@ -48,7 +49,11 @@ public class EntityManager {
             if (c.dead) {
                 onCreatureDied(g, c);
                 it.remove();
-                forgetTarget(c);
+                if (reallyDied(c)) {
+                    forgetTarget(c);
+                } else {
+                    depart(g, c);
+                }
             }
         }
         for (Iterator<Npc> it = npcs.iterator(); it.hasNext(); ) {
@@ -88,9 +93,73 @@ public class EntityManager {
                     g.ragdolls.spawn(g, n);
                 }
                 it.remove();
-                forgetTarget(n);
+                if (reallyDied(n)) {
+                    forgetTarget(n);
+                } else {
+                    // Routed, gone home, faded away: no body, and no fire or panic follows it.
+                    depart(g, n);
+                }
             }
         }
+    }
+
+    /**
+     * A person leaving the world without dying — a settlement going dormant,
+     * a party going abstract or being retired, a captive led away, a trader or
+     * a routed fighter gone — after they are out of {@link #npcs}. Their fire
+     * (with its heat, scorch and the bottles already counted against them) and
+     * their panic are forgotten rather than carried or simulated anywhere
+     * else, no AI keeps them as a target, and a conversation with them closes.
+     * Nothing is spawned, credited or reported: that belongs to a death. Their
+     * health and standing are whatever the leaving code wrote back.
+     */
+    public void depart(Game g, Npc n) {
+        g.combustion.clear(n);
+        FirePanic.forget(n);
+        forgetTarget(n);
+        if (g.activeNpc == n) {
+            if (g.uiMode == Game.UiMode.NPC) {
+                g.closeScreens();
+            } else {
+                g.activeNpc = null;
+            }
+        }
+    }
+
+    /** An animal leaving the world without dying, as {@link #depart(Game, Npc)} does for a person. */
+    public void depart(Game g, Creature c) {
+        g.combustion.clear(c);
+        FirePanic.forget(c);
+        forgetTarget(c);
+    }
+
+    /** Takes a person out of the world without a death; see {@link #depart(Game, Npc)}. */
+    public boolean removeNpc(Game g, Npc n) {
+        if (!npcs.remove(n)) {
+            return false;
+        }
+        depart(g, n);
+        return true;
+    }
+
+    /**
+     * Takes every person {@code leaving} accepts out of the world without a
+     * death, keeping the order of those who stay; see {@link #depart(Game, Npc)}.
+     * Never call this from inside {@link #fastTick}'s own iteration.
+     *
+     * @return how many left
+     */
+    public int removeNpcs(Game g, Predicate<? super Npc> leaving) {
+        int removed = 0;
+        for (int i = npcs.size() - 1; i >= 0; i--) {
+            Npc n = npcs.get(i);
+            if (leaving.test(n)) {
+                npcs.remove(i);
+                depart(g, n);
+                removed++;
+            }
+        }
+        return removed;
     }
 
     /**
@@ -263,6 +332,7 @@ public class EntityManager {
             c.decay -= dt;
             if (c.decay <= 0 || c.empty()) {
                 it.remove();
+                BurnResidue.letGo(c.burn);
             }
         }
         // Human bodies rot on the same clock, but have nothing to be emptied of.
@@ -271,6 +341,7 @@ public class EntityManager {
             corpse.decay -= dt;
             if (corpse.decay <= 0) {
                 it.remove();
+                BurnResidue.letGo(corpse.burn);
             }
         }
         // Pieces of a body blown apart rot on that clock too, and are dropped
@@ -314,15 +385,25 @@ public class EntityManager {
     public void slowTick(Game g) {
         float px = g.player.pos.x, pz = g.player.pos.z;
 
-        creatures.removeIf(c -> c.distSqTo(px, c.pos.y, pz) > 170 * 170);
+        for (int i = creatures.size() - 1; i >= 0; i--) {
+            Creature c = creatures.get(i);
+            if (c.distSqTo(px, c.pos.y, pz) > 170 * 170) {
+                creatures.remove(i);
+                depart(g, c);
+            }
+        }
         // Bodies get the same radius as the wildlife that left them, so a long
         // walk cannot leave a trail of corpses accumulating behind the player.
         float far = RagdollConstants.DESPAWN_DISTANCE * RagdollConstants.DESPAWN_DISTANCE;
-        corpses.removeIf(corpse -> {
+        for (int i = corpses.size() - 1; i >= 0; i--) {
+            HumanCorpse corpse = corpses.get(i);
             float dx = corpse.pos.x - px;
             float dz = corpse.pos.z - pz;
-            return dx * dx + dz * dz > far;
-        });
+            if (dx * dx + dz * dz > far) {
+                corpses.remove(i);
+                BurnResidue.letGo(corpse.burn);
+            }
+        }
         if (g.spawningPaused()) {
             return; // R25: natural spawning only; despawning above still runs.
         }

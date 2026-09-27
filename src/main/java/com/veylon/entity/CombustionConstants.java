@@ -60,4 +60,19 @@ public final class CombustionConstants {
      * person is attacked once per bottle; beyond this the oldest is forgotten.
      */
     public static final int REPORTED_BOTTLES = 4;
+
+    /**
+     * Longest the flames of a body that died burning go on on its remains,
+     * seconds; less when it had less fuel left. Presentation only.
+     */
+    public static final float RESIDUE_FLAME_SECONDS = 4f;
+    /** Seconds the remains smoke after their flames end, or after water or rain put them out. */
+    public static final float RESIDUE_SMOKE_SECONDS = 3f;
+    /**
+     * Most burn residues flaming or smoking at once; a new one past this ends
+     * the oldest one's flames and smoke (its scorch stays on its remains).
+     */
+    public static final int MAX_BURN_RESIDUES = 32;
+    /** Longest frame step a residue ages by, so a stall cannot end one in a single frame. */
+    public static final float RESIDUE_MAX_STEP = 0.25f;
 }

@@ -736,7 +736,12 @@ public class SettlementManager
         return bed.offset(0, 1, 0);
     }
 
-    /** Writes live state back into resident records and despawns entities. */
+    /**
+     * Writes live state back into resident records and despawns entities.
+     * Health is kept as it is now; a fire or a panic is not: the dormant
+     * simulation has no fire, so a resident burning as the settlement goes
+     * dormant is put out and calm when it wakes ({@code EntityManager.depart}).
+     */
     public void deactivate(Game g, Settlement s) {
         for (Settlement.Resident r : s.residents) {
             Npc n = r.live;
@@ -749,7 +754,7 @@ public class SettlementManager
             r.sicknessTimer = n.sickTimer;
             r.hunger = n.hunger;
             r.live = null;
-            g.entities.npcs.remove(n);
+            g.entities.removeNpc(g, n);
         }
     }
 
@@ -1283,7 +1288,7 @@ public class SettlementManager
         Settlement.Resident r = s.residents.get(captive.residentIndex);
         r.rescued = true;
         r.live = null;
-        g.entities.npcs.remove(captive);
+        g.entities.removeNpc(g, captive);
         g.log(captive.name + " is free! \"I owe you my life. I'll make for friendly walls.\"");
         g.audio.playQuest();
         g.faction.onCaptiveRescued(g, s, captive.residentIndex);
