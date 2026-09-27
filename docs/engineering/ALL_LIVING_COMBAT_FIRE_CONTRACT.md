@@ -194,6 +194,122 @@ Not sources, by decision: a held torch or any held item (no world flame volume);
 flashes; burning bodies, ragdolls and fragments (R8). There is no lava. Light level or
 `BlockType.heat` alone never implies a flame.
 
+### 4.1 As built in milestone 07 (sources connected)
+
+Every source below reports through the 06 API (§10.1); nothing else hurts a body for touching
+a flame. Sampling runs at the start of each body's fast tick in `CombustionSystem`
+(`sampleFlames`), before the candidate is resolved, for every body that can burn.
+
+| Source | Production entry point | Flame volume | Touches only while | Kind, heat, intensity, afterburn | Owner and `sourceId` |
+| --- | --- | --- | --- | --- | --- |
+| Fire bomb breaking on a body | `ProjectileSystem.onEntityHit` (FIRE_BOMB) calls `CombustionSystem.ignite` **before** `shatter`, whether or not the spill finds ground | the struck body, at the hit sample | the torso is not under water (§10.1); not the Creative player | `DIRECT_HIT`, at once, 1.0, 6 s | the thrower (`Projectile.fromPlayer`); the id the bottle's spill will get (`LiquidFireSystem.nextSpillId()`) |
+| Burning liquid | `LiquidFireSystem.exposeContacts` | the patch cell's footprint from `CONTACT_BELOW` 0.1 under its floor to `CONTACT_HALF_HEIGHT` 0.6 over it | in `patches()`; `wet == 0` **and** not rained on now; its cell still open and dry over solid ground | `LIQUID`, at once, the patch's intensity (1 → 0.5 at the rim), 6 s | `Patch.byPlayer`; the spill id |
+| Burning block | `FireSystem.exposeContacts` → `touchBurningBlock` | the block's own cell when it is not solid (grass, bush); `FLAME_FACE_REACH` 0.25 out of each side and bottom face **into a non-solid neighbour only**; `FLAME_PLUME_HEIGHT` 0.75 over the top **only if the cell above is not solid** | in the burning list; `wet == 0` and not rained on now; still flammable | `BLOCK_FIRE`, 4 /s, 1.0, 4 s | `Burn.byPlayer` and `Burn.origin` (the bottle), else environmental; the bottle for a player's fire, else a packed cell id |
+| Fueled campfire | `FireSystem.exposeContacts` → `touchFlameBlocks` | `[0.25, 0.75] × [0.15, 1.0] × [0.25, 0.75]` of its cell | block `CAMPFIRE` with a `campfireFuel` entry above 0; rain does not stop it (world rule unchanged) | `CAMPFIRE`, **1 /s** (1.25 s at 0.8), 0.8, 3 s | environmental; packed cell |
+| Placed torch | same | `[0.38, 0.62] × [0.66, 1.0] × [0.38, 0.62]` of its cell | block `TORCH` (no lit state exists; rain does not stop it) | `TORCH`, 1 /s (1.67 s at 0.6), 0.6, 2 s | environmental; packed cell |
+
+The "not sources" list above was rechecked in source and stands: no other block, item or
+effect reports a contact. A held torch has no world volume; a lantern, trail marker, glow
+fungus, alarm bell and a furnace are covered by a test that stands people in or beside them
+for ten seconds.
+
+**Sweep** (`entity/BodySweep`, one reused instance). The **flame box** is the entity box —
+`width` square, `height` tall from the feet, the box physics, projectiles and the 0.8.0 pool
+contact use — except for a flying creature (`CreatureType.flying`): its half-width grows to
+the widest lateral reach of its anatomy table's rest pose (bird: 0.39 against a body half of
+0.17), and it reaches the same wing length (0.22) below the feet and above the back, the
+envelope a flapping wing sweeps. The box is swept in a straight line from where the previous
+fast tick sampled it (its bottom centre, `BodyCombustion.sample*`) to where it is now; each
+source asks `touches(volume)`, an exact slab test on open intervals (touching faces do not
+count) that also yields the contact point (the centre of the common volume half-way through
+the overlap). A move longer than `MAX_SWEEP` 2 blocks samples only its end (teleport,
+respawn, a jump across the map). **Maximum sampling gap:** none in space along the sampled
+path, one fast tick (0.05 s) in time; linear motion between two samples is assumed (a turn or
+collision slide inside 0.05 s bends it by centimetres). A tick in which the sweep touched a
+flame counts as a whole tick of contact, so heat is over-credited by at most one tick.
+**Order:** the player has moved by the frame before the fast tick; people and animals move in
+the entity step after combustion, so their sweep covers the previous tick's move. Every move
+is swept exactly once. Tested: a crossing of a one-cell patch at 12 blocks/s that falls wholly
+between two medium ticks catches every kind of body; a dash from just short of it to just past
+it in one fast tick catches; the same dash a hair to the side does not; a 4-block jump does not.
+
+**Legacy contact removed.** `FireSystem.damageNear` (with `CONTACT_RANGE_SQ`,
+`PLAYER/CREATURE/NPC_BURN_DPS`, `BURN_AFFLICTION_CHANCE` and its random roll) and
+`LiquidFireSystem.burnOccupants` / `standsIn` / the (NPC, spill) memory
+(`MAX_TRACKED_NPC_SPILLS`, `trackedNpcSpills()`, `ENTITY_DPS_*`) are gone. The medium ticks
+keep spread, burn-down, rain, keg arming and block ignition only. Burn damage is the
+combustion equation alone, and the medical injury is `Player.inflictBurnInjury` alone (a test
+throws a real bottle through the player's command and the whole game loop and finds exactly
+the contact damage after four medium ticks, over a burning log buried under the floor). The
+two removed random rolls shift the fire systems' streams only in scenes where the player stood
+in a flame.
+
+**Ownership.** Several flames touching one body in one tick resolve by §10.1's dominance
+(kind, intensity, player, source id, point), so the order flames appeared in decides nothing
+(test: the same three overlapping flames made in two orders). A refresh hands the fire to the
+latest dominant contact, as §10.1 built. A block fire keeps the attribution of whatever lit it
+first: a patch passes on `byPlayer` and its spill id (`FireSystem.ignite(g, x, y, z, byPlayer,
+origin)`), and a spreading cell inherits its parent's, so a resident walking into grass the
+player's bottle set alight, well clear of the liquid, burns for the player: the player's
+attack, the player's kill. Fires lit by blasts, lightning and meteors stay environmental
+(decision: a player's blast already reports its own victims; 0.8.0 behaviour).
+
+**Attacks.** When a candidate is applied to a person and the fire is (now) the player's,
+`CombustionSystem.reportAttack` runs once per (person, bottle): `BodyCombustion.firstReportOf`
+remembers the last `REPORTED_BOTTLES` 4 bottles per body (cleared with `clear()`). It points
+`lastKnown` at the flame's contact point only if the player is perceivable, then calls
+`SettlementManager.onNpcAttackedByPlayer` (settled people only; its reputation cost is not
+perception-gated, its alert and its own `lastKnown` are). A direct hit, its pool and every
+block fire the pool starts are one bottle, so one attack; a second bottle on a person already
+burning is a second attack. Environmental flames report nothing — 0.8.0 also pointed a person's
+`lastKnown` at an environmental pool, which that field (where the player was last known) never
+meant; only the player throws bottles in production.
+
+**Water and rain.** A patch or burning cell the rain reaches, or that is still wet, touches
+nobody, even before its first medium tick has started soaking it (the 0.8.0 pool was inert only
+from its first soak; a rained-on block fire kept hurting until out). A campfire and a torch have
+no weather rule, so they still touch in rain, and the body's own rain rule puts it out after
+1.5 s of rain on the head, after which heat can light it again (the §10.1 limitation). A bottle
+breaking on a body whose torso is under water ignites nothing and its liquid finds no ground;
+water to the hips does not save a person.
+
+**People and animals keep out of torches and campfires** (not proposed; found by a probe). A
+throwaway headless probe ran four seeds' first three settlements for three minutes each with
+the day clock at 20 minutes a second (577 000 NPC ticks): with only the sources connected,
+**21 residents caught fire in normal life** — legacy camp guards crossing the camp's campfire at
+1.8 blocks/s, traders walking past the trading campfire, guards sleeping in a barracks torch's
+cell next to their bed, a brute at a gate post treading in a torch's tip. After the changes
+below: **0 flame contacts, 0 ignitions** in the same run.
+
+- `Pathfinder.passable` refuses torch and campfire cells: routes, and the sleeping places
+  `residentSleepPosition` picks, keep out of them.
+- `Entity.keepsOutOfFlames` (true for `Npc` and `Creature`, false for the player):
+  `VoxelPhysics.integrate` treats torch and campfire cells as solid for the step, unless the
+  body began the step in one; then it walks to the nearest of that cell's four neighbours it
+  can stand in, at 1.5 blocks/s or its own speed. People and animals therefore cannot be
+  shoved or knocked into one either; the player walks where they choose.
+- `Steering.moveToward` looks 0.45 ahead (`FireSystem.standingFlameAhead`) and sidesteps away
+  from a torch or campfire cell, so walkers go round rather than bump and hop over.
+- `PlayerBlockActions.placeSelectedBlockAt` refuses a torch or campfire whose flame would touch
+  a body that can burn: the Survival player placing it at their own feet, or any person or
+  animal (`FireSystem.flameWouldTouch`); the Creative player can place one at their feet.
+
+**Changes from the proposals above** (reasons from the probe unless stated):
+
+- `CAMPFIRE` heat gain 2 → 1 /s: 0.58 s in a campfire's flame at a walker's 1.8 blocks/s was
+  0.93 heat plus the tick the sweep credits, so crossing a camp lit the guards. People and
+  animals no longer walk into campfires at all (above), so the rate now matters for the player:
+  crouching straight through one (0.52 s in its flame) comes to about 0.46 of the way to
+  catching instead of 0.92, while standing in it catches after 1.25 s. Tuning, not pinned by a
+  test.
+- Flame tops 1.05 / 1.10 → 1.0: a body standing on the block beside a torch trod in its tip.
+- Burning-block volume: face slabs into open neighbours and a plume over an open top, instead
+  of the cell inflated on every side, so no corner reaches round an edge and no solid face — a
+  wall, a floor, the ground over a buried log — passes heat (the 0.8.0 check burned a person on
+  stone over a buried log, or on a slab laid over a burning one; tested).
+- `World.getChunk` keeps a small direct-mapped cache behind its one-entry cache, so per-body
+  queries across a crowd's chunks stop boxing map keys (§16).
+
 ## 5. Data owners
 
 | Data | Owner (proposed name) | Notes |
@@ -248,6 +364,8 @@ gap: one fast tick (0.05 s).
 As built in 06 (§10.1): steps 1–3 are wired, with source sampling in step 2 left to 07 (which
 adds it before resolution) and the `dead` guard in `CreatureAI.update`. A `dt` above `FAST_DT`
 advances one `FAST_DT`, so "only ever advances by `FAST_DT` steps" holds for direct callers too.
+As built in 07 (§4.1): step 2 samples every source for each body before resolving it, with the
+sweep, gap and shape above; the medium tick no longer damages bodies.
 
 ## 7. Fragment identity strategy
 
@@ -556,11 +674,9 @@ ticked). What remains visible after death is presentation residue only (09/10).
 
 ### 10.1 As built in milestone 06 (state, rules, API)
 
-**Production ignition is not connected yet.** 06 built the state, the rules and the fast-tick
-wiring. No game system reports a contact: until 07 connects the sources of §4, the legacy
-medium-tick contact damage (`FireSystem.damageNear`, `LiquidFireSystem.burnOccupants`, each still
-rolling `Affliction.BURN` at 50 %) is the only fire damage in play, and a body burns only when a
-test or a QA scene calls `ignite`/`expose`. 06's tests prove the mechanics, not the sources.
+**Production ignition** was connected by 07 (§4.1): every source now reports here and the
+legacy medium-tick contact damage is gone. As 06 left it, no game system reported a contact and
+06's tests proved the mechanics, not the sources.
 
 **Owner and types** (package `entity`, all transient, none saved):
 
@@ -715,7 +831,7 @@ the player (test `theBurnInjuryWaitsOutTheFlamesAndThePoulticeOnlyTreatsTheInjur
 pool then the full afterburn cost 13.08 health against a calm twin (formula 13.05), the injury
 came at exactly 1.0 s, its seconds did not move while alight, and afterwards it cost 0.18/s. A
 poultice mid-flame cured the injury, the flames burned on, and no second injury came that
-episode. Until 07 removes them, the legacy contact paths still add their own 50 % `BURN` roll.
+episode. Since 07 the legacy contact paths and their own 50 % `BURN` roll are gone (§4.1).
 
 ## 12. Panic policy (NPCs and animals only)
 
@@ -869,7 +985,7 @@ species and both sides are free).
 | --- | --- | --- |
 | Heat gain to ignite: DIRECT_HIT, LIQUID | immediate | a molotov must ignite |
 | Heat gain: BLOCK_FIRE | 4.0 /s (0.25 s of contact) | stepping into a burning bush catches |
-| Heat gain: CAMPFIRE | 2.0 /s (0.5 s) | standing in the fire catches, brushing past does not |
+| Heat gain: CAMPFIRE | 2.0 /s (0.5 s); **as built in 07: 1.0 /s (1.25 s at intensity 0.8)** | standing in the fire catches, brushing past does not; §4.1 says why it halved |
 | Heat gain: TORCH | 1.0 /s (1.0 s) | only deliberate contact with the flame head |
 | `HEAT_DECAY` | 2.0 /s | brief grazes do not accumulate |
 | Source intensity: DIRECT_HIT / LIQUID / BLOCK_FIRE / CAMPFIRE / TORCH | 1.0 / patch intensity (0.5–1) / 1.0 / 0.8 / 0.6 | |
@@ -919,9 +1035,22 @@ Gameplay (enforced by tests; wall-clock numbers only in opt-in `performanceTest`
   all burning allocates 1280, all of it `World.getChunk` boxing its map key when consecutive
   bodies change chunk (80 bytes a miss, the lookup every entity's physics already makes), held
   under the ragdoll/fragment steps' 4 KB. The wall-clock target is unmeasured.
+  As built in 07 (sources sampled every tick for every body): per body, a bounds rejection
+  against each patch (≤ 160) and burning cell (≤ 220, kept in a list beside the map so no
+  iterator is made), the exact test and a few block lookups only on a hit, and the torch and
+  campfire cells under the swept box (about 4–16 lookups standing or walking; the 2-block
+  sweep limit bounds it). `World.getChunk` now resolves any 8 × 8 window of recent chunks
+  without boxing, so measured: idle crowd **0** bytes per fast tick, the same crowd all burning
+  **0** (was 1280), and every flame at its cap around a moving crowd **96** — the campfire fuel
+  map's key, made only for a body touching a fueled campfire's flame (four of the 75 here; a
+  boxed default made it 160 until it was removed). Chunks are never loaded or generated by
+  sampling (tested at the edge of the loaded area). Keeping out of fires costs people and
+  animals one scan of their own cells per physics step and one of the cells ahead per steering
+  call. The wall-clock target is still unmeasured.
 - Existing caps unchanged: `MAX_LIVE_FRAGMENTS` 120, `MAX_SETTLED_FRAGMENTS` 600,
   `RagdollConstants.MAX_LIVE` 12, `FireSystem.MAX_ACTIVE_FIRES` 220,
-  `LiquidFireConstants.MAX_PATCHES` 160 (22 per spill), `MAX_TRACKED_NPC_SPILLS` 64,
+  `LiquidFireConstants.MAX_PATCHES` 160 (22 per spill), `MAX_TRACKED_NPC_SPILLS` 64 (removed
+  in 07: each body remembers `REPORTED_BOTTLES` 4 bottles in a fixed array instead),
   `ProjectileSystem.MAX_LIVE` 96, `ParticleSystem.MAX` 4000 (splash limit 2800, blood 3600),
   `SettlementManager.MAX_ACTIVE_NPCS` 40, `ExplosionSystem.MAX_ACTIVE_FUSES` 64. With ≤ 12 pieces
   per body, 120 live fragments hold 10 bodies in flight.
@@ -959,9 +1088,20 @@ Replace, keeping unrelated coverage:
 - `MolotovTest` assertions of `ENTITY_DPS_* × TICK` per medium tick, the per-tick BURN roll,
   and `CombatFireIntegrationTest.aBurnDeathInLiquidFireFallsWholeEvenWithTorsoWounds` timing
   (07): contact damage moves to the fast-tick combustion equation; one-burn-per-tick
-  de-duplication, attribution and Creative immunity must still be asserted.
+  de-duplication, attribution and Creative immunity must still be asserted. *Done:* the fire
+  helpers of `MolotovTest` and `CombatFireIntegrationTest` run the fast ticks of each medium
+  tick; the four-patch test asserts one contact at `CONTACT_DPS_*` per fast tick (its bodies now
+  each touch the pool's centre, since damage scales with the liquid's strength), the injury
+  after a second alight, Creative immunity; the attack test still counts −36 then −72 for two
+  bottles on two residents; the crowd test replaced the (NPC, spill) memory cap with "a crowd
+  past the NPC cap all catch"; the rain test now also stands someone in the rained-on pool
+  through the fast ticks and a control under the roof. `RuntimeBoundsTest` and
+  `SimulationSystemContractTest` dropped `trackedNpcSpills()` (the new world asserts bottle ids
+  restart instead).
 - `FireSystem.damageNear` behaviour relied on by fire/weather tests (07): stacking and
-  through-floor damage are intentionally removed.
+  through-floor damage are intentionally removed. *Done:* `CreativeHazardsTest`,
+  `SurvivalCreativeParityTest` and `BlastLethalityTest.fireBombIsNotLethal` drive half a second
+  of the combustion fast tick instead of a medium tick of the fire systems.
 
 ## 18. Dependency handoff
 
@@ -972,7 +1112,7 @@ Replace, keeping unrelated coverage:
 | 04 fragment rendering (done) | 02 definitions, 03 fragments | Definition-driven model selection and isolation in `Renderer.drawFragment`, cut faces per family, bounds from full geometry, suppressed intact carcass, all-species QA scene (§7.2). |
 | 05 persistence (done) | §7 save strategy, 03 remains ids | `world.remains` v1 for every family's settled pieces, their poses and the anchored harvest links (with lodged arrows); `world.fragments` v1 unchanged and pinned by a literal fixture (§14.1). |
 | 06 combustion state (done) | §5, §6, §10, §11, §15 | `Entity.combustion` (`BodyCombustion`), `CombustionSource`, `CombustionSystem` (`expose`/`ignite`/`extinguish`/`clear`/`isBurning`/`burningBodies`, read-only getters), fast-tick wiring, `CreatureAI` dead guard, medical-BURN gating, reset in `WorldBootstrap`, `FireSystem.isPrecipitationReaching`, `RuntimeBudgetSnapshot.burningBodies` (§10.1). |
-| 07 sources | §4, §10; 06 API | Fast-tick swept contact for patches, burning cells, campfires, torches; direct-hit ignition; `damageNear`/`burnOccupants` stop hurting; `Burn.byPlayer`; attack de-dup per burn episode. |
+| 07 sources (done) | §4, §10; 06 API | `BodySweep` swept contact sampled in `CombustionSystem` for patches (`LiquidFireSystem.exposeContacts`), burning cells, campfires and torches (`FireSystem.exposeContacts`); direct-hit ignition in `ProjectileSystem.onEntityHit`; legacy contact damage removed; block-fire attribution (`FireSystem.ignite(…, byPlayer, origin)`); one attack per person per bottle; people and animals keep out of torches and campfires (`Entity.keepsOutOfFlames`, `VoxelPhysics`, `Steering`, `Pathfinder`); flame placement refused into a burnable body (§4.1). |
 | 08 panic | §12; 06 snapshot, 07 ignition | Panic hooks in `NpcAI.update`/`CreatureAI.update`, per-actor intent, seeded stream, NPC screen closure, bird flight escape. |
 | 09 lifecycle | §6, §9, §14 | Dead guard before creature AI, residue snapshot at death, resets on load/new world/respawn/Creative/deactivation, pause and sleep behaviour. |
 | 10 presentation | §16 presentation budgets, 02/04 geometry, 06/09 snapshots | Attached flames, scorch, smoke, embers, audio, first-person cues, QA scenes and captures. |

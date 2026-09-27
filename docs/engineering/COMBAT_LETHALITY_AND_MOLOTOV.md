@@ -8,6 +8,16 @@ rain, the molotov simulation and its presentation, then this integration pass.
 Host: Windows 11 x64, Java 25.0.4.1 (Temurin), Gradle 9.1.0. Not the reference
 machine the repository's wall-clock budgets were recorded on.
 
+> **Superseded in part** by the all-living combat and fire work
+> ([contract](ALL_LIVING_COMBAT_FIRE_CONTRACT.md)). This record describes the
+> 0.8.0 revision. Since then a lethal blast blows every living body apart, not
+> only people (§8.1); and burning liquid, burning blocks, fueled campfires,
+> placed torches and a bottle breaking on a body set bodies alight with a fire
+> of their own (§4.1, §10.1): the pool and block-fire contact damage per medium
+> tick described under *The molotov* and in *Deliberate limits* is gone, as is
+> the `MAX_TRACKED_NPC_SPILLS` memory, and a bottle that breaks on a body in the
+> air now sets it alight.
+
 ## The rules
 
 Every value below is the constant the code reads, not a restatement of intent.

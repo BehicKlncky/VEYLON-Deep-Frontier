@@ -27,7 +27,8 @@ Checkpoints by milestone (filled in by the following milestone):
 | 03 | `86ed85c14184ed22d710edbc80d1dda2cb7348c1` — `feat(combat): blow apart every living body a lethal blast kills`; `6bd61f8e1a9bc06e2de07b0edabbb967f5aa90d6` — `test(combat): pin lethal blasts and one body for every living thing`; `7d6c4aec43df0fcd2fb6af94cc8031cc64ff0d17` — `docs(combat): record all-living blast deaths` |
 | 04 | `290c388d017bfb5371d40d181837fd7c52f5aff0` — `feat(gfx): draw every body's pieces as its own anatomy`; `4baef52c995b2dcd956a19dd4eb64d47fa6ce500` — `feat(qa): stage every kind of body blown apart for captures`; `42d9572f6feb4edab950618271c01fda3e711430` — `test(gfx): pin every body's pieces as drawn, and the capture scenes`; `a203df9ad3900c2a93c1d213b96d0c2d0251e75f` — `docs(combat): record species fragment rendering` |
 | 05 | `f3c553d356f767e0b7bd04c3205ab536d7c10dbd` — `feat(save): keep every body's remains and harvest record in a save`; `08f1b0d9d3ad0cb9c0bb5c5dc1a4aecd55d57db8` — `test(save): pin how every body's remains survive a save`; `e8b825a0570e4785ebd828064c71ef906f0f557f` — `docs(combat): record remains persistence` |
-| 06 | reported in the milestone 06 handoff; record here in 07 |
+| 06 | `f863a66e669215d1313c3e7782c051f925c2cf49` — `feat(fire): give every living body one fire on its own clock`; `fae46fa4fa8f7b42490a5c7362c466982df637e5` — `test(fire): pin one fire per living body for every kind of body`; `a5882236a95ad4cc1e6589c7a5686d56d39e60f0` — `docs(combat): record shared body combustion` |
+| 07 | reported in the milestone 07 handoff; record here in 08 |
 
 ## Status
 
@@ -39,7 +40,7 @@ Checkpoints by milestone (filled in by the following milestone):
 | 04 | Species fragment rendering | **Complete** (presentation; animal pieces still not saved until 05) |
 | 05 | Fragment save compatibility | **Complete** (`world.remains` v1; `world.fragments` v1 unchanged) |
 | 06 | Shared body combustion | **Complete** (state, rules, fast-tick wiring; no production source connected until 07) |
-| 07 | Connect all fire sources | Not started |
+| 07 | Connect all fire sources | **Complete** (every real flame and a bottle breaking on a body set bodies alight; legacy contact damage gone; people and animals keep out of torches and campfires) |
 | 08 | NPC and animal fire panic | Not started |
 | 09 | Combustion lifecycle | Not started |
 | 10 | Body fire presentation | Not started |
@@ -50,8 +51,9 @@ Since 03, a lethal blast kills and blows apart every living body (all six specie
 family, a Survival player) in the simulation; since 04 every piece is drawn as its own body's
 anatomy; since 05 every settled piece, the pose its body died in and an animal's harvest record
 survive a save (`world.remains`). Since 06 every living body can carry one fire
-(`Entity.combustion`, advanced by `CombustionSystem` on the fast tick), but no game source sets
-one alight yet: fire damage in play is still the legacy medium-tick contact until 07.
+(`Entity.combustion`, advanced by `CombustionSystem` on the fast tick); since 07 burning liquid,
+burning blocks, fueled campfires, placed torches and a fire bomb breaking on a body set it
+alight through one swept contact path, and nothing else burns a body.
 
 ## Milestone 01 — source audit and contract (2026-09-26)
 
@@ -803,3 +805,126 @@ contract §10.1 (with §11 and §13 notes).
 - 10 (presentation): read-only getters only; `scorch()` grows with `intensity × dt / 10 s` and never
   falls. The player's red flash (1 on contact ticks, ≥ 0.5 × intensity in afterburn) is the only
   feedback so far.
+
+## Milestone 07 — fire sources connected (2026-09-27)
+
+### Start state
+
+- Branch `feature/all-living-dismemberment-combustion`, tip `a588223` (milestone 06); the three 06
+  checkpoints are now recorded in the table above. Working tree clean apart from the user's
+  untracked `.agents/` and `AGENTS.md`, which stay untracked.
+- Same host and portable Temurin 25.0.4.1+1 JDK; Gradle 9.1.0, `--no-daemon --console=plain`.
+- Read: `AGENTS.md`, the pack's `00_BASE_KNOWLEDGE.md` and `07_CONNECT_ALL_FIRE_SOURCES.md` (and
+  08–11 for what they expect from 07), contract §4, §6, §10, §11, §15–§18, and this file.
+- Predecessors checked in source: 06's `CombustionSystem` API and fast-tick order as recorded;
+  `FireSystem.damageNear` and `LiquidFireSystem.burnOccupants` still hurting on the medium tick
+  with their 50 % `BURN` rolls, as 06 left them; no production caller of `expose`/`ignite`.
+- Source anchors inspected: `ProjectileSystem.onEntityHit`/`shatter`/`step`/`entityAt`,
+  `LiquidFireSystem.spill`/`tick`/`burnOccupants`/`standsIn`/`igniteTouching`,
+  `FireSystem.ignite`/`mediumTick`/`damageNear`/`tickCampfires`/`isRainedOn`,
+  `ExplosionSystem.detonate` (block ignition, attack reporting), `WeatherSystem`/`EventSystem`
+  ignition, `BlockType`, `World.getBlock`/`getChunk`/`campfireFuel`, `AmbienceSystem` (campfires
+  drawn from `campfireFuel`), `PlayerBlockActions.placeSelectedBlockAt`, `SettlementManager`
+  (`onNpcAttackedByPlayer`, `residentSleepPosition`, `spawnPointFor`), `NpcAI`/`SettledNpcAI`
+  movement, `Pathfinder`, `Steering`, `VoxelPhysics`, `Entity.collidesAt`, `CreatureModels`
+  bird wings and `FragmentAnatomy` tables, and every test that drove fire damage through a
+  medium tick.
+
+### Commands and results
+
+All from the repository root in PowerShell with the portable JDK on `PATH`. Logs are in the
+git-ignored `build/` directory.
+
+| Command | Result |
+| --- | --- |
+| `.\gradlew.bat compileJava`, then `compileTestJava` | Main compiled; tests failed to compile exactly where they named the removed legacy symbols (`ENTITY_DPS_*`, `MAX_TRACKED_NPC_SPILLS`, `trackedNpcSpills()`) in `MolotovTest`, `CombatFireIntegrationTest`, `RuntimeBoundsTest`, `SimulationSystemContractTest`; adapted as contract §17 records. |
+| `.\gradlew.bat test` with `MolotovTest`, `FireWeatherTest`, `CombatFireIntegrationTest`, `BlastLethalityTest`, `CreativeHazardsTest`, `SurvivalCreativeParityTest`, `SimulationSystemContractTest`, `RuntimeBoundsTest`, `BodyCombustionTest`, `CombustionIntegrationTest`, `CombustionAllocationTest`, `CombatSystemsTest` | 229 tests, 2 failures at the first run (`build/all-living-m07-focused.log`): an assertion of mine that the player's own pool is not "player-owned" (it is; only the credit is withheld, as 06 built), and the four-patch test's bodies no longer touching the pool's centre once damage scales with the liquid's strength. Both fixed; green since. |
+| `.\gradlew.bat test --tests com.veylon.entity.FlameSourceIgnitionTest` | First run 45 tests, 3 failures, all fixture mistakes (two walking lanes outside the flattened arena, so the player fell; an unsturdy deer burned to death); green after moving them. Now 46 tests (`build/all-living-m07-new.log`). |
+| Throwaway settlement probe (a scratch test, deleted; four seeds, first three settlements each, 3 min per visit at 20 in-game minutes per second, 577 000 NPC ticks) | With the sources connected and nothing else: **21 residents caught fire in normal life** (`build/all-living-m07-settlement-probe.log`). After the pathfinder rule and the halved campfire rate: 14 (`probe2`); with steering round fires: 3 (`probe3`); a push-out attempt made it 8 (`probe5`, reverted); with fires as obstacles in physics: **0 contacts, 0 ignitions** (`probe6`), and again with the final code (`build/all-living-m07-settlement-probe-final.log`). |
+| `.\gradlew.bat test --tests com.veylon.entity.CombustionAllocationTest --tests com.veylon.CombustionIntegrationTest -i` | Passed. Nobody burning **0** bytes per fast tick, everybody burning **0** (06 measured 1280, all chunk-key boxing, now cached), every flame at its cap around a moving crowd **96** (the campfire fuel map's key; 160 before a boxed default was removed). |
+| `.\gradlew.bat test` | **BUILD SUCCESSFUL in 5 m 32 s: 1326 tests in 133 classes, 0 failures, 0 errors, 0 skipped** (`build/all-living-m07-test.log`). 06 ended at 1278 in 132. |
+| Mutation check (scratch PowerShell script, one production mutation at a time; `FlameSourceIgnitionTest`, `MolotovTest`, `CombustionIntegrationTest`, `CombatFireIntegrationTest`; each file restored in `finally` and its hash compared) | Baseline green. **17 of 20 caught** at the first pass (`build/all-living-m07-mutation.log`): a direct hit that no longer ignites (19 failing), no sweep, liquid reaching 50 blocks up, a rained-on pool still touching, no attack de-duplication, environmental fires reporting attacks, spread or pool-lit fires losing their thrower, paths through campfires, people and animals walking into fires, no steering round them, flames placed into bodies, no wing reach, jumps swept, the direct hit counted as another bottle, no sampling at all (49 failing), torches and campfires never touching. Survived: a rained-on burning block still touching, an unfueled campfire burning, a burning block reaching 1.5 blocks sideways — all three because "never touched" was asserted as `heat() == 0`, which a body that caught also shows. The tests now assert no flame was ever applied (`hasExposure()` false, not alight); a re-run of the three (`build/all-living-m07-mutation-rerun.log`) **caught all three**. Every file's hash matched its backup afterwards. |
+| `.\gradlew.bat build` (the tree committed below) | **BUILD SUCCESSFUL in 5 m 42 s: 1326 tests in 133 classes, 0 failures, 0 errors, 0 skipped**; `javadoc` (doclint) and `check` executed (`build/all-living-m07-build-final.log`). An earlier `build` before the last test-assertion and comment fixes was also green (5 m 38 s). |
+
+Not run: `performanceTest` (this host is not the reference machine and its durable-save gate
+fails regardless; contract §16's 0.2 ms combustion target is still unmeasured) and native QA
+(nothing is drawn differently: body flames are milestone 10; the sources' own visuals are
+unchanged).
+
+### What was built
+
+The as-built source table, sweep, ownership, attack, rain and keep-out rules and every change
+from the proposals are in contract §4.1; budgets in §16; replaced tests in §17.
+
+| Path | Change |
+| --- | --- |
+| `entity/BodySweep.java` (new) | A body's flame box swept from its last sample to now: exact open-interval slab test with contact point, `MAX_SWEEP` 2, flier wing reach from `FragmentAnatomy`, `overlapsNow` for placement. |
+| `entity/CombustionSystem.java` | `sampleFlames` at the start of each body's tick (asks `LiquidFireSystem` and `FireSystem`), `reportAttack` once per (person, bottle). |
+| `entity/BodyCombustion.java` | Sample position (`sampled`, `sampleX/Y/Z`, `sampledAt`), reported-bottle memory (`firstReportOf`); both cleared by `clear()`. |
+| `entity/CombustionConstants.java`, `CombustionSource.java` | `REPORTED_BOTTLES` 4; `CAMPFIRE` heat gain 1 /s. |
+| `simulation/LiquidFireSystem.java`, `LiquidFireConstants.java` | `exposeContacts`, `nextSpillId()`, `liquidCanLie`; pool-lit block fires carry `byPlayer` and the spill id; `burnOccupants`, `standsIn`, the (NPC, spill) memory, `ENTITY_DPS_*`, `MAX_TRACKED_NPC_SPILLS` removed. |
+| `simulation/FireSystem.java`, `FireConstants.java` | `exposeContacts` (burning blocks by face, fueled campfires, torches), `ignite(g, x, y, z, byPlayer, origin)`, `Burn` keeps its cell, owner and bottle in a list beside the map, spread inherits, `NO_ORIGIN`, `flameWouldTouch`, `standingFlameAhead`/`NO_FLAME`; flame-shape constants; `damageNear` and its constants removed. |
+| `combat/ProjectileSystem.java` | A fire bomb breaking on a body ignites it (`DIRECT_HIT`, the bottle's spill id) before it shatters. |
+| `entity/Entity.java`, `Npc.java`, `Creature.java`, `VoxelPhysics.java` | `keepsOutOfFlames` (people and animals), `flamesBlock` in `collidesAt`, `flameCell`/`inFlameCell`, walking out of a torch or campfire cell; `world()` accessor. |
+| `ai/Steering.java`, `ai/Pathfinder.java` | Steering sidesteps a torch or campfire cell ahead; the pathfinder refuses those cells. |
+| `PlayerBlockActions.java` | A torch or campfire cannot be placed with its flame in a body that can burn. |
+| `world/World.java` | `getChunk`: 64-entry direct-mapped cache behind the one-entry cache (no boxing across an 8 × 8 window). |
+| `src/test/.../entity/FlameSourceIgnitionTest.java` (new) | 46 tests (two parameterized over 13 bodies, 20 single). Real bottles broken on each of 13 living bodies (6 species from `CreatureType.values()`, 6 NPC families, Survival player; people throw at the player) then combustion and fire ticks: alight at once, the pool takes over at the contact rate, afterburn away from every flame. Creative player hit and standing in the pool while a neighbour and a deer burn. A bird six blocks up: no pool, burns to death in the real game tick under its own AI, the thrower's kill and meat. Water policy: animal in one cell, person to the hips (burns, faster drain), person under water. Crossing a one-cell patch at 12 blocks/s between two medium ticks for all 13 bodies; a dash between two fast ticks (hare, bird, deer, person) and the same dash a hair aside; a 4-block jump; liquid height (a bird a block over the pool against one skimming it); wing reach at a torch against a hare. The player walking/running through a pool, burning bushes (and past them a hand's width away), a campfire (brushing through vs standing in it) and a torch (walking through vs lingering), always burning on after leaving; a hare under a torch. Warmth, a held torch, lantern, trail marker, glow fungus, alarm bell, furnace, unfueled campfire: no heat. A buried log and a slab over a log: no heat; standing on a burning log and a burning crown at head height: catch. A pulled-up bush and a flooded patch; rain on a bush and a pool against a roofed bush; a campfire in the rain. Three overlapping flames in two orders: one owner, one contact's damage, the same point. A molotov-lit grass fire spread clear of the pool: the walker's burn is the thrower's attack (once per bottle) and kill; a wild fire's is nobody's. Four bottles on one resident: four attacks, none more over three seconds in the pools; Creative pays unseen. Walking round a campfire and a torch (no heat, no hop), the pathfinder's route, a shove at a campfire, one set down in it walks out. Flame placement per mode. Sampling at the edge of the loaded area loads no chunk. |
+| `src/test/.../CombustionIntegrationTest.java` | The player's own throw command, the projectile and `Game.fastTick`/`mediumTick` over a buried burning log: exactly the contact damage after four medium ticks. |
+| `src/test/.../entity/CombustionAllocationTest.java` | Every flame at its cap around a moving crowd, under the 4 KB allowance (measured 96). |
+| `MolotovTest`, `CombatFireIntegrationTest`, `BlastLethalityTest`, `CreativeHazardsTest`, `SurvivalCreativeParityTest`, `RuntimeBoundsTest`, `SimulationSystemContractTest` | Adapted to contact on the fast tick (contract §17). |
+| docs | contract §4.1 (new), §6, §10.1, §11, §15, §16, §17, §18; `ARCHITECTURE.md` molotov, rain and body-fire paragraphs; a superseded-in-part note on `COMBAT_LETHALITY_AND_MOLOTOV.md`. |
+
+### Evidence of the decisions
+
+- **Fires as obstacles for people and animals.** The probe above is the reason; each weaker
+  rule left residents burning (walking through campfires at a camp guard's 1.8 blocks/s; a
+  guard sleeping on the tile a barracks torch stands on, reached by direct steering; a guard
+  pushed from a torch into a wall; a brute on a ledge treading in a torch's tip). Treating the
+  cells as solid for bodies that keep out of fires is the one rule that holds whatever the AI
+  chose, and it cannot be circumvented by a shove.
+- **Per-bottle attacks.** `MolotovTest` already pinned "one attack per NPC per bottle" (−36 then
+  −72 for two bottles on two residents); a per-episode rule would have given −36 twice.
+- **Rain at contact time.** Without it a pool spilled into rain lit people for up to half a
+  second before its first medium tick began to soak it (the rain test now covers that window).
+
+### Limitations
+
+- The flame box of a quadruped is its square entity box: a deer's head and tail reach past it
+  along its length, unmodelled. A flier's wing envelope is a symmetric approximation.
+- Heat is credited a whole tick for any contact in it (at most 0.05 s too much).
+- A body standing in a campfire in open rain is put out every 1.5 s and relit by heat (§10.1).
+- Fires lit by blasts, lightning and meteors are environmental.
+- `Steering.flyToward` does not sidestep fires; collision still keeps birds out of their cells.
+- A person hit by more than four distinct bottles can have the oldest count again.
+- People and animals can no longer be knocked or shoved into a torch or campfire; they burn from
+  one only if it is lit where they stand, and then walk out.
+- `CreatureAI.panicFromFire` still flees only burning blocks; nothing flees a burning body's own
+  flames yet (08).
+- Wall-clock cost unmeasured; no native captures (nothing new is drawn).
+
+### Handoff to milestone 08
+
+- Every production flame now reaches `CombustionSystem`; a person or animal ignites for real
+  from a bottle (direct or pool), a burning block, or a campfire or torch they were put in.
+  Read `g.combustion.isBurning(e)`, `e.combustion.inContact()`, `hasExposure()` and
+  `exposureX/Y/Z()` (the contact point of the flame that last touched the body) for panic and
+  flight direction. AI runs after the combustion tick in the same fast tick.
+- People and animals treat torch and campfire cells as solid (`Entity.keepsOutOfFlames`, applied
+  in `VoxelPhysics.integrate`), and `Steering.moveToward` sidesteps them; a panicking body using
+  `Steering` inherits both. Liquid pools and burning bushes are not obstacles: running through
+  them is how panicking bodies catch again, which is intended.
+- A burning person the player's flame lit has already been reported once for that bottle
+  (`reportAttack`); panic must not report again.
+- Keep green: `FlameSourceIgnitionTest`, `BodyCombustionTest`, `CombustionIntegrationTest`,
+  `CombustionAllocationTest`, `MolotovTest`, `FireWeatherTest`, `CombatFireIntegrationTest`.
+
+### Handoff to milestones 09–11
+
+- 09: `BodyCombustion.clear()` also forgets the sample position (the next tick samples only
+  where the body is) and the reported bottles; a body that leaves and comes back (settlement
+  dormancy, load) is a new entity with neither. No collection outside the body holds a body.
+- 10: sources draw as before; a body's fire is still only its red flash. `exposureX/Y/Z` is
+  where a flame touched the body, if flames should start there.
+- 11: the source matrix of contract §4.1 is covered here headlessly; native captures of bodies
+  catching at each source belong with 10's presentation.

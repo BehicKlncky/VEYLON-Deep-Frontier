@@ -690,12 +690,14 @@ damage and no broken blocks. `LiquidFireSystem` runs the pool it spills on the
 medium tick beside `FireSystem`: a priority flood from the cell the bottle broke
 over, biased along the throw, that only ever runs sideways and down, never into
 a solid or water cell, at most 22 cells per bottle and 160 in the world. Each
-patch burns whoever stands in it once per tick, lights the fuse of a
-neighbouring keg, and rolls to set the flammable blocks it touches alight
-**through `FireSystem.ignite`** — which is what keeps one ceiling over both
-kinds of flame: block fires from bottles, blasts, lightning and spread all
-compete for the same `FireSystem.MAX_ACTIVE_FIRES` (220), while the pools have
-their own cap.
+patch lights the fuse of a neighbouring keg and rolls to set the flammable blocks
+it touches alight **through `FireSystem.ignite`** — which is what keeps one
+ceiling over both kinds of flame: block fires from bottles, blasts, lightning and
+spread all compete for the same `FireSystem.MAX_ACTIVE_FIRES` (220), while the
+pools have their own cap. A block fire a bottle lights remembers the bottle and
+passes it on as it spreads, so it burns bodies for the thrower. A bottle that
+breaks on a body sets that body alight before it spills, so a bird hit in the air
+burns though the liquid finds no ground.
 
 **Rain is one predicate.** `FireSystem.isRainedOn` — precipitation falling and
 sky light above `RAIN_EXPOSURE_SKYLIGHT` in the cell above — decides for burning
@@ -704,26 +706,43 @@ out after two seconds without being consumed; an exposed pool goes out after
 one. Shelter needs headroom: the sky light is sampled one cell up, and the top
 of a column is always fully lit, so a roof resting directly on a block does not
 shelter it. A patch under cover burns on, but does not light a block the rain is
-falling on, which the rain would only put out again.
+falling on, which the rain would only put out again. A pool or a burning block
+the rain is reaching, or that is still wet from it, sets no body alight; a
+campfire has no weather rule beyond faster fuel drain, so it does, and the rain on
+the body's head then puts it out.
 
 **A living body burns on its own clock.** Every `Entity` carries one
 `BodyCombustion`, read-only outside the `entity` package; `CombustionSystem`
 (`Game.combustion`) is its only writer and runs on the fast tick between the
 player's needs and entity AI, so AI reads this tick's fire and a body the fire
 kills is routed whole in the same tick (a dead creature no longer gets an AI step,
-as a dead NPC never did). Flame sources report contacts (`expose`) or set a body
-alight at once (`ignite`); each body keeps only the strongest contact of a tick,
-so flames never stack, and one fire with one afterburn timer that later contacts
-refresh up to a cap. Damage goes through `Entity.hurt` with the fire owner's
-credit, at a contact rate while a flame touches the body and a lower afterburn
-rate as the fire fades; a burn death falls whole. Water over most of the body
+as a dead NPC never did). Each tick first sweeps every living body's box from
+where it was sampled last to where it is now (`BodySweep`) and asks the flames
+standing in the world whether they touch it — patches of burning liquid
+(`LiquidFireSystem.exposeContacts`), burning blocks, fueled campfires and placed
+torches (`FireSystem.exposeContacts`) — so a body crossing a small flame between
+two samples still touches it; a fire bomb breaking on a body calls `ignite`.
+These are the only ways a flame hurts a body: the block and liquid fires' medium
+ticks no longer damage anyone. Each body keeps only the strongest contact of a
+tick, so flames never stack, and one fire with one afterburn timer that later
+contacts refresh up to a cap. When the player's flame lights or takes over a
+person's fire, that is one attack per bottle, never per patch or tick. Damage
+goes through `Entity.hurt` with the fire owner's credit, at a contact rate while
+a flame touches the body and a lower afterburn rate as the fire fades; a burn
+death falls whole. Water over most of the body
 puts it out, water to the hips only shortens it, and rain puts it out when it
 reaches the head — `FireSystem.isPrecipitationReaching` asked of the head's cell,
 the same predicate `isRainedOn` asks of the cell above a block, so any roof over
 the head shelters. The Survival player's medical burn injury is separate: it
 comes once per fire, after a second alight, and neither hurts nor heals while
-the flames burn. A Creative player never catches. The rules, numbers and API
-are in [the combat and fire contract](engineering/ALL_LIVING_COMBAT_FIRE_CONTRACT.md) §10.1.
+the flames burn. A Creative player never catches. People and animals keep out of
+torch and campfire cells as they keep out of walls (`Entity.keepsOutOfFlames`,
+applied in `VoxelPhysics`, steered round by `Steering.moveToward`, routed round by
+`Pathfinder`), and walk out of one they find themselves in, so residents living
+beside their fires do not set themselves alight; the player walks where they
+choose, and cannot place a torch or campfire into a body that can burn. The
+rules, numbers and API are in
+[the combat and fire contract](engineering/ALL_LIVING_COMBAT_FIRE_CONTRACT.md) §10.1 and §4.1.
 
 | State | Persisted | Where |
 | --- | --- | --- |
