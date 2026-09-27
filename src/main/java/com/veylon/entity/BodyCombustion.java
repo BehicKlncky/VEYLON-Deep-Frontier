@@ -41,6 +41,24 @@ public final class BodyCombustion {
     /** Whether a flame touched the body on the last fast tick. */
     boolean contact;
 
+    /*
+     * How the last fire ended and what it looked like, for presentation only:
+     * nothing in the simulation reads these, so they can never change a burn.
+     */
+    /** Seconds since the last fire went out, up to {@link CombustionConstants#OUT_MEMORY_SECONDS}. */
+    float outSeconds = CombustionConstants.OUT_MEMORY_SECONDS;
+    /** How strongly the body burned the moment its last fire went out. */
+    float outIntensity;
+    /** Whether water or rain put the last fire out, rather than it burning out. */
+    boolean outDoused;
+    /** Fires this body has caught in its life; each ignition starts a new one. */
+    int episodes;
+    /**
+     * A number fixed for one episode, from where the flame first touched the
+     * body, so two bodies never flicker in step and a replay flickers alike.
+     */
+    int flameSeed;
+
     /** The kind of the contact that last lit or refreshed the fire; null when not burning. */
     CombustionSource owner;
     boolean ownerByPlayer;
@@ -49,6 +67,8 @@ public final class BodyCombustion {
     /** Whether the body has ever been touched by a flame; the point below is meaningful then. */
     boolean exposed;
     float exposureX, exposureY, exposureZ;
+    /** The same point from the body's feet when it touched, so the flames can climb from it as the body moves. */
+    float touchX, touchY, touchZ;
 
     /** The strongest contact offered since the last fast tick, or null. */
     CombustionSource pending;
@@ -142,6 +162,52 @@ public final class BodyCombustion {
         return exposed;
     }
 
+    /**
+     * Seconds since the last fire on this body went out, capped at {@link
+     * CombustionConstants#OUT_MEMORY_SECONDS} (also the value for a body that
+     * never burned, or is burning now). Presentation input only.
+     */
+    public float outSeconds() {
+        return outSeconds;
+    }
+
+    /** How strongly the body was burning when its last fire went out. */
+    public float outIntensity() {
+        return outIntensity;
+    }
+
+    /** Whether water or rain put the last fire out (it steams), rather than it burning out. */
+    public boolean outDoused() {
+        return outDoused;
+    }
+
+    /** How many fires the body has caught; a new value means a new ignition. */
+    public int episodes() {
+        return episodes;
+    }
+
+    /** A number fixed for the current (or last) episode; see {@link #flameSeed}. */
+    public int flameSeed() {
+        return flameSeed;
+    }
+
+    /**
+     * Where the last applied contact touched the body, from the body's feet
+     * (its position) at that moment: the presentation carries the point with
+     * the body, so flames climb from it on a body running or flying away.
+     */
+    public float touchX() {
+        return touchX;
+    }
+
+    public float touchY() {
+        return touchY;
+    }
+
+    public float touchZ() {
+        return touchZ;
+    }
+
     /** Where the last applied contact touched the body, for heat avoidance. */
     public float exposureX() {
         return exposureX;
@@ -211,6 +277,18 @@ public final class BodyCombustion {
         soak = 0f;
         burnSeconds = 0f;
         own(kind, byPlayer, sourceId);
+        episodes++;
+        flameSeed = seedFrom(exposureX, exposureY, exposureZ, episodes);
+        outSeconds = CombustionConstants.OUT_MEMORY_SECONDS;
+    }
+
+    /** Mixes where the flame touched and the episode into one well-spread number. */
+    private static int seedFrom(float x, float y, float z, int episode) {
+        int h = Float.floatToIntBits(x) * 0x9E3779B1;
+        h = (h ^ Float.floatToIntBits(y)) * 0x85EBCA6B;
+        h = (h ^ Float.floatToIntBits(z)) * 0xC2B2AE35;
+        h ^= episode * 0x27D4EB2F;
+        return h ^ (h >>> 15);
     }
 
     /**
@@ -230,11 +308,14 @@ public final class BodyCombustion {
         ownerSourceId = sourceId;
     }
 
-    void touchedAt(float x, float y, float z) {
+    void touchedAt(float x, float y, float z, Entity body) {
         exposed = true;
         exposureX = x;
         exposureY = y;
         exposureZ = z;
+        touchX = x - body.pos.x;
+        touchY = y - body.pos.y;
+        touchZ = z - body.pos.z;
     }
 
     void sampledAt(float x, float y, float z) {
@@ -262,6 +343,27 @@ public final class BodyCombustion {
         return true;
     }
 
+    /**
+     * Puts a burning fire out, remembering for the presentation how strongly
+     * it burned and whether water ({@code doused}) or its own fuel ended it.
+     * A body that was not alight is left as {@link #extinguish} leaves it.
+     */
+    void putOut(boolean doused) {
+        if (burning) {
+            outIntensity = intensity();
+            outDoused = doused;
+            outSeconds = 0f;
+        }
+        extinguish();
+    }
+
+    /** Ages the memory of how the last fire went out; a presentation clock only. */
+    void ageOut(float dt) {
+        if (outSeconds < CombustionConstants.OUT_MEMORY_SECONDS) {
+            outSeconds = Math.min(CombustionConstants.OUT_MEMORY_SECONDS, outSeconds + dt);
+        }
+    }
+
     /** Puts the flames out and forgets any heat; the scorch, the last exposure and the episode's length stay. */
     void extinguish() {
         burning = false;
@@ -283,7 +385,13 @@ public final class BodyCombustion {
         scorch = 0f;
         exposed = false;
         exposureX = exposureY = exposureZ = 0f;
+        touchX = touchY = touchZ = 0f;
         sampled = false;
         reportedCount = 0;
+        outSeconds = CombustionConstants.OUT_MEMORY_SECONDS;
+        outIntensity = 0f;
+        outDoused = false;
+        episodes = 0;
+        flameSeed = 0;
     }
 }

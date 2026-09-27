@@ -135,6 +135,8 @@ public class PostProcessor {
         finalShader.set("uVignettes", env.vigDamage, env.vigCold, env.vigPoison, env.vigSmokeHeat);
         finalShader.set("uHeat", env.heatMix);
         finalShader.set("uUnderwater", env.underwater);
+        finalShader.set("uBurn", env.vigBurn);
+        finalShader.set("uBurnTime", env.burnTime);
         finalShader.set("uFxaaOn", fxaaOn ? 1f : 0f);
         finalShader.set("uTexel", 1f / width, 1f / height);
         glDrawArrays(GL_TRIANGLES, 0, 3);

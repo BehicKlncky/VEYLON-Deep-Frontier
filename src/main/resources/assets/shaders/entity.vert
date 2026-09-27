@@ -12,6 +12,9 @@ out vec3 vNormal;
 out float vDist;
 out vec4 vSunSpace;
 out vec3 vWorldPos;
+// Position on the box in metres from its own centre, so a pattern drawn on it
+// (a burning body's char) stays on the body however it moves.
+out vec3 vLocal;
 
 void main() {
     vec4 world = uModel * vec4(aPos, 1.0);
@@ -22,4 +25,5 @@ void main() {
     vDist = length(viewPos.xyz);
     vSunSpace = uSunMatrix * world;
     vWorldPos = world.xyz;
+    vLocal = aPos * vec3(length(uModel[0].xyz), length(uModel[1].xyz), length(uModel[2].xyz));
 }

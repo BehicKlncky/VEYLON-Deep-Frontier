@@ -150,18 +150,21 @@ public final class CombustionSystem implements FastTickSystem {
             totalIgnitions++;
             announce(g, e, "You're on fire! Deep water or open rain will put it out.");
         }
-        b.touchedAt(x, y, z);
+        b.touchedAt(x, y, z, e);
         b.offer(kind, strength, byPlayer, sourceId, x, y, z);
         return true;
     }
 
-    /** Puts the body's flames out now; its scorch stays. Returns whether it was burning. */
+    /**
+     * Puts the body's flames out now, as water would (they steam); its scorch
+     * stays. Returns whether it was burning.
+     */
     public boolean extinguish(Entity e) {
         if (e == null) {
             return false;
         }
         boolean was = e.combustion.burning;
-        e.combustion.extinguish();
+        e.combustion.putOut(true);
         return was;
     }
 
@@ -228,6 +231,9 @@ public final class CombustionSystem implements FastTickSystem {
             b.clear();
             return;
         }
+        if (!b.burning) {
+            b.ageOut(dt);
+        }
         sampleFlames(g, e, b);
         if (!b.burning && b.heat == 0f && b.pending == null) {
             return;
@@ -242,7 +248,7 @@ public final class CombustionSystem implements FastTickSystem {
                 totalDoused++;
                 announce(g, e, "The water puts the flames out.");
             }
-            b.extinguish();
+            b.putOut(true);
             return;
         }
 
@@ -251,7 +257,7 @@ public final class CombustionSystem implements FastTickSystem {
         if (kind != null) {
             boolean byPlayer = b.pendingByPlayer;
             int sourceId = b.pendingSourceId;
-            b.touchedAt(b.pendingX, b.pendingY, b.pendingZ);
+            b.touchedAt(b.pendingX, b.pendingY, b.pendingZ, e);
             if (b.burning) {
                 b.refresh(kind, b.pendingIntensity, byPlayer, sourceId);
             } else {
@@ -279,7 +285,7 @@ public final class CombustionSystem implements FastTickSystem {
             if (b.soak + TIMER_EPSILON >= RAIN_EXTINGUISH_SECONDS) {
                 totalRainedOut++;
                 announce(g, e, "The rain puts the flames out.");
-                b.extinguish();
+                b.putOut(true);
                 return;
             }
         } else {
@@ -305,7 +311,7 @@ public final class CombustionSystem implements FastTickSystem {
             if (b.fuel <= TIMER_EPSILON) {
                 totalBurnouts++;
                 announce(g, e, "The flames on you burn out.");
-                b.extinguish();
+                b.putOut(false);
             }
         }
     }

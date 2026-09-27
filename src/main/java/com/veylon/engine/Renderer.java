@@ -1,17 +1,17 @@
 package com.veylon.engine;
 
 import com.veylon.Game;
+import com.veylon.entity.BodyFamily;
 import com.veylon.entity.BodyFragment;
-import com.veylon.entity.BodyPose;
-import com.veylon.entity.BodySkeleton;
 import com.veylon.entity.Carcass;
 import com.veylon.entity.Creature;
 import com.veylon.entity.FragmentPiece;
 import com.veylon.entity.HumanCorpse;
 import com.veylon.entity.Npc;
-import com.veylon.entity.NpcAppearance;
 import com.veylon.entity.Ragdoll;
 import com.veylon.entity.Track;
+import com.veylon.gfx.BodyFireLook;
+import com.veylon.gfx.BodyFlames;
 import com.veylon.gfx.Environment;
 import com.veylon.gfx.GraphicsSettings;
 import com.veylon.gfx.MaterialRegistry;
@@ -19,13 +19,12 @@ import com.veylon.gfx.ParticleRenderer;
 import com.veylon.gfx.PostProcessor;
 import com.veylon.gfx.ShadowMap;
 import com.veylon.gfx.SkyRenderer;
-import com.veylon.gfx.model.Animator;
-import com.veylon.gfx.model.CreatureModels;
+import com.veylon.gfx.model.BodyPosing;
 import com.veylon.gfx.model.EntityModel;
+import com.veylon.gfx.model.FlameAnchors;
 import com.veylon.gfx.model.FragmentModels;
 import com.veylon.gfx.model.HeldItemModels;
 import com.veylon.gfx.model.ModelPart;
-import com.veylon.gfx.model.NpcModels;
 import com.veylon.item.ItemStack;
 import com.veylon.item.ItemType;
 import com.veylon.item.ToolKind;
@@ -80,6 +79,13 @@ public class Renderer {
     /** A body fragment's collision box frame, kept while its cut faces are drawn. */
     private final Matrix4f fragmentBase = new Matrix4f();
     private final Vector3f fragmentTint = new Vector3f();
+    /** The flames standing on burning bodies this frame, drawn with the particles. */
+    private final BodyFlames bodyFlames = new BodyFlames();
+    /** The fire of the body being drawn; reused, so no body's fire outlives its draw. */
+    private final BodyFireLook fireLook = new BodyFireLook();
+    private final float[] gripFlames = new float[8 * ParticleRenderer.INSTANCE_FLOATS];
+    /** The particle clock this frame: flames flicker by it, so they hold still while paused. */
+    private double fireClock;
     private final Matrix4f identity = new Matrix4f();
     private final Matrix4f projView = new Matrix4f();
     private final FrustumIntersection frustum = new FrustumIntersection();
@@ -95,8 +101,12 @@ public class Renderer {
     public int drawCalls;
     public long trianglesRendered;
     public int particlesDrawn;
-    /** Actual particle instanced submissions made this frame (0..2). */
+    /** Actual particle instanced submissions made this frame (0..3: body flames are the third). */
     public int particleDrawCalls;
+    /** Flame tongues drawn on burning bodies this frame (part of {@link #particlesDrawn}). */
+    public int bodyFlamesDrawn;
+    /** Burning bodies and pieces that drew flames this frame. */
+    public int burningBodiesDrawn;
     public int chunkMeshRebuildsLastFrame;
     public long chunkMeshRebuildsTotal;
 
@@ -386,11 +396,14 @@ public class Renderer {
         glDepthMask(true);
         glDisable(GL_BLEND);
 
-        // Particles (instanced, zero to two actual draw submissions).
+        // Particles (instanced, zero to three actual draw submissions: body flames are the third).
         float pAmbient = Math.max(0.25f,
                 (env.ambientSky.x + env.ambientSky.y + env.ambientSky.z) / 3f + env.flash);
-        particles.render(game.particles, proj, view, camRight, camUp, pAmbient);
+        particles.render(game.particles, bodyFlames, proj, view, camRight, camUp, pAmbient,
+                (float) fireClock, fogStart, fogEnd, flameOcclusion());
         particlesDrawn = particles.drawnLastFrame;
+        bodyFlamesDrawn = particles.bodyFlamesLastFrame;
+        burningBodiesDrawn = bodyFlames.bodies;
         particleDrawCalls = particles.drawCallsLastFrame;
         drawCalls += particles.drawCallsLastFrame;
 
@@ -422,17 +435,18 @@ public class Renderer {
         entityShader.set("uFogEnd", fogEnd);
         entityShader.set("uTintMul", 1f, 1f, 1f);
         entityShader.set("uEmissive", 0f);
+        noFire();
     }
 
     private void renderEntities(Game game, Matrix4f proj, Matrix4f view) {
         bindEntityCommon(proj, view, settings.shadowQuality > 0);
+        fireClock = game.particles.time;
+        entityShader.set("uFireTime", (float) fireClock);
+        beginBodyFlames(game);
 
         renderTracks(game);
-        renderCarcasses(game);
-        renderCorpses(game);
-        renderRagdolls(game);
-        renderFragments(game);
 
+        // The living first: their flames are taken from the frame's share before any remains'.
         Vector3f camPos = game.camera.position;
         float entityRange = fogEnd + 12f;
         for (Creature c : game.entities.creatures) {
@@ -442,13 +456,13 @@ public class Renderer {
                     boundsHalf, boundsHeight, entityRange)) {
                 continue;
             }
-            EntityModel creatureModel = CreatureModels.of(c.type);
-            Animator.poseCreature(creatureModel, c, game.totalTime);
+            ModelPart root = BodyPosing.creature(c, game.totalTime, model);
             setEntityLight(game, c.pos.x, c.pos.y + c.height * 0.5f, c.pos.z);
             entityShader.set("uTintMul", 1f, 1f, 1f);
-            model.identity().translate(c.pos.x, c.pos.y, c.pos.z)
-                    .rotateY((float) Math.toRadians(-c.yaw));
-            drawModel(creatureModel, model);
+            fireMaterial(fireLook.living(c));
+            drawPart(root, model);
+            attachFlames(game, FlameAnchors.of(BodyFamily.of(c.type)), root, 0, 1f,
+                    c.pos.x, c.pos.y, c.pos.z, c.vel.x, c.vel.z);
         }
 
         for (Npc n : game.entities.npcs) {
@@ -456,14 +470,20 @@ public class Renderer {
                     0.55f, n.height + 0.25f, entityRange)) {
                 continue;
             }
-            EntityModel npcModel = NpcModels.get();
-            Animator.poseNpc(npcModel, n, game.totalTime);
+            ModelPart root = BodyPosing.npc(n, game.totalTime, model);
             setEntityLight(game, n.pos.x, n.pos.y + 1f, n.pos.z);
             entityShader.set("uTintMul", 1f, 1f, 1f);
-            model.identity().translate(n.pos.x, n.pos.y, n.pos.z)
-                    .rotateY((float) Math.toRadians(-n.yaw));
-            drawModel(npcModel, model);
+            fireMaterial(fireLook.living(n));
+            drawPart(root, model);
+            attachFlames(game, FlameAnchors.of(BodyFamily.HUMANOID), root, 0, 1f,
+                    n.pos.x, n.pos.y, n.pos.z, n.vel.x, n.vel.z);
         }
+        noFire();
+
+        renderCarcasses(game);
+        renderCorpses(game);
+        renderRagdolls(game);
+        renderFragments(game);
 
         renderProjectiles(game);
 
@@ -721,19 +741,16 @@ public class Renderer {
             setEntityLight(game, c.pos.x, c.pos.y + 0.3f, c.pos.z);
             float rot = c.rotten() ? 0.6f : 1f;
             entityShader.set("uTintMul", rot, rot * 0.9f, rot * 0.85f);
-            EntityModel carcassModel = CreatureModels.of(t);
-            if (c.pose.solved) {
-                // The pose the body actually settled in, carried off the ragdoll.
-                Animator.poseBody(carcassModel, BodySkeleton.of(t), c.pose);
-            } else {
-                // Restored from an older save or staged by QA: the fixed sprawl.
-                Animator.poseCarcass(carcassModel);
-            }
-            bodyTransform(c.pos.x, c.pos.y, c.pos.z, c.pose);
-            drawModel(carcassModel, model);
+            // The pose the body settled in, carried off the ragdoll, or the
+            // fixed sprawl for one restored from an older save or staged by QA.
+            ModelPart root = BodyPosing.carcass(c, model);
+            fireMaterial(fireLook.remains(c.burn));
+            drawPart(root, model);
+            attachFlames(game, FlameAnchors.of(BodyFamily.of(t)), root, 0, 1f, c.pos.x, c.pos.y, c.pos.z, 0f, 0f);
         }
         entityShader.set("uTintMul", 1f, 1f, 1f);
         entityShader.set("uEmissive", 0f);
+        noFire();
     }
 
     /** Settled human bodies: same seam as carcasses, humanoid model. */
@@ -747,10 +764,14 @@ public class Renderer {
             }
             setEntityLight(game, corpse.pos.x, corpse.pos.y + 0.2f, corpse.pos.z);
             entityShader.set("uTintMul", 1f, 1f, 1f);
-            drawBody(BodySkeleton.humanoid(), corpse.pose, corpse.appearance,
-                    corpse.pos.x, corpse.pos.y, corpse.pos.z);
+            ModelPart root = BodyPosing.corpse(corpse, model);
+            fireMaterial(fireLook.remains(corpse.burn));
+            drawPart(root, model);
+            attachFlames(game, FlameAnchors.of(BodyFamily.HUMANOID), root, 0, 1f,
+                    corpse.pos.x, corpse.pos.y, corpse.pos.z, 0f, 0f);
         }
         entityShader.set("uEmissive", 0f);
+        noFire();
     }
 
     /** Bodies still falling. Same shader state block, no new mesh or draw path. */
@@ -766,16 +787,14 @@ public class Renderer {
             }
             setEntityLight(game, x, y, z);
             entityShader.set("uTintMul", 1f, 1f, 1f);
-            if (r.human()) {
-                drawBody(r.skeleton, r.pose, r.appearance, x, y, z);
-            } else {
-                EntityModel creatureModel = CreatureModels.of(r.creatureType);
-                Animator.poseBody(creatureModel, r.skeleton, r.pose);
-                bodyTransform(x, y, z, r.pose);
-                drawModel(creatureModel, model);
-            }
+            ModelPart root = BodyPosing.ragdoll(r, model);
+            fireMaterial(fireLook.remains(r.burn));
+            drawPart(root, model);
+            attachFlames(game, FlameAnchors.of(BodyPosing.family(r)), root, 0, 1f, x, y, z,
+                    r.vx[Ragdoll.TORSO], r.vz[Ragdoll.TORSO]);
         }
         entityShader.set("uEmissive", 0f);
+        noFire();
     }
 
     /**
@@ -799,6 +818,7 @@ public class Renderer {
         }
         entityShader.set("uTintMul", 1f, 1f, 1f);
         entityShader.set("uEmissive", 0f);
+        noFire();
     }
 
     private void drawFragment(Game game, Vector3f camPos, BodyFragment f, float range) {
@@ -812,8 +832,13 @@ public class Renderer {
         setEntityLight(game, f.pos.x, f.pos.y, f.pos.z);
         entityShader.set("uTintMul", FragmentModels.tint(f, fragmentTint));
         // Resets whatever the last body left on the shared model before posing it.
-        ModelPart root = Animator.poseFragment(f);
-        drawPart(root, FragmentModels.rootFrame(f, model));
+        ModelPart root = BodyPosing.fragment(f, model);
+        // One fire for the whole body: each piece carries the anchors of its own
+        // parts, so the pieces together hold the body's flames once.
+        fireMaterial(fireLook.remains(f.burn));
+        drawPart(root, model);
+        attachFlames(game, FlameAnchors.of(f.definition.family), root, f.definition.id + 1, f.burnShare,
+                f.pos.x, f.pos.y, f.pos.z, f.vel.x, f.vel.z);
         // Parts leave their own emission set; a wound has none.
         entityShader.set("uEmissive", 0f);
         FragmentModels.pieceFrame(f, fragmentBase);
@@ -824,30 +849,110 @@ public class Renderer {
         }
     }
 
-    private void drawBody(BodySkeleton skeleton, BodyPose pose, NpcAppearance appearance,
-                          float x, float y, float z) {
-        EntityModel npcModel = NpcModels.get();
-        Animator.poseBody(npcModel, skeleton, pose);
-        // resetPose inside poseBody makes every archetype accessory visible again.
-        Animator.applyAppearance(npcModel, appearance);
-        bodyTransform(x, y, z, pose);
-        drawModel(npcModel, model);
+    // ------------------------------------------------------------------
+    // Burning bodies: char, embers and firelight on the body's own boxes,
+    // and flame tongues on its posed parts, drawn with the particles.
+    // ------------------------------------------------------------------
+
+    /**
+     * Shares this frame's flame tongues out over every burning body in range
+     * — the living, the falling, the dead, and each piece of one blown apart
+     * at its share of the body — before any is drawn.
+     */
+    private void beginBodyFlames(Game game) {
+        Vector3f cam = game.camera.position;
+        float bodies = 0f;
+        for (int i = 0; i < game.entities.creatures.size(); i++) {
+            Creature c = game.entities.creatures.get(i);
+            bodies += !c.dead && inFlameRange(cam, c.pos.x, c.pos.y, c.pos.z)
+                    && fireLook.living(c).flame > 0f ? 1f : 0f;
+        }
+        for (int i = 0; i < game.entities.npcs.size(); i++) {
+            Npc n = game.entities.npcs.get(i);
+            bodies += !n.dead && inFlameRange(cam, n.pos.x, n.pos.y, n.pos.z)
+                    && fireLook.living(n).flame > 0f ? 1f : 0f;
+        }
+        for (int i = 0; i < game.ragdolls.live.size(); i++) {
+            Ragdoll r = game.ragdolls.live.get(i);
+            bodies += flaming(cam, r.burn, r.px[Ragdoll.TORSO], r.py[Ragdoll.TORSO], r.pz[Ragdoll.TORSO]) ? 1f : 0f;
+        }
+        for (int i = 0; i < game.entities.corpses.size(); i++) {
+            HumanCorpse c = game.entities.corpses.get(i);
+            bodies += flaming(cam, c.burn, c.pos.x, c.pos.y, c.pos.z) ? 1f : 0f;
+        }
+        for (int i = 0; i < game.entities.carcasses.size(); i++) {
+            Carcass c = game.entities.carcasses.get(i);
+            bodies += !c.fragmented() && flaming(cam, c.burn, c.pos.x, c.pos.y, c.pos.z) ? 1f : 0f;
+        }
+        bodies += flamingShare(cam, game.fragments.live) + flamingShare(cam, game.fragments.settled);
+        fireLook.none();
+        bodyFlames.begin(bodies, settings.particleDensity, Math.max(0.3f, Math.min(1f, 1.1f - ambientLight())));
+    }
+
+    /** Average sky ambient, 0 at night to about 0.8 at noon. */
+    private float ambientLight() {
+        return (env.ambientSky.x + env.ambientSky.y + env.ambientSky.z) / 3f;
     }
 
     /**
-     * The draw transform for a body with a {@link BodyPose}.
-     *
-     * <p>Orientation belongs here rather than on the model root: applied after
-     * the heading, {@code rotateZ} is a roll about the body's own spine, which
-     * is what rolling onto a flank means. The trailing translate hangs the
-     * model off the point the pose is positioned by — the torso for a solved
-     * body, the feet for one that never ran through the solver.
+     * How much of the scene behind a flame it covers: enough by day that a
+     * flame stays orange against bright grass and sky, little at night, where
+     * flames are light in the dark.
      */
-    private void bodyTransform(float x, float y, float z, BodyPose pose) {
-        model.identity()
-                .translate(x, y + pose.lift, z)
-                .rotateY(pose.yaw).rotateX(pose.pitch).rotateZ(pose.roll)
-                .translate(0, -pose.pivotY, 0);
+    private float flameOcclusion() {
+        return Math.max(0.12f, Math.min(0.6f, 0.1f + 0.65f * ambientLight()));
+    }
+
+    private boolean flaming(Vector3f cam, com.veylon.entity.BurnResidue burn, float x, float y, float z) {
+        return burn != null && burn.flame() > 0f && inFlameRange(cam, x, y, z);
+    }
+
+    private float flamingShare(Vector3f cam, List<BodyFragment> pieces) {
+        float share = 0f;
+        for (int i = 0; i < pieces.size(); i++) {
+            BodyFragment f = pieces.get(i);
+            share += flaming(cam, f.burn, f.pos.x, f.pos.y, f.pos.z) ? f.burnShare : 0f;
+        }
+        return share;
+    }
+
+    private static boolean inFlameRange(Vector3f cam, float x, float y, float z) {
+        float dx = x - cam.x, dy = y - cam.y, dz = z - cam.z;
+        return dx * dx + dy * dy + dz * dz <= BodyFlames.MAX_DISTANCE * BodyFlames.MAX_DISTANCE;
+    }
+
+    /**
+     * The next body drawn is charred, glows and is lit by its own flames as
+     * {@code look} says; an unburned body gets zeros, so no body's fire is
+     * left on the next one.
+     */
+    private void fireMaterial(BodyFireLook look) {
+        float flicker = 0.86f + 0.14f * (float) Math.sin(fireClock * 13.0 + (look.seed & 1023) * 0.37);
+        entityShader.set("uScorch", look.scorch);
+        entityShader.set("uBurnGlow", look.glow);
+        entityShader.set("uFireLight", look.light * flicker);
+    }
+
+    private void noFire() {
+        entityShader.set("uScorch", 0f);
+        entityShader.set("uBurnGlow", 0f);
+        entityShader.set("uFireLight", 0f);
+    }
+
+    /**
+     * The flames of the body just drawn from {@code root} in {@link #model},
+     * on the parts it was drawn with, leaning with the air past it.
+     */
+    private void attachFlames(Game game, FlameAnchors anchors, ModelPart root, int pieceSeed, float share,
+                              float x, float y, float z, float velX, float velZ) {
+        if (fireLook.flame <= 0f) {
+            return;
+        }
+        Vector3f cam = game.camera.position;
+        float dx = x - cam.x, dy = y - cam.y, dz = z - cam.z;
+        float distance = (float) Math.sqrt(dx * dx + dy * dy + dz * dz);
+        bodyFlames.add(anchors, root, model, fireLook, pieceSeed, share, distance,
+                game.particles.windX() - velX, game.particles.windZ() - velZ);
     }
 
     /** First-person held item, drawn in camera space over the scene. */
@@ -867,6 +972,13 @@ public class Renderer {
         // Camera-space: fake a from-above light.
         entityShader.set("uLightDir", 0.3f, 0.8f, 0.5f);
         setEntityLight(game, game.player.pos.x, game.player.pos.y + 1.2f, game.player.pos.z);
+        // A burning player's flames light the item in hand and lick round its
+        // grip: the item is all of the player the view shows, so the flames go
+        // there and to the edges of the view (the composite), never in front.
+        // The item itself does not char.
+        fireMaterial(fireLook.living(game.player));
+        entityShader.set("uScorch", 0f);
+        entityShader.set("uBurnGlow", 0f);
 
         float motion = settings.motion;
         float swing = game.swingTimer > 0 ? (0.35f - game.swingTimer) / 0.35f : 0;
@@ -888,6 +1000,12 @@ public class Renderer {
                 .scale(viewScale);
         drawModel(heldModel, model);
         entityShader.set("uEmissive", 0f);
+        noFire();
+        int flames = BodyFlames.grip(model, fireLook, gripFlames);
+        if (flames > 0) {
+            particles.renderCameraSpace(gripFlames, flames, proj, (float) fireClock, flameOcclusion());
+            drawCalls++;
+        }
     }
 
     private float heldViewScale(ItemType type) {

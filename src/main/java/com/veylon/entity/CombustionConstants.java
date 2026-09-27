@@ -75,4 +75,11 @@ public final class CombustionConstants {
     public static final int MAX_BURN_RESIDUES = 32;
     /** Longest frame step a residue ages by, so a stall cannot end one in a single frame. */
     public static final float RESIDUE_MAX_STEP = 0.25f;
+
+    /**
+     * Seconds a living body remembers how its last fire went out, so the
+     * flames can die down and steam or smoke after it. Presentation input
+     * only: nothing in the simulation reads it.
+     */
+    public static final float OUT_MEMORY_SECONDS = 3f;
 }

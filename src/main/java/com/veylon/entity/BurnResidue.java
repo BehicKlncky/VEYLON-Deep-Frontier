@@ -41,12 +41,20 @@ public final class BurnResidue {
     int holders;
     /** Whether {@link BurnResidueSystem} is still ageing it; once not, it shows no flame or smoke. */
     boolean tracked;
+    /** The dying body's flicker number ({@link BodyCombustion#flameSeed()}), so its flames go on alike. */
+    final int seed;
 
-    BurnResidue(float scorch, float flame, float flameSeconds, float x, float y, float z) {
+    BurnResidue(float scorch, float flame, float flameSeconds, int seed, float x, float y, float z) {
         this.scorch = scorch;
         this.flame = flame;
         this.flameSeconds = flameSeconds;
+        this.seed = seed;
         anchor(x, y, z);
+    }
+
+    /** The number the dying body's flames flickered by; its remains' flames keep it. */
+    public int seed() {
+        return seed;
     }
 
     /** How scorched the remains look, 0..1. It never fades. */

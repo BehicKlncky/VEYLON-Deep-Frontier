@@ -80,7 +80,7 @@ public final class BurnResidueSystem implements SimulationSystem {
         }
         float flame = b.burning ? b.intensity() : 0f;
         float seconds = b.burning ? Math.clamp(b.fuel, 0f, RESIDUE_FLAME_SECONDS) : 0f;
-        BurnResidue r = new BurnResidue(b.scorch, flame, seconds,
+        BurnResidue r = new BurnResidue(b.scorch, flame, seconds, b.flameSeed,
                 e.pos.x, e.pos.y + e.height * 0.5f, e.pos.z);
         // Rain already on the body counts on: dying does not restart the soak.
         r.soak = b.burning ? b.soak : 0f;

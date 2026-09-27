@@ -52,6 +52,17 @@ public class Environment {
     public final Vector3f gradeTint = new Vector3f(1, 1, 1);
     public float underwater;
     public float vigDamage, vigCold, vigPoison, vigSmokeHeat, heatMix;
+    /**
+     * 0..1 how strongly the player's own body burns, eased: the flames the
+     * composite draws around the edges of the view (never while dead or in
+     * Creative, where the player cannot burn).
+     */
+    public float vigBurn;
+    /** The particle clock those flames flicker by; it holds still while paused. */
+    public float burnTime;
+    private final BodyFireLook burnLook = new BodyFireLook();
+    /** How fast the edge flames follow the player's fire, per second. */
+    private static final float BURN_EASE = 10f;
 
     private final Vector3f tmp = new Vector3f();
 
@@ -211,7 +222,7 @@ public class Environment {
 
         // ---- State vignettes ----
         var p = g.player;
-        vigDamage = clamp(p.damageFlash * 0.8f, 0f, 1f);
+        vigDamage = clamp(BodyFireLook.shownDamageFlash(p) * 0.8f, 0f, 1f);
         if (p.health < 25) {
             vigDamage = Math.max(vigDamage,
                     (0.5f + 0.5f * (float) Math.sin(g.totalTime * 4)) * (1f - p.health / 25f) * 0.5f);
@@ -225,6 +236,13 @@ public class Environment {
         heatMix = hot ? 1f : 0f;
         vigSmokeHeat = p.has(Affliction.SMOKE) ? 0.45f
                 : (hot ? clamp((p.bodyTemp - 40f) / 2f, 0f, 0.6f) : 0f);
+
+        // The player's own fire: the look every other body's fire is drawn from,
+        // eased so it swells as they catch and dies down as it goes out.
+        burnLook.living(p);
+        float burnTarget = p.dead ? 0f : Math.min(1f, burnLook.flame * (1f + 0.3f * burnLook.flare));
+        vigBurn += (burnTarget - vigBurn) * Math.min(1f, dt * BURN_EASE);
+        burnTime = (float) g.particles.time;
     }
 
     private static void desaturate(Vector3f c, float amount) {

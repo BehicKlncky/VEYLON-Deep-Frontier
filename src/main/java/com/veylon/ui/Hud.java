@@ -375,7 +375,7 @@ public class Hud {
     private void renderVignettes(Game g, UiRenderer ui, int w, int h) {
         Player p = g.player;
         if (p.abilities.invulnerable()) return;
-        float red = p.damageFlash * 0.45f;
+        float red = com.veylon.gfx.BodyFireLook.shownDamageFlash(p) * 0.45f;
         if (p.health < 25) {
             red = Math.max(red, (0.5f + 0.5f * (float) Math.sin(g.totalTime * 4))
                     * (1f - p.health / 25f) * 0.30f);

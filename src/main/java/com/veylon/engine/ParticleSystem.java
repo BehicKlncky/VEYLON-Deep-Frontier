@@ -9,7 +9,9 @@ import java.util.Random;
 /**
  * CPU particle simulation drawn by the instanced ParticleRenderer.
  * kind selects the procedural sprite + blend: 0 soft puff, 1 hard dot,
- * 2 velocity-aligned streak (rain), 3 additive spark (embers, beacon motes).
+ * 2 velocity-aligned streak (rain), 3 additive spark (embers, beacon motes),
+ * 4 additive flame tongue (flames licking off a burning body),
+ * 5 haze: a soft, see-through puff that swells as it ages (smoke and steam off a burning body).
  */
 public class ParticleSystem {
 
@@ -18,6 +20,8 @@ public class ParticleSystem {
     public static final byte KIND_DOT = 1;
     public static final byte KIND_STREAK = 2;
     public static final byte KIND_SPARK = 3;
+    public static final byte KIND_FLAME = 4;
+    public static final byte KIND_HAZE = 5;
     private static final float RAIN_WIND_RESPONSE = 1.7f;
     private static final float RAIN_FALL_RESPONSE = 2.5f;
     private static final float RAIN_TERMINAL_BASE = 15f;
@@ -42,6 +46,13 @@ public class ParticleSystem {
     private final float[] maxLife = new float[MAX];
     private final float[] grav = new float[MAX];
     private final boolean[] splash = new boolean[MAX];
+    /**
+     * How fast a particle's velocity relaxes towards the wind (and its fall or
+     * rise towards still air), per second; 0 for the particles that keep the
+     * ballistic flight they always had. Body fire's smoke, embers and flames
+     * leave with the body's own velocity and settle into the wind this way.
+     */
+    private final float[] airResponse = new float[MAX];
     private final RainCollision collision = new RainCollision();
     /** Weather leaves at least 1,200 slots for fire, combat and other effects. */
     public static final int RAIN_LIMIT = 2400, SPLASH_LIMIT = 2800;
@@ -78,6 +89,12 @@ public class ParticleSystem {
     public int collisionProbesLastUpdate;
     public int impactsLastUpdate;
     public int count;
+    /**
+     * Seconds of particle time: advanced only by {@link #update}, which runs
+     * only in simulated frames, so whatever flickers by it (the flames on
+     * burning bodies) holds still while the game is paused.
+     */
+    public double time;
 
     /** 0..1 multiplier applied to emission counts (graphics setting). */
     public float density = 1f;
@@ -90,6 +107,7 @@ public class ParticleSystem {
         // A new dry world must not retain the previous world's voxel data until its first rain.
         collision.reset();
         windX = windZ = 0;
+        time = 0;
     }
 
     public void spawn(byte particleKind, float x, float y, float z,
@@ -114,6 +132,7 @@ public class ParticleSystem {
         maxLife[i] = lifetime;
         grav[i] = gravity;
         splash[i] = false;
+        airResponse[i] = 0f;
     }
 
     /** Compatibility for isolated non-weather effects; rain needs a loaded world to survive. */
@@ -125,6 +144,7 @@ public class ParticleSystem {
     public void update(float dt, World world) {
         collisionProbesLastUpdate = impactsLastUpdate = 0;
         if (!(dt > 0) || !Float.isFinite(dt)) return;
+        time += dt;
         // Descending traversal handles swap removal and appending secondary droplets together:
         // the swapped tail has already been processed, or was just born this frame.
         for (int i = count - 1; i >= 0; i--) {
@@ -137,7 +157,16 @@ public class ParticleSystem {
                 vz[i] += (windZ - vz[i]) * drag;
                 float terminal = RAIN_TERMINAL_BASE + size[i] * RAIN_TERMINAL_SIZE_SCALE;
                 vy[i] += (-terminal - vy[i]) * (1f - (float) Math.exp(-RAIN_FALL_RESPONSE * step));
-            } else vy[i] -= grav[i] * step;
+            } else {
+                if (airResponse[i] > 0f) {
+                    // Carried by the air: towards the wind, and towards still air vertically.
+                    float drag = 1f - (float) Math.exp(-airResponse[i] * step);
+                    vx[i] += (windX - vx[i]) * drag;
+                    vz[i] += (windZ - vz[i]) * drag;
+                    vy[i] -= vy[i] * drag;
+                }
+                vy[i] -= grav[i] * step;
+            }
             float x = px[i] + vx[i] * step, y = py[i] + vy[i] * step, z = pz[i] + vz[i] * step;
             if ((rain || splash[i]) && world != null) {
                 int result = collision.trace(world, px[i], py[i], pz[i], x, y, z);
@@ -163,6 +192,7 @@ public class ParticleSystem {
         vx[i] = vx[last]; vy[i] = vy[last]; vz[i] = vz[last];
         cr[i] = cr[last]; cg[i] = cg[last]; cb[i] = cb[last];
         size[i] = size[last]; kind[i] = kind[last]; splash[i] = splash[last];
+        airResponse[i] = airResponse[last];
         life[i] = life[last]; maxLife[i] = maxLife[last]; grav[i] = grav[last];
     }
 
@@ -170,6 +200,15 @@ public class ParticleSystem {
     public float velocityY(int i) { return vy[i]; }
     public float velocityZ(int i) { return vz[i]; }
     public boolean isRainSplash(int i) { return splash[i]; }
+    /** How fast particle {@code i} settles into the wind; 0 for ballistic particles. */
+    public float airResponse(int i) { return airResponse[i]; }
+    /** Share of particle {@code i}'s life already spent, 0 when born, 1 when it dies. */
+    public float age(int i) { return 1f - life[i] / Math.max(1e-4f, maxLife[i]); }
+    /** A number fixed for particle {@code i}'s whole life, for flicker. */
+    public float seed(int i) { return maxLife[i] * 7.919f; }
+    /** The cosmetic wind particles drift in, m/s. */
+    public float windX() { return windX; }
+    public float windZ() { return windZ; }
 
     /** Smooth cosmetic wind supplied by the rain field, independent of gameplay weather RNG. */
     public void setRainWind(float x, float z) { windX = x; windZ = z; }
@@ -532,6 +571,88 @@ public class ParticleSystem {
                     s, s, s + 0.03f,
                     0.28f + rng.nextFloat() * 0.22f, 1.0f + rng.nextFloat() * 0.8f, -0.3f);
         }
+    }
+
+    // ------------------------------------------------------------------
+    // Burning bodies. Each leaves the body with the body's own velocity and
+    // settles into the wind (airResponse), so a running body trails its smoke.
+    // All stop at SPLASH_LIMIT, like burning liquid, and follow the density.
+    // ------------------------------------------------------------------
+
+    /** How fast a flame, an ember, smoke and steam off a body settle into the wind, per second. */
+    private static final float LICK_AIR = 3f, EMBER_AIR = 0.8f, SMOKE_AIR = 1.1f, STEAM_AIR = 1.6f;
+    /** Upward pull on a body's flame, smoke and steam (negative gravity), m/s². */
+    private static final float LICK_LIFT = 2.5f, SMOKE_LIFT = 1.1f, STEAM_LIFT = 1.8f;
+
+    /**
+     * A tongue of flame licking up off a burning body at {@code (x, y, z)}: it
+     * leaves with the body's velocity, rises and shrinks away within half a
+     * second. {@code width} is the flame the anchor holds, {@code heat} 0..1
+     * turns it from deep orange to yellow.
+     *
+     * @return whether a particle was added
+     */
+    public boolean bodyLick(float x, float y, float z, float velX, float velY, float velZ,
+                            float width, float heat) {
+        if (count >= SPLASH_LIMIT || scaled(1) < 1) {
+            return false;
+        }
+        float h = unit(heat);
+        int i = count;
+        spawn(KIND_FLAME, x + rnd(width * 0.3f), y + rng.nextFloat() * width * 0.3f, z + rnd(width * 0.3f),
+                velX + rnd(0.25f), velY + 1.0f + rng.nextFloat(), velZ + rnd(0.25f),
+                1f, 0.42f + 0.3f * h + rnd(0.05f), 0.07f + 0.1f * h,
+                width * (0.55f + 0.35f * rng.nextFloat()), 0.22f + rng.nextFloat() * 0.2f, -LICK_LIFT);
+        airResponse[i] = LICK_AIR;
+        return true;
+    }
+
+    /** One ember thrown up off a burning body; it glows, drifts and falls. */
+    public boolean bodyEmber(float x, float y, float z, float velX, float velY, float velZ) {
+        if (count >= SPLASH_LIMIT || scaled(1) < 1) {
+            return false;
+        }
+        int i = count;
+        spawn(KIND_SPARK, x + rnd(0.1f), y, z + rnd(0.1f),
+                velX * 0.8f + rnd(0.7f), velY * 0.5f + 1.2f + rng.nextFloat() * 1.6f, velZ * 0.8f + rnd(0.7f),
+                1f, 0.45f + rng.nextFloat() * 0.3f, 0.1f,
+                0.035f + rng.nextFloat() * 0.03f, 0.8f + rng.nextFloat() * 0.8f, 1.4f);
+        airResponse[i] = EMBER_AIR;
+        return true;
+    }
+
+    /**
+     * A puff of smoke off a burning body, {@code size} across: sooty while the
+     * flames are strong, greyer as they weaken ({@code flame} 0..1).
+     */
+    public boolean bodySmoke(float x, float y, float z, float velX, float velY, float velZ,
+                             float size, float flame) {
+        if (count >= SPLASH_LIMIT || scaled(1) < 1) {
+            return false;
+        }
+        float s = 0.13f + 0.12f * (1f - unit(flame)) + rnd(0.03f);
+        int i = count;
+        spawn(KIND_HAZE, x + rnd(0.08f), y, z + rnd(0.08f),
+                velX + rnd(0.2f), velY + 0.4f + rng.nextFloat() * 0.4f, velZ + rnd(0.2f),
+                s, s * 0.95f, s * 0.9f,
+                size * (0.8f + 0.5f * rng.nextFloat()), 1.6f + rng.nextFloat() * 1.2f, -SMOKE_LIFT);
+        airResponse[i] = SMOKE_AIR;
+        return true;
+    }
+
+    /** A puff of steam off a body that water or rain is putting out: pale, quick, rising. */
+    public boolean bodySteam(float x, float y, float z, float velX, float velY, float velZ, float size) {
+        if (count >= SPLASH_LIMIT || scaled(1) < 1) {
+            return false;
+        }
+        float s = 0.82f + rng.nextFloat() * 0.12f;
+        int i = count;
+        spawn(KIND_HAZE, x + rnd(0.1f), y, z + rnd(0.1f),
+                velX + rnd(0.2f), velY + 0.6f + rng.nextFloat() * 0.6f, velZ + rnd(0.2f),
+                s, s, s + 0.03f,
+                size * (0.8f + 0.5f * rng.nextFloat()), 0.8f + rng.nextFloat() * 0.5f, -STEAM_LIFT);
+        airResponse[i] = STEAM_AIR;
+        return true;
     }
 
     /**
