@@ -15,6 +15,7 @@ import com.veylon.world.Chunk;
 import org.junit.jupiter.api.Test;
 
 import static com.veylon.entity.CombustionConstants.AFTERBURN_DPS_PLAYER;
+import static com.veylon.entity.CombustionConstants.CONTACT_DPS_NPC;
 import static com.veylon.entity.CombustionConstants.CONTACT_DPS_PLAYER;
 import static com.veylon.entity.CombustionConstants.FADE_SECONDS;
 import static com.veylon.entity.CombustionConstants.MIN_INTENSITY;
@@ -28,8 +29,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * Body fire inside the real game loop: {@code Game.fastTick}'s order (needs,
  * then fire, then AI, physics and deaths), the scheduler's frame partitions,
  * the medium tick, the death transition, respawn, kill credit and the medical
- * burn injury. Contacts come from the public combustion commands; the
- * production flame sources are connected in milestone 07.
+ * burn injury. Most contacts come from the public combustion commands; one
+ * test throws a real bottle with the player's own command. The flame sources
+ * themselves are {@code entity.FlameSourceIgnitionTest}'s subject.
  */
 class CombustionIntegrationTest {
 
@@ -300,6 +302,50 @@ class CombustionIntegrationTest {
         }
         assertTrue(treated.player.health < health, "the flames still hurt");
         assertFalse(treated.player.has(Affliction.BURN), "and one episode leaves one injury");
+    }
+
+    /**
+     * The player's own throw command, the projectile's flight and the whole
+     * game tick: the bottle sets a villager alight, the villager stands in
+     * its pool over a buried burning log, and four medium ticks later has
+     * lost exactly the body fire's contact damage. The block and liquid fires'
+     * medium ticks hurt nobody of their own any more, so nothing is counted
+     * twice and heat does not come up through the floor.
+     */
+    @Test
+    void aBottleThrownThroughTheRealLoopBurnsExactlyOnceAndOnlyThroughTheBodyFire() {
+        Game g = arena();
+        g.world.setBlock(314, 38, 310, BlockType.LOG, false);
+        assertTrue(g.fire.ignite(g, 314, 38, 310), "precondition: a burning log under the floor");
+        Npc villager = g.entities.spawnNpc(g.world, "Villager", 314.5f, FEET, 310.5f);
+        villager.maxHealth = villager.health = 500f;
+        g.player.pos.set(310.5f, FEET, 310.5f);
+        g.camera.position.set(310.5f, FEET + 1.6f, 310.5f);
+        g.player.inventory.set(0, new ItemStack(ItemType.FIRE_BOMB, 1));
+        g.player.hotbarSel = 0;
+
+        org.joml.Vector3f atFeet = new org.joml.Vector3f(4f, -1.5f, 0f).normalize();
+        assertTrue(g.updateThrownWeaponCommand(2f, true, atFeet));
+        for (int i = 0; i < 300 && g.projectiles.liveCount() > 0; i++) {
+            g.projectiles.update(g, 0.01f);
+        }
+        assertEquals(0, g.projectiles.liveCount(), "the bottle broke");
+        assertTrue(g.combustion.isBurning(villager), "and set the villager alight");
+        assertEquals(1, g.combustion.burningBodies(g), "nobody else: the thrower stands clear of the pool");
+
+        float before = villager.health;
+        for (int t = 1; t <= 40; t++) {
+            g.fastTick(DT);
+            if (t % 10 == 0) {
+                g.mediumTick(SimulationScheduler.MEDIUM_DT);
+            }
+            assertTrue(villager.combustion.inContact(), "standing in the pool, tick " + t);
+        }
+        float intensity = villager.combustion.intensity();
+        assertEquals(CONTACT_DPS_NPC * intensity * 40 * DT, before - villager.health, 1e-2f,
+                "two seconds at the contact rate, nothing added by the fire systems' medium ticks");
+        assertTrue(villager.lastHitByPlayer, "the thrower's burn");
+        assertFalse(g.player.combustion.burning());
     }
 
     @Test

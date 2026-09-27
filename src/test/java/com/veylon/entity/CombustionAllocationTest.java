@@ -3,8 +3,11 @@ package com.veylon.entity;
 import com.sun.management.ThreadMXBean;
 import com.veylon.Game;
 import com.veylon.settlement.SettlementManager;
+import com.veylon.simulation.FireSystem;
+import com.veylon.simulation.LiquidFireConstants;
 import com.veylon.simulation.SimulationScheduler;
 import com.veylon.simulation.WeatherSystem.Weather;
+import com.veylon.util.Vec3i;
 import com.veylon.world.BlockType;
 import org.junit.jupiter.api.Test;
 
@@ -19,14 +22,14 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * measured with the thread's allocation counter, in the default suite.
  *
  * <p>A crowd at the NPC cap plus a herd. Nobody burning is the usual case and
- * must cost nothing at all. Everybody burning is the worst case: half the crowd
- * in contact every tick (the candidate, refresh and contact-damage path), half
- * in afterburn (fuel, fade and drain), some of them in shallow water under a
- * roof, and a herd in open rain that is put out and caught again. Its only
- * allocation is {@code World.getChunk} boxing its map key when consecutive
- * bodies stand in different chunks (about 80 bytes each), which every
- * entity's physics step already pays; the allowance is the ragdoll and
- * fragment steps' 4 KB.
+ * must cost nothing at all, contact sampling included. Everybody burning is the
+ * worst case of the fire itself: half the crowd in contact every tick (the
+ * candidate, refresh and contact-damage path), half in afterburn (fuel, fade
+ * and drain), some of them in shallow water under a roof, and a herd in open
+ * rain that is put out and caught again. Every flame at its cap is the worst
+ * case of contact sampling. Since {@code World.getChunk} stopped boxing its
+ * key for recently used chunks, only a body standing in a campfire allocates
+ * (the fuel map's key); the allowance is the ragdoll and fragment steps' 4 KB.
  */
 class CombustionAllocationTest {
 
@@ -64,6 +67,75 @@ class CombustionAllocationTest {
         assertTrue(g.combustion.totalRainedOut >= CREATURES, "the herd was put out by the rain");
         assertTrue(g.combustion.totalIgnitions > SettlementManager.MAX_ACTIVE_NPCS + CREATURES,
                 "and caught again");
+        assertTrue(bytes < BYTES_PER_TICK_ALLOWANCE, "the combustion tick allocated " + bytes
+                + " bytes/tick, over the " + BYTES_PER_TICK_ALLOWANCE + " byte allowance");
+    }
+
+    /**
+     * Every kind of flame at its cap around a crowd that keeps moving: the
+     * liquid's 160 patches under one row of people, 220 burning bushes under
+     * the herd, torches and fueled campfires in the other row's cells. Every
+     * body sweeps a new box each tick and touches something, so this is the
+     * contact sampling's worst case, held to the same allowance.
+     */
+    @Test
+    void touchingEveryKindOfFlameAtItsCapStaysWithinTheHotPathAllowance() {
+        Game g = BodyCombustionTest.arena();
+        // Eight bottles in a row: the ninth, 176 patches, runs past the cap and
+        // the first pool loses its middle, so nobody stands in that one.
+        for (int bottle = 0; bottle < 8; bottle++) {
+            g.liquidFire.spill(g, 292.5f + bottle * 8f, 40.5f, 300.5f, 0, 0, bottle % 2 == 0);
+        }
+        for (int i = 0; i < SettlementManager.MAX_ACTIVE_NPCS; i++) {
+            if (i < 22) {
+                g.entities.spawnNpc(g.world, "Bather", 300.5f + (i % 7) * 8f, 40f, 299.5f + i / 7);
+                continue;
+            }
+            Vec3i cell = new Vec3i(288 + (i - 22) * 3, 40, 306);
+            g.world.setBlock(cell.x(), cell.y(), cell.z(), i % 4 == 0 ? BlockType.CAMPFIRE : BlockType.TORCH, false);
+            g.world.campfireFuel.put(cell, 1_000f);
+            g.entities.spawnNpc(g.world, "Villager", cell.x() + 0.5f, 40f, cell.z() + 0.5f);
+        }
+        Creature.CreatureType[] species = Creature.CreatureType.values();
+        for (int i = 0; i < CREATURES; i++) {
+            g.entities.spawnCreature(g.world, species[i % species.length],
+                    290.5f + (i % 18) * 3f, 40f, 330.5f + (i / 18) * 6f);
+        }
+        int[] rows = {330, 336, 333, 331};
+        for (int z : rows) {
+            for (int x = 288; x < 352 && g.fire.count() < FireSystem.MAX_ACTIVE_FIRES; x++) {
+                g.world.setBlock(x, 40, z, BlockType.BUSH, false);
+                g.fire.ignite(g, x, 40, z, z == 330, 3);
+            }
+        }
+        assertEquals(LiquidFireConstants.MAX_PATCHES, g.liquidFire.count(), "precondition: every patch in use");
+        assertEquals(FireSystem.MAX_ACTIVE_FIRES, g.fire.count(), "precondition: every fire slot in use");
+
+        ThreadMXBean bean = (ThreadMXBean) ManagementFactory.getThreadMXBean();
+        long thread = Thread.currentThread().threadId();
+        long before = 0;
+        for (int t = 0; t < WARMUP_TICKS + MEASURED_TICKS; t++) {
+            if (t == WARMUP_TICKS) {
+                before = bean.getThreadAllocatedBytes(thread);
+            }
+            float step = t % 2 == 0 ? 0.4f : -0.4f;
+            for (int i = 0; i < g.entities.npcs.size(); i++) {
+                Npc n = g.entities.npcs.get(i);
+                n.health = n.maxHealth;
+                n.pos.x += step;
+            }
+            for (int i = 0; i < g.entities.creatures.size(); i++) {
+                Creature c = g.entities.creatures.get(i);
+                c.health = c.maxHealth;
+                c.pos.x += step;
+            }
+            g.combustion.fastTick(g, DT);
+        }
+        long bytes = (bean.getThreadAllocatedBytes(thread) - before) / MEASURED_TICKS;
+        System.out.println("combustion allocation, every flame at its cap: " + bytes + " bytes/fast tick");
+
+        assertEquals(SettlementManager.MAX_ACTIVE_NPCS + CREATURES, g.combustion.burningBodies(g),
+                "every body touched a flame and burns");
         assertTrue(bytes < BYTES_PER_TICK_ALLOWANCE, "the combustion tick allocated " + bytes
                 + " bytes/tick, over the " + BYTES_PER_TICK_ALLOWANCE + " byte allowance");
     }
