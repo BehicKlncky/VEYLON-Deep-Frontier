@@ -30,7 +30,8 @@ Checkpoints by milestone (filled in by the following milestone):
 | 06 | `f863a66e669215d1313c3e7782c051f925c2cf49` — `feat(fire): give every living body one fire on its own clock`; `fae46fa4fa8f7b42490a5c7362c466982df637e5` — `test(fire): pin one fire per living body for every kind of body`; `a5882236a95ad4cc1e6589c7a5686d56d39e60f0` — `docs(combat): record shared body combustion` |
 | 07 | `1397b34d44a802b1ae0ff0a36ec0a2645626db44` — `perf(world): resolve recent chunks without boxing their key`; `5985785ab8ebbbf53efcebf576fcf19d91a5ef73` — `feat(fire): set living bodies alight from every real flame`; `621497e72167074a28e1d563aa974d6a8e3b0f72` — `test(fire): pin how every real flame sets every kind of body alight`; `67fa9b4eb194776258ef0d5206a68c754d307e3a` — `docs(combat): record fire sources connected to living bodies` |
 | 08 | `ea4befcd1f7f2fa95d016980ec3563892b13991a` — `feat(ai): make burning people and animals flee their own fire`; `be8784c31136ddaf7804d7015ec54509d856f0d8` — `test(ai): pin fire panic for every body and the player's untouched control`; `f0edea276c2fe4cfbf84d4698792d2d92596b97c` — `docs(combat): record fire panic` |
-| 09 | reported in the milestone 09 handoff; record here in 10 |
+| 09 | `d27765ca236c196d06613cfedfe12c46a6a7d274` — `feat(fire): hand a dying body's fire to its remains and to nothing else`; `c2808c74c056b6648ce10f78a566105ccfad5750` — `test(fire): pin body fire across death, saves, departures, modes, pause and sleep`; `f917f151e18422a1ecf261ba1771a0f3979e43ac` — `docs(combat): record combustion lifecycle` |
+| 10 | reported in the milestone 10 handoff; record here in 11 |
 
 ## Status
 
@@ -45,7 +46,7 @@ Checkpoints by milestone (filled in by the following milestone):
 | 07 | Connect all fire sources | **Complete** (every real flame and a bottle breaking on a body set bodies alight; legacy contact damage gone; people and animals keep out of torches and campfires) |
 | 08 | NPC and animal fire panic | **Complete** (every burning person and animal flees, then decides afresh; the player keeps every control) |
 | 09 | Combustion lifecycle | **Complete** (a burning death hands its fire to the one body it leaves; departures, saves, loads, resets, modes, pause and sleep leave no stale fire or panic) |
-| 10 | Body fire presentation | Not started |
+| 10 | Body fire presentation | **Complete** (flames on the drawn pose of every body and its remains, char, smoke, embers, steam, first-person cues, sound; presentation only) |
 | 11 | End-to-end validation | Not started |
 | 12 | Merge and push | Not started |
 
@@ -62,7 +63,11 @@ flames and scorch on the one body it becomes (ragdoll, then corpse or carcass, o
 sharing one fire) for a few seconds; whichever lethal cause comes first decides the death; a body
 that leaves the world without dying takes no fire, panic or body with it; saving leaves fires
 burning and loading, a new world, respawn and Creative start without them; only simulated frames
-advance any of it, and nobody sleeps through a fire.
+advance any of it, and nobody sleeps through a fire. Since 10 a burning body is seen and heard
+burning: flame tongues stand on the limbs of the pose it is drawn in (living, falling, dead or in
+pieces) and climb from where it caught, it chars as it burns, gives off licks of flame, embers and
+smoke that trail it on the wind, steams when water or rain puts it out, and crackles; the player sees
+their own fire at the edges of the view and round the item in hand, never inside the camera.
 
 ## Milestone 01 — source audit and contract (2026-09-26)
 
@@ -1236,3 +1241,212 @@ letting fires go, and the residue's fields all primitive.
   change, pause and sleep, one cause and one record, one reward across transitions) is
   `CombustionLifecycleTest`; `RemainsPersistenceTest` and `RemainsSectionTest` keep the save format.
 - Open for the user (from 08, unchanged): caged captives spawn with their heads in the cage roof.
+
+## Milestone 10 — body fire presentation (2026-09-27)
+
+### Start state
+
+- Branch `feature/all-living-dismemberment-combustion`, tip `f917f15` (milestone 09); the three 09
+  checkpoints are now recorded in the table above. `git fetch origin`: `origin/main` still `3704f4d`.
+  Working tree clean apart from the user's untracked `.agents/` and `AGENTS.md`, which stay untracked.
+- Same host and portable Temurin 25.0.4.1+1 JDK; Gradle 9.1.0, `--no-daemon --console=plain`.
+  GPU: NVIDIA GeForce RTX 3060 Ti, OpenGL 3.3 core with KHR_debug, 1280 × 720 framebuffer.
+- Read: `AGENTS.md`, the pack's `00_BASE_KNOWLEDGE.md` and `10_REALISTIC_BODY_FIRE_PRESENTATION.md`,
+  contract §1, §10, §14.2, §15, §16, §18, this file's 04/06/07/08/09 handoffs to 10, `ART_DIRECTION.md`,
+  `AUDIO_DESIGN.md`, the QA section of `DEVELOPING.md`.
+- Predecessors checked in source: 06's read-only `BodyCombustion` getters and scorch; 08's
+  `PanicIntent`; 09's `BurnResidue` on `Ragdoll`/`HumanCorpse`/`Carcass`/`BodyFragment` with
+  `burnShare`, aged only in `Game.advanceWorld`. Nothing drew any of it (the player's red flash was
+  the only feedback).
+
+### Seams found
+
+| Anchor | Finding | Used as |
+| --- | --- | --- |
+| `Renderer.renderEntities` | Every body posed from a shared model right before its draw; four near-copies of the posing code (living, ragdoll, corpse/carcass, piece) | Extracted into `gfx/model/BodyPosing`, the one posing path the renderer, the flames and the emitters share |
+| `ModelPart.render` | Matrix chain `T(pivot + pose)·Rz·Ry·Rx·S`, visibility skips a subtree | Replicated exactly by `FlameAnchors.sample` (a fixed matrix stack) |
+| `ParticleSystem`/`ParticleRenderer` | 13-float instances, two passes, a pinned layout in `PhysicalRainTest`; no drag, no clock, `totalTime` is wall clock (runs while paused) | Layout kept; velocity slot reused by flame sprites; a per-particle air response and a particle clock added |
+| `entity.frag` | `uTintMul`, `uEmissive` per body; no local coordinates | Box-local metres from `uModel`'s column lengths; char, ember glow and self-light uniforms |
+| `post_final.frag` / `Environment` | State vignettes computed per frame (damage, cold, poison, smoke/heat) | Burn fringe added beside them |
+| `AmbienceSystem.updateEmitters` | Runs only in `advanceWorld` (simulated frames), 0.12 s cadence, own presentation RNG | Home of `BodyFireEffects` |
+| `AudioManager`/`VoicePool` | 24 voices by priority class, positioned fire loop driven by `updateAmbienceMix`, detail pops on the ambience bus | New one-shots, loop hand-over |
+| `QaHarness` | 1,479 of 1,500 lines | Scenes in a new `BodyFireQaScene`, 9 lines of wiring (1,488) |
+| `Game` | 990 of 1,000 lines | Untouched |
+
+### Commands and results
+
+All from the repository root in PowerShell with the portable JDK on `PATH`. Logs are in the
+git-ignored `build/` directory.
+
+| Command | Result |
+| --- | --- |
+| `.\gradlew.bat compileJava compileTestJava installDist` (after each change set) | BUILD SUCCESSFUL (`build/m10-compile.log`). |
+| `.\gradlew.bat test` with the production changes in and no test changed (first working version) | **1388 tests in 136 classes, 0 failures** (`build/all-living-m10-existing.log`). |
+| `.\gradlew.bat test --tests com.veylon.gfx.* --tests com.veylon.BodyFireEffectsTest --tests com.veylon.BodyFireQaSceneTest --tests com.veylon.engine.BodyFireSoundsTest --tests com.veylon.qa.RuntimeBoundsTest` | First run of the new classes 71 of 73 green. Both failures were test design: a `burning()` helper that burned the whole crowd 1.2 s after *each* ignition (early bodies burned out), and the legacy-NPC cap tripped by forty unaffiliated test people (now only the fire's own limits are asserted). A new order-independence test then **found a real fairness bug**: each piece of a blown-apart body took a whole body's flame budget, and the renderer drew remains before the living, so a field of burning pieces could starve living bodies of flames. Fixed (a piece's budget is `floor(share × per-body budget)`, the living are drawn first). Then green (`build/all-living-m10-new.log`). |
+| Mutation check (scratchpad `m10-mutation.ps1`: one production mutation at a time over the new test classes and the new `RuntimeBoundsTest` case, each file restored in `finally` and its hash compared; LF patterns) | **31 of 36 caught** on the first pass, none unapplied, every hash matched (`build/all-living-m10-mutation.log`). Survivors: wrong rotation order (living gaits rotate each part about one axis only), flames allowed on glowing parts (equivalent today: every glowing box is also under the size floor), remains' flames frozen at death (the test asserted "never rises", not "falls"), no per-body particle cap (the scenario could not exceed 6), and the out memory kept across a new life (equivalent in the look). Five tests added or tightened (a falling body's multi-axis pose, a synthetic model with a large glowing box, remains that do die down, a nearly rained-out thornhorn, a douse then a new life); **all five caught on the rerun** (`m10-mutation-rerun.ps1`, `build/all-living-m10-mutation-rerun.log`): **36 of 36**. |
+| Throwaway CPU probe (a test class run once, then deleted) | 24 burning bodies: flames built in **0.026 ms** a frame (896 tongues), an emitter pass **0.026 ms** (0.004 ms a frame at 60 fps) — **0.029 ms per frame**; 75 burning bodies: **0.082 ms** per frame (975 tongues: the cap shares them out) (`build/all-living-m10-probe.log`). Not the reference host; the contract's proposed 0.5 ms target is not a gate. |
+| `.\gradlew.bat build --rerun-tasks` (the tree committed below) | **BUILD SUCCESSFUL in 14 m 10 s: 1462 tests in 142 classes, 0 failures, 0 errors, 0 skipped**; `javadoc` (doclint) and `check` executed (`build/all-living-m10-build.log`). 09 ended at 1385 in 136; the existing suite alone ran 1388 in 136 with this milestone's production changes. |
+
+Not run: `performanceTest` (this host is not the reference machine and its durable-save gate fails
+regardless of code changes).
+
+### What was built
+
+Rules, API, budgets and the changes from the proposals are in contract §16.1 (with §15 and §18).
+
+| Path | Change |
+| --- | --- |
+| `entity/BodyCombustion.java`, `CombustionSystem.java`, `CombustionConstants.java` | Presentation-only, read-only memory: `outSeconds()`, `outIntensity()`, `outDoused()` (`putOut(doused)` at every extinction, `ageOut` on the fast tick, `OUT_MEMORY_SECONDS` 3 s), `episodes()`, `flameSeed()` (from the touch point and the episode, set at ignition), `touchX/Y/Z()` (the touch point from the body's feet). Nothing in the simulation reads them; `clear()` forgets them. |
+| `entity/BurnResidue.java`, `BurnResidueSystem.java` | `seed()` copied at capture. |
+| `gfx/BodyFireLook.java` (new) | The one mapping from a living fire or a residue to its look; `shownDamageFlash(Player)`. |
+| `gfx/model/FlameAnchors.java` (new) | Per-family anchors on the real boxes (anatomy by area, worn parts by count), sampled on the posed tree without allocation. |
+| `gfx/model/BodyPosing.java` (new) | The one posing path for every kind of body (and `bodyFrame`, moved out of `Renderer`). |
+| `gfx/BodyFlames.java` (new) | Per-frame flame tongues, cores and glows; shared cap, piece shares, distance detail, lean; `grip` flames in camera space. |
+| `gfx/ParticleRenderer.java` | Third, premultiplied pass for body flames and camera-space grip flames; flame and haze packing; uniforms `uTime`, `uFogStart/End`, `uPremultiply`, `uOcclusion`. |
+| `engine/ParticleSystem.java` | `KIND_FLAME`, `KIND_HAZE`, per-particle `airResponse` (drag towards the wind), `time` (the particle clock), `windX/Z()`, `age(i)`, `seed(i)`; `bodyLick`, `bodyEmber`, `bodySmoke`, `bodySteam`. Old kinds behave as before. |
+| `engine/Renderer.java` | Uses `BodyPosing`; per-body char/glow/light uniforms, zeroed after every body; flames for the living, then ragdolls, corpses, carcasses and pieces; grip flames and firelight on the held item; `bodyFlamesDrawn`, `burningBodiesDrawn` stats. |
+| `shaders/particle.vert`, `particle.frag` | Sprite 4: base-anchored, world-up, leaning, flickering, fogged flame tongue with a torn edge and hot core; premultiplied output. |
+| `shaders/entity.vert`, `entity.frag` | `vLocal`; `uScorch`, `uBurnGlow`, `uFireLight`, `uFireTime`. |
+| `shaders/post_final.frag`, `gfx/PostProcessor.java`, `gfx/Environment.java` | `uBurn`/`uBurnTime`: two rows of flame tongues at the bottom edge and lower corners, thin side flames, a warm wash; `vigBurn`, `burnTime`; the damage vignette shows only the flash above the afterburn floor. |
+| `ui/Hud.java` | The red HUD edges likewise. |
+| `BodyFireEffects.java` (new), `AmbienceSystem.java` | Released particles and sound on the ambience cadence; fire-loop hand-over in `updateAmbienceMix`; reset with the world. |
+| `engine/BodyFireSounds.java` (new), `ProceduralAudio.java`, `AudioManager.java` | `BodyCrackle`, `BodyFlare`, `BodySizzle` (own generator, made last); `playBodyCrackle/Flare/Sizzle`. |
+| `BodyFireQaScene.java` (new), `QaHarness.java` | Ten capture scenes (below); per-second report lines with the frame time. |
+| tests | New: `gfx/FlameAnchorsTest` (30), `gfx/BodyFireLookTest` (9), `gfx/BodyFlamesTest` (12), `BodyFireEffectsTest` (10), `BodyFireQaSceneTest` (9), `engine/BodyFireSoundsTest` (3), fixture `BodyFireArena`; `qa/RuntimeBoundsTest` + 1. |
+| docs | contract §15, §16.1 (new), §18; `ARCHITECTURE.md` (collaborators, a presentation paragraph); `DEVELOPING.md` (scene list, "Burning bodies QA and contributor rules"); `audio/AUDIO_DESIGN.md` ("Burning bodies"). |
+
+### Visual QA
+
+- **Commands.** After `.\gradlew.bat installDist`, per run in PowerShell:
+  `$env:VEYLON_SEED='20260919'; $env:VEYLON_SCENE='<scene>'; $env:VEYLON_SHOT='<shots>';
+  $env:VEYLON_CAPTURE_TAG='<tag>'; java --enable-native-access=ALL-UNNAMED -Xmx2G
+  '-Dveylon.dataDir=build/qa/all-living-m10' -cp 'build/install/veylon/lib/*' com.veylon.Main`, with the
+  shots listed in `DEVELOPING.md` ("Burning bodies QA"). Low settings: a first run with
+  `VEYLON_FRONTEND=options VEYLON_QA_SET_OPTIONS='particleDensity=0.25,bloom=false,shadowQuality=0'`
+  persisted them into `build/qa/all-living-m10-low`, then `body_fire_row` ran there (the option hook only
+  acts on the title options screen). Frame time: `VEYLON_VSYNC=0` runs of `body_fire_row`,
+  `body_fire_row_night`, `body_fire_panic` and `body_fire_blast`, one shot each.
+- **Captures** (git-ignored, not committed): `build/qa/all-living-m10/screenshots/` and
+  `build/qa/all-living-m10-low/screenshots/`; run logs beside them. The final round, taken with the
+  committed code (55 images, every run `glErrors=0 khrErrors=0`): `row_final_{0,1,3,6,8,10}s`,
+  `night_final_{0,1,3,6,8,10}s`, `close_final_{0,1,3,6,8}s`, `out_final_{2,3,4,5,8}s`,
+  `blast_final_{1,2,3,5,9}s`, `panic_final_{0,1,2,4,6,9}s`, `bird_final_{0,1,2,3,4}s`,
+  `rain_final_{1,2,3,5,8}s`, `ragdoll_final_{1,2,3,4,7,10}s`, `player_final_{0,1,3,5,6,8}s`; low settings
+  `row_low_{0,3,6,8}s`; frame-time runs `perf_{row,night,panic,blast}_*`. Earlier rounds (`*_v1` to
+  `*_v5`) are the iterations below.
+- **Iterations the images drove** (each a real defect seen in a capture, fixed, recaptured):
+  1. `row_v1`: flames were small yellow tufts nobody would read as a burning body, smoke opaque dark
+     balls, char round "leopard" spots with bright rims → larger, denser, brighter tongues with cores;
+     a see-through, swelling haze kind for smoke and steam; warped char with a thin ember line.
+  2. `row_v2`/`close_v2`: flames white-hot in daylight (additive over a bright scene tonemaps to
+     white) → a premultiplied flame pass that covers part of what is behind it by day.
+  3. `night_v3`: the per-body glow showed as round discs, and self-light turned clothing yellow →
+     glow a third as strong and scaled down by day, self-light lowered.
+  4. `bird_v4`: three burning birds drew no flames for their first second → the flames' climb from
+     the touch point used a world point the fast bird had left behind; the touch point is now kept
+     relative to the body.
+  5. `panic_v4`/`ragdoll_v4`: a near wall filled the frame; the weak crowd ran out of shot before
+     falling; the trader "moved on" (trader AI departs) → raised viewpoint on a pillar, the ragdoll
+     scene staged in the yard, the departing-trader flag only in held scenes.
+  6. `player_v4`: the first-person fringe read as a flat orange band, and the afterburn's standing
+     red flash drew flat red HUD rectangles over it → two rows of individual tongues; the red edges
+     show only the flash above the afterburn floor.
+  7. `night_final` (first pass): each body's glow was still a disc about 4 m across (sized by the
+     number of tongues) → sized by how far the body's flames actually spread, at most 3 m.
+- **Inspected in the final images:**
+  - *Catching and climbing:* at 1.3 s (`row_final_1s`, `close_final_1s`) the flames stand low on the
+    bodies and over the lower limbs, at 3 s they cover every body; birds alight in flight
+    (`bird_final_1s`) carry small flames at once (iteration 4).
+  - *Flames follow limbs:* legs, arms, heads, tails and wings carry their own tongues in the pose
+    drawn — mid-stride legs in the panic yard (`panic_final_2s`), a hovering bird's wings, pieces
+    tumbling in the air (`blast_final_2s`), collapsing bodies (`ragdoll_final_2s`); running bodies
+    trail their flames and smoke behind them.
+  - *Species scale:* a bird wears a few small tongues, a hare few, a thornhorn a broad fire over its
+    back (`row_final_3s`); no body is a solid orange box; neighbouring tongues flicker apart.
+  - *Late burn and extinction:* at 6 s fewer, smaller tongues, thin ember lines along the char and
+    more smoke (`row_final_6s`, `night_final_6s`); at 8 s smoke wisps rise from burned-out bodies
+    (`close_final_8s`); in the rain the open bodies steam and go out while the three under the roof
+    burn on (`out_final_4s`), the one with its feet in water went out first.
+  - *Scorch:* every body chars by its own burn — the roofed ones in `out_final_8s` far more than the
+    ones the rain saved; species colours, the deer's glow spots and each person's kit (vest, raider
+    red, trader pack, brute plates) show between the char (`row_final_10s`, `close_final_8s`).
+  - *Remains:* burning ragdolls settle into burning corpses and carcasses that smoke after
+    (`ragdoll_final_{3,7}s`); blast pieces burn in flight and at rest and then smoke
+    (`blast_final_{2,3,5}s`); no fire stays at a body's old position, no second body appears.
+  - *Day and night:* by day the flames stay orange against grass and sky; at night the bodies are
+    lit by their own flames with a halo that hugs them (`night_final_3s`).
+  - *Occlusion:* the roof in `out_final` and the roof slab over half the yard in `rain_v5_3s` hide
+    what is under them from above; walls hide what is behind them.
+  - *First person:* separate tongues along the bottom edge and up the lower corners, the crosshair
+    and the middle of the view clear, flames at the axe's grip, the burning guard ahead readable
+    (`player_final_1s`); the rain puts the player out and the fringe fades (`player_final_6s`).
+  - *Low settings* (`row_low_3s`, particle density 0.25, no bloom, no shadows): every body still
+    reads as burning with about half the tongues.
+- **Measured natively (vsync off, RTX 3060 Ti, 1280 × 720):** `body_fire_row` 0.71–0.75 ms a frame
+  with 11 bodies alight (645 tongues drawn) against 0.68–0.71 ms once they are out; night 0.72–0.75
+  against 0.71–0.72; the panic yard 0.76–0.79 with 7–8 alight; blast pieces 0.79–0.86 while they burn
+  and fly against 0.75–0.76 at rest. Body flames add one draw submission (`particleSubmissions=3`)
+  while shown. The first second of every run (1.3–1.4 ms) is start-up.
+- **Not visually verified:** macOS; other GPUs and drivers; 4096 shadows and render distances
+  other than the default; the pause menu over a burning scene (QA scenes step their own world, so a
+  native pause proves nothing; the source gate is `Game.simulates()` → `advanceWorld`, which is the
+  only caller of the emitters and the particle clock); a burning body inside a building with a low
+  ceiling; the fire loop's hand-over by ear.
+
+### Evidence of the decisions
+
+- **One look for everything.** Flames drawn, particles given off, the scorch uniforms, the
+  first-person fringe and the sounds all read `BodyFireLook`, so a douse reads the same everywhere:
+  flames taper in 0.25 s, steam for 1.2 s, a sizzle once (tests in `BodyFireLookTest`,
+  `BodyFireEffectsTest`; seen in `out_*` captures).
+- **Flames on the drawn pose.** `FlameAnchorsTest` replays `ModelPart.render`'s traversal and finds
+  every anchor on a face of a drawn box for every species, a person, and falling bodies whose joints
+  turn about several axes; a hidden accessory holds none; the pieces of a body hold each anchor once.
+- **Presentation never reaches the simulation.** `BodyFireEffectsTest` runs twelve seconds of a
+  burning crowd (panic, deaths, ragdolls) twice, once building every frame's flames at full particle
+  density and once at zero with none built: every body's position, health, fire and the panic stream's
+  next draw are identical.
+- **Fair under load.** A crowded frame shares its 1,024 flames evenly (every one of 60 bodies within
+  three tongues of each other); pieces take their share whatever the draw order; an emitter pass over
+  75 bodies stays under 96 particles and every body gives off some.
+
+### Limitations
+
+Remaining visible issues and gaps, none of them a gameplay effect:
+
+- **Char pattern.** Char spreads as warped noise patches of the same scale on every part; it does not
+  follow where the flames touched first or burned longest, and at mid scorch it can read as blotches.
+- **No light cast on the world.** A burning body lights itself (and a held item) but not the ground,
+  walls or other bodies around it: there is no dynamic-light API and none was invented.
+- **Daylight contrast.** The renderer's existing daylight exposure washes bodies pale (seen in 04's
+  captures too); flames stay orange but read less strongly by day than at night.
+- **Billboards.** Tongues are camera-facing sprites tilted to world up; seen from straight above they
+  foreshorten. Smoke (drawn in the alpha pass) is not depth-sorted against flames (drawn after).
+- **Crowds.** Past about a dozen bodies in range each body's tongues are thinned evenly (1,024 a frame);
+  in a very crowded frame the smallest pieces of a blown-apart body may show no tongue of their own
+  while its bigger pieces carry its fire.
+- **First person.** The fringe is drawn under the HUD panels, so the bottom-left corner's flames are
+  mostly hidden by the vitals panel; with nothing in hand there is no hand geometry, so only the
+  fringe shows. The contact tick's red flash (a fresh hurt) still shows over the fringe.
+- **Sound** is verified by headless tests only (sources, events, bounds, buses); nobody listened on a
+  device. The fire loop follows a burning body on the medium tick (0.5 s), so it lags a running one;
+  crackles are placed every pass.
+- **Pause.** Flames, smoke and particles freeze while paused (particle clock); living bodies' idle
+  animation still follows the wall clock (pre-existing), so a paused burning body can breathe under
+  frozen flames.
+- **Not captured:** macOS, other GPUs, other render distances and 4096 shadows, a burning body in a
+  low-ceilinged building, a Creative-mode scene (the player cannot burn; tested headlessly in 06/09).
+- **QA holds.** Held scenes raise their bodies' health so nobody dies inside the capture; the
+  ragdoll and blast scenes cover deaths.
+- Pre-existing and unchanged: loaded remains carry no scorch (09's transient policy).
+
+### Handoff to milestone 11
+
+- Keep green: `FlameAnchorsTest`, `BodyFireLookTest`, `BodyFlamesTest`, `BodyFireEffectsTest`,
+  `BodyFireQaSceneTest`, `BodyFireSoundsTest`, `RuntimeBoundsTest`, and 09's list.
+- Scenes: the ten `body_fire_*` scenes and their shots are in `DEVELOPING.md`; each prints a
+  `[scene] … frameMs=` line once a second (the frame time of the second just ended).
+- Budgets to verify end to end: ≤ 1,024 flames a frame, ≤ 96 released particles a pass, ≤ 4 bodies
+  heard, residues ≤ 32; the per-frame CPU numbers above are from a throwaway probe on this host, a
+  `@Tag("performance")` benchmark calibrated on the reference host would make them a gate.
+- `COMBAT_LETHALITY_AND_MOLOTOV.md` should gain the burning-body presentation among its limits.

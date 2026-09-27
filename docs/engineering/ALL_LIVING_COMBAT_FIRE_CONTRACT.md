@@ -1252,6 +1252,8 @@ once (tested). A residue carries no reward, yield or arrows.
 | `RESIDUE_SMOKE_SECONDS` (added in 09) | 3 s | §16's death-residue smoke, after the flames or a douse |
 | `MAX_BURN_RESIDUES` (added in 09) | 32 | §16; past it the oldest loses flames and smoke, never scorch |
 | `RESIDUE_MAX_STEP` (added in 09) | 0.25 s | a stalled frame cannot end a residue at once |
+| `OUT_MEMORY_SECONDS` (added in 10) | 3 s | presentation only: how long a put-out fire is remembered for its taper, steam and wisp (§16.1); nothing in the simulation reads it |
+| Presentation constants (added in 10) | §16.1 | anchors, flame sizes, detail distances, per-frame and per-pass caps, taper, steam and wisp times; all proposed, retune with captures |
 
 Worked outcomes with these values (0.5 s of pool contact at intensity 1, then a full
 afterburn): villager (30) survives with ≈ 10 after ≈ 6 s of visible burning; captive (24)
@@ -1323,6 +1325,120 @@ Presentation (*proposed*, 10 may retune with captures):
   residues (a body scorched earlier, not burning at death) are carried but never tracked.
 - *Proposed* cost target: ≤ 0.5 ms CPU per frame for 24 burning bodies on the reference host.
 
+### 16.1 As built in milestone 10 (presentation)
+
+**Reading the fire.** Presentation never writes combustion or residue state, reads no simulation
+random stream and runs on the main thread. Everything it shows comes from one mapping,
+`gfx/BodyFireLook` (`living(Entity)`, `remains(BurnResidue)`, `none()`), which yields: `flame`
+(size, heat, light), `coverage` (share of anchors alight), `flare` (swell on catching), `spreading` +
+`spread` + touch point (flames climb from the touch), `smoke`, `steam`, `embers`, `scorch`, `glow`
+(embers in the char), `light` (self-light), `seed` (flicker). To support it the simulation keeps a few
+**presentation-only, read-only** values that nothing in the simulation reads:
+
+| Symbol | Kept by | Meaning |
+| --- | --- | --- |
+| `BodyCombustion.outSeconds()`, `outIntensity()`, `outDoused()` | `putOut(doused)` at every extinction (water, rain → doused; burnout → not; `CombustionSystem.extinguish` → doused), aged by `ageOut` on the fast tick up to `OUT_MEMORY_SECONDS` (3 s); `clear()` forgets | how and how strongly the last fire went out |
+| `BodyCombustion.episodes()`, `flameSeed()` | `ignite` (the seed mixes the touch point and the episode) | a new ignition; a flicker number fixed per fire, deterministic per replay |
+| `BodyCombustion.touchX/Y/Z()` | `touchedAt(x, y, z, body)`: the touch point minus the body's feet | where to climb from, carried with a moving body |
+| `BurnResidue.seed()` | copied at capture | the remains flicker like the living body did |
+
+Status to look (tested in `BodyFireLookTest`):
+
+| State | Look |
+| --- | --- |
+| catching | `flare` = 1 − burnSeconds / 0.35 s; flames climb from the touch at 0.25 m + 3 m/s until 3 m |
+| burning | `flame` = intensity; `coverage` 0.35 at `MIN_INTENSITY` → 1 at full; `smoke` 1 → 0.25 as intensity rises (it thickens as the fire weakens); `glow` = intensity |
+| rain on a burning body | `flame` × (1 − 0.45 × soak fraction), `coverage` × (1 − 0.3 × soak fraction), `steam` = soak fraction |
+| burned out | flames taper to 0 over 0.6 s, a smoke wisp over 1.5 s, no steam |
+| doused (water, rain) | flames taper over 0.25 s, steam over 1.2 s |
+| remains | `flame` = `BurnResidue.flame()`, `smoke` = `smoke()`, steam for 1.2 s after a douse, scorch kept |
+| unburned, or a new life (`clear`) | nothing, scorch 0 |
+
+**Where flames stand.** `gfx/model/FlameAnchors.of(family)` builds fixed points on that family's
+shared model: the anatomy's own boxes (the `FragmentAnatomy` joint table) share
+`max(round(area × 10 /m²), boxes ≥ 0.05 m²)` anchors, between 4 and `MAX_CORE_ANCHORS` 32, one first
+for every box ≥ 0.05 m², then by largest area per anchor; worn or grown boxes (vest, pack, ruff,
+plates, horns) get one each (two past 0.8 m²), at most `MAX_EXTRA_ANCHORS` 24; boxes under 0.012 m²
+and glowing boxes get none. Per anchor: a point on a face (up-facing faces weighted 1.3, sides 1,
+underside 0.35), a flame width 0.75 × √(largest face) in [0.09, 0.48] m, a height/width stretch
+1.8–2.8 (+0.5 on top faces), a lighting order spread by the golden ratio. As built: bird 6 anchors
+(largest flame 0.15 m), hare 8, every other body 32 on its anatomy plus what it wears. `sample(start,
+frame, out)` walks the posed part tree exactly as `ModelPart.render` does — pivots, poses, Z·Y·X
+rotation, scale, visibility — so a part a person's look hides, or a piece's isolation, has no
+anchors; the pieces of a body together hold each anchor once. `gfx/model/BodyPosing` is the single
+posing path (living, ragdoll, corpse, carcass, piece; `bodyFrame`), used by the renderer, the flames
+and the emitters, so flames sit on the pose that is drawn.
+
+**Flames drawn** (`gfx/BodyFlames`, per frame, from `Renderer`): per alight anchor an outer tongue
+(orange cooling to red at its rim, HDR 1.2, alpha 0.8–1) and, within 32 m, a hotter core (0.52 of the
+width, HDR 1.5); one soft glow per body or big piece (≥ 0.3 share), as wide as its flames spread
+(2 × their farthest reach from their centre + the widest flame, × 0.7–1 with heat, at most 3 m), alpha
+0.09 × heat × a darkness factor. Widths grow with the flame (0.45 + 0.55 × flame) and the catch swell
+(+45 %). Tongues lean with the air past the body (0.11 per m/s, at most 0.7). Detail by distance:
+all anchors with cores ≤ 32 m, half the anchors without cores ≤ 64 m, a quarter ≤ 96 m, none beyond
+(the body burns on). The frame's `MAX_INSTANCES` 1,024 are shared evenly: `begin(bodies in range, a
+piece counting as its burnShare, particle density, glow strength)` gives each body
+`clamp(1024 / bodies, 3, 113)`, a piece `floor(that × burnShare)`; the living are drawn before the
+remains. A density setting below 1 thins flames to at most half, since they are how a body shows it
+burns. Drawn in `ParticleRenderer`'s third instanced submission with premultiplied blending: a flame
+adds its light and covers 0.12 (night) to 0.6 (day) of what is behind it, so it stays orange by day
+and glows at night; glows stay additive. `particle.vert` sprite 4 is a base-anchored billboard rising
+along world up (tilted 0.35 towards the view's up), flickering in height on its own rhythm; it fades
+within 0.3–1.1 m of the camera and into the fog. `particle.frag` shapes the tongue: a rounded base,
+a noise-torn edge scrolling upward, licks tearing loose near the tip, a yellow-white core cooling to
+the rim. Everything flickers by `ParticleSystem.time`, advanced only in simulated frames: paused
+flames stand still.
+
+**Char, glow and self-light** (`entity.vert`/`entity.frag`, set per body by `Renderer.fireMaterial`
+and zeroed by `noFire()` after every body and before anything else, so nothing leaks to the next
+body, to terrain or to effects): `uScorch` darkens the whole body with soot (× 1 − 0.45 scorch) and
+spreads warped char patches in box-local metres (threshold 0.97 − 0.62 scorch), seeded by each part's
+colour, so species and kit colours stay between them; `uBurnGlow` lights a thin ember line where
+char meets skin; `uFireLight` adds the body's own orange light (flickering). The held item is lit by
+the player's fire but never charred.
+
+**Given off** (`BodyFireEffects`, owned by `AmbienceSystem`, every 0.12 s pass, only in simulated
+frames): per body per pass `LICKS` 1.4, `EMBERS` 0.3, `SMOKE` 0.9 and `STEAM` 1.4 particles at full
+strength, scaled by the look, by the body's anchors over 12 (0.4–2), by range (full ≤ 48 m, half ≤
+96 m, none beyond), by the crowd (× 24 / bodies within 48 m past 24) and, for a piece, by its share;
+at most `MAX_PER_BODY` 6 per body and `MAX_PER_PASS` 96 per pass, all stopping at
+`ParticleSystem.SPLASH_LIMIT`. Licks and embers leave from alight anchors, smoke and steam from any;
+each leaves with the body's velocity (licks 0.7, smoke 0.9, steam 0.6 of it) and its
+`ParticleSystem` air response (licks 3/s, embers 0.8/s, smoke 1.1/s, steam 1.6/s) settles it into
+the rain field's wind. Smoke and steam are the new `KIND_HAZE`: see-through (≤ 0.38), fading in and
+swelling 0.55 → 2.15 of their size. The player's own body gives off nothing into the view.
+
+**First person.** `Environment.vigBurn` eases (10/s) towards the player's flame (× 1 + 0.3 flare),
+0 while dead; `post_final.frag` draws two offset rows of flame tongues along the bottom edge, higher
+at the lower corners (at most about a third of the screen height there), thin flames up the lower
+sides and a warm wash at the edges; the crosshair and the middle of the view stay clear. While the
+player burns, the red damage vignette and HUD edges show only the flash above the afterburn floor
+(`BodyFireLook.shownDamageFlash`); `Player.damageFlash` itself, and sleep's reading of it, are
+unchanged. With an item in hand, 2–5 small flames lick round its grip (`BodyFlames.grip`), drawn in
+camera space after it; with nothing in hand there is no hand geometry to put them on.
+
+**Sound** (`BodyFireEffects` → `AudioManager.playBodyCrackle/Flare/Sizzle`, buffers from
+`engine/BodyFireSounds`, synthesized last from their own seed): the four burning bodies nearest the
+listener within 24 m (the player included; a body in pieces is heard once, at its core piece) crackle
+1.5–5 times a second (ambience bus, background priority); a catch is heard once as a flare and a
+douse once as a sizzle (ordinary priority), at most four such events a pass, remembered per body and
+episode in a ring of 16; within 8 m the loudest takes over the fire loop when louder than any block
+fire (`AmbienceSystem.updateAmbienceMix`). A new world (`AmbienceSystem.reseed`) forgets them.
+
+**Budgets as built.** Anchors ≤ 56 per body; flames ≤ 1,024 per frame (≤ 113 per body), one extra
+draw submission per frame when any are drawn (plus one for grip flames); ≤ 6 particles per body and
+≤ 96 per pass, under the splash ceiling; ≤ 4 bodies heard; residues ≤ 32 (09). Measured headlessly:
+posing and sampling 60,000 bodies allocates under 4 KB in total, a frame of 40 burning people's
+flames under 64 bytes, an emitter pass over 75 burning bodies under 64 bytes (tests). Frame cost:
+see the milestone 10 section of the progress record.
+
+**Changes from the proposals above.** The "24 nearest within 48 blocks" rule became even sharing of
+a fixed frame cap with distance detail (32/64/96 m) for flames, and range halves (48/96 m) with
+crowd thinning past 24 for particles — fair under load without sorting. Flames are drawn every frame
+on the posed body rather than emitted on the 0.12 s cadence; only released particles use the
+cadence. Per-body flames are 2 × anchors (+ glow) rather than `1 + 4 × area × I`, because anchors
+already scale with area.
+
 ## 17. Tests that encode old behaviour
 
 Replace, keeping unrelated coverage:
@@ -1364,5 +1480,5 @@ Replace, keeping unrelated coverage:
 | 07 sources (done) | §4, §10; 06 API | `BodySweep` swept contact sampled in `CombustionSystem` for patches (`LiquidFireSystem.exposeContacts`), burning cells, campfires and torches (`FireSystem.exposeContacts`); direct-hit ignition in `ProjectileSystem.onEntityHit`; legacy contact damage removed; block-fire attribution (`FireSystem.ignite(…, byPlayer, origin)`); one attack per person per bottle; people and animals keep out of torches and campfires (`Entity.keepsOutOfFlames`, `VoxelPhysics`, `Steering`, `Pathfinder`); flame placement refused into a burnable body (§4.1). |
 | 08 panic (done) | §12; 06 snapshot, 07 ignition | `ai/FirePanic` hooked first in `NpcAI.update`, `SettledNpcAI.update` and `CreatureAI.update`; `PanicIntent` on `Npc.panic`/`Creature.panic` (read-only getters); seeded `EntityManager.nextPanicFloat`; NPC screen closure and a talk gate while panicking; straight-line goal checks on the pathfinder's footing, ground look-ahead, bird flight escape; recovery reset (§12.1). |
 | 09 lifecycle (done) | §6, §9, §14 | `BurnResidue` captured at the death transition by `BurnResidueSystem` (`Game.burnResidues`), moved ragdoll → corpse/carcass and shared by a body's pieces (`burnShare`), aged and bounded per frame; first-lethal-cause order; `EntityManager.depart`/`removeNpc`/`removeNpcs` for every departure; `FirePanic.forget`; `Player.tickNeeds` dead guard; `Game.simulates`/`advanceWorld`; sleep refusal and wake; dialog-target resets (§14.2). |
-| 10 presentation | §16 presentation budgets, 02/04 geometry, 06/09 snapshots | Attached flames, scorch, smoke, embers, audio, first-person cues, QA scenes and captures. |
+| 10 presentation (done) | §16 presentation budgets, 02/04 geometry, 06/09 snapshots | `BodyFireLook` (one status-to-look mapping), `FlameAnchors` + `BodyPosing` (flames on the drawn pose), `BodyFlames` (per-frame tongues, shared cap), `BodyFireEffects` (licks, embers, smoke, steam, sound), char/glow/self-light in `entity.frag`, first-person fringe and grip flames, body-fire sounds, `BodyFireQaScene` scenes, read-only out memory / flicker / touch offset on `BodyCombustion` (§16.1). |
 | 11 validation | the whole contract | Production-path matrix tests, bounds/perf evidence, docs, updated `COMBAT_LETHALITY_AND_MOLOTOV.md` limits. |

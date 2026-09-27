@@ -42,7 +42,7 @@ runs. All are inert when unset. Everything below is handled by `QaHarness`;
 | `VEYLON_SEED` | Fixed world seed (a non-numeric value is hashed) |
 | `VEYLON_GAME_MODE=survival\|creative` | Initial mode for automated world runs only; absent means Survival. Invalid values fail explicitly. Ignored for normal title sessions and frontend-only captures. |
 | `VEYLON_SMOKE=<seconds>` | Release smoke gate: save/load, fire, storm, a fortress approach, then a pass/fail report. Throws on failure |
-| `VEYLON_SCENE=<name>` | Stage a deterministic benchmark scene (`day`, `pinefog`, `nightfire`, `ruin`, `toxic`, `ao_shadow`, `phase4`, `ashwolf`, `silhouette30`, `vfx_blood`, `vfx_mining`, `vfx_beacon`, `death_ragdoll_showcase`, `death_ragdoll_sequence`, `dismember_showcase`, `dismember_wall`, `dismember_bomb` (a real scrap bomb thrown into a group of six, one outside the lethal radius; it goes off at 2.4 s), `dismember_species`, `dismember_species_wall` and `dismember_species_close` (every species, a guard and the player's remains blown apart at 1 s; open meadow, a step and a wall, and a close view of the small bodies), `molotov_ground`, `molotov_tree` and `molotov_rain` (a real fire bomb thrown at 0.5 s onto a dry clearing at dusk, beside a round tree that catches, or with rain from 3 s that puts the pool out; shots `0.7,1.2,3,7,11`, `1,4,10,20` and `2,3.5,5`), `movement`, `inventory`, `ui_cycle`, `held_*`, and `creative_flight` with `VEYLON_GAME_MODE=creative`, which flies east at Shift speed and prints a `[flight]` streaming report at 29 s) |
+| `VEYLON_SCENE=<name>` | Stage a deterministic benchmark scene (`day`, `pinefog`, `nightfire`, `ruin`, `toxic`, `ao_shadow`, `phase4`, `ashwolf`, `silhouette30`, `vfx_blood`, `vfx_mining`, `vfx_beacon`, `death_ragdoll_showcase`, `death_ragdoll_sequence`, `dismember_showcase`, `dismember_wall`, `dismember_bomb` (a real scrap bomb thrown into a group of six, one outside the lethal radius; it goes off at 2.4 s), `dismember_species`, `dismember_species_wall` and `dismember_species_close` (every species, a guard and the player's remains blown apart at 1 s; open meadow, a step and a wall, and a close view of the small bodies), `molotov_ground`, `molotov_tree` and `molotov_rain` (a real fire bomb thrown at 0.5 s onto a dry clearing at dusk, beside a round tree that catches, or with rain from 3 s that puts the pool out; shots `0.7,1.2,3,7,11`, `1,4,10,20` and `2,3.5,5`), the burning-body scenes `body_fire_row`, `body_fire_row_night`, `body_fire_close`, `body_fire_out`, `body_fire_blast`, `body_fire_panic`, `body_fire_bird`, `body_fire_rain`, `body_fire_ragdoll` and `body_fire_player` (see "Burning bodies QA" below), `movement`, `inventory`, `ui_cycle`, `held_*`, and `creative_flight` with `VEYLON_GAME_MODE=creative`, which flies east at Shift speed and prints a `[flight]` streaming report at 29 s) |
 | `VEYLON_SHOT="5,10"` | Capture screenshots at those elapsed seconds |
 | `VEYLON_FRONTEND=<name>` | Pin a front-end screen (`options`, `audio`, `loading`, `death`, `victory`, `glyphs`, `newworld`). `newworld-save` shows the replace-save notice without writing a save. `pause` and `gamemode` stage a Survival world with the pause menu or the mode confirmation open; `pause-creative`, `gamemode-creative` and `victory-creative` stage a Creative world; `catalog`, `catalog-tools`, `catalog-search` (query "iron") and `catalog-inventory` open the Creative catalog; `worldcontrols` and `worldcontrols-held` open the Creative world controls, the second with dusk, a frozen clock, a locked storm and paused spawning already applied |
 | `VEYLON_RESOLUTION=1920x1080` | Framebuffer override |
@@ -512,3 +512,54 @@ Contributor rules this feature adds:
   any other way leaves a missing leg or a raider's hood on the next body drawn
   from it. `SpeciesFragmentDrawTest` checks a piece's first frame against the
   living body and a live body drawn after a piece against one drawn alone.
+
+## Burning bodies QA and contributor rules
+
+Use `VEYLON_SEED=20260919`. Every scene sets bodies alight through
+`CombustionSystem.ignite` (a fire bomb breaking low on each body's near side)
+and steps in fixed 1/60 s steps tied to elapsed seconds; `VEYLON_SHOT` names
+files by whole seconds, so pick shots with different whole parts.
+
+- *Held* scenes keep the bodies where they were put (only the fire, remains,
+  particles and ambience run; health is raised so nobody dies in the capture):
+  `body_fire_row` and `body_fire_row_night` (five NPC families in front, every
+  species behind, a bird hovering; alight at 1 s, burnt out at about 7 s;
+  shots `0.5,1.3,3,6,8,10`), `body_fire_close` (a guard, a wolf, a deer and a
+  bird close to the camera; `1.4,3,6,8`), `body_fire_out` (rain from 2.5 s on
+  four bodies in the open, a roof over three, one with its feet in water;
+  `2,3.3,4.3,5.5,8`) and `body_fire_blast` (a burning row blown apart at 2 s;
+  `1.5,2.3,3.5,5.5,9`).
+- *Live* scenes run the whole world step: `body_fire_panic` (a walled yard seen
+  from a pillar; `0.5,1.5,2.5,4,6,9`), `body_fire_rain` (the same crowd, a roof
+  over half the yard, rain from 1.5 s; `1.2,2.2,3.2,5,8`), `body_fire_ragdoll`
+  (the yard's crowd too weak to outlive its fire; `1.3,2.1,3,4.5,7,10`),
+  `body_fire_bird` (three birds alight in flight; `0.4,1.2,2.2,3.1,4.1`) and
+  `body_fire_player` (the Survival player alight with an axe in hand, a burning
+  guard ahead, rain from 5 s; `0.5,1.3,3,5.6,6.8,8`).
+- Each prints `[scene] <name> t=…` lines once a second and whenever the number
+  of bodies alight changes: bodies alight, residues, ragdolls, pieces,
+  particles, what body fire gave off last pass, bodies heard, flames drawn and
+  the rain and burnout tallies.
+
+Run `gradlew test --tests '*FlameAnchors*' --tests '*BodyFire*' --tests
+'*BodyFlames*' --tests '*Combustion*' --tests '*RuntimeBounds*'` while working
+on any of it.
+
+Contributor rules this feature adds:
+
+- **Pose a body only through `BodyPosing`.** The renderer, the attached flames
+  and the emitters all pose through it, which is what keeps flames on the pose
+  that is drawn; a second posing path would put them on another.
+- **Presentation reads the fire; it never writes it.** Anything a look needs
+  that the simulation does not keep belongs on `BodyCombustion` or
+  `BurnResidue` as a read-only value the simulation maintains (as the out
+  memory, flicker number and touch offset are), never as presentation state
+  holding entities past a pass.
+- **Share the frame, do not queue for it.** `BodyFlames.begin` shares its cap
+  over every burning body in range, a piece by its `burnShare`; draw the
+  living first. New per-frame or per-pass work goes in fixed arrays, and
+  `BodyFlamesTest`, `BodyFireEffectsTest` and `FlameAnchorsTest` hold the
+  paths at zero allocation.
+- **Nothing inside the camera.** The player's own fire is shown at the edges
+  of the view (`post_final.frag`) and round a held item's grip; never emit
+  world particles at the player's body.

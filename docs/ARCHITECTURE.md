@@ -45,7 +45,9 @@ Main.main
               PlayerConsumables      eat, drink, treat, equip
               CrateTransactionSystem crate transfers and theft attribution
               InteractPromptBuilder  read-only HUD interaction hint
-              AmbienceSystem         ambient particles and audio mix
+              AmbienceSystem         ambient particles and audio mix, and (BodyFireEffects)
+                                     what burning bodies give off and how they sound
+              BodyFireQaScene        opt-in burning-body capture scenes
               AudioSceneState        bounded read-only environment/music observations
               FireAudioLocator       nearest loaded audible fire
               SleepSystem            sleep eligibility, quality, night effects
@@ -332,7 +334,7 @@ in a named collaborator:
 | `PlayerConsumables` | eat, drink, treat wounds, equip gear |
 | `CrateTransactionSystem` | crate transfers and theft attribution |
 | `InteractPromptBuilder` | the `[F] …` hint (pure read — cannot change what F does) |
-| `AmbienceSystem` | ambient particles and the audio mix |
+| `AmbienceSystem` | ambient particles and the audio mix; `BodyFireEffects`, what burning bodies give off and their sound |
 | `SleepSystem` | sleep eligibility, quality scoring, night effects |
 | `QaHarness` | benchmark scenes, showcases, release smoke gate |
 
@@ -791,6 +793,32 @@ administrative `dead` path): its fire and panic are forgotten, no AI keeps it as
 target, a conversation with it closes, and it leaves no body or residue; a dormant
 resident keeps the health it left with. The player cannot fall asleep while alight,
 and a fire wakes a sleeper. Details in the contract §14.2.
+
+**How a burning body looks and sounds.** Presentation reads the fire and never
+writes it. `gfx/BodyFireLook` turns a living body's `BodyCombustion` (including
+presentation-only fields the fire keeps for it: how long ago and how its last fire
+went out, how strongly it burned then, a flicker number per fire, and where the
+flame touched it relative to its feet) or a `BurnResidue` into one look — flames,
+how much of the body they cover, the swell and climb of catching, smoke, steam,
+embers, scorch, glow and light — so every presentation tells the same story.
+`gfx/model/BodyPosing` is the only way a body is posed for drawing (living,
+falling, dead, a piece), and `gfx/model/FlameAnchors` finds bounded points on that
+family's real boxes, spread by area, and resolves them through the same part
+transforms the renderer draws with. Each frame `Renderer` draws the living first,
+then the remains; for each burning one it sets the char, ember glow and firelight
+uniforms of `entity.frag` and adds flame tongues on the alight anchors to
+`gfx/BodyFlames` (≤ 1,024 a frame, shared evenly over the burning bodies in range,
+a piece by its share of its body), which `ParticleRenderer` draws in one extra
+premultiplied pass after the ordinary particles. On the ambience cadence
+`BodyFireEffects` (inside `AmbienceSystem`, so it only runs in simulated frames)
+gives off licks of flame, embers, smoke and steam from the same alight anchors with
+the body's velocity, carried off by the wind (`ParticleSystem`'s per-particle air
+response), and plays the nearest four burning bodies' crackle, catch and douse
+sounds through `AudioManager`. The player's own fire is drawn at the edges of the
+view by `post_final.frag` (`Environment.vigBurn`) and round the grip of a held
+item, never inside the camera. Nothing here reads a simulation random stream,
+allocates per frame, or changes a burn; flames flicker by the particle clock, which
+stands still while the game is paused. Details, budgets and QA in the contract §16.1.
 
 | State | Persisted | Where |
 | --- | --- | --- |
