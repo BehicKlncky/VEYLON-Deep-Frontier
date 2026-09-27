@@ -28,7 +28,8 @@ Checkpoints by milestone (filled in by the following milestone):
 | 04 | `290c388d017bfb5371d40d181837fd7c52f5aff0` — `feat(gfx): draw every body's pieces as its own anatomy`; `4baef52c995b2dcd956a19dd4eb64d47fa6ce500` — `feat(qa): stage every kind of body blown apart for captures`; `42d9572f6feb4edab950618271c01fda3e711430` — `test(gfx): pin every body's pieces as drawn, and the capture scenes`; `a203df9ad3900c2a93c1d213b96d0c2d0251e75f` — `docs(combat): record species fragment rendering` |
 | 05 | `f3c553d356f767e0b7bd04c3205ab536d7c10dbd` — `feat(save): keep every body's remains and harvest record in a save`; `08f1b0d9d3ad0cb9c0bb5c5dc1a4aecd55d57db8` — `test(save): pin how every body's remains survive a save`; `e8b825a0570e4785ebd828064c71ef906f0f557f` — `docs(combat): record remains persistence` |
 | 06 | `f863a66e669215d1313c3e7782c051f925c2cf49` — `feat(fire): give every living body one fire on its own clock`; `fae46fa4fa8f7b42490a5c7362c466982df637e5` — `test(fire): pin one fire per living body for every kind of body`; `a5882236a95ad4cc1e6589c7a5686d56d39e60f0` — `docs(combat): record shared body combustion` |
-| 07 | reported in the milestone 07 handoff; record here in 08 |
+| 07 | `1397b34d44a802b1ae0ff0a36ec0a2645626db44` — `perf(world): resolve recent chunks without boxing their key`; `5985785ab8ebbbf53efcebf576fcf19d91a5ef73` — `feat(fire): set living bodies alight from every real flame`; `621497e72167074a28e1d563aa974d6a8e3b0f72` — `test(fire): pin how every real flame sets every kind of body alight`; `67fa9b4eb194776258ef0d5206a68c754d307e3a` — `docs(combat): record fire sources connected to living bodies` |
+| 08 | reported in the milestone 08 handoff; record here in 09 |
 
 ## Status
 
@@ -41,7 +42,7 @@ Checkpoints by milestone (filled in by the following milestone):
 | 05 | Fragment save compatibility | **Complete** (`world.remains` v1; `world.fragments` v1 unchanged) |
 | 06 | Shared body combustion | **Complete** (state, rules, fast-tick wiring; no production source connected until 07) |
 | 07 | Connect all fire sources | **Complete** (every real flame and a bottle breaking on a body set bodies alight; legacy contact damage gone; people and animals keep out of torches and campfires) |
-| 08 | NPC and animal fire panic | Not started |
+| 08 | NPC and animal fire panic | **Complete** (every burning person and animal flees, then decides afresh; the player keeps every control) |
 | 09 | Combustion lifecycle | Not started |
 | 10 | Body fire presentation | Not started |
 | 11 | End-to-end validation | Not started |
@@ -53,7 +54,9 @@ anatomy; since 05 every settled piece, the pose its body died in and an animal's
 survive a save (`world.remains`). Since 06 every living body can carry one fire
 (`Entity.combustion`, advanced by `CombustionSystem` on the fast tick); since 07 burning liquid,
 burning blocks, fueled campfires, placed torches and a fire bomb breaking on a body set it
-alight through one swept contact path, and nothing else burns a body.
+alight through one swept contact path, and nothing else burns a body. Since 08 every burning person
+and animal drops what it was doing and flees on irregular, obstacle-aware runs (birds fly), then
+decides afresh; the player's controls are untouched.
 
 ## Milestone 01 — source audit and contract (2026-09-26)
 
@@ -928,3 +931,126 @@ from the proposals are in contract §4.1; budgets in §16; replaced tests in §1
   where a flame touched the body, if flames should start there.
 - 11: the source matrix of contract §4.1 is covered here headlessly; native captures of bodies
   catching at each source belong with 10's presentation.
+
+## Milestone 08 — NPC and animal fire panic (2026-09-27)
+
+### Start state
+
+- Branch `feature/all-living-dismemberment-combustion`, tip `67fa9b4` (milestone 07); the four 07
+  checkpoints are now recorded in the table above. `git fetch origin`: `origin/main` still `3704f4d`.
+  Working tree clean apart from the user's untracked `.agents/` and `AGENTS.md`, which stay untracked.
+- Same host and portable Temurin 25.0.4.1+1 JDK; Gradle 9.1.0, `--no-daemon --console=plain`.
+- Read: `AGENTS.md`, the pack's `00_BASE_KNOWLEDGE.md` and `08_NPC_AND_ANIMAL_FIRE_PANIC.md` (and 09–11
+  for what they expect from 08), contract §3, §5, §6, §10–§16 and §18, and this file.
+- Predecessors checked in source: 06's `CombustionSystem.isBurning` and the read-only
+  `BodyCombustion` getters (`inContact`, `hasExposure`, `exposureX/Y/Z`); 07's production ignition
+  (`ProjectileSystem` direct hit, `LiquidFireSystem`/`FireSystem.exposeContacts`) and the fire keep-out
+  in `VoxelPhysics`/`Steering`/`Pathfinder`; the fast-tick order needs → combustion → entities, so AI
+  reads this tick's fire; no panic code existed (`CreatureAI.panicFromFire` only flees burning blocks).
+- Source anchors inspected: `NpcAI.update` (dead guard, upkeep, `interactFreeze`, settled/war-party
+  dispatch, traders, raiders, camp jobs), `SettledNpcAI.update` (captive early return, perception,
+  combat, `partyTravel`/`counterattackTravel` with `abstractTravel`, friendly defence, search,
+  `dailyLife` with sleep and duty, `rangedCombat` reload), `CreatureAI.update` and every species
+  branch, `Steering`, `Pathfinder`, `VoxelPhysics`, `Entity`, `Npc`, `Creature`,
+  `EntityManager.fastTick` and its AI streams, `WorldBootstrap.reseedSimulation`,
+  `WorldInteractions` NPC gates, `NpcScreen.update` (sets `interactFreeze` every frame),
+  `Game.frame` (an NPC screen does **not** pause the simulation), `Game.closeScreens`,
+  `HotkeyRouter.toggle` (may leave `activeNpc` set under another screen), `SettlementManager`
+  (`openGate`, `canRescueCaptive`, resident spawning), `SettlementBuilder.prisonCage`,
+  `CounterattackDirector`, `Animator.poseCreature/poseNpc`. Direct callers of `SettledNpcAI.update`:
+  `NpcAI.update` only in production; tests call it directly.
+
+### Commands and results
+
+All from the repository root in PowerShell with the portable JDK on `PATH`. Logs are in the
+git-ignored `build/` directory.
+
+| Command | Result |
+| --- | --- |
+| `.\gradlew.bat compileJava compileTestJava` | BUILD SUCCESSFUL (`build/all-living-m08-compile.log`). |
+| `.\gradlew.bat test` over `FlameSourceIgnitionTest`, `BodyCombustionTest`, `CombustionIntegrationTest`, `CombustionAllocationTest`, `MolotovTest`, `FireWeatherTest`, `CombatFireIntegrationTest`, `CreativePerceptionTest`, `HumanPerceptionGameplayTest`, `WorldSeedDeterminismTest`, `PlayerMovementSystemTest`, `EntityEcologyTest`, `OverloadedDeadFlagTest`, `CreativeHazardsTest`, `SurvivalCreativeParityTest`, `PathfinderTest`, with the panic wired and no test changed | 301 tests, **1 failure** (`build/all-living-m08-existing.log`): `CombustionIntegrationTest.aBottleThrownThroughTheRealLoopBurnsExactlyOnceAndOnlyThroughTheBodyFire` stood a burning villager in its pool under the whole game tick for two seconds; it now runs out. The test walls and roofs the villager into its cell once alight (walls alone failed: its hops at the walls lifted it clear of the liquid) and measures the same thing; 7 of 7 green (`build/all-living-m08-cit.log`). |
+| `.\gradlew.bat test --tests com.veylon.ai.FirePanicTest` | First run 29 tests, 2 failures: an assertion of mine (a wounded, afraid thornhorn re-charging a perceivable player in reach after recovery is its ordinary rule, not a stale charge — the test now moves the player out of reach first) and a real fault (a roofed bird rose into the roof it flew under). Fixed as below; now 30 tests green (`build/all-living-m08-panic.log`). |
+| Throwaway probes (scratch tests in `com.veylon.ai`, deleted, not committed) | A roofed bird traced tick by tick: its climb, checked along the centre of a straight line, grazed the roof's edge because the flight climbed at 45° at once. After the fix: 48 birds under a roof in six seeds, **0** pressed against it (`build/all-living-m08-panic.log`, probe output). Real generated settlements (seeds 20260716, 777, 4242, 99; three settlements each; every resident set alight in Creative, 10 s): residents — **no body entered a block or an unloaded column, no fall over 4 blocks** (`build/all-living-m08-settlement-probe2.log`); one resident per fort was already inside a block when lit (below). 411 animals of all six species placed on the real surface round the same settlements: first run 5 falls of 4–8 blocks down terraces (a body that took a legal 3-block drop ran on over a second one in the air); after checking the ground in the air too, the only falls left began before the fire (a wolf already falling at 11.7 m/s when lit), and counting only falls that begin on the ground: **0 falls, 0 in blocks, 0 in unloaded columns, 0 stuck**, 2796 goals and 493 blocked replans in 5 s (`build/all-living-m08-animal-probe-final.log`). |
+| `.\gradlew.bat test --tests com.veylon.ai.FirePanicAllocationTest -i` | Passed: **0 bytes per fast tick** for 40 people and 35 animals panicking in a walled yard of pillars (`build/all-living-m08-alloc.log`). |
+| Mutation check (scratch PowerShell script, one production mutation at a time, `FirePanicTest`, each file restored in `finally` and its hash compared) | First pass (`build/all-living-m08-mutation.log`): 14 caught, 5 not applied (the script assumed CRLF; the sources are LF; one pattern matched twice), 2 **survived**: no ground check ahead (the goal checks already kept the bodies off the pit; the arc of their turn did not reach it) and a bird climbing faster than its checked line (one roofed bird's draws happened to miss the edge). The edge test now starts bodies at the brink and opens a pit across a runner's way after it chose its goal; the roof test flies a flock of eight. Re-run of those seven (`build/all-living-m08-mutation-rerun.log`): **7 of 7 caught**, so **21 of 21** in all: the `NpcAI`, `SettledNpcAI` and `CreatureAI` hooks removed; a conversation not closed, its freeze kept, talk offered while panicking; a stale combat target or path kept; endless and no recovery; no turn limit; no ground check; birds run on the ground; unseeded draws; no goal jitter; no replan cooldown; blocked progress ignored; a bird climbing faster than its checked line; the flight line checked at its centre only; goal checks ignoring walls; panic ending while still alight. Every file's hash matched its backup afterwards. |
+| `.\gradlew.bat build` | **BUILD SUCCESSFUL in 8 m 24 s: 1357 tests in 135 classes, 0 failures, 0 errors, 0 skipped**; `javadoc` (doclint) and `check` executed (`build/all-living-m08-build.log`). 07 ended at 1326 in 133. |
+
+Not run: `performanceTest` (this host is not the reference machine and its durable-save gate fails
+regardless; the panic's wall-clock cost is unmeasured) and native QA (nothing is drawn differently
+except that burning bodies now move; body flames and captures are milestone 10).
+
+### What was built
+
+Hooks, phases, goal and movement rules, budgets and the changes from the proposals are in contract
+§12.1 (with §5, §15, §16, §18).
+
+| Path | Change |
+| --- | --- |
+| `ai/FirePanic.java` (new) | The panic: phases and recovery reset, people's suspensions and NPC-screen closure, goal choice (escape direction, eight directions, straight-line checks `groundReach`/`flightReach`), turn-limited steering, ground look-ahead and bird flight, blocked-progress replanning, gate shoving. |
+| `ai/PanicIntent.java` (new) | Per-body state with package-private fields and public read-only getters. |
+| `ai/PanicConstants.java` (new) | Contract §15 values and the tuning added here. |
+| `ai/NpcAI.java`, `ai/SettledNpcAI.java`, `ai/CreatureAI.java` | The hook, first after the dead guard and upkeep (`SettledNpcAI` for direct callers). |
+| `ai/Pathfinder.java` | `passable` package-private, so panic checks use the pathfinder's footing. |
+| `entity/Npc.java`, `entity/Creature.java` | `public final PanicIntent panic`. |
+| `entity/EntityManager.java` | Panic stream `nextPanicFloat()`, seeded in `setAiRandomSeed` (salt `0x50414e494353L`). |
+| `WorldInteractions.java`, `ui/NpcScreen.java` | No talk with, and no open screen for, a panicking person. |
+| `src/test/.../ai/FirePanicTest.java` (new) | 30 tests. Every dispatch family and species set alight by a real bottle (a caged captive by a spill in its cage) after living its ordinary life — deer and hare grazing, a wolf biting the player, a charging thornhorn, a stalker, a bird aloft, a camp member at work and one in conversation, a wandering trader, a raider, residents at work and asleep, a settlement trader, an archer shooting and a guard striking the player, a patrol, a bounty hunter, a counterattacker: panicking every tick, FLEE, at least three goals, 2.5 blocks from where it caught (the captive struggles about its cage), never in a block, one physics step at most the panic speed per tick. Armed bodies (wolf, charging thornhorn, stalker, guard, archer, powderman mid-reload) round a Survival and a Creative player: nothing strikes, shoots or finishes a reload while alight or recovering, even running past the player; after recovery a hungry wolf bites a perceivable player again but never a Creative one, and a thornhorn whose player is out of reach does not resume its charge. A direct call into `SettledNpcAI`. Recovery: exactly 1.5 s, slowing, then its own AI's choice, no stale target or path, the settlement gone found gone, and 10 s scorched and hurt without panicking again. One seed replays the panic bit for bit, also with the camera spinning, the player wandering and particles drawn; four villagers lit alike choose goals at different moments and run different ways. Walls thrown up round a runner: replans, bounded turning, out by the open side, goals within the bound. Walled and roofed in: struggles in its cell, no teleport, no second step, no spin, trapped goals counted. A caged captive stays in and is still rescuable. A bird climbs and flies round a tower; a flock under a roof flies level below it. The brink of a seven-block pit, a pit opening across a runner's goal, the edge of the loaded world: nobody falls, nothing loads. An open conversation closes with a log line; no talk while panicking; talk again when calm. The player among a burning crowd, alight in one game and not the other, moves, sprints, crouches and looks identically through the production movement system and the whole game tick, and the crowd runs identically. |
+| `src/test/.../ai/FirePanicAllocationTest.java` (new) | 75 panicking bodies in a walled yard of pillars, 5000 ticks: under 64 bytes per tick (measured 0), goals within the bound, hundreds of blocked replans. |
+| `CombustionIntegrationTest` | The real-loop bottle test walls and roofs its villager into the pool (above). |
+| docs | contract §5, §12.1 (new), §15, §16, §18; `ARCHITECTURE.md` seed streams, transient state and a panic paragraph. |
+
+### Evidence of the decisions
+
+- **Straight-line checks instead of A\*.** A 4–8-block goal redrawn up to four times a second per body
+  would run `Pathfinder.find` (a `HashMap`, a `PriorityQueue` and records per query) that often; the
+  straight check with the pathfinder's own `standable`/`passable` rules costs a few dozen block
+  lookups and measured 0 bytes. The real-settlement probe (walls, gates, beds, cages, campfires) shows
+  no body entering a block, an unloaded column or a deep drop.
+- **Ground check in the air.** The animal probe's terrace falls (up to 8.2 blocks) disappeared when the
+  check was also made while airborne, from the feet's current height.
+- **Flight follows its checked line.** The tick-by-tick trace showed the bird's climb at 45° from the
+  first tick while the check had assumed an even slope; with the climb held to the line and the check
+  made at the body's top and bottom every half block, no bird of 48 touched the roof.
+- **Freeze cleared, screen closed by the AI.** `NpcScreen.update` rewrites `interactFreeze` every render
+  frame while open, and the simulation runs under an NPC screen, so a burning speaker would otherwise
+  be held still (and after the panic, frozen for a second more). Closing through `Game.closeScreens`
+  from the AI tick works headlessly and before the next render frame.
+
+### Limitations
+
+- **Captives in generated forts cannot move at all**, burning or not: they spawn 0.4 above the cage
+  floor (`SettlementManager` spawns captives and leaders at `+0.4`), which puts a person's head into
+  the cage's roof bars (floor + 3), and a body overlapping a block cannot take any step (every step
+  still overlaps). Found by the settlement probe (one captive in each of three forts), pre-existing,
+  not changed here: panic cannot free or move them, but they do not visibly struggle. Spawning a
+  captive at `+0.02` like other residents would let the tested struggle show; that is a settlement
+  change outside this milestone.
+- A wide body (thornhorn, 1.1) is checked along its centre line; collision and blocked replans handle
+  the rest. Ladders are climbed only when a run meets one; climbing counts as no progress.
+- A body standing in the middle of a pool has no direction to run from; it runs its heading and the
+  drawn angle, which leaves the pool within a second or two in every test.
+- Birds do not sidestep fires (07); collision keeps them out of flame cells.
+- A body in an unloaded column (an abstract war party far away) stands and burns out where it is.
+- A player may still rescue a burning captive.
+- There is no dedicated panic pose; the ordinary FLEE pose and gait from speed are used (10's work).
+- Wall-clock cost unmeasured; no native captures.
+
+### Handoff to milestone 09
+
+- Panic lives only on `Npc.panic` and `Creature.panic`; a new or loaded entity is calm and a dead one
+  is never ticked (the AI's dead guards run first). No registry or collection holds a panicking body.
+- It ends by itself 1.5 s after `CombustionSystem.isBurning` turns false (extinguished, burned out,
+  cleared), then resets the body's plans; `CombustionSystem.clear(e)` therefore also ends a panic
+  within the recovery. There is no public command to stop one early; add it in `FirePanic` if a
+  lifecycle transition needs one (deactivation removes the entity, so it should not).
+- `PanicIntent` tallies (`goals()`, `replans()`, `trappedGoals()`) reset with each new panic.
+- Keep green: `FirePanicTest`, `FirePanicAllocationTest`, and 07's list.
+
+### Handoff to milestones 10–11
+
+- 10: read-only `panic.active()`, `recovering()`, `recoverySeconds()` and `headingX/Z()` for flailing
+  poses or flame lean; the state is FLEE during panic. **QA scenes that hold people still with
+  `interactFreeze` cannot hold a burning one**: panic runs before the freeze. Stage burning subjects
+  in walls or cages (as `CombustionIntegrationTest` does), or add a QA-only hold in `FirePanic`.
+- 11: the panic matrix is `FirePanicTest`; the budget evidence is `FirePanicAllocationTest` and the
+  probes above; the captive spawn height is an open finding for the user.

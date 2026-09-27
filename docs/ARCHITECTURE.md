@@ -126,7 +126,8 @@ still uses. It **resets before it constructs**, in this order:
    lives on the body and goes with it).
 3. `reseedSimulation(seed)` — seeds every simulation and player-outcome
    generator, eighteen of them, each with a distinct salt so their streams stay
-   independent. Without this, a second
+   independent (the entity manager's AI call seeds four decision streams:
+   creatures, camp NPCs, settled NPCs and the fire panic). Without this, a second
    world in the same process inherits RNG state from the first, which is what
    made a settlement test intermittently fail. Presentation-only randomness
    (`AudioManager`, `NpcScreen`) is deliberately excluded.
@@ -240,10 +241,11 @@ regenerating under a newer generator.
 Transient state is deliberately **not** serialized: an in-flight reload is
 cancelled on load, and bow draw resets. Combat and fire add more of it. An
 NPC's torso wound count and the shot id that last wounded it, the blast
-record a lethal explosion leaves on the body it killed, and a living body's
-fire (`Entity.combustion`) live on the entity and die with it — a person who
+record a lethal explosion leaves on the body it killed, a living body's
+fire (`Entity.combustion`) and a burning person's or animal's panic
+(`Npc.panic`, `Creature.panic`) live on the entity and die with it — a person who
 leaves the world, through a save, a load or a settlement going dormant, comes
-back unwounded and not burning at their stored health. Saving leaves a body
+back unwounded, not burning and calm at their stored health. Saving leaves a body
 that is burning in the live world burning. Pools
 of burning liquid and burning blocks are not saved either: a save taken with
 the world alight loads with the fires out. What does survive is the remains of
@@ -744,6 +746,26 @@ choose, and cannot place a torch or campfire into a body that can burn. The
 rules, numbers and API are in
 [the combat and fire contract](engineering/ALL_LIVING_COMBAT_FIRE_CONTRACT.md) §10.1 and §4.1.
 
+**Burning people and animals panic; the player never does.** `ai/FirePanic` is
+the first decision of `NpcAI.update` — before a conversation holds a person
+still and before every family's own brain, `SettledNpcAI` included (which
+repeats the call for direct callers) — and of `CreatureAI.update`, before any
+species' choice. While a body is alight, and for a second and a half after, it
+drops what it was doing: no attack, shot, reload, trade, work, meal or sleep. It
+runs toward goals a few blocks off, redrawn every 0.6–1.2 s from its own seeded
+stream (`EntityManager.nextPanicFloat`): away from where the flame touched it,
+turned by a seeded angle, each checked along a straight line with the
+pathfinder's footing rules. It turns at a bounded rate, moves with the shared
+`Steering`, stops short of a drop deeper than three blocks or the edge of the
+loaded world, replans when blocked (never more than four goals a second), and a
+bird flies its escape, climbing. Walls, cage bars and fires stop it as they stop
+anyone. An open NPC screen closes when its speaker catches, and nobody offers to
+talk while panicking. When the recovery ends, the body's plans are forgotten and
+its ordinary AI decides afresh from the world as it is. Panic reads neither the
+player nor the camera, so it cannot find a Creative player; the player's own fire
+is damage and presentation only, and their controls are untouched. The intent
+(`Npc.panic`, `Creature.panic`) is transient. Details in the contract §12.1.
+
 | State | Persisted | Where |
 | --- | --- | --- |
 | Settled pieces of every body (family, piece, position, orientation, decay, appearance, the pose it died in) | yes | `world.remains`, one record per piece, oldest first; one pose per body |
@@ -752,7 +774,7 @@ rules, numbers and API are in
 | Pieces still in flight | no — a save settles them first, so they come to rest rather than being lost | — |
 | Pools of burning liquid, burning blocks | no — a save taken mid-burn loads with the fires out | — |
 | A fire bomb still in the air | yes, with the other explosives; it shatters where it lands | active explosives |
-| Torso wounds, the last shot id, the blast record, a living body's fire | no — they live on the entity and die with it | — |
+| Torso wounds, the last shot id, the blast record, a living body's fire and panic | no — they live on the entity and die with it | — |
 
 `world.fragments` (0.8.0) and `world.remains` are optional stable-ID sections in
 the v3 extension envelope, so the frozen v3 body and the bodies layout are

@@ -322,7 +322,7 @@ below: **0 flame contacts, 0 ignitions** in the same run.
 | Player remains | `BodyFragmentSystem` pieces with an explicit neutral player appearance | Never references the live `Player`. |
 | Active combustion per body | one embedded state object per `Entity` (`Entity.combustion`, class `entity/BodyCombustion`) | Dies with the entity; no registry to purge; bounded by the entity lists. As built in 06 (§10.1). |
 | Combustion rules, exposure resolution, damage | `entity/CombustionSystem` owned by `Game` (`Game.combustion`), reset in `WorldBootstrap`; no random stream | Tuning in `entity/CombustionConstants` and `entity/CombustionSource`. Package `entity`, not the proposed `simulation`, so the state's mutators are package-private (§10.1). |
-| Panic intent (goal, timers, recovery) | embedded per `Npc`/`Creature` (or inside `BodyCombustion`) | Written only by AI; seeded panic stream on `EntityManager` or the combustion system. |
+| Panic intent (goal, timers, recovery) | embedded per `Npc`/`Creature` (or inside `BodyCombustion`) | Written only by AI; seeded panic stream on `EntityManager` or the combustion system. As built in 08 (§12.1): `ai/PanicIntent` as `Npc.panic` / `Creature.panic`, package-private fields written only by `ai/FirePanic`; stream `EntityManager.nextPanicFloat`. |
 | Burn visuals, scorch rendering, audio | presentation layer (`AmbienceSystem`/`ParticleSystem`/`Renderer`/`AudioManager`) reading a read-only snapshot | Presentation never writes gameplay state. |
 | Death-time visual residue | a bounded list owned by the presentation or fragment/ragdoll layer (09) | Snapshot values only, no entity references. |
 
@@ -857,6 +857,101 @@ episode. Since 07 the legacy contact paths and their own 50 % `BURN` roll are go
   paths are not restored. A medical injury alone never causes panic.
 - Panic never targets or reveals an imperceptible player; heat avoidance uses exposure points.
 
+### 12.1 As built in milestone 08
+
+**Owner and types** (package `ai`, all transient, none saved):
+
+| Symbol | Role |
+| --- | --- |
+| `FirePanic` | The rules. `update(Game, Npc, dt)` and `update(Game, Creature, dt)` (package-private) run one tick of panic and return true when it decided the tick. |
+| `PanicIntent` | The state, `public final` on every `Npc` (`panic`) and `Creature` (`panic`); none on `Player`. Package-private fields, public getters: `active()`, `recovering()`, `recoverySeconds()`, `hasGoal()`, `goalX/Y/Z()`, `headingX/Z()`, and this panic's tallies `goals()`, `replans()`, `trappedGoals()`. A new body starts calm; the intent clears itself when a recovery ends. |
+| `PanicConstants` | Tuning (§15). |
+| `EntityManager.nextPanicFloat()` | The panic stream ("PANICS", salt `0x50414e494353L`), seeded in `setAiRandomSeed` beside the three AI decision streams. Drawn only when a goal is chosen, in the entity tick's order; nothing else draws from it. |
+
+**Hooks (exact).** `NpcAI.update`: after the `dead` guard and the per-tick upkeep (`decideTimer`,
+`attackCooldown`, hunger, `bobPhase`), **before** `interactFreeze`, so before the conversation freeze,
+the whole `SettledNpcAI` route (captives, hostile combat, war parties and counterattacks, friendly
+defence, search, residents' and settlement traders' duty, sleep), wandering traders, raiders and the
+camp jobs. `SettledNpcAI.update`: the same call first, for direct callers; the game's one caller is
+`NpcAI.update` (unchanged since 01), where it is a no-op because a panicking NPC never gets there.
+`CreatureAI.update`: after the `dead` guard and the upkeep (`decideTimer`, `attackCooldown`, hunger,
+fear decay, `bobPhase`), before the species switch. `WorldInteractions.canOpenNpcInteraction` refuses a
+panicking person (no talk prompt, F does nothing); `NpcScreen.update` closes on one too.
+
+**Phases.** Calm → panicking while `CombustionSystem.isBurning` (alive and alight) → recovering for
+`RECOVERY_SECONDS` (1.5) after the flames go out, still panicking but easing to `RECOVERY_STRIDE` of the
+speed → recovered: the intent is cleared, the body's plans are reset and its **ordinary AI runs in that
+same tick**. Catching again while recovering is alight again, and the recovery restarts when the flames
+are out. A medical burn is not a fire: nothing panics without active flames (tested for 10 s after).
+
+**While panicking.** People: `state = FLEE`; `interactFreeze = 0`; if the open NPC screen is this
+person's, `Game.closeScreens()` and one log line; `lastKnownAge` keeps aging and `repathCooldown` keeps
+counting (what they know stays dated); everything else waits — perception, search, work, meals,
+sleep, party mission timers, departure timers and the reload timer (so no reload completes);
+`abstractTravel` is cleared in a loaded column (panic is physical) and a body in an unloaded column
+stands and burns out where it is. Animals: `state = FLEE`; `fear` is left alone. No attack, shot,
+trade or interaction code runs, because none of the ordinary AI does.
+
+**Recovery reset (`settle`).** Person: `state = IDLE`, `hasTarget`, `targetBlock`, `path`,
+`pathIndex`, `combatTarget` cleared, `decideTimer` 0 (a settled person perceives at once), `workTimer`
+0, `repathCooldown` 0, `interactFreeze` 0, stopped. Animal: `state = WANDER`, `hasTarget` and
+`targetEntity` cleared, `decideTimer` and `eatTimer` 0, stopped (a bird hovers). Nothing restores an old
+charge, hunt, meal, conversation, path or target; a settlement that went away is found gone; a player
+who is now out of reach or imperceptible is not attacked.
+
+**Goals.** A goal is chosen at the start, when the timer (`GOAL_INTERVAL` 0.6 s + a draw of up to
+`GOAL_INTERVAL_JITTER` 0.6 s) runs out, when the goal is reached (within `ARRIVE` 0.8), or when progress
+is blocked, but never within `REPLAN_COOLDOWN` (0.25 s) of the last: at most four a second. Each choice
+takes the same draws whatever the terrain (walker four: spread, distance, interval, stride; bird five:
+plus climb), so one body's surroundings never shift the stream for the next body. Escape direction:
+straight away from the last contact point while a flame touches the body; out of contact, half that and
+half its current heading; with no usable point (closer than 0.05 horizontally) its heading, and a new
+panic's heading is the way it faces. The drawn direction is that ± `SPREAD_DEGREES` 70; then turned
+50, 100 and 150 degrees to the drawn side first, and straight back: eight directions. A body that is
+blocked skips directions within `BLOCKED_EXCLUSION_DEGREES` 30 of its heading. Each direction is
+checked along a straight line (`groundReach`: cell to cell with the pathfinder's own footing —
+`Pathfinder.standable`/`passable`, now package-private: same level, one up with headroom, down at most
+`Pathfinder.MAX_DROP` 3, never a torch or campfire cell, never an unloaded column; animals also stop at a
+closed gate). The first direction clear for the whole distance (4–8 blocks) wins, else the one that gets
+furthest; if none gets a block, the goal is one block in the best direction and the choice counts as
+trapped — the body struggles there. Birds (`flightReach`): 6–10 blocks level, climbing 3–6 but never
+above 16 over the ground beneath them (a bird above that glides down to it), sampled every half block at
+the top and bottom of the body; the climb is tried first, then level flight.
+
+**Moving.** The heading turns toward the goal at `TURN_RATE_DEGREES` 270 per second and is always a unit
+vector, so there is no zero direction to spin on. Walkers use `Steering.moveToward` toward a point two
+blocks along the heading (its hop over one block, ladder climb, swimming and fire sidestep as ever;
+`VoxelPhysics` keeps them out of walls, bars and fires), at `CREATURE_SPEED_MUL` 1.6 × species speed or
+`NPC_SPEED_MUL` 1.35 × archetype speed (`LEGACY_PERSON_SPEED` 3.2 without one), times the goal's stride
+(0.85–1). Before each step the columns past the leading faces of the body box (per axis and their
+corner, 0.35 ahead) must be loaded and have footing within three blocks below the feet — checked in the
+air too, so a body that took a legal drop does not carry on over a second one; otherwise it stops and
+replans. People shove a closed gate ahead open (`SettlementManager.openGate`). Birds use
+`Steering.flyToward` at a vertical rate that follows the checked line and stop at an unloaded column.
+Blocked progress is a step that achieved under `STUCK_PROGRESS` 30 % of its distance (horizontal for
+walkers, so jumping at a wall is not progress; three-dimensional for birds) for `STUCK_SECONDS` 0.2.
+Physics runs once per tick in the entity tick, as ever; panic never moves a body itself.
+
+**Blind to the player and presentation.** `FirePanic` never reads the player, the camera or anything
+rendered; a player's position, perceivability and mode cannot change a choice (a test moves the player
+and spins the camera between ticks and compares every position bit for bit). The player has no panic:
+§13 holds, tested through the production movement system and the whole game tick with a burning crowd
+round a burning player.
+
+**Changes from the proposals above** (reasons in the progress file):
+
+- `Pathfinder` is not used for panic. Goals are 4–8 blocks off and checked with the pathfinder's own
+  footing rules along a straight line; A* for up to four random goals a second per body would allocate
+  per query and plan detours that read as deliberate. Measured: 0 bytes per fast tick for 75 panicking
+  bodies.
+- Captives run the same panic; bars and collision keep them in, and rescue stays the player's action.
+- `fear` is not raised or cleared by panic; a thornhorn that is still wounded and afraid may charge a
+  perceivable player in reach afresh after recovery (its ordinary rule), never an old target.
+- A second hook in `SettledNpcAI.update` covers direct callers.
+- The ground check is made in the air too, and the flight check at the body's top and bottom with the
+  climb following it: the real-settlement probe and the roofed-bird test found the weaker versions let a
+  body clear a second drop and a bird graze a roof edge.
+
 ## 13. Player control and Creative
 
 - Combustion never touches `PlayerMovementSystem`, `Player.moveSpeedMul`, `canSprint`,
@@ -1001,13 +1096,19 @@ species and both sides are free).
 | `SCORCH_SECONDS` | 10 s at intensity 1 (added in 06) | presentation input only; 10 may retune |
 | `AFTERBURN_FLASH` | 0.5 × intensity (added in 06) | least red flash kept during afterburn; contact ticks flash 1 |
 | `MAX_BURN_SECONDS` | 600 (added in 06) | keeps an endless campfire contact finite |
-| `PANIC_GOAL_INTERVAL` | 0.6 s + seeded 0–0.6 s | irregular, not per frame |
-| `PANIC_GOAL_DISTANCE` | 4–8 blocks (birds 6–10 horizontal, climb 3–6) | |
-| `PANIC_SPREAD` | ± 70° | crowds do not mirror each other |
-| Panic speed | creature `type.speed × 1.6`; NPC `speed × 1.35` | matches existing flee multipliers |
-| `PANIC_TURN_RATE` | 270 °/s | coherent motion |
-| `PANIC_REPLAN_COOLDOWN` | 0.25 s | bounded replanning |
-| `PANIC_RECOVERY` | 1.5 s | brief settling after extinction |
+| `PANIC_GOAL_INTERVAL` | 0.6 s + seeded 0–0.6 s | irregular, not per frame; as built `PanicConstants.GOAL_INTERVAL` + `GOAL_INTERVAL_JITTER` |
+| `PANIC_GOAL_DISTANCE` | 4–8 blocks (birds 6–10 horizontal, climb 3–6) | as built `GOAL_DISTANCE_*`, `FLIGHT_DISTANCE_*`, `CLIMB_*` |
+| `PANIC_SPREAD` | ± 70° | crowds do not mirror each other; as built `SPREAD_DEGREES` |
+| Panic speed | creature `type.speed × 1.6`; NPC `speed × 1.35` | matches existing flee multipliers; as built `CREATURE_SPEED_MUL`, `NPC_SPEED_MUL`, a person without an archetype walking at `LEGACY_PERSON_SPEED` 3.2 (08) |
+| `PANIC_TURN_RATE` | 270 °/s | coherent motion; as built `TURN_RATE_DEGREES` |
+| `PANIC_REPLAN_COOLDOWN` | 0.25 s | bounded replanning; as built `REPLAN_COOLDOWN` |
+| `PANIC_RECOVERY` | 1.5 s | brief settling after extinction; as built `RECOVERY_SECONDS` |
+| `MIN_STRIDE` / `RECOVERY_STRIDE` (added in 08) | each goal at 0.85–1 of the panic speed; 0.55 at the end of the recovery | a stumbling, then slowing, run |
+| `AFTER_CONTACT_AWAY_WEIGHT` (added in 08) | 0.5 | out of the flames, half "away from the touch", half the way it runs |
+| `STUCK_SECONDS` / `STUCK_PROGRESS` (added in 08) | 0.2 s under 30 % of the intended step | blocked progress replans quickly, not on one bad tick |
+| `ARRIVE` (added in 08) | 0.8 blocks | a reached goal is replaced |
+| `CANDIDATE_STEP_DEGREES` / `BLOCKED_EXCLUSION_DEGREES` (added in 08) | 50° (eight directions) / 30° | a blocked line turns the goal; a blocked body turns away |
+| `FLIGHT_CEILING_ABOVE_GROUND` (added in 08) | 16 blocks | about the top of a bird's ordinary flight (5–13) |
 | `MIN_SEPARATE_PIECE` | 0.10 m | section 7 |
 | `MAX_ANCHORED_REMAINS` | 60 | section 9 (as built: `BodyFragmentConstants`) |
 | `MIN_LAUNCH_MASS` | 1.25 kg | section 9.1; added in 03 |
@@ -1060,6 +1161,13 @@ Gameplay (enforced by tests; wall-clock numbers only in opt-in `performanceTest`
   `burningBodies <= livingBodies`, smoke line `burning=N/M`). 06 adds no collection: one fixed
   state object per body, one pending contact per body, four `int` counters.
 - Panic: ≤ 1 goal per actor per 0.25 s; path work within existing `Pathfinder` limits.
+  As built in 08 (§12.1): no `Pathfinder` query at all. A walker's goal checks at most 8 directions ×
+  8 cells (each cell a few block lookups, the same as the pathfinder's neighbour step); a bird's at most
+  8 directions × 2 heights × 24 half-block samples × 2 cells. Each tick adds the heading turn and the
+  ground check ahead (at most 3 columns × 5 lookups). No collection, no allocation outside opening a gate:
+  `FirePanicAllocationTest` measures a crowd at the NPC cap plus 35 animals and birds, all panicking in a
+  walled yard of pillars for 5000 ticks (thousands of blocked replans), at **0 bytes per fast tick**. The
+  goal bound is asserted by the tests (goals ≤ 1 + elapsed / 0.25 s). Wall-clock cost is unmeasured.
 - Eviction and caps never undo a death or skip a living body's combustion; only presentation
   degrades.
 
@@ -1113,7 +1221,7 @@ Replace, keeping unrelated coverage:
 | 05 persistence (done) | §7 save strategy, 03 remains ids | `world.remains` v1 for every family's settled pieces, their poses and the anchored harvest links (with lodged arrows); `world.fragments` v1 unchanged and pinned by a literal fixture (§14.1). |
 | 06 combustion state (done) | §5, §6, §10, §11, §15 | `Entity.combustion` (`BodyCombustion`), `CombustionSource`, `CombustionSystem` (`expose`/`ignite`/`extinguish`/`clear`/`isBurning`/`burningBodies`, read-only getters), fast-tick wiring, `CreatureAI` dead guard, medical-BURN gating, reset in `WorldBootstrap`, `FireSystem.isPrecipitationReaching`, `RuntimeBudgetSnapshot.burningBodies` (§10.1). |
 | 07 sources (done) | §4, §10; 06 API | `BodySweep` swept contact sampled in `CombustionSystem` for patches (`LiquidFireSystem.exposeContacts`), burning cells, campfires and torches (`FireSystem.exposeContacts`); direct-hit ignition in `ProjectileSystem.onEntityHit`; legacy contact damage removed; block-fire attribution (`FireSystem.ignite(…, byPlayer, origin)`); one attack per person per bottle; people and animals keep out of torches and campfires (`Entity.keepsOutOfFlames`, `VoxelPhysics`, `Steering`, `Pathfinder`); flame placement refused into a burnable body (§4.1). |
-| 08 panic | §12; 06 snapshot, 07 ignition | Panic hooks in `NpcAI.update`/`CreatureAI.update`, per-actor intent, seeded stream, NPC screen closure, bird flight escape. |
+| 08 panic (done) | §12; 06 snapshot, 07 ignition | `ai/FirePanic` hooked first in `NpcAI.update`, `SettledNpcAI.update` and `CreatureAI.update`; `PanicIntent` on `Npc.panic`/`Creature.panic` (read-only getters); seeded `EntityManager.nextPanicFloat`; NPC screen closure and a talk gate while panicking; straight-line goal checks on the pathfinder's footing, ground look-ahead, bird flight escape; recovery reset (§12.1). |
 | 09 lifecycle | §6, §9, §14 | Dead guard before creature AI, residue snapshot at death, resets on load/new world/respawn/Creative/deactivation, pause and sleep behaviour. |
 | 10 presentation | §16 presentation budgets, 02/04 geometry, 06/09 snapshots | Attached flames, scorch, smoke, embers, audio, first-person cues, QA scenes and captures. |
 | 11 validation | the whole contract | Production-path matrix tests, bounds/perf evidence, docs, updated `COMBAT_LETHALITY_AND_MOLOTOV.md` limits. |
