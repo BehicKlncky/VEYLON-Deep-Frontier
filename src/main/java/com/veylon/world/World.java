@@ -149,24 +149,42 @@ public class World {
      * chunk's neighbourhood, fire and water work a cell at a time, and
      * raycasts step through a few metres.
      *
-     * <p>This can never go stale. Chunks are only ever added to the map —
+     * <p>Behind it sits a small direct-mapped table keyed by the chunk
+     * coordinates' low bits, so any 8 x 8 window of chunks resolves without
+     * the map: per-body queries that hop between the chunks a crowd stands in
+     * (body fire contact, 20 times a second for every body) never box.
+     *
+     * <p>Neither can go stale. Chunks are only ever added to the map —
      * unloading frees GPU meshes and leaves the block data in place — and a new
      * world is a new {@link World}, so there is no invalidation to get wrong.
      */
     private int cachedCx = Integer.MIN_VALUE;
     private int cachedCz = Integer.MIN_VALUE;
     private Chunk cachedChunk;
+    private static final int RECENT_BITS = 3;
+    private static final int RECENT_MASK = (1 << RECENT_BITS) - 1;
+    private final int[] recentCx = new int[1 << 2 * RECENT_BITS];
+    private final int[] recentCz = new int[1 << 2 * RECENT_BITS];
+    private final Chunk[] recentChunk = new Chunk[1 << 2 * RECENT_BITS];
 
     public Chunk getChunk(int cx, int cz) {
         if (cx == cachedCx && cz == cachedCz) {
             return cachedChunk;
         }
-        Chunk c = chunks.get(key(cx, cz));
-        if (c != null) {
-            cachedCx = cx;
-            cachedCz = cz;
-            cachedChunk = c;
+        int slot = (cx & RECENT_MASK) | (cz & RECENT_MASK) << RECENT_BITS;
+        Chunk c = recentChunk[slot];
+        if (c == null || recentCx[slot] != cx || recentCz[slot] != cz) {
+            c = chunks.get(key(cx, cz));
+            if (c == null) {
+                return null;
+            }
+            recentCx[slot] = cx;
+            recentCz[slot] = cz;
+            recentChunk[slot] = c;
         }
+        cachedCx = cx;
+        cachedCz = cz;
+        cachedChunk = c;
         return c;
     }
 
