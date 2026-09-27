@@ -58,6 +58,7 @@ final class QaHarness {
     private final DismemberQaScene dismemberScene;
     private final SpeciesDismemberQaScene speciesDismemberScene;
     private final MolotovQaScene molotovScene;
+    private final BodyFireQaScene bodyFireScene;
     private final HudQaScene hudScene;
 
     // Render statistics sampled across an automated run.
@@ -106,6 +107,7 @@ final class QaHarness {
         dismemberScene = new DismemberQaScene(game);
         speciesDismemberScene = new SpeciesDismemberQaScene(game);
         molotovScene = new MolotovQaScene(game);
+        bodyFireScene = new BodyFireQaScene(game);
         hudScene = new HudQaScene(game);
     }
 
@@ -271,6 +273,7 @@ final class QaHarness {
         dismemberScene.update(elapsed);
         speciesDismemberScene.update(elapsed);
         molotovScene.update(elapsed);
+        bodyFireScene.update(elapsed);
         hudScene.update(elapsed);
     }
 
@@ -723,6 +726,12 @@ final class QaHarness {
                 site = moveBenchmarkToBiome(Biome.MEADOW);
                 clearBenchmarkStage(site, 12, 16);
                 molotovScene.stage(site, normalized);
+            }
+            case "body_fire_row", "body_fire_row_night", "body_fire_close", "body_fire_out", "body_fire_blast",
+                    "body_fire_panic", "body_fire_bird", "body_fire_rain", "body_fire_ragdoll", "body_fire_player" -> {
+                site = moveBenchmarkToBiome(Biome.MEADOW);
+                clearBenchmarkStage(site, 14, 18);
+                bodyFireScene.stage(site, normalized);
             }
             case "vfx_blood", "blood_tracks" -> {
                 site = moveBenchmarkToBiome(Biome.MEADOW);
