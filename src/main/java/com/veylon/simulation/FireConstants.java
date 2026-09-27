@@ -1,7 +1,9 @@
 package com.veylon.simulation;
 
 /**
- * Fire spread, burn duration, suppression and contact damage tuning.
+ * Fire spread, burn duration, suppression and flame shape tuning. What a flame
+ * does to a body that touches it is tuned with the body's fire, in
+ * {@code entity.CombustionConstants} and {@code entity.CombustionSource}.
  *
  * <p>Extracted verbatim from {@link FireSystem}; changing one is a gameplay
  * change, not a refactor.
@@ -48,16 +50,29 @@ public final class FireConstants {
     /** Rain drains exposed campfire fuel this many times faster. */
     public static final float RAIN_CAMPFIRE_DRAIN_MULT = 2.2f;
 
-    /** Squared distance within which fire damages an entity. */
-    public static final float CONTACT_RANGE_SQ = 2.4f;
-    /** Damage per second dealt to the player standing in fire. */
-    public static final float PLAYER_BURN_DPS = 4f * 2;
-    /** Damage per second dealt to creatures. */
-    public static final float CREATURE_BURN_DPS = 5f * 2;
-    /** Damage per second dealt to NPCs. */
-    public static final float NPC_BURN_DPS = 4f * 2;
-    /** Chance per damaging tick that contact inflicts the burn affliction. */
-    public static final float BURN_AFFLICTION_CHANCE = 0.5f;
+    /**
+     * How far a burning block's flames reach out of each open face into the
+     * cell beside or below it. Faces against a solid block give no flame, so
+     * heat never crosses a wall or a floor.
+     */
+    public static final float FLAME_FACE_REACH = 0.25f;
+    /** How far above a burning block's top the flames rise, when the cell above is open. */
+    public static final float FLAME_PLUME_HEIGHT = 0.75f;
+    /**
+     * A placed torch's flame, in its own cell: the burning head, a little
+     * wider and taller than the drawn head so a hand brushing it counts. It
+     * stops at the cell's top, so nobody standing on the block beside a torch
+     * treads in its tip.
+     */
+    public static final float TORCH_FLAME_HALF_WIDTH = 0.12f;
+    public static final float TORCH_FLAME_BOTTOM = 0.66f;
+    public static final float TORCH_FLAME_TOP = 1.0f;
+    /** A fueled campfire's flames, in its own cell: over the logs, up to the cell's top. */
+    public static final float CAMPFIRE_FLAME_HALF_WIDTH = 0.25f;
+    public static final float CAMPFIRE_FLAME_BOTTOM = 0.15f;
+    public static final float CAMPFIRE_FLAME_TOP = 1.0f;
+
+    /** The medical burn injury's length: this, plus up to the range at random. */
     public static final float BURN_AFFLICTION_SECONDS_MIN = 60f;
     public static final float BURN_AFFLICTION_SECONDS_RANGE = 40f;
 

@@ -79,4 +79,10 @@ public class Creature extends Entity {
         this.maxHealth = type.maxHealth;
         this.health = type.maxHealth;
     }
+
+    /** Animals keep out of torches and campfires, flying or not. */
+    @Override
+    protected boolean keepsOutOfFlames() {
+        return true;
+    }
 }

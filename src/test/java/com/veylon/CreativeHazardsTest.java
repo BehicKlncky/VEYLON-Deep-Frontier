@@ -52,7 +52,10 @@ class CreativeHazardsTest {
             case FIRE -> {
                 game.world.setBlock(310, 40, 310, BlockType.LOG, false);
                 assertTrue(game.fire.ignite(game, 310, 40, 310));
-                game.fire.mediumTick(game, 0.5f);
+                // Half a second of the fast tick in which bodies touch flames.
+                for (int i = 0; i < 10; i++) {
+                    game.combustion.fastTick(game, 0.05f);
+                }
             }
             case EXPLOSION -> game.explosions.explode(game, 311.5f, 41, 310.5f, 2, 30, 0, false);
             case ARROW, BULLET -> {

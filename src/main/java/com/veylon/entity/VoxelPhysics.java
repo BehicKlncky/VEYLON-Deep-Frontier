@@ -14,13 +14,78 @@ final class VoxelPhysics {
     private static final float MIN_REMAINING_MOVE = 1e-7f;
     private static final int HORIZONTAL_HIT = 1;
     private static final int HORIZONTAL_STEPPED = 1 << 1;
+    /** Least speed at which a body walks out of a torch or campfire cell, blocks per second. */
+    private static final float FLAME_STEP_OUT_SPEED = 1.5f;
+    /** A flame cell's four neighbours, in the order a tie is settled. */
+    private static final int[][] NEIGHBOURS = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}};
 
     private VoxelPhysics() {
     }
 
+    /**
+     * One step of a walking, swimming or low-flying body. A body that keeps
+     * out of fires ({@link Entity#keepsOutOfFlames}) treats torch and campfire
+     * cells as solid for the step; one that began the step in such a cell (it
+     * was set down, spawned or a fire was lit there) instead walks out of it.
+     */
     static void integrate(Entity entity, float dt, boolean gravity, float stepHeight) {
         refreshEnvironment(entity);
+        entity.flamesBlock = entity.keepsOutOfFlames() && !walkOutOfFlameCell(entity);
+        integrateBody(entity, dt, gravity, stepHeight);
+        entity.flamesBlock = false;
+    }
 
+    /**
+     * When a body that keeps out of fires stands in a torch or campfire cell,
+     * sets its horizontal velocity toward the nearest of that cell's four
+     * neighbours it can stand in, at no less than
+     * {@link #FLAME_STEP_OUT_SPEED}, whatever its AI chose. Walled in, it keeps
+     * its own velocity. True when it was in such a cell.
+     */
+    private static boolean walkOutOfFlameCell(Entity e) {
+        if (!e.keepsOutOfFlames()) {
+            return false;
+        }
+        long cell = e.flameCell();
+        if (cell == Entity.NO_FLAME_CELL) {
+            return false;
+        }
+        int fx = (int) (cell >> 32);
+        int fz = (int) cell;
+        int y = (int) Math.floor(e.pos.y + 0.01f);
+        float bestX = 0f, bestZ = 0f, best = Float.MAX_VALUE;
+        for (int[] d : NEIGHBOURS) {
+            int nx = fx + d[0], nz = fz + d[1];
+            if (!standable(e, nx, y, nz)) {
+                continue;
+            }
+            float tx = nx + 0.5f - e.pos.x, tz = nz + 0.5f - e.pos.z;
+            float dist = tx * tx + tz * tz;
+            if (dist < best) {
+                best = dist;
+                bestX = tx;
+                bestZ = tz;
+            }
+        }
+        if (best != Float.MAX_VALUE) {
+            float len = (float) Math.sqrt(best);
+            float speed = Math.max(FLAME_STEP_OUT_SPEED,
+                    (float) Math.sqrt(e.vel.x * e.vel.x + e.vel.z * e.vel.z));
+            e.vel.x = bestX / len * speed;
+            e.vel.z = bestZ / len * speed;
+        }
+        return true;
+    }
+
+    /** Open at the feet and the head, no fire in either, solid underfoot. */
+    private static boolean standable(Entity e, int x, int y, int z) {
+        BlockType feet = e.world.getBlock(x, y, z);
+        BlockType head = e.world.getBlock(x, y + 1, z);
+        return !feet.solid && !head.solid && !Entity.isFlameCell(feet) && !Entity.isFlameCell(head)
+                && e.world.isSolid(x, y - 1, z);
+    }
+
+    private static void integrateBody(Entity entity, float dt, boolean gravity, float stepHeight) {
         if (gravity) {
             if (entity.onLadder) {
                 entity.vel.y = Math.max(entity.vel.y, -1.6f);

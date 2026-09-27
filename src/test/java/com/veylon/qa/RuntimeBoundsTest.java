@@ -128,7 +128,6 @@ class RuntimeBoundsTest {
                 "resolved/removed kegs leave no stale source attribution");
         assertEquals(0, settled.fires(), "burned-out cells leave no fire state");
         assertEquals(0, settled.liquidFirePatches(), "spilled liquid burns out");
-        assertEquals(0, game.liquidFire.trackedNpcSpills(), "burned-out spills are forgotten");
         assertEquals(0, settled.particles(), "visual effects expire");
         assertEquals(0, settled.counterattackMissions(), "resolved missions clean up");
         assertEquals(0, settled.dormantCounterattackers(), "mission cleanup releases dormant capacity");

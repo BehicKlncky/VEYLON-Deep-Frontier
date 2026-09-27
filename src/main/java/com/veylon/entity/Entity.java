@@ -1,5 +1,6 @@
 package com.veylon.entity;
 
+import com.veylon.world.BlockType;
 import com.veylon.world.World;
 import org.joml.Vector3f;
 
@@ -47,6 +48,11 @@ public abstract class Entity {
         this.world = world;
     }
 
+    /** The world this body moves in. */
+    public World world() {
+        return world;
+    }
+
     public boolean collidesAt(float px, float py, float pz) {
         if (py < 0) {
             return true;
@@ -61,13 +67,68 @@ public abstract class Entity {
         for (int x = x0; x <= x1; x++) {
             for (int y = y0; y <= y1; y++) {
                 for (int z = z0; z <= z1; z++) {
-                    if (world.isSolid(x, y, z)) {
+                    BlockType t = world.getBlock(x, y, z);
+                    if (t.solid || flamesBlock && isFlameCell(t)) {
                         return true;
                     }
                 }
             }
         }
         return false;
+    }
+
+    /**
+     * Whether this body keeps out of the cells of torches and campfires as it
+     * keeps out of solid blocks, and walks out of one it finds itself in
+     * ({@link VoxelPhysics#integrate}). People and animals do: they live
+     * beside fires without walking into them. The player, whose movement is
+     * theirs alone, walks where they choose.
+     */
+    protected boolean keepsOutOfFlames() {
+        return false;
+    }
+
+    /**
+     * Set by each physics step: torch and campfire cells block this body. Not
+     * for a body that began the step in such a cell, which must be free to
+     * leave it.
+     */
+    boolean flamesBlock;
+
+    /** Whether any cell of the body box where it stands now holds a torch or a campfire. */
+    boolean inFlameCell() {
+        return flameCell() != NO_FLAME_CELL;
+    }
+
+    /** What {@link #flameCell} returns when the body is in no torch or campfire cell. */
+    static final long NO_FLAME_CELL = Long.MIN_VALUE;
+
+    /**
+     * The column of a torch or campfire cell the body box overlaps where it
+     * stands now, packed as {@code x << 32 | z}, or {@link #NO_FLAME_CELL}.
+     */
+    long flameCell() {
+        float hw = width / 2f;
+        int x0 = (int) Math.floor(pos.x - hw);
+        int x1 = (int) Math.floor(pos.x + hw - 1e-4f);
+        int y0 = (int) Math.floor(pos.y);
+        int y1 = (int) Math.floor(pos.y + height - 1e-4f);
+        int z0 = (int) Math.floor(pos.z - hw);
+        int z1 = (int) Math.floor(pos.z + hw - 1e-4f);
+        for (int x = x0; x <= x1; x++) {
+            for (int y = y0; y <= y1; y++) {
+                for (int z = z0; z <= z1; z++) {
+                    if (isFlameCell(world.getBlock(x, y, z))) {
+                        return (long) x << 32 | z & 0xffffffffL;
+                    }
+                }
+            }
+        }
+        return NO_FLAME_CELL;
+    }
+
+    static boolean isFlameCell(BlockType t) {
+        return t == BlockType.TORCH || t == BlockType.CAMPFIRE;
     }
 
     /** Integrates velocity with gravity and voxel collision. */

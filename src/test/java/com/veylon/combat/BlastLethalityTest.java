@@ -279,8 +279,11 @@ class BlastLethalityTest {
         assertEquals(tough.maxHealth, tough.health, "so nobody is hurt the moment it breaks");
         assertFalse(fragile.dead);
 
-        // Standing in the burning liquid can still finish someone.
-        g.liquidFire.mediumTick(g, 0.5f);
+        // Standing in the burning liquid can still finish someone: half a
+        // second of the body-fire fast ticks in which bodies touch flames.
+        for (int i = 0; i < 10; i++) {
+            g.combustion.fastTick(g, 0.05f);
+        }
         assertTrue(tough.health < tough.maxHealth, "the liquid burns");
         assertFalse(tough.dead, "but does not kill a person one block away");
         assertFalse(tough.dismemberOnDeath);

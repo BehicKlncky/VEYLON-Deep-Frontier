@@ -4,6 +4,7 @@ import com.veylon.Game;
 import com.veylon.combat.ProjectileSystem;
 import com.veylon.combat.WeaponRegistry;
 import com.veylon.entity.Affliction;
+import com.veylon.entity.CombustionSource;
 import com.veylon.entity.Creature;
 import com.veylon.entity.GameMode;
 import com.veylon.entity.Npc;
@@ -26,12 +27,11 @@ import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Path;
 
-import static com.veylon.simulation.LiquidFireConstants.ENTITY_DPS_CREATURE;
-import static com.veylon.simulation.LiquidFireConstants.ENTITY_DPS_NPC;
-import static com.veylon.simulation.LiquidFireConstants.ENTITY_DPS_PLAYER;
+import static com.veylon.entity.CombustionConstants.CONTACT_DPS_CREATURE;
+import static com.veylon.entity.CombustionConstants.CONTACT_DPS_NPC;
+import static com.veylon.entity.CombustionConstants.CONTACT_DPS_PLAYER;
 import static com.veylon.simulation.LiquidFireConstants.MAX_PATCHES;
 import static com.veylon.simulation.LiquidFireConstants.MAX_PATCHES_PER_SPILL;
-import static com.veylon.simulation.LiquidFireConstants.MAX_TRACKED_NPC_SPILLS;
 import static com.veylon.simulation.LiquidFireConstants.RAIN_EXTINGUISH_SECONDS;
 import static com.veylon.simulation.LiquidFireConstants.SPILL_RADIUS;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -43,17 +43,21 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * A fire bomb is a molotov: it breaks on the first thing it hits, makes no
- * blast, and spills burning liquid over the ground that burns whoever stands
- * in it, lights what it touches and goes out on its own or in the rain.
+ * blast, and spills burning liquid over the ground that sets whoever stands
+ * in it alight, lights what it touches and goes out on its own or in the rain.
  *
  * <p>Everything happens in {@code CombatSystemsTest}'s flat stone arena, floor
  * top at y = 39, so liquid on the floor lies in the cells at y = 40. Weather is
- * set directly and only the fire systems' medium ticks are driven, in the
- * scheduler's half-second steps, so no weather roll changes the sky mid-test.
+ * set directly and only the fire systems are driven, in the order and at the
+ * rates {@code Game} drives them: the body-fire fast tick, where bodies touch
+ * flames, ten times per half-second medium tick of the block and liquid
+ * fires. No AI or physics runs, so bodies stay where they are put, and no
+ * weather roll changes the sky mid-test.
  */
 class MolotovTest {
 
     private static final float TICK = SimulationScheduler.MEDIUM_DT;
+    private static final float FAST = SimulationScheduler.FAST_DT;
     private static final float FRAME = 0.02f;
     /** Where people stand: spawned a hair above the arena floor. */
     private static final float FEET = 40.1f;
@@ -106,10 +110,13 @@ class MolotovTest {
                 "the pool is centred at the feet of the one it hit");
         assertEquals(1f, centre.intensity(), 0f);
         assertEquals(before, target.health, "the bottle itself does no impact damage");
+        assertTrue(g.combustion.isBurning(target), "but the one it broke on is alight at once");
+        assertSame(CombustionSource.DIRECT_HIT, target.combustion.owner());
+        assertTrue(target.combustion.ownerByPlayer());
 
-        g.liquidFire.mediumTick(g, TICK);
-        assertEquals(before - ENTITY_DPS_NPC * TICK, target.health, 1e-4f,
-                "the liquid at its feet burns it");
+        g.combustion.fastTick(g, FAST);
+        assertEquals(before - CONTACT_DPS_NPC * FAST, target.health, 1e-4f,
+                "the next fast tick burns it at the contact rate, the liquid at its feet included");
         assertTrue(target.lastHitByPlayer, "and the burn is the thrower's");
     }
 
@@ -183,23 +190,21 @@ class MolotovTest {
         assertEquals(bottles - 1, newest.spillId());
         assertNotNull(patchAt(295 + 4 * 8, 40, 340), "the newest bottle keeps its centre");
 
-        // So many people in one pool that the memory of who was burned by
-        // which bottle fills up: everyone still burns, the memory stays capped.
+        // A crowd far past the NPC cap in one pool: nobody is left out, and
+        // the pool keeps nothing about who stood in it.
         g.liquidFire.reset();
         g.liquidFire.spill(g, 320.5f, 40.5f, 345.5f, 0, 0, false);
-        Npc[] crowd = new Npc[MAX_TRACKED_NPC_SPILLS + 6];
+        Npc[] crowd = new Npc[70];
         for (int i = 0; i < crowd.length; i++) {
             crowd[i] = g.entities.spawnNpc(g.world, "Crowd " + i, 320.5f, FEET, 345.5f);
         }
-        g.liquidFire.mediumTick(g, TICK);
-        assertEquals(MAX_TRACKED_NPC_SPILLS, g.liquidFire.trackedNpcSpills());
+        g.combustion.fastTick(g, FAST);
         for (Npc n : crowd) {
-            assertTrue(n.health < n.maxHealth, n.name + " burns though the memory is full");
+            assertTrue(g.combustion.isBurning(n) && n.health < n.maxHealth, n.name + " catches");
         }
         tick(LiquidFireConstants.BURN_SECONDS_MIN + LiquidFireConstants.BURN_SECONDS_RANGE
                 + LiquidFireConstants.BURN_SECONDS_JITTER + TICK);
         assertEquals(0, g.liquidFire.count(), "the pool burns out on its own");
-        assertEquals(0, g.liquidFire.trackedNpcSpills(), "and is forgotten with it");
     }
 
     @Test
@@ -233,35 +238,32 @@ class MolotovTest {
             if (mode == GameMode.CREATIVE) {
                 assertTrue(g.switchGameMode(GameMode.CREATIVE));
             }
-            // Everyone straddles four burning cells at once.
+            // Everyone straddles four burning cells at once, one of them the
+            // pool's full-strength centre: the flames scale with the liquid.
             g.player.pos.set(330f, FEET, 330f);
             Creature thornhorn = g.entities.spawnCreature(g.world, Creature.CreatureType.THORNHORN,
-                    331f, FEET, 329f);
-            Npc settler = g.entities.spawnNpc(g.world, "Settler", 329f, FEET, 331f);
+                    331f, FEET, 331f);
+            Npc settler = g.entities.spawnNpc(g.world, "Settler", 330f, FEET, 331f);
             g.liquidFire.spill(g, 330.5f, 40.5f, 330.5f, 0, 0, false);
             float player = g.player.health;
             float creature = thornhorn.health;
             float npc = settler.health;
 
-            g.liquidFire.mediumTick(g, TICK);
+            g.combustion.fastTick(g, FAST);
 
-            assertEquals(creature - ENTITY_DPS_CREATURE * TICK, thornhorn.health, 1e-4f,
+            assertEquals(creature - CONTACT_DPS_CREATURE * FAST, thornhorn.health, 1e-4f,
                     mode + ": a creature on four patches burns once");
-            assertEquals(npc - ENTITY_DPS_NPC * TICK, settler.health, 1e-4f,
+            assertEquals(npc - CONTACT_DPS_NPC * FAST, settler.health, 1e-4f,
                     mode + ": an NPC on four patches burns once");
             assertFalse(thornhorn.lastHitByPlayer, "nobody threw this one");
             if (mode == GameMode.SURVIVAL) {
-                assertEquals(player - ENTITY_DPS_PLAYER * TICK, g.player.health, 1e-4f,
+                assertEquals(player - CONTACT_DPS_PLAYER * FAST, g.player.health, 1e-4f,
                         "the player on four patches burns once");
                 assertEquals(1f, g.player.damageFlash);
-                for (int i = 0; i < 12 && !g.player.has(Affliction.BURN); i++) {
-                    g.liquidFire.mediumTick(g, TICK);
-                }
-                assertTrue(g.player.has(Affliction.BURN), "standing in it inflicts burns");
+                tick(1f);
+                assertTrue(g.player.has(Affliction.BURN), "a second alight in it inflicts burns");
             } else {
-                for (int i = 0; i < 12; i++) {
-                    g.liquidFire.mediumTick(g, TICK);
-                }
+                tick(6f);
                 assertEquals(player, g.player.health, "Creative: the liquid cannot hurt the player");
                 assertEquals(0f, g.player.damageFlash);
                 assertFalse(g.player.has(Affliction.BURN), "nor burn them");
@@ -327,11 +329,16 @@ class MolotovTest {
         // Under a stone roof with a block of headroom, on bare floor.
         fill(296, 304, 42, 42, 296, 304, BlockType.STONE);
         int sheltered = g.liquidFire.spill(g, 300.5f, 40.5f, 300.5f, 0, 0, true);
+        Npc dry = g.entities.spawnNpc(g.world, "Dry", 300.5f, FEET, 300.5f);
         assertEquals(MAX_PATCHES_PER_SPILL, exposed);
         assertEquals(MAX_PATCHES_PER_SPILL, sheltered);
         assertFalse(g.fire.isRainedOn(g, 300, 40, 300), "precondition: the roof shelters");
 
         tick(RAIN_EXTINGUISH_SECONDS + TICK);
+
+        assertFalse(wet.combustion.burning(), "the rain-soaked pool never set anyone alight, "
+                + "not even before its first medium tick");
+        assertTrue(g.combustion.isBurning(dry), "control: the pool under the roof does");
 
         assertEquals(sheltered, g.liquidFire.count(), "only the sheltered pool is still burning");
         for (Patch p : g.liquidFire.patches()) {
@@ -417,12 +424,12 @@ class MolotovTest {
         assertTrue(g.liquidFire.count() > 0, "precondition: the bottle broke among them");
         tick(4 * TICK);
         for (Npc n : new Npc[] {a, b, drifter}) {
-            assertTrue(n.health <= n.maxHealth - 4 * ENTITY_DPS_NPC * TICK + 1e-3f,
-                    n.name + " stood in the fire for all four ticks");
+            assertTrue(n.health <= n.maxHealth - 0.5f * 4 * TICK * CONTACT_DPS_NPC + 1e-3f,
+                    n.name + " stood in the fire, at least at its rim's strength, all the while");
             assertTrue(n.lastHitByPlayer);
         }
         assertEquals(-36f, village.localReputation, 1e-4f,
-                "two residents burned for four ticks are two attacks, not eight");
+                "two residents burned for 40 fast ticks are two attacks, not eighty");
         assertEquals(0f, a.lastKnownAge, "the perceivable thrower is noticed");
 
         // A second bottle on the same people is a second attack on each.
@@ -452,7 +459,7 @@ class MolotovTest {
             float ageBefore = resident.lastKnownAge;
             g.liquidFire.spill(g, 330.5f, 40.5f, 330.5f, 0, 0, true);
 
-            g.liquidFire.mediumTick(g, TICK);
+            g.combustion.fastTick(g, FAST);
 
             assertTrue(resident.health < resident.maxHealth, mode + ": precondition: it burned");
             assertEquals(-18f, village.localReputation, 1e-4f, mode + ": the attack costs reputation");
@@ -548,9 +555,15 @@ class MolotovTest {
         return t;
     }
 
-    /** Block fire first, then the liquid, as {@code Game.mediumTick} orders them. */
+    /**
+     * Whole medium ticks as {@code Game} runs them: the ten body-fire fast
+     * ticks of the half second first, then block fire, then the liquid.
+     */
     private void tick(float seconds) {
         for (float t = 0; t < seconds; t += TICK) {
+            for (int i = 0; i < Math.round(TICK / FAST); i++) {
+                g.combustion.fastTick(g, FAST);
+            }
             g.fire.mediumTick(g, TICK);
             g.liquidFire.mediumTick(g, TICK);
         }

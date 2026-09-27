@@ -57,6 +57,23 @@ public final class BodyCombustion {
     int pendingSourceId;
     float pendingX, pendingY, pendingZ;
 
+    /**
+     * Where the last fast tick sampled the body's flame box (its bottom
+     * centre), the start of the next tick's sweep; meaningless until
+     * {@code sampled}.
+     */
+    boolean sampled;
+    float sampleX, sampleY, sampleZ;
+
+    /**
+     * The player's bottles whose attack on this body has been reported,
+     * oldest first: one attack per body per bottle, however many patches,
+     * ticks, refreshes or burn episodes it takes. Bounded; the oldest is
+     * forgotten first.
+     */
+    private final int[] reportedBottles = new int[CombustionConstants.REPORTED_BOTTLES];
+    private int reportedCount;
+
     /** Whether the body is alight. Kept as it was when the body died; see {@link CombustionSystem#isBurning}. */
     public boolean burning() {
         return burning;
@@ -220,6 +237,31 @@ public final class BodyCombustion {
         exposureZ = z;
     }
 
+    void sampledAt(float x, float y, float z) {
+        sampled = true;
+        sampleX = x;
+        sampleY = y;
+        sampleZ = z;
+    }
+
+    /**
+     * Remembers that the player's bottle {@code bottle} has been reported as
+     * an attack on this body; false when it already was.
+     */
+    boolean firstReportOf(int bottle) {
+        for (int i = 0; i < reportedCount; i++) {
+            if (reportedBottles[i] == bottle) {
+                return false;
+            }
+        }
+        if (reportedCount == reportedBottles.length) {
+            System.arraycopy(reportedBottles, 1, reportedBottles, 0, reportedCount - 1);
+            reportedCount--;
+        }
+        reportedBottles[reportedCount++] = bottle;
+        return true;
+    }
+
     /** Puts the flames out and forgets any heat; the scorch, the last exposure and the episode's length stay. */
     void extinguish() {
         burning = false;
@@ -241,5 +283,7 @@ public final class BodyCombustion {
         scorch = 0f;
         exposed = false;
         exposureX = exposureY = exposureZ = 0f;
+        sampled = false;
+        reportedCount = 0;
     }
 }

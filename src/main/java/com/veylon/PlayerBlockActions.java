@@ -1,5 +1,6 @@
 package com.veylon;
 
+import com.veylon.entity.CombustionSystem;
 import com.veylon.entity.Creature;
 import com.veylon.entity.Entity;
 import com.veylon.entity.Npc;
@@ -10,6 +11,7 @@ import com.veylon.item.Inventory;
 import com.veylon.item.ItemStack;
 import com.veylon.item.ItemType;
 import com.veylon.item.ToolKind;
+import com.veylon.simulation.FireSystem;
 import com.veylon.util.Vec3i;
 import com.veylon.world.BlockType;
 import com.veylon.world.RackBatch;
@@ -349,8 +351,8 @@ final class PlayerBlockActions {
         if (place == null || !game.world.getBlock(px, py, pz).isReplaceable()) {
             return false;
         }
-        // Don't place inside the player or an entity.
-        if (place.solid && wouldCollide(px, py, pz)) {
+        // Don't place inside the player or an entity, nor a flame into anyone who can burn.
+        if (place.solid && wouldCollide(px, py, pz) || flameWouldTouch(place, px, py, pz)) {
             return false;
         }
         game.world.setBlock(px, py, pz, place, true);
@@ -391,6 +393,30 @@ final class PlayerBlockActions {
         }
         for (Npc n : game.entities.npcs) {
             if (aabbIntersectsBlock(n, bx, by, bz)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * True when a torch or campfire placed here would put its flame into a
+     * body that can burn: the Survival player placing it at their own feet,
+     * or a person or animal standing there. Placing never sets anyone alight;
+     * walking into a flame does.
+     */
+    private boolean flameWouldTouch(BlockType place, int bx, int by, int bz) {
+        if (CombustionSystem.canBurn(game.player)
+                && FireSystem.flameWouldTouch(place, bx, by, bz, game.player)) {
+            return true;
+        }
+        for (Creature c : game.entities.creatures) {
+            if (CombustionSystem.canBurn(c) && FireSystem.flameWouldTouch(place, bx, by, bz, c)) {
+                return true;
+            }
+        }
+        for (Npc n : game.entities.npcs) {
+            if (CombustionSystem.canBurn(n) && FireSystem.flameWouldTouch(place, bx, by, bz, n)) {
                 return true;
             }
         }

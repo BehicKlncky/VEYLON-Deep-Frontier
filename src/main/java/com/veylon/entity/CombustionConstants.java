@@ -55,4 +55,9 @@ public final class CombustionConstants {
     public static final float MAX_BURN_SECONDS = 600f;
     /** Least red flash kept on the player's screen per unit of intensity during afterburn. */
     public static final float AFTERBURN_FLASH = 0.5f;
+    /**
+     * The player's bottles a body remembers having reported as attacks, so a
+     * person is attacked once per bottle; beyond this the oldest is forgotten.
+     */
+    public static final int REPORTED_BOTTLES = 4;
 }

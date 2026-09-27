@@ -6,6 +6,7 @@ import com.veylon.combat.ProjectileSystem;
 import com.veylon.combat.WeaponRegistry;
 import com.veylon.entity.Affliction;
 import com.veylon.entity.BodyFragment;
+import com.veylon.entity.CombustionConstants;
 import com.veylon.entity.Entity;
 import com.veylon.entity.GameMode;
 import com.veylon.entity.Npc;
@@ -52,8 +53,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * {@code CombatSystemsTest}'s flat stone arena, floor top at y = 40, so people
  * stand at y = 40.1 and liquid on the floor lies in the cells at y = 40. The
  * weather is set directly and only the systems a scene needs are stepped, at
- * the frame and medium-tick rates {@code Game} drives them at, so no weather
- * roll or AI decision changes a scene mid-test.
+ * the frame, fast-tick and medium-tick rates {@code Game} drives them at, so
+ * no weather roll or AI decision changes a scene mid-test.
  */
 class CombatFireIntegrationTest {
 
@@ -456,13 +457,14 @@ class CombatFireIntegrationTest {
             assertTrue(g.updateThrownWeaponCommand(2f, true, new Vector3f(0, -1, 0)));
             fly();
             assertTrue(standsInFire(g.player), mode + ": precondition: the player stands in the pool");
-            int ticks = 6;
+            int ticks = 60;
             for (int i = 0; i < ticks; i++) {
-                g.liquidFire.mediumTick(g, TICK);
+                g.combustion.fastTick(g, SimulationScheduler.FAST_DT);
             }
             if (mode == GameMode.SURVIVAL) {
-                assertEquals(before - ticks * LiquidFireConstants.ENTITY_DPS_PLAYER * TICK,
-                        g.player.health, 1e-3f, "Survival: the player's own pool burns them");
+                assertEquals(before - ticks * CombustionConstants.CONTACT_DPS_PLAYER * SimulationScheduler.FAST_DT,
+                        g.player.health, 1e-3f, "Survival: the player's own pool sets them alight");
+                assertTrue(g.player.has(Affliction.BURN), "and leaves the medical burn");
             } else {
                 assertEquals(before, g.player.health, "Creative: the liquid cannot hurt the player");
                 assertEquals(0f, g.player.damageFlash);
@@ -522,8 +524,15 @@ class CombatFireIntegrationTest {
         assertEquals(0, g.projectiles.liveCount(), "everything thrown or fired has landed");
     }
 
-    /** Block fire first, then the liquid, as {@code Game.mediumTick} orders them. */
+    /**
+     * One medium tick of fire as {@code Game} runs it: the half second's ten
+     * body-fire fast ticks, where bodies touch the flames, then block fire,
+     * then the liquid. No AI or physics, so people stay where they stand.
+     */
     private void tickFires() {
+        for (int i = 0; i < FRAMES_PER_TICK; i++) {
+            g.combustion.fastTick(g, SimulationScheduler.FAST_DT);
+        }
         g.fire.mediumTick(g, TICK);
         g.liquidFire.mediumTick(g, TICK);
     }

@@ -51,11 +51,19 @@ public final class Pathfinder {
         return (int) (k & 0xFFFL);
     }
 
-    /** True when the cell can contain a standing NPC body (feet cell). */
+    /**
+     * True when the cell can contain a standing NPC body (feet cell). Nobody
+     * walks or stands in a fire: a torch's or campfire's cell is not passable,
+     * so routes and the sleeping places beside beds keep out of the flames
+     * that set a body alight.
+     */
     private static boolean passable(World w, int x, int y, int z) {
         BlockType t = w.getBlock(x, y, z);
         if (t == BlockType.GATE) {
             return true; // NPCs shoulder gates open; cost handled below
+        }
+        if (t == BlockType.TORCH || t == BlockType.CAMPFIRE) {
+            return false;
         }
         return !t.solid || t.isClimbable();
     }

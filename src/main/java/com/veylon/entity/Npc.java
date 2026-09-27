@@ -123,6 +123,12 @@ public class Npc extends Entity {
         health = 35;
     }
 
+    /** People walk round torches and campfires rather than through them. */
+    @Override
+    protected boolean keepsOutOfFlames() {
+        return true;
+    }
+
     public boolean hostileToPlayer() {
         // Captives are protected prisoners, not members of the faction that
         // happens to hold them.  Keep this before settlement ownership so a

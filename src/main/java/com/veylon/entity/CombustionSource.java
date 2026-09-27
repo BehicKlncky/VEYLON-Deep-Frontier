@@ -19,7 +19,7 @@ public enum CombustionSource {
     DIRECT_HIT(Float.POSITIVE_INFINITY, 6f, 1.0f),
     LIQUID(Float.POSITIVE_INFINITY, 6f, 1.0f),
     BLOCK_FIRE(4f, 4f, 1.0f),
-    CAMPFIRE(2f, 3f, 0.8f),
+    CAMPFIRE(1f, 3f, 0.8f),
     TORCH(1f, 2f, 0.6f);
 
     /** Heat gained per second of contact at intensity 1; infinite for an immediate kind. */

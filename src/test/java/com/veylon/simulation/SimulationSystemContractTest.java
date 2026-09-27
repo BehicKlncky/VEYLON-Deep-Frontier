@@ -77,8 +77,10 @@ class SimulationSystemContractTest {
         assertTrue(game.liquidFire.spill(game, lx + 0.5f, ly + 1.5f, lz + 0.5f, 1, 0, true) > 0,
                 "precondition: liquid is burning");
         game.liquidFire.mediumTick(game, SimulationScheduler.MEDIUM_DT);
-        assertTrue(bather.health < bather.maxHealth && game.liquidFire.trackedNpcSpills() > 0,
-                "precondition: the liquid has burned someone it now remembers");
+        game.combustion.fastTick(game, SimulationScheduler.FAST_DT);
+        assertTrue(bather.health < bather.maxHealth && game.combustion.isBurning(bather)
+                        && game.liquidFire.nextSpillId() > 0,
+                "precondition: the liquid has set someone alight and counted its bottle");
         game.liquidFire.totalPatchIgnitions = 4;
         game.time.advance(9_000);
         game.weather.current = WeatherSystem.Weather.STORM;
@@ -165,7 +167,7 @@ class SimulationSystemContractTest {
         assertEquals(0, game.fire.totalIgnitions, "fire statistics do not carry over");
         assertEquals(0, game.fire.totalExtinguished);
         assertEquals(0, game.liquidFire.count(), "burning liquid does not carry over");
-        assertEquals(0, game.liquidFire.trackedNpcSpills(), "nor who it has burned");
+        assertEquals(0, game.liquidFire.nextSpillId(), "bottles are counted afresh");
         assertEquals(0, game.liquidFire.totalSpills, "liquid fire statistics do not carry over");
         assertEquals(0, game.liquidFire.totalPatchIgnitions);
         int nx = (int) game.player.pos.x - 4;

@@ -32,8 +32,20 @@ import static com.veylon.entity.CombustionConstants.TIMER_EPSILON;
  * direct hit sets a body alight at once with {@link #ignite}. {@link
  * #extinguish} puts one out and {@link #clear} forgets a body's fire for a new
  * life. A dead body, a Creative player and a body whose torso is under water
- * refuse a flame. Which production sources call these is milestone 07's work;
- * nothing in the game reports a contact yet.
+ * refuse a flame.
+ *
+ * <p><b>Sources.</b> Each fast tick first sweeps every living body's flame box
+ * ({@link BodySweep}) from where the last tick sampled it to where it is now
+ * and asks the world's flames whether they touch it: burning liquid
+ * ({@code LiquidFireSystem.exposeContacts}), and burning blocks, fueled
+ * campfires and placed torches ({@code FireSystem.exposeContacts}). A fire
+ * bomb breaking on a body calls {@link #ignite} from the projectile step.
+ * Nothing else hurts a body for touching a flame.
+ *
+ * <p><b>Attacks.</b> When the player's flame lights or takes over a person's
+ * fire, that person is attacked once per bottle (the contact's source id):
+ * the settlement is told, and the person looks to where the flame touched
+ * them if the player can be perceived. Flames nobody threw never count.
  *
  * <p><b>Cadence.</b> Only {@link #fastTick} advances a fire, one fixed
  * {@link SimulationScheduler#FAST_DT} step per call, from {@code Game.fastTick}
@@ -41,11 +53,15 @@ import static com.veylon.entity.CombustionConstants.TIMER_EPSILON;
  * processing, so AI reads this tick's fire and a body the fire kills is
  * removed in the same tick. No medium or slow tick touches a fire, so nothing
  * advances twice. Equal simulated time under any frame partition gives the
- * same fires, whatever renders or not.
+ * same fires, whatever renders or not. The player has moved by the frame
+ * before the tick samples it; people and animals move in the entity step
+ * after it, so their sweep covers the previous tick's move: either way every
+ * move is swept exactly once.
  *
  * <p><b>One tick of one body</b>, in order: a dead body is not ticked; a
- * Creative player's fire is cleared; a torso under water puts the fire out and
- * ignores every contact; the tick's candidate contact lights the body
+ * Creative player's fire is cleared; the flames its sweep touched offer their
+ * contacts; a torso under water puts the fire out and ignores every contact;
+ * the tick's candidate contact lights the body
  * (immediately for liquid and direct hits, by heat for the rest) or refreshes
  * its fire; exposed rain on the head soaks and at last puts it out; damage;
  * afterburn fuel drains when nothing touched it. Damage per tick is
@@ -65,6 +81,9 @@ public final class CombustionSystem implements FastTickSystem {
     public int totalBurnouts;
     public int totalDoused;
     public int totalRainedOut;
+
+    /** Reused for every body's contact sampling. */
+    private final BodySweep sweep = new BodySweep();
 
     @Override
     public void reset() {
@@ -93,8 +112,10 @@ public final class CombustionSystem implements FastTickSystem {
      * only the strongest counts, so contacts never add up.
      *
      * @param intensity the flame's strength, clamped to at most 1
-     * @param sourceId  a stable id of the source within its kind (a spill id,
-     *                  a packed cell); breaks ties between equal contacts
+     * @param sourceId  a stable id of the source: for the player's flame, the
+     *                  bottle it came from (its spill id), which is what an
+     *                  attack is counted by; otherwise an id within its kind
+     *                  (a packed cell). Also breaks ties between equal contacts
      * @param x         where the flame touches the body
      * @return false when the body cannot burn or the contact is not a flame
      */
@@ -207,6 +228,7 @@ public final class CombustionSystem implements FastTickSystem {
             b.clear();
             return;
         }
+        sampleFlames(g, e, b);
         if (!b.burning && b.heat == 0f && b.pending == null) {
             return;
         }
@@ -227,19 +249,24 @@ public final class CombustionSystem implements FastTickSystem {
         CombustionSource kind = b.pending;
         b.contact = kind != null;
         if (kind != null) {
+            boolean byPlayer = b.pendingByPlayer;
+            int sourceId = b.pendingSourceId;
             b.touchedAt(b.pendingX, b.pendingY, b.pendingZ);
             if (b.burning) {
-                b.refresh(kind, b.pendingIntensity, b.pendingByPlayer, b.pendingSourceId);
+                b.refresh(kind, b.pendingIntensity, byPlayer, sourceId);
             } else {
                 b.heat = kind.ignitesOnContact() ? 1f
                         : Math.min(1f, b.heat + kind.heatGainPerSecond * b.pendingIntensity * dt);
                 if (b.heat + TIMER_EPSILON >= 1f) {
-                    b.ignite(kind, b.pendingIntensity, b.pendingByPlayer, b.pendingSourceId);
+                    b.ignite(kind, b.pendingIntensity, byPlayer, sourceId);
                     totalIgnitions++;
                     announce(g, e, "You're on fire! Deep water or open rain will put it out.");
                 }
             }
             b.pending = null;
+            if (b.burning && byPlayer && e instanceof Npc n) {
+                reportAttack(g, n, b, sourceId);
+            }
         } else if (!b.burning) {
             b.heat = Math.max(0f, b.heat - HEAT_DECAY_PER_SECOND * dt);
         }
@@ -281,6 +308,34 @@ public final class CombustionSystem implements FastTickSystem {
                 b.extinguish();
             }
         }
+    }
+
+    /**
+     * Asks every flame in the world whether it touched the body on its way
+     * here since the last tick; each one that did offers a contact.
+     */
+    private void sampleFlames(Game g, Entity e, BodyCombustion b) {
+        sweep.set(e, b.sampled, b.sampleX, b.sampleY, b.sampleZ);
+        b.sampledAt(sweep.endX(), sweep.endY(), sweep.endZ());
+        g.liquidFire.exposeContacts(g, e, sweep);
+        g.fire.exposeContacts(g, e, sweep);
+    }
+
+    /**
+     * The player's flame has just lit or taken over a person's fire: the
+     * first time for this bottle, the person looks to where the flame
+     * touched them if the player can be perceived, and a settlement counts
+     * the attack (its reputation cost does not wait on perception).
+     */
+    private static void reportAttack(Game g, Npc n, BodyCombustion b, int bottle) {
+        if (!b.firstReportOf(bottle)) {
+            return;
+        }
+        if (g.player == null || g.player.isPerceivableByAi()) {
+            n.lastKnown.set(b.exposureX, b.exposureY, b.exposureZ);
+            n.lastKnownAge = 0f;
+        }
+        g.settlementManager.onNpcAttackedByPlayer(g, n);
     }
 
     private static void burn(Entity e, BodyCombustion b, float damage, float intensity) {
