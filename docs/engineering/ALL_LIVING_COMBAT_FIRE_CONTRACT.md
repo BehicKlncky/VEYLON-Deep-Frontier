@@ -324,7 +324,8 @@ below: **0 flame contacts, 0 ignitions** in the same run.
 | Combustion rules, exposure resolution, damage | `entity/CombustionSystem` owned by `Game` (`Game.combustion`), reset in `WorldBootstrap`; no random stream | Tuning in `entity/CombustionConstants` and `entity/CombustionSource`. Package `entity`, not the proposed `simulation`, so the state's mutators are package-private (§10.1). |
 | Panic intent (goal, timers, recovery) | embedded per `Npc`/`Creature` (or inside `BodyCombustion`) | Written only by AI; seeded panic stream on `EntityManager` or the combustion system. As built in 08 (§12.1): `ai/PanicIntent` as `Npc.panic` / `Creature.panic`, package-private fields written only by `ai/FirePanic`; stream `EntityManager.nextPanicFloat`. |
 | Burn visuals, scorch rendering, audio | presentation layer (`AmbienceSystem`/`ParticleSystem`/`Renderer`/`AudioManager`) reading a read-only snapshot | Presentation never writes gameplay state. |
-| Death-time visual residue | a bounded list owned by the presentation or fragment/ragdoll layer (09) | Snapshot values only, no entity references. |
+| Death-time visual residue | a bounded list owned by the presentation or fragment/ragdoll layer (09) | Snapshot values only, no entity references. As built in 09 (§14.2): `entity/BurnResidue`, carried by `Ragdoll.burn` → `HumanCorpse.burn` / `Carcass.burn`, or shared by a body's pieces (`BodyFragment.burn`, `burnShare`); aged and bounded by `entity/BurnResidueSystem` (`Game.burnResidues`, ≤ 32). |
+| Leaving the world without dying | `EntityManager.depart` (via `removeNpc`, `removeNpcs`, the entity tick's administrative `dead` path, the creature despawn) (09) | Forgets fire and panic, purges AI targets and a conversation; spawns, credits and reports nothing (§14.2). |
 
 ## 6. Update cadence and order
 
@@ -364,6 +365,13 @@ gap: one fast tick (0.05 s).
 As built in 06 (§10.1): steps 1–3 are wired, with source sampling in step 2 left to 07 (which
 adds it before resolution) and the `dead` guard in `CreatureAI.update`. A `dt` above `FAST_DT`
 advances one `FAST_DT`, so "only ever advances by `FAST_DT` steps" holds for direct callers too.
+As built in 09 (§14.2): the frame's world step is `Game.advanceWorld`, run only when
+`Game.simulates()`; after fragments it ages the burn residues (`burnResidues.update`). Every
+explosion happens in the frame (projectile impacts, then keg fuses), after that frame's fast
+ticks, so within a frame a burn death always precedes a blast; a body the fire killed is
+already out of the entity lists (or, for the player, dead and skipped by the blast), and a body a
+blast killed is never ticked by its fire again. `Player.tickNeeds` now stops for a dead player,
+so the fast ticks left in the frame a player died in neither heal nor hurt the body.
 As built in 07 (§4.1): step 2 samples every source for each body before resolving it, with the
 sweep, gap and shape above; the medium tick no longer damages bodies.
 
@@ -670,7 +678,9 @@ owners never report player attacks. Block fires ignited by a player's patch carr
 and pass it to cells they spread to.
 
 **Death and removal.** Dead or removed bodies leave combustion immediately (their state is not
-ticked). What remains visible after death is presentation residue only (09/10).
+ticked). What remains visible after death is presentation residue only (09/10). As built in 09
+(§14.2): the residue is a `BurnResidue` captured at the death transition; a body removed without
+dying has its fire cleared by `EntityManager.depart` and leaves none.
 
 ### 10.1 As built in milestone 06 (state, rules, API)
 
@@ -962,6 +972,9 @@ round a burning player.
   Survival starts with a clear state. As built in 06: `Player.restoreCreativeBody` clears the
   fire too, so the switch to Creative forgets it at once, and every command refuses the
   invulnerable player.
+- As built in 09 (§14.2): the round trip Survival → Creative → Survival brings no flame back
+  until a fresh contact (tested through `Game.switchGameMode`); the player cannot fall asleep
+  while alight and a fire wakes a sleeping player. Neither touches movement or the camera.
 
 ## 14. Persistence and transient state
 
@@ -1074,6 +1087,126 @@ pieces or links.
 Carcass)` (throws `IllegalArgumentException` unless the piece is the core of the record's
 species and both sides are free).
 
+### 14.2 As built in milestone 09 (lifecycle)
+
+**Transient policy.** Stated in the class comments of `BodyCombustion`, `CombustionSystem`,
+`BurnResidue` and `BurnResidueSystem`, in `SaveSystem.save` beside the settle calls, and here:
+
+| State | Save | Load, new world | Respawn | To Creative / back | Dormancy, departure | Death |
+| --- | --- | --- | --- | --- | --- | --- |
+| A body's fire: burning, fuel, heat, soak, owner, scorch, exposure, sample point, reported bottles (`Entity.combustion`) | not written, left running | new bodies, none | cleared (`Game.respawn`) | player's cleared (`Player.restoreCreativeBody`); clear on return until a fresh contact; people and animals burn on | cleared (`EntityManager.depart`) | frozen, never ticked again; copied into the residue |
+| Panic (`Npc.panic`, `Creature.panic`) | not written, left running | new bodies, calm | — (the player never panics) | unaffected | cleared (`FirePanic.forget`) | never ticked (dead guards) |
+| Remains' flames and scorch (`BurnResidue`) | not written; a save's settle moves them onto the corpse, carcass or settled pieces, still ageing | `BurnResidueSystem.reset`; loaded remains carry none | unaffected | unaffected | none made | made here |
+| Health, the player's medical `BURN` | saved (existing) | restored; `BURN` counts down and hurts again once not alight | existing | existing | health, `alive`, sickness, hunger written back to the resident record | — |
+| Settled remains, harvest links | saved (05) | restored once | — | — | — | — |
+
+**The death transition and the residue (API for 10).** `BurnResidueSystem.capture(Entity)` is
+called at exactly two places, both at the moment the one representation is chosen:
+`RagdollSystem.begin` (both `spawn` overloads) and `BodyFragmentSystem.launch` (people, animals and
+the player's remains). It returns null for a body neither burning nor scorched; otherwise a
+`BurnResidue` copying the scorch, and for a body alight its `intensity()`, its fuel (capped) and its
+rain `soak`. Every field is a primitive: it cannot hold the entity or the live `Player` (a test
+checks the class reflectively).
+
+| Carrier | Field | Rule |
+| --- | --- | --- |
+| Falling whole body | `Ragdoll.burn` | set at spawn; anchored to the torso point every solver step |
+| Body at rest | `HumanCorpse.burn`, `Carcass.burn` | **moved** from the ragdoll at `RagdollSystem.emit` (the ragdoll's field is nulled; the same object, never a copy); a bird leaves no body, so its residue is let go |
+| Body blown apart | `BodyFragment.burn`, `BodyFragment.burnShare` | one object shared by every piece; `burnShare` = the piece's mass / the body's (the shares sum to 1); anchored to the core piece (`definition.parent == -1`) in flight and at rest; the harvest record of a fragmented animal has `burn == null` |
+
+Read-only getters (package `entity` owns every mutator): `scorch()` (constant, kept for the remains'
+lifetime), `flameAtDeath()`, `flame()` = `flameAtDeath × (1 − age / flameSeconds)` while
+`age < flameSeconds`, else 0, `smoke()` = `flameAtDeath × age / flameSeconds` during the flames, then
+falling linearly to 0 over `RESIDUE_SMOKE_SECONDS`, `active()` (flame or smoke showing),
+`flameSeconds()` = `min(RESIDUE_FLAME_SECONDS, fuel at death)`, cut to the age at which water or rain
+put it out, `age()`, `doused()`, and the anchor `x()/y()/z()` (capture: the body's centre; then the
+ragdoll torso point, the core piece's centre, the corpse or carcass position). `flame()` and `smoke()`
+are 0 once the system lets the residue go. **10 draws through the carriers** — `ragdolls.live`,
+`entities.corpses`, whole `entities.carcasses`, `fragments.live` and `fragments.settled` — each
+piece at its `burnShare` of the body's flame, so a body in pieces is never drawn with ten fires.
+
+`BurnResidueSystem` (`Game.burnResidues`, a `SimulationSystem`): `capture`, `update(Game, dt)` from
+`Game.advanceWorld` after the fragment step (so paused frames age nothing, and a residue shared by
+ten pieces ages once), `trackedCount()`, diagnostics `totalCaptured`, `totalEvicted`, `reset()` from
+`WorldBootstrap.resetForNewWorld`. Each update, per tracked residue: released if no carrier holds it
+(`BurnResidue.hold`/`letGo`, package-private: a ragdoll or corpse or carcass holds once, each piece
+once; corpse and carcass rot, the corpse distance cull, piece eviction, `removePiece`, rot and
+distance cull let go); otherwise it ages by `min(dt, RESIDUE_MAX_STEP)`; while its flames last, water
+in the anchor cell douses it at once and open precipitation there (`FireSystem.isPrecipitationReaching`,
+the living body's predicate) douses it once the soak it inherited plus the rain since reaches
+`RAIN_EXTINGUISH_SECONDS`; an unloaded column is skipped. It is released when its smoke ends. A capture
+past `MAX_BURN_RESIDUES` (32) ends the oldest one's flames and smoke; its scorch stays on its carriers.
+Nothing samples a residue as a flame: it deals no damage and lights nobody (R8, tested).
+
+**First lethal cause.** Within a frame the fast ticks (fire, then AI, physics and death routing) run
+before any projectile impact or keg fuse, so a burn death is always processed before a blast in the
+same frame. `Entity.hurt` ignores a dead body, so the first lethal hit keeps `lastHitByPlayer`;
+`ExplosionSystem.detonate` passes over a dead body before its lethal gate and `recordBlastDeath`
+refuses a body the call did not kill; `CombustionSystem` drops a dead body's contact and never
+advances it. Hence: fire first → a whole body, no blast record, the fire owner's credit, even for the
+player killed by the fire in a fast tick and caught by a keg later in the frame; blast first → the
+blast record and the blast owner's credit, one set of pieces, the fire frozen as the blast found it
+(and captured from there). The player's body keeps no needs tick while dead (`Player.tickNeeds`
+returns for a dead player): the fast ticks left in the frame of a death no longer heal it above 0
+or keep an injury counting. `enterDeathIfDue` runs once per death (existing).
+
+**Leaving without dying.** `EntityManager.depart(Game, Npc)` / `depart(Game, Creature)`:
+`CombustionSystem.clear` (fire, heat, scorch, exposure, sample point and the reported bottles — the
+only source de-duplication memory a body has), `FirePanic.forget` (new, public: clears the intent
+without the recovery's plan reset), `forgetTarget` (other people's `combatTarget`, animals'
+`targetEntity`), and for a person the conversation: `Game.closeScreens()` when the NPC screen is
+theirs, otherwise `activeNpc = null`. It spawns, credits, reports and logs nothing. Callers:
+`EntityManager.removeNpc` and `removeNpcs(Game, Predicate)` (new; a reverse index scan that keeps the
+order of those who stay; never called from inside the entity tick's own iteration) — used by
+`SettlementManager.deactivate` and `rescueCaptive`, all four `CounterattackDirector` removals
+(garrison replaced, orphans after a load, dematerialize, members removed) and
+`FactionSystem.cleanupExpiredObjective`; the entity tick's administrative `dead` path (health left:
+routed fighters, departing traders, fading raiders — never a corpse, `reallyDied`); and the creature
+despawn in `EntityManager.slowTick` (an index loop now). Dormancy policy (finite): the dormant
+simulation has no fire, so deactivation writes back the health a resident has at that moment and
+drops the fire and panic; reactivation spawns a new, calm, unburned body at that health. No fire
+is simulated anywhere remote.
+
+**Pause, screens and sleep.** `Game.simulates()` (the frame's gate, unchanged rule, now callable)
+and `Game.advanceWorld(dt)` (the frame's whole world step) are the only way anything burns, panics,
+falls or ages. Pausing: `PAUSE`, `OPTIONS`, `AUDIO_OPTIONS`, `GAME_MODE`, `WORLD_CONTROLS`, the debug
+pause (`simPaused`), and every app state but `PLAYING` (death screen included). Not pausing:
+`INVENTORY`, `CRAFTING`, `CRATE`, `NPC`, `MAP`, `CREATIVE_CATALOG` — fires burn on under them.
+Sleep fast-forwards only `time.totalMinutes`; fires advance by the frames' fast ticks and residues by
+the frames' seconds, so a night's sleep burns nothing ahead (60 sleeping frames: 170 in-game
+minutes, one second of fire). `SleepSystem.startSleep` refuses while the player is alight;
+`tickSleep` wakes a burning player whatever the red flash (afterburn flashes at most 0.5, which
+never woke anyone). A conversation replaced by another screen lets its speaker go
+(`HotkeyRouter.toggle`), and a new world clears the speaker (`WorldBootstrap.clearPerWorldState`).
+
+**Reset owners.**
+
+| State | Reset by |
+| --- | --- |
+| `Entity.combustion` | a new body (new world, load, reactivation); `CombustionSystem.clear` from `Game.respawn`, `EntityManager.depart`; `BodyCombustion.clear` from `Player.restoreCreativeBody` (mode switch, Creative needs tick, Creative respawn) |
+| `Npc.panic`, `Creature.panic` | a new body; the end of the recovery (`FirePanic`); `FirePanic.forget` from `depart` |
+| `CombustionSystem` tallies | `WorldBootstrap.resetForNewWorld` |
+| `BurnResidueSystem` list and tallies | `WorldBootstrap.resetForNewWorld`; per residue: expiry, no carrier left, eviction past 32 |
+| `Ragdoll.burn` | moved on at `RagdollSystem.emit`; `RagdollSystem.reset` drops the ragdolls |
+| `HumanCorpse.burn`, `Carcass.burn`, `BodyFragment.burn` | die with their carrier, letting go on removal |
+| `Game.activeNpc` | `Game.closeScreens`, `WorldBootstrap.clearPerWorldState` (new), `HotkeyRouter.toggle` (new), `EntityManager.depart` (new) |
+
+**Rewards and harvest across transitions** are unchanged in ownership: the first lethal cause's
+`lastHitByPlayer`, one carcass or one anchored record per animal, and a save and load restore each
+once (tested). A residue carries no reward, yield or arrows.
+
+**Changes from the proposals above:**
+
+- The residue lives on its carriers rather than in a list the presentation walks; the registry
+  (≤ 32) only ages and bounds it and knows the carriers' core position by copy.
+- Scorch stays on remains for as long as they last (a copied constant); only flames (≤ 4 s) and
+  smoke (≤ 3 s) are the bounded, decaying part.
+- Water and open rain put a residue's flames out by the living body's rules, the soak carried over.
+- A player who burns to death leaves no residue: no player body exists to carry one (only a
+  blast leaves the player's remains).
+- `Player.tickNeeds` gained its dead guard; departures were centralised in `EntityManager.depart`,
+  applying the deactivation policy to every administrative removal, not only settlements.
+
 ## 15. Proposed tuning (all values proposed)
 
 | Constant | Value | Why |
@@ -1115,6 +1248,10 @@ species and both sides are free).
 | `FragmentModels.SHELL_REACH` | 0.03 m | section 7.2; added in 04 (vest and haunch are 0.02) |
 | `FragmentModels.CONTACT_SPEED` | 1 m/s | section 7.2; added in 04, well under the 4.5 m/s launch bias |
 | Combustion salt / panic salt | `0x4255524e494eL` / `0x50414e494353L` | distinct from every existing salt in the source tree; the combustion salt is unused since 06 (no random stream) |
+| `RESIDUE_FLAME_SECONDS` (added in 09) | 4 s, or the fuel left if less | §16's death-residue flame; the flames die down as the body's own would have |
+| `RESIDUE_SMOKE_SECONDS` (added in 09) | 3 s | §16's death-residue smoke, after the flames or a douse |
+| `MAX_BURN_RESIDUES` (added in 09) | 32 | §16; past it the oldest loses flames and smoke, never scorch |
+| `RESIDUE_MAX_STEP` (added in 09) | 0.25 s | a stalled frame cannot end a residue at once |
 
 Worked outcomes with these values (0.5 s of pool contact at intensity 1, then a full
 afterburn): villager (30) survives with ≈ 10 after ≈ 6 s of visible burning; captive (24)
@@ -1179,7 +1316,11 @@ Presentation (*proposed*, 10 may retune with captures):
   smoke rising as `I` falls; embers at ≤ 0.15 chance. Body fire stops adding at
   `ParticleSystem.SPLASH_LIMIT` and never touches the blood reserve.
 - At most 4 simultaneous body-fire audio sources nearest the listener.
-- Death residue ≤ 4 s flame + ≤ 3 s smoke, at most 32 residues.
+- Death residue ≤ 4 s flame + ≤ 3 s smoke, at most 32 residues. As built in 09 (§14.2): exactly
+  that, one residue per body whatever its piece count, one small object per burning death and no
+  per-frame allocation (a bounded `ArrayList` of 32, scanned backwards); `RuntimeBudgetSnapshot`
+  reports `burnResidues` with the hard limit `burnResidues <= MAX_BURN_RESIDUES`. Scorch-only
+  residues (a body scorched earlier, not burning at death) are carried but never tracked.
 - *Proposed* cost target: ≤ 0.5 ms CPU per frame for 24 burning bodies on the reference host.
 
 ## 17. Tests that encode old behaviour
@@ -1222,6 +1363,6 @@ Replace, keeping unrelated coverage:
 | 06 combustion state (done) | §5, §6, §10, §11, §15 | `Entity.combustion` (`BodyCombustion`), `CombustionSource`, `CombustionSystem` (`expose`/`ignite`/`extinguish`/`clear`/`isBurning`/`burningBodies`, read-only getters), fast-tick wiring, `CreatureAI` dead guard, medical-BURN gating, reset in `WorldBootstrap`, `FireSystem.isPrecipitationReaching`, `RuntimeBudgetSnapshot.burningBodies` (§10.1). |
 | 07 sources (done) | §4, §10; 06 API | `BodySweep` swept contact sampled in `CombustionSystem` for patches (`LiquidFireSystem.exposeContacts`), burning cells, campfires and torches (`FireSystem.exposeContacts`); direct-hit ignition in `ProjectileSystem.onEntityHit`; legacy contact damage removed; block-fire attribution (`FireSystem.ignite(…, byPlayer, origin)`); one attack per person per bottle; people and animals keep out of torches and campfires (`Entity.keepsOutOfFlames`, `VoxelPhysics`, `Steering`, `Pathfinder`); flame placement refused into a burnable body (§4.1). |
 | 08 panic (done) | §12; 06 snapshot, 07 ignition | `ai/FirePanic` hooked first in `NpcAI.update`, `SettledNpcAI.update` and `CreatureAI.update`; `PanicIntent` on `Npc.panic`/`Creature.panic` (read-only getters); seeded `EntityManager.nextPanicFloat`; NPC screen closure and a talk gate while panicking; straight-line goal checks on the pathfinder's footing, ground look-ahead, bird flight escape; recovery reset (§12.1). |
-| 09 lifecycle | §6, §9, §14 | Dead guard before creature AI, residue snapshot at death, resets on load/new world/respawn/Creative/deactivation, pause and sleep behaviour. |
+| 09 lifecycle (done) | §6, §9, §14 | `BurnResidue` captured at the death transition by `BurnResidueSystem` (`Game.burnResidues`), moved ragdoll → corpse/carcass and shared by a body's pieces (`burnShare`), aged and bounded per frame; first-lethal-cause order; `EntityManager.depart`/`removeNpc`/`removeNpcs` for every departure; `FirePanic.forget`; `Player.tickNeeds` dead guard; `Game.simulates`/`advanceWorld`; sleep refusal and wake; dialog-target resets (§14.2). |
 | 10 presentation | §16 presentation budgets, 02/04 geometry, 06/09 snapshots | Attached flames, scorch, smoke, embers, audio, first-person cues, QA scenes and captures. |
 | 11 validation | the whole contract | Production-path matrix tests, bounds/perf evidence, docs, updated `COMBAT_LETHALITY_AND_MOLOTOV.md` limits. |

@@ -122,8 +122,8 @@ still uses. It **resets before it constructs**, in this order:
 1. Release GPU meshes of the outgoing world (`releaseWorldMeshes`).
 2. Reset every cross-world system: scheduler, audio, time, weather, temperature, fire,
    liquid fire, water, events, plants, item conditions, noise, projectiles, explosions,
-   settlements, ragdolls, body fragments and body combustion (its tallies; each body's fire
-   lives on the body and goes with it).
+   settlements, ragdolls, body fragments, body combustion (its tallies; each body's fire
+   lives on the body and goes with it) and burn residues (the flames remains died with).
 3. `reseedSimulation(seed)` — seeds every simulation and player-outcome
    generator, eighteen of them, each with a distinct salt so their streams stay
    independent (the entity manager's AI call seeds four decision streams:
@@ -165,16 +165,19 @@ while (!window.shouldClose())
    `frameFrontend(dt)` and return. No world exists in these states.
 2. **State machine** — `DEATH`/`VICTORY` handle Esc/Enter; otherwise
    `handleGlobalKeys()` (inventory, crafting, map, pause, debug overlays).
-3. `simulate = appState == PLAYING && uiMode not PAUSE/OPTIONS/AUDIO_OPTIONS && !simPaused`.
+3. `simulate = simulates()`: `appState == PLAYING`, no pausing screen (`UiMode.pausesSimulation`:
+   the pause menu and the options, audio, game-mode and world-controls screens opened from it)
+   and not `simPaused`. The inventory, crafting, map, crate, catalog and NPC screens do not pause.
 4. Animation timers decay; sleep advances if sleeping.
 5. **Player input** — when no screen is open and `simulate`: `updateMouseLook`,
    `updateMovement`, `updateActions`. `updateActions` raycasts the target,
    refreshes the prompt, and routes to `PlayerInteractionSystem`, which calls
    back through `interactionCommands` into combat/mining/interact.
-6. **Simulation** — when `simulate`: `time.advance`, then
+6. **Simulation** — when `simulate`, `advanceWorld(dt)`: `time.advance`, then
    `scheduler.update(dt, this)` which drives the three tick buckets, then
-   per-frame systems (particles, ragdolls, body fragments, projectiles,
-   explosion fuses, noise decay, ambient emitters).
+   per-frame systems (particles, projectiles, ragdolls, body fragments, burn residues,
+   explosion fuses, noise decay, ambient emitters). Nothing else advances the world, so a
+   paused frame burns, panics and settles nothing.
 7. **Camera and audio** follow the player eye; set the listener before `audio.update(dt)`.
 8. **Streaming** — `world.ensureChunks(...)` around the player, then
    `renderer.buildDirtyMeshes(...)` on a per-frame budget.
@@ -246,7 +249,9 @@ fire (`Entity.combustion`) and a burning person's or animal's panic
 (`Npc.panic`, `Creature.panic`) live on the entity and die with it — a person who
 leaves the world, through a save, a load or a settlement going dormant, comes
 back unwounded, not burning and calm at their stored health. Saving leaves a body
-that is burning in the live world burning. Pools
+that is burning in the live world burning. The flames and scorch a body dies with,
+carried by its ragdoll, corpse, carcass or pieces (`BurnResidue`), are not saved
+either: loaded remains show neither. Pools
 of burning liquid and burning blocks are not saved either: a save taken with
 the world alight loads with the fires out. What does survive is the remains of
 every body blown apart once they have settled — people, animals and the
@@ -766,6 +771,27 @@ player nor the camera, so it cannot find a Creative player; the player's own fir
 is damage and presentation only, and their controls are untouched. The intent
 (`Npc.panic`, `Creature.panic`) is transient. Details in the contract §12.1.
 
+**A fire goes on on the body a death leaves, and nowhere else.** A dead body's fire
+is never ticked, it never panics, and the first lethal cause decides the death: the
+fire's fast tick runs before the frame's projectiles and fuses, and a body already
+dead neither takes a blast record nor gives its kill back to its fire's owner. At the
+death transition — `RagdollSystem.spawn` for a body that falls whole,
+`BodyFragmentSystem`'s launch for one blown apart, the player's remains included —
+`BurnResidueSystem.capture` (`Game.burnResidues`) copies the body's scorch and, if it
+was alight, the strength it burned with and its afterburn left into a `BurnResidue`
+that refers to nothing. The ragdoll hands that same object to the corpse or carcass
+it settles into; every piece of a body blown apart shares it, each by its mass
+(`BodyFragment.burnShare`). Its flames die down within four seconds, sooner in water
+or open rain, and smoke for three; at most 32 do at once, and whatever carries one
+leaving the world lets it go. It is presentation only: nothing samples it as a flame.
+A body that leaves the world without dying — a settlement going dormant, a party going
+abstract or retired, a captive rescued, a routed fighter, a despawned animal — goes
+through `EntityManager.depart` (`removeNpc`, `removeNpcs`, the entity tick's
+administrative `dead` path): its fire and panic are forgotten, no AI keeps it as a
+target, a conversation with it closes, and it leaves no body or residue; a dormant
+resident keeps the health it left with. The player cannot fall asleep while alight,
+and a fire wakes a sleeper. Details in the contract §14.2.
+
 | State | Persisted | Where |
 | --- | --- | --- |
 | Settled pieces of every body (family, piece, position, orientation, decay, appearance, the pose it died in) | yes | `world.remains`, one record per piece, oldest first; one pose per body |
@@ -775,6 +801,7 @@ is damage and presentation only, and their controls are untouched. The intent
 | Pools of burning liquid, burning blocks | no — a save taken mid-burn loads with the fires out | — |
 | A fire bomb still in the air | yes, with the other explosives; it shatters where it lands | active explosives |
 | Torso wounds, the last shot id, the blast record, a living body's fire and panic | no — they live on the entity and die with it | — |
+| The flames and scorch remains died with (`BurnResidue`) | no — a save leaves them burning; a load builds remains without them | — |
 
 `world.fragments` (0.8.0) and `world.remains` are optional stable-ID sections in
 the v3 extension envelope, so the frozen v3 body and the bodies layout are
