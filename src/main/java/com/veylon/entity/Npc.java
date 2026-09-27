@@ -1,6 +1,7 @@
 package com.veylon.entity;
 
 import com.veylon.ai.FactionSystem;
+import com.veylon.ai.PanicIntent;
 import com.veylon.settlement.HumanFaction;
 import com.veylon.settlement.NpcArchetype;
 import com.veylon.settlement.Settlement;
@@ -113,6 +114,8 @@ public class Npc extends Entity {
      * Transient: not saved, reset only by a new {@code Npc} instance.
      */
     public int lastTorsoShotId = -1;
+    /** Flight from the fire on this body; written only by the AI. Transient. */
+    public final PanicIntent panic = new PanicIntent();
 
     public Npc(World world, String name) {
         super(world);

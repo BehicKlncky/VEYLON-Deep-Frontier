@@ -57,7 +57,7 @@ public final class Pathfinder {
      * so routes and the sleeping places beside beds keep out of the flames
      * that set a body alight.
      */
-    private static boolean passable(World w, int x, int y, int z) {
+    static boolean passable(World w, int x, int y, int z) {
         BlockType t = w.getBlock(x, y, z);
         if (t == BlockType.GATE) {
             return true; // NPCs shoulder gates open; cost handled below

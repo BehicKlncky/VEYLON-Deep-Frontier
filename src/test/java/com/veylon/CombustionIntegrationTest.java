@@ -306,11 +306,13 @@ class CombustionIntegrationTest {
 
     /**
      * The player's own throw command, the projectile's flight and the whole
-     * game tick: the bottle sets a villager alight, the villager stands in
+     * game tick: the bottle sets a villager alight, the villager stays in
      * its pool over a buried burning log, and four medium ticks later has
      * lost exactly the body fire's contact damage. The block and liquid fires'
      * medium ticks hurt nobody of their own any more, so nothing is counted
-     * twice and heat does not come up through the floor.
+     * twice and heat does not come up through the floor. A burning villager
+     * panics and would run out of the pool, so once alight it is walled and
+     * roofed into its cell, where it can only struggle.
      */
     @Test
     void aBottleThrownThroughTheRealLoopBurnsExactlyOnceAndOnlyThroughTheBodyFire() {
@@ -332,6 +334,14 @@ class CombustionIntegrationTest {
         assertEquals(0, g.projectiles.liveCount(), "the bottle broke");
         assertTrue(g.combustion.isBurning(villager), "and set the villager alight");
         assertEquals(1, g.combustion.burningBodies(g), "nobody else: the thrower stands clear of the pool");
+        for (int y = 40; y <= 41; y++) {
+            g.world.setBlock(313, y, 310, BlockType.STONE, false);
+            g.world.setBlock(315, y, 310, BlockType.STONE, false);
+            g.world.setBlock(314, y, 309, BlockType.STONE, false);
+            g.world.setBlock(314, y, 311, BlockType.STONE, false);
+        }
+        // A roof too, or its hops at the walls would lift it clear of the liquid.
+        g.world.setBlock(314, 42, 310, BlockType.STONE, false);
 
         float before = villager.health;
         for (int t = 1; t <= 40; t++) {

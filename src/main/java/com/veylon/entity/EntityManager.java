@@ -36,6 +36,8 @@ public class EntityManager {
     private final Random creatureAiRng = new Random();
     private final Random npcAiRng = new Random();
     private final Random settledNpcAiRng = new Random();
+    /** Goals of people and animals fleeing the fire on their bodies ({@code ai.FirePanic}). */
+    private final Random panicRng = new Random();
 
     public void fastTick(Game g, float dt) {
         for (Iterator<Creature> it = creatures.iterator(); it.hasNext(); ) {
@@ -469,11 +471,21 @@ public class EntityManager {
         rng.setSeed(seed);
     }
 
-    /** Seeds the three independent AI decision streams for this game instance. */
+    /** Seeds the four independent AI decision streams for this game instance. */
     public void setAiRandomSeed(long worldSeed) {
         creatureAiRng.setSeed(worldSeed ^ 0x435245415455L);
         npcAiRng.setSeed(worldSeed ^ 0x4c454741434eL);
         settledNpcAiRng.setSeed(worldSeed ^ 0x5345544e5043L);
+        panicRng.setSeed(worldSeed ^ 0x50414e494353L);
+    }
+
+    /**
+     * The fire panic's own stream ("PANICS"), drawn by burning people and
+     * animals in the entity tick's order. Nothing else draws from it, so a
+     * panic never shifts another decision and presentation never shifts a panic.
+     */
+    public float nextPanicFloat() {
+        return panicRng.nextFloat();
     }
 
     public float nextCreatureAiFloat() {

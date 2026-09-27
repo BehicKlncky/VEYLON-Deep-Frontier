@@ -158,11 +158,16 @@ final class WorldInteractions {
     // NPCs
     // ------------------------------------------------------------------
 
-    /** Normal talk/trade gate. Captives use the rescue action and never this UI. */
+    /**
+     * Normal talk/trade gate. Captives use the rescue action and never this UI.
+     * Nobody stops to talk while fleeing the fire on their body; an open
+     * conversation is closed by that person's AI when they catch.
+     */
     boolean canOpenNpcInteraction(Npc npc) {
         return npc != null && !npc.dead && !npc.raider
                 && npc.archetype != NpcArchetype.CAPTIVE
-                && !npc.hostileToPlayer();
+                && !npc.hostileToPlayer()
+                && !npc.panic.active();
     }
 
     /** Shared decision used by the HUD prompt and the real interaction command. */

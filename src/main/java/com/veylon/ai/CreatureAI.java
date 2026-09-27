@@ -51,6 +51,11 @@ public final class CreatureAI {
         c.fear = Math.max(0, c.fear - 0.1f * dt);
         c.bobPhase += dt * (Math.abs(c.vel.x) + Math.abs(c.vel.z)) * 2.2f;
 
+        // A burning animal flees before any species' own choice, predators included.
+        if (FirePanic.update(g, c, dt)) {
+            return;
+        }
+
         switch (c.type) {
             case BIRD -> updateBird(g, c, dt);
             case HARE -> updateHare(g, c, dt);

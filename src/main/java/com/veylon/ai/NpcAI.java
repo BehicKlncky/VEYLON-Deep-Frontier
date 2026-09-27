@@ -26,6 +26,11 @@ public final class NpcAI {
         n.hunger = Math.min(100, n.hunger + 0.03f * dt);
         n.bobPhase += dt * (Math.abs(n.vel.x) + Math.abs(n.vel.z)) * 2.2f;
 
+        // A burning person drops everything else first, a conversation included.
+        if (FirePanic.update(g, n, dt)) {
+            return;
+        }
+
         if (n.interactFreeze > 0) {
             n.interactFreeze -= dt;
             Steering.stop(n);

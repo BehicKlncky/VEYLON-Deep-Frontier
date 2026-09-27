@@ -1,5 +1,6 @@
 package com.veylon.entity;
 
+import com.veylon.ai.PanicIntent;
 import com.veylon.world.World;
 import org.joml.Vector3f;
 
@@ -70,6 +71,8 @@ public class Creature extends Entity {
     /** Arrows lodged in the animal; recovered when the carcass is harvested. */
     public int stuckArrows;
     public com.veylon.item.ItemType stuckArrowType;
+    /** Flight from the fire on this body; written only by the AI. Transient. */
+    public final PanicIntent panic = new PanicIntent();
 
     public Creature(World world, CreatureType type) {
         super(world);
