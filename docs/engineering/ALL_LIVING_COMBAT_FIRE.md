@@ -2,7 +2,8 @@
 
 Integrated validation of 2026-09-28 (milestone 11 of 12). Branch
 `feature/all-living-dismemberment-combustion`, based on `main` at `3704f4d`
-(`merge: release v0.8.0`); not yet merged or released. Host: AMD Ryzen 5 5600X,
+(`merge: release v0.8.0`); merged into `main` by milestone 12 as
+`merge: all-living dismemberment and combustion`, not released. Host: AMD Ryzen 5 5600X,
 NVIDIA GeForce RTX 3060 Ti (OpenGL 3.3, driver 610.88), 32 GB, Windows 11 x64,
 Temurin 25.0.4.1, Gradle 9.1.0 — not the reference machine the repository's
 wall-clock baselines were recorded on.

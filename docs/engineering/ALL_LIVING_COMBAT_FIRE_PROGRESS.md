@@ -11,7 +11,8 @@ SHA.
 
 | Item | Value |
 | --- | --- |
-| Task branch | `feature/all-living-dismemberment-combustion` (local; not yet pushed) |
+| Task branch | `feature/all-living-dismemberment-combustion`; kept after the merge, like the earlier feature branches |
+| Integration | `merge: all-living dismemberment and combustion` on `main` (`--no-ff`; first parent `3704f4d`, second parent this branch's final tip); the branch and `main` pushed to `origin` in milestone 12 |
 | Original base | `3704f4dea3b7870777b20656813937368a83a171` — `merge: release v0.8.0` (2026-09-20) |
 | Base provenance | Branch already existed at milestone 01 start, created from `HEAD` at the base (reflog: "branch: Created from HEAD"), with no commits of its own. Verified and resumed, not recreated. |
 | `main` / `origin/main` at start | both `3704f4d` after `git fetch origin` on 2026-09-26 (no incoming commits) |
@@ -32,7 +33,8 @@ Checkpoints by milestone (filled in by the following milestone):
 | 08 | `ea4befcd1f7f2fa95d016980ec3563892b13991a` — `feat(ai): make burning people and animals flee their own fire`; `be8784c31136ddaf7804d7015ec54509d856f0d8` — `test(ai): pin fire panic for every body and the player's untouched control`; `f0edea276c2fe4cfbf84d4698792d2d92596b97c` — `docs(combat): record fire panic` |
 | 09 | `d27765ca236c196d06613cfedfe12c46a6a7d274` — `feat(fire): hand a dying body's fire to its remains and to nothing else`; `c2808c74c056b6648ce10f78a566105ccfad5750` — `test(fire): pin body fire across death, saves, departures, modes, pause and sleep`; `f917f151e18422a1ecf261ba1771a0f3979e43ac` — `docs(combat): record combustion lifecycle` |
 | 10 | `5693ee5550f84882d3a1419390b7f469e24d3763` — `feat(fire): show every burning body's fire on the pose it is drawn in`; `915cee2203586f2f3e832e5bf8f509ecefa9dd09` — `feat(qa): stage burning bodies of every kind for captures`; `ee486f6f7ee0c6ddb03bc7c63ebccb2549a8bb21` — `test(fire): pin how every burning body looks, sounds and stays bounded`; `1e654847065d1e3a679fe8498175d12e4996cc4a` — `docs(combat): record body fire presentation` |
-| 11 | reported in the milestone 11 handoff; record here in 12 |
+| 11 | `594fa0942f6715761bea4a066fc9a31a030aef50` — `feat(qa): count bodies, pieces and ragdolls in the runtime report`; `f32b9a45f4569147c02772198fb5603b646baf29` — `test(combat): drive every living body through the player's commands and the frame`; `8317faecefd7310dd4c5ff5d58c1959cde81652f` — `docs(combat): record all-living validation and how to extend it` |
+| 12 | this record, then the merge; both SHAs are in the milestone 12 handoff (the merge follows this record) |
 
 ## Status
 
@@ -49,7 +51,7 @@ Checkpoints by milestone (filled in by the following milestone):
 | 09 | Combustion lifecycle | **Complete** (a burning death hands its fire to the one body it leaves; departures, saves, loads, resets, modes, pause and sleep leave no stale fire or panic) |
 | 10 | Body fire presentation | **Complete** (flames on the drawn pose of every body and its remains, char, smoke, embers, steam, first-person cues, sound; presentation only) |
 | 11 | End-to-end validation | **Complete** (registry-driven matrix through the player's commands and the frame; full-load bounds and benchmark; native captures; docs). The one failing `performanceTest` gate is the durable-save host gap that predates this work; macOS and other GPUs are not verified |
-| 12 | Merge and push | Not started |
+| 12 | Merge and push | **Complete** (two-parent `--no-ff` merge into `main`, the implementation tree milestone 11 validated; branch and `main` pushed to `origin`) |
 
 Since 03, a lethal blast kills and blows apart every living body (all six species, every NPC
 family, a Survival player) in the simulation; since 04 every piece is drawn as its own body's
@@ -1548,3 +1550,62 @@ Nothing new was seen: the scenes look as milestones 04 and 10 recorded them, at 
   summary record. Engineering record: `docs/engineering/ALL_LIVING_COMBAT_FIRE.md`; captures:
   `build/qa/all-living-m11/screenshots/`.
 - The user's untracked `.agents/` and `AGENTS.md` must stay out of every commit.
+
+## Milestone 12 — merge and push (2026-09-28)
+
+This section is the branch's last commit, written before the merge so that `main` needs no
+follow-up commit to narrate it. The merge and push SHAs and the remote check are in the
+milestone 12 handoff.
+
+### Start state
+
+- Branch `feature/all-living-dismemberment-combustion` at `8317fae` (milestone 11), tree
+  `83b5c1069b66b54ee90837d1a2e4b254d9c0e073`: 34 commits on `3704f4d`, linear, no merges. Working
+  tree clean apart from the user's untracked `.agents/` and `AGENTS.md`, which stay untracked; no
+  commit of this task touches either path.
+- `git fetch origin --prune`: `origin/main` still `3704f4d`, which is local `main` and this branch's
+  base (`git merge-base --is-ancestor main` the tip: true), so no synchronization merge was needed.
+  No same-name remote branch existed. The fetch pruned the tracking ref of
+  `feature/combat-lethality-molotov`, which the remote had already deleted; the local branch of that
+  name is untouched.
+
+### Author audit
+
+- All 34 commits: author and committer `BehicKlncky`, the configured identity. Their full messages
+  hold no `Co-Authored-By` line or other co-author, model or agent credit (case-insensitive scan; the
+  hits for "AI" are the game's AI); the only trailer is one `Validation:` line. No hooks, commit
+  template or signing are configured.
+
+### Validation reused
+
+- Milestone 11's `.\gradlew.bat build --rerun-tasks` ran on `8317fae` itself: it started after that
+  commit, nothing was committed or changed after it, and all 143 test reports in
+  `build/test-results/test/` are from its end. **BUILD SUCCESSFUL in 6 m 30 s, 1523 tests in 143
+  classes, 0 failures, 0 errors, 0 skipped**; `javadoc` and `check` executed
+  (`build/all-living-m11-tip-build.log`). It is reused, not repeated.
+- This record changes Markdown only: this file and one sentence of the
+  [summary record](ALL_LIVING_COMBAT_FIRE.md). No test or build task reads Markdown, so, as
+  `AGENTS.md` sets for documentation-only changes, it was checked with `git diff --check` and its
+  links, not the game build. Every path outside `docs/engineering/` is identical to `8317fae`.
+
+### Integration
+
+- `git switch main`, then
+  `git merge --no-ff feature/all-living-dismemberment-combustion -m "merge: all-living dismemberment and combustion"`
+  — a subject-only message like the earlier merges. First parent `3704f4d`, second parent this
+  branch's tip; since `main` is the branch's base, the merge's tree is the tip's tree.
+- `git push -u origin feature/all-living-dismemberment-combustion`, `git push origin main`, then
+  `git ls-remote --heads origin` compared with the local SHAs. No force, no tags, no version bump or
+  release.
+
+### Open for the user
+
+Unchanged by this milestone:
+
+- All combustion, panic and presentation numbers are proposed, not signed off (contract §15); the
+  0.8.0 torso launch question is still open.
+- A Survival player inside 3.9 blocks of their own scrap bomb, or 5.7 of a keg, now dies (contract §8,
+  item 6).
+- Caged captives in generated forts spawn with their heads in the cage roof (pre-existing, from 08).
+- Not verified: macOS, other GPUs and drivers, sound by ear, a 0.8.0 build opening a new save; the
+  durable-save `performanceTest` gate fails on this host regardless of this work.
