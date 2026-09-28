@@ -9,7 +9,9 @@ import com.veylon.engine.ParticleSystem;
 import com.veylon.entity.BodyFragmentConstants;
 import com.veylon.entity.BodyFragmentSystem;
 import com.veylon.entity.CombustionConstants;
+import com.veylon.entity.Creature;
 import com.veylon.entity.Npc;
+import com.veylon.entity.RagdollConstants;
 import com.veylon.settlement.CounterattackDirector;
 import com.veylon.settlement.SettlementManager;
 import com.veylon.simulation.FireSystem;
@@ -39,17 +41,26 @@ public record RuntimeBudgetSnapshot(
         int anchoredRemains,
         int burningBodies,
         int livingBodies,
-        int burnResidues) {
+        int burnResidues,
+        int liveFragments,
+        int settledFragments,
+        int liveRagdolls,
+        int panickingBodies) {
 
     public static RuntimeBudgetSnapshot capture(Game game) {
         int pathNodes = 0;
         int largestPath = 0;
+        int panicking = 0;
         for (Npc npc : game.entities.npcs) {
+            panicking += npc.panic.active() ? 1 : 0;
             if (npc.path == null) {
                 continue;
             }
             pathNodes += npc.path.size();
             largestPath = Math.max(largestPath, npc.path.size());
+        }
+        for (Creature creature : game.entities.creatures) {
+            panicking += creature.panic.active() ? 1 : 0;
         }
         int dormantAttackers = game.settlementManager.counterattacks.missions.values().stream()
                 .mapToInt(mission -> Math.max(0, mission.survivors))
@@ -73,7 +84,11 @@ public record RuntimeBudgetSnapshot(
                 BodyFragmentSystem.anchoredRemains(game.entities.carcasses),
                 game.combustion.burningBodies(game),
                 game.entities.npcs.size() + game.entities.creatures.size() + 1,
-                game.burnResidues.trackedCount());
+                game.burnResidues.trackedCount(),
+                game.fragments.liveCount(),
+                game.fragments.settledCount(),
+                game.ragdolls.liveCount(),
+                panicking);
     }
 
     /** True when every collection with a hard runtime ceiling is within it. */
@@ -100,7 +115,12 @@ public record RuntimeBudgetSnapshot(
                 && particles <= ParticleSystem.MAX
                 && anchoredRemains <= BodyFragmentConstants.MAX_ANCHORED_REMAINS
                 && burningBodies <= livingBodies
-                && burnResidues <= CombustionConstants.MAX_BURN_RESIDUES;
+                && burnResidues <= CombustionConstants.MAX_BURN_RESIDUES
+                && liveFragments <= BodyFragmentConstants.MAX_LIVE_FRAGMENTS
+                && settledFragments <= BodyFragmentConstants.MAX_SETTLED_FRAGMENTS
+                && liveRagdolls <= RagdollConstants.MAX_LIVE
+                // The player never panics.
+                && panickingBodies < livingBodies;
     }
 
     /** Compact live occupancy used verbatim by smoke output and failure logs. */
@@ -126,7 +146,10 @@ public record RuntimeBudgetSnapshot(
                 + ",edits=" + pendingGenerationEdits + "}"
                 + " anchoredRemains=" + anchoredRemains
                 + " burning=" + burningBodies + "/" + livingBodies
-                + " burnResidues=" + burnResidues;
+                + " burnResidues=" + burnResidues
+                + " fragments={live=" + liveFragments + ",settled=" + settledFragments + "}"
+                + " ragdolls=" + liveRagdolls
+                + " panicking=" + panickingBodies;
     }
 
     public static String hardLimitSummary() {
@@ -148,6 +171,9 @@ public record RuntimeBudgetSnapshot(
                 + " chain=" + ExplosionSystem.MAX_CHAIN
                 + " blockEdits=" + ExplosionSystem.MAX_BLOCKS
                 + " anchoredRemains=" + BodyFragmentConstants.MAX_ANCHORED_REMAINS
-                + " burnResidues=" + CombustionConstants.MAX_BURN_RESIDUES;
+                + " burnResidues=" + CombustionConstants.MAX_BURN_RESIDUES
+                + " liveFragments=" + BodyFragmentConstants.MAX_LIVE_FRAGMENTS
+                + " settledFragments=" + BodyFragmentConstants.MAX_SETTLED_FRAGMENTS
+                + " ragdolls=" + RagdollConstants.MAX_LIVE;
     }
 }
