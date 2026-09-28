@@ -7,6 +7,7 @@ import org.junit.jupiter.api.Test;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -29,6 +30,8 @@ class SimulationSystemContractTest {
 
         assertInstanceOf(FastTickSystem.class, game.settlementManager,
                 "settlements are driven from Game.fastTick");
+        assertInstanceOf(FastTickSystem.class, game.combustion,
+                "living bodies on fire are driven from Game.fastTick");
 
         for (Object mediumSystem : List.of(game.weather, game.temperature, game.water, game.fire,
                 game.liquidFire)) {
@@ -53,6 +56,8 @@ class SimulationSystemContractTest {
         assertInstanceOf(SimulationSystem.class, game.ragdolls);
         // Severed pieces are driven beside them, for the same reason.
         assertInstanceOf(SimulationSystem.class, game.fragments);
+        // So are the flames the dead leave on those bodies.
+        assertInstanceOf(SimulationSystem.class, game.burnResidues);
     }
 
     @Test
@@ -74,8 +79,10 @@ class SimulationSystemContractTest {
         assertTrue(game.liquidFire.spill(game, lx + 0.5f, ly + 1.5f, lz + 0.5f, 1, 0, true) > 0,
                 "precondition: liquid is burning");
         game.liquidFire.mediumTick(game, SimulationScheduler.MEDIUM_DT);
-        assertTrue(bather.health < bather.maxHealth && game.liquidFire.trackedNpcSpills() > 0,
-                "precondition: the liquid has burned someone it now remembers");
+        game.combustion.fastTick(game, SimulationScheduler.FAST_DT);
+        assertTrue(bather.health < bather.maxHealth && game.combustion.isBurning(bather)
+                        && game.liquidFire.nextSpillId() > 0,
+                "precondition: the liquid has set someone alight and counted its bottle");
         game.liquidFire.totalPatchIgnitions = 4;
         game.time.advance(9_000);
         game.weather.current = WeatherSystem.Weather.STORM;
@@ -127,6 +134,31 @@ class SimulationSystemContractTest {
         assertTrue(game.fragments.liveCount() > 0 && game.fragments.settledCount() > 0,
                 "precondition: pieces are both flying and lying in the world");
 
+        // A deer lit twice over and the player alight.
+        var torch = game.entities.spawnCreature(game.world, com.veylon.entity.Creature
+                .CreatureType.DEER, game.player.pos.x + 2f, game.player.pos.y, game.player.pos.z);
+        game.combustion.ignite(game, torch, com.veylon.entity.CombustionSource.DIRECT_HIT, 1f, true, 0,
+                torch.pos.x, torch.pos.y, torch.pos.z);
+        game.combustion.ignite(game, game.player, com.veylon.entity.CombustionSource.DIRECT_HIT, 1f,
+                false, 0, game.player.pos.x, game.player.pos.y, game.player.pos.z);
+        game.combustion.fastTick(game, SimulationScheduler.FAST_DT);
+        game.combustion.extinguish(torch);
+        game.combustion.ignite(game, torch, com.veylon.entity.CombustionSource.DIRECT_HIT, 1f, true, 0,
+                torch.pos.x, torch.pos.y, torch.pos.z);
+        assertTrue(game.combustion.burningBodies(game) >= 2 && game.combustion.totalIgnitions >= 3,
+                "precondition: bodies are burning");
+        // And one burned to death, its body still aflame on the ground.
+        var burned = game.entities.spawnCreature(game.world, com.veylon.entity.Creature
+                .CreatureType.HARE, game.player.pos.x - 2f, game.player.pos.y, game.player.pos.z);
+        game.combustion.ignite(game, burned, com.veylon.entity.CombustionSource.DIRECT_HIT, 1f, false, 0,
+                burned.pos.x, burned.pos.y, burned.pos.z);
+        burned.health = 0.01f;
+        game.combustion.fastTick(game, SimulationScheduler.FAST_DT);
+        game.entities.fastTick(game, SimulationScheduler.FAST_DT);
+        game.burnResidues.update(game, 0.016f);
+        assertTrue(game.burnResidues.trackedCount() > 0 && game.burnResidues.totalCaptured > 0,
+                "precondition: remains are burning");
+
         game.newWorld(31_415L, true);
 
         assertEquals(8 * 60, game.time.totalMinutes, 1e-6,
@@ -148,7 +180,7 @@ class SimulationSystemContractTest {
         assertEquals(0, game.fire.totalIgnitions, "fire statistics do not carry over");
         assertEquals(0, game.fire.totalExtinguished);
         assertEquals(0, game.liquidFire.count(), "burning liquid does not carry over");
-        assertEquals(0, game.liquidFire.trackedNpcSpills(), "nor who it has burned");
+        assertEquals(0, game.liquidFire.nextSpillId(), "bottles are counted afresh");
         assertEquals(0, game.liquidFire.totalSpills, "liquid fire statistics do not carry over");
         assertEquals(0, game.liquidFire.totalPatchIgnitions);
         int nx = (int) game.player.pos.x - 4;
@@ -161,6 +193,13 @@ class SimulationSystemContractTest {
                 "spill ids start again from zero in the next world");
         assertTrue(game.events.active.isEmpty(), "active events do not carry over");
         assertEquals(0, game.events.totalEventsTriggered);
+        assertEquals(0, game.combustion.burningBodies(game), "no body carries a fire into the next world");
+        assertFalse(game.player.combustion.burning() || game.player.combustion.scorch() > 0f);
+        assertEquals(0, game.combustion.totalIgnitions, "fire statistics do not carry over");
+        assertEquals(0, game.combustion.totalBurnouts + game.combustion.totalDoused
+                + game.combustion.totalRainedOut);
+        assertEquals(0, game.burnResidues.trackedCount(), "no remains carry a fire into the next world");
+        assertEquals(0, game.burnResidues.totalCaptured + game.burnResidues.totalEvicted);
 
         assertEquals(0, game.ragdolls.liveCount(),
                 "a falling body does not carry into the next world");
@@ -206,14 +245,16 @@ class SimulationSystemContractTest {
         game.newWorld(2_718L, true);
         game.time.advance(5_000);
         game.weather.current = WeatherSystem.Weather.RAIN;
+        game.combustion.totalIgnitions = 3;
 
         for (SimulationSystem system : List.of(game.time, game.weather, game.temperature,
                 game.water, game.fire, game.liquidFire, game.plants, game.events, game.itemConditions,
-                game.settlementManager, game.ragdolls, game.fragments)) {
+                game.settlementManager, game.ragdolls, game.fragments, game.combustion, game.burnResidues)) {
             system.reset();
         }
 
         assertEquals(8 * 60, game.time.totalMinutes, 1e-6);
         assertEquals(WeatherSystem.Weather.CLEAR, game.weather.current);
+        assertEquals(0, game.combustion.totalIgnitions);
     }
 }

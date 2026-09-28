@@ -82,6 +82,11 @@ final class SleepSystem {
 
     /** Attempts to begin sleeping; logs the reason and does nothing when refused. */
     void startSleep(boolean campBed) {
+        if (game.combustion.isBurning(game.player)) {
+            // Sleep fast-forwards the night but not a fire, which would burn on unseen.
+            game.log("You can't sleep while you're on fire!");
+            return;
+        }
         if (game.daylightFrozen()) {
             // Sleeping fast-forwards the very clock the control is holding (R25).
             game.log("The daylight cycle is frozen - unfreeze it in [T] World controls to sleep.");
@@ -157,13 +162,19 @@ final class SleepSystem {
         boolean rested = game.player.fatigue <= FULLY_RESTED_FATIGUE
                 && sleptMinutes > RESTED_SLEEP_MINUTES;
         boolean attacked = game.player.damageFlash > ATTACKED_DAMAGE_FLASH;
-        if (morning || rested || attacked) {
-            wake(attacked);
+        // A fire wakes the sleeper even in afterburn, whose flash stays below that line.
+        boolean burning = game.combustion.isBurning(game.player);
+        if (morning || rested || attacked || burning) {
+            wake(attacked, burning);
         }
     }
 
-    private void wake(boolean attacked) {
+    private void wake(boolean attacked, boolean burning) {
         game.sleeping = false;
+        if (burning) {
+            game.log("You wake up on fire!");
+            return;
+        }
         if (attacked) {
             game.log("You are attacked in your sleep!");
             return;

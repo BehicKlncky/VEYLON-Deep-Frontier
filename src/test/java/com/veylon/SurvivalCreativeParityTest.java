@@ -153,7 +153,10 @@ class SurvivalCreativeParityTest {
     void fireContactDamagesAndFlashesTheSurvivalPlayer() {
         game.world.setBlock(310, 40, 310, BlockType.LOG, false);
         assertTrue(game.fire.ignite(game, 310, 40, 310), "R26: fixture fire must ignite");
-        game.fire.mediumTick(game, 0.5f);
+        // Half a second of the fast tick in which bodies touch flames.
+        for (int i = 0; i < 10; i++) {
+            game.combustion.fastTick(game, 0.05f);
+        }
         assertTrue(game.player.health < game.player.maxHealth, "R26: real fire contact burns");
         assertEquals(1f, game.player.damageFlash, "R26: fire damage retains feedback");
     }

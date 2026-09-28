@@ -74,6 +74,8 @@ final class ProceduralAudio {
             for (int i = 1; i < VariantBank.COUNT; i++) sink.accept(VariantBank.key(name, i), recipes.get(name).get());
         }
         MusicPhrases.synthesize(rng, sink);
+        // Last, and from their own generator: everything above keeps its exact samples.
+        BodyFireSounds.synthesize(new Random(BodyFireSounds.SEED), sink);
     }
 
     // ---- 0.3.0 combat & settlement synthesis ----

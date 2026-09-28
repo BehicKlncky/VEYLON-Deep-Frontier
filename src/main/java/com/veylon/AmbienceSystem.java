@@ -80,6 +80,8 @@ final class AmbienceSystem {
     private static final double BEACON_AUDIO_RANGE = 22.0;
 
     private final Game game;
+    /** What burning bodies give off and how they sound. */
+    final BodyFireEffects bodyFire;
     private final Vector3f firePosition = new Vector3f();
     private final Random emitterRng = new Random();
     private float emitterTimer;
@@ -88,12 +90,14 @@ final class AmbienceSystem {
 
     AmbienceSystem(Game game) {
         this.game = game;
+        this.bodyFire = new BodyFireEffects(game);
     }
 
     /** Keeps ambient scatter replayable per world seed. */
     void reseed(long seed) {
         emitterRng.setSeed(seed);
         rainField.reset();
+        bodyFire.reset();
         emitterTimer = breathTimer = coughTimer = 0;
     }
 
@@ -114,6 +118,7 @@ final class AmbienceSystem {
         emitWeatherEvents(px, py, pz);
         emitFires(px, py, pz);
         emitLiquidFire(px, py, pz);
+        bodyFire.update(EMITTER_INTERVAL, emitterRng);
         emitBeacon(px, py, pz);
         emitPlayerEffects();
     }
@@ -271,6 +276,12 @@ final class AmbienceSystem {
                 game.audio.setFirePosition(firePosition.x, firePosition.y, firePosition.z);
             } else {
                 fireGain = 0;
+            }
+            // A burning body close by, the player's own included, takes the fire loop
+            // when it is the louder fire.
+            if (bodyFire.loopGain > fireGain) {
+                fireGain = bodyFire.loopGain;
+                game.audio.setFirePosition(bodyFire.loopX, bodyFire.loopY, bodyFire.loopZ);
             }
         }
 

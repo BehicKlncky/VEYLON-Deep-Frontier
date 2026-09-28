@@ -42,7 +42,7 @@ runs. All are inert when unset. Everything below is handled by `QaHarness`;
 | `VEYLON_SEED` | Fixed world seed (a non-numeric value is hashed) |
 | `VEYLON_GAME_MODE=survival\|creative` | Initial mode for automated world runs only; absent means Survival. Invalid values fail explicitly. Ignored for normal title sessions and frontend-only captures. |
 | `VEYLON_SMOKE=<seconds>` | Release smoke gate: save/load, fire, storm, a fortress approach, then a pass/fail report. Throws on failure |
-| `VEYLON_SCENE=<name>` | Stage a deterministic benchmark scene (`day`, `pinefog`, `nightfire`, `ruin`, `toxic`, `ao_shadow`, `phase4`, `ashwolf`, `silhouette30`, `vfx_blood`, `vfx_mining`, `vfx_beacon`, `death_ragdoll_showcase`, `death_ragdoll_sequence`, `dismember_showcase`, `dismember_wall`, `dismember_bomb` (a real scrap bomb thrown into a group of six, one outside the lethal radius; it goes off at 2.4 s), `molotov_ground`, `molotov_tree` and `molotov_rain` (a real fire bomb thrown at 0.5 s onto a dry clearing at dusk, beside a round tree that catches, or with rain from 3 s that puts the pool out; shots `0.7,1.2,3,7,11`, `1,4,10,20` and `2,3.5,5`), `movement`, `inventory`, `ui_cycle`, `held_*`, and `creative_flight` with `VEYLON_GAME_MODE=creative`, which flies east at Shift speed and prints a `[flight]` streaming report at 29 s) |
+| `VEYLON_SCENE=<name>` | Stage a deterministic benchmark scene (`day`, `pinefog`, `nightfire`, `ruin`, `toxic`, `ao_shadow`, `phase4`, `ashwolf`, `silhouette30`, `vfx_blood`, `vfx_mining`, `vfx_beacon`, `death_ragdoll_showcase`, `death_ragdoll_sequence`, `dismember_showcase`, `dismember_wall`, `dismember_bomb` (a real scrap bomb thrown into a group of six, one outside the lethal radius; it goes off at 2.4 s), `dismember_species`, `dismember_species_wall` and `dismember_species_close` (every species, a guard and the player's remains blown apart at 1 s; open meadow, a step and a wall, and a close view of the small bodies), `molotov_ground`, `molotov_tree` and `molotov_rain` (a real fire bomb thrown at 0.5 s onto a dry clearing at dusk, beside a round tree that catches, or with rain from 3 s that puts the pool out; shots `0.7,1.2,3,7,11`, `1,4,10,20` and `2,3.5,5`), the burning-body scenes `body_fire_row`, `body_fire_row_night`, `body_fire_close`, `body_fire_out`, `body_fire_blast`, `body_fire_panic`, `body_fire_bird`, `body_fire_rain`, `body_fire_ragdoll` and `body_fire_player` (see "Burning bodies QA" below), `movement`, `inventory`, `ui_cycle`, `held_*`, and `creative_flight` with `VEYLON_GAME_MODE=creative`, which flies east at Shift speed and prints a `[flight]` streaming report at 29 s) |
 | `VEYLON_SHOT="5,10"` | Capture screenshots at those elapsed seconds |
 | `VEYLON_FRONTEND=<name>` | Pin a front-end screen (`options`, `audio`, `loading`, `death`, `victory`, `glyphs`, `newworld`). `newworld-save` shows the replace-save notice without writing a save. `pause` and `gamemode` stage a Survival world with the pause menu or the mode confirmation open; `pause-creative`, `gamemode-creative` and `victory-creative` stage a Creative world; `catalog`, `catalog-tools`, `catalog-search` (query "iron") and `catalog-inventory` open the Creative catalog; `worldcontrols` and `worldcontrols-held` open the Creative world controls, the second with dusk, a frozen clock, a locked storm and paused spawning already applied |
 | `VEYLON_RESOLUTION=1920x1080` | Framebuffer override |
@@ -117,8 +117,9 @@ several helpers and each one needed its own gate.
    must also be classified in `ProjectileSystem.step`, which is where
    `HitZone.classify` is called with the entry point of the hit.
 3. Decide whether it is a *bomb* for `ExplosionSystem`: a blast that passes
-   `lethalToHumans` kills and dismembers every person inside
-   `power × LETHAL_RADIUS_FACTOR`. The fire bomb deliberately is not one.
+   `lethalToLiving` kills and dismembers every living body inside
+   `power × LETHAL_RADIUS_FACTOR`, a Creative player excepted. The fire bomb
+   deliberately is not one.
 
 ### A new way for AI to notice the player
 
@@ -152,17 +153,52 @@ transfers, equipping) keeps the Survival rule in both modes and needs no gate.
    `BodySkeleton.rigid` and tumbles as one piece, which is a legitimate choice
    for something tiny rather than an oversight. All rest directions, including
    the skitterwing's sideways wings, are supported.
-4. Add spawn rules to `EntityManager` (biome, time of day, density cap).
-5. Only touch `CreatureAI` if it needs behaviour the existing states don't
-   cover.
+4. Describe how it comes apart in `FragmentAnatomy`: append a `BodyFamily`
+   constant (the build fails until `BodyFamily.of` and the table switch cover the
+   new type), list the model's joints parent first with the builder's own pivots
+   and boxes, including any part the living animation moves, and declare the
+   pieces core first. `AnatomyModels.validate` and `FragmentAnatomyModelTest`
+   hold the table to the model and put the pieces back together; a split half
+   shorter than `BodyFragmentConstants.MIN_SEPARATE_PIECE` must stay with its
+   parent piece. Drawing the pieces needs nothing more: `FragmentModels`
+   derives wound depths and culling bounds from the table and the model, and
+   `SpeciesFragmentDrawTest` covers every `BodyFamily`. Add the type to the
+   row in `SpeciesDismemberQaScene` and capture it (see the lethal combat QA
+   section below). The family's ordinal and its pieces' ids are what
+   `world.remains` saves, so append the family, pin it and its piece names in
+   `SerializedEnumOrderTest`, and only ever append pieces afterwards. A save
+   stores each pose joint by joint: changing a family's joint table later makes
+   older saves load that family's pieces in its rest pose (in place, without
+   their articulation) unless `RemainsSection` learns the old layout.
+5. Add spawn rules to `EntityManager` (biome, time of day, density cap).
+6. Only touch `CreatureAI` if it needs behaviour the existing states don't
+   cover, and put any new decision after the `FirePanic` call at the top of
+   `CreatureAI.update`.
+
+Fire needs nothing more: `FlameAnchors` places the new species' flames on the
+boxes of its anatomy table, `CombustionSystem` burns any `Creature` at the
+creature rates, and `FirePanic` makes it flee (a `flying` type by
+`flightReach`, climbing). `AllLivingEndToEndTest`, `BodyCombustionTest` and
+`FirePanicTest` build their cases from `CreatureType.values()`, so the new
+species is thrown at, blown apart, set alight, made to panic and killed through
+the production commands as soon as it exists — a missing anatomy table, flame
+anchor or death payment fails there.
 
 ### An NPC role
 
 1. Append to `NpcArchetype` (loadout, job, dialogue).
-2. Add its daily schedule to `SettledNpcAI`.
-3. Add visual distinction in `NpcModels`.
+2. Add its daily schedule to `SettledNpcAI`. `FirePanic` runs before the whole
+   settlement brain, so a burning resident of the new role flees rather than
+   working, fighting or sleeping; nothing is needed for that.
+3. Add visual distinction in `NpcModels`. Kit it wears is a box of the humanoid
+   model, so its flames, char and blast pieces follow automatically.
 4. If it should be placed by settlement generation, update
    `SettlementBuilder`'s resident roster.
+
+`AllLivingEndToEndTest` stands every archetype in a settlement on the side its
+kind takes (headhunters, scavengers and captives hostile; settlers friendly or
+neutral) and blows it apart and burns it to death through the player's
+commands, checking that its death is paid for exactly once.
 
 ### A biome
 
@@ -200,6 +236,43 @@ transfers, equipping) keeps the Survival rule in both modes and needs no gate.
 5. Add whatever modifier query other systems need (`growthMul`, `thirstMul`,
    `wolfCapBonus`, …) rather than having them check `isActive` directly.
 
+### A flame that sets bodies alight
+
+Only a real, exposed flame qualifies: light, warmth, an enclosed flame (a
+lantern, a furnace), a glowing block or a held item never does (the list and
+its reasons are in the
+[combat and fire contract](engineering/ALL_LIVING_COMBAT_FIRE_CONTRACT.md) §4).
+
+1. Give the flame a volume in the world: the part of its cell where the flame
+   stands, reaching only into open neighbours so it never crosses a wall, a
+   floor or the ground (`FireSystem.touchBurningBlock` is the model).
+2. Report contacts from the system that owns the flame, in an
+   `exposeContacts(Game, Entity, BodySweep)` method called from
+   `CombustionSystem.sampleFlames`. Test the swept box with
+   `BodySweep.touches` so a body crossing the flame between two fast ticks still
+   touches it, and report with `CombustionSystem.expose(e, kind, intensity,
+   byPlayer, sourceId, contactX/Y/Z)`. Look only at the cells under the swept
+   box or at the flame's own bounded list; never load a chunk, never allocate.
+3. Decide its weather: a flame the rain puts out asks
+   `FireSystem.isRainedOn` and touches nobody while it is rained on or still
+   wet; a sheltered one (a torch, a campfire) has no rule and the rain on the
+   body's head puts the body out instead.
+4. Pick its `CombustionSource` kind. The declaration order is the dominance
+   order when several flames touch a body in one tick; each kind sets the heat
+   gain (infinite lights on first contact), the afterburn it grants (at most
+   `CombustionConstants.MAX_FUEL_SECONDS`) and its intensity. The enum is not
+   saved, so a new kind may go wherever its dominance belongs.
+5. Attribute it: `byPlayer` and the bottle's id for a flame the player's
+   bottle started (so the player's attack is counted once per bottle),
+   environmental with a stable per-cell id otherwise.
+6. If people and animals should not walk into it, treat it the way torches and
+   campfires are treated (`Entity.keepsOutOfFlames` in `VoxelPhysics`,
+   `Pathfinder.passable`, `Steering.moveToward`'s sidestep).
+7. Add its cases to `FlameSourceIgnitionTest` (catches the way it should, not
+   through a wall or floor, not when out or rained on, overlapping flames burn
+   as one), keep `CombustionAllocationTest` at zero, and add its row to the
+   contract's §4.1 source table.
+
 ### A simulation system
 
 1. Add a class in `simulation/`, with a `reset()` and a constants class beside it.
@@ -220,8 +293,9 @@ transfers, equipping) keeps the Survival rule in both modes and needs no gate.
 ## Common pitfalls
 
 **Reordering an enum breaks every save.** `BlockType`, `ItemType`, `Affliction`,
-`Biome`, `SettlementType`, `NpcArchetype` and the creature/NPC state enums are
-persisted by ordinal. Append only. `SerializedEnumOrderTest` will catch you.
+`Biome`, `SettlementType`, `NpcArchetype`, `CreatureType`, `BodyFamily` and the
+creature/NPC state enums are persisted by ordinal, and so is each body family's
+fragment piece list. Append only. `SerializedEnumOrderTest` will catch you.
 
 **Bulk block edits with `notify = true` are quadratic.** Each notified
 `setBlock` triggers listener work. For anything larger than a few blocks, pass
@@ -436,6 +510,15 @@ shows the same moment on every run.
   people apart at one second, the second with a stone wall three blocks behind
   them. `dismember_bomb` (`VEYLON_SHOT=2.2,4,9`) throws a real scrap bomb into
   a group of six, one of them outside the lethal radius; it goes off at 2.4 s.
+- `dismember_species`, `dismember_species_wall` and `dismember_species_close`
+  (`VEYLON_SHOT=0.5,1,3,8`, plus `1.3` in a second run with its own
+  `VEYLON_CAPTURE_TAG` for pieces in flight) stand a hare, a bird in flight, a
+  gloomstalker, the player's remains, a guard, a wolf, a deer and a thornhorn
+  in a row, each in its own pose and heading, and blow them all apart at one
+  second. The second scene adds a stone step and a wall behind the row, the
+  third views the small end of the row from close by. The living clock is
+  pinned, so the 0.5 s and 1 s shots must show the same bodies — the second
+  with blood and, where the player's remains appear, nothing else changed.
 - `molotov_ground`, `molotov_tree` and `molotov_rain`
   (`VEYLON_SHOT=0.7,1.2,3,7,11`, `1,4,10,20` and `2,3.5,5`) throw a real fire
   bomb onto a dry clearing at dusk, beside a tree that catches, and with rain
@@ -447,32 +530,141 @@ shots in one run would round to the same filename (`VEYLON_SHOT` names files by
 whole seconds, so 1.2 and 1.6 overwrite each other).
 
 Run `gradlew test --tests '*ProjectileHitZone*' --tests '*BlastLethality*'
---tests '*BodyFragment*' --tests '*Fragment*' --tests '*Molotov*' --tests
-'*FireWeather*' --tests '*LiquidFire*' --tests '*CombatFireIntegration*'` while
-working on any of this.
+--tests '*BodyFragment*' --tests '*Fragment*' --tests '*Dismember*' --tests
+'*Molotov*' --tests '*FireWeather*' --tests '*LiquidFire*' --tests
+'*CombatFireIntegration*'` while working on any of this.
 
 Contributor rules this feature adds:
 
 - **Give a new projectile kind a row in the torso-wound table**, as "How to
   add…" describes. The table is the only place a person's wound cost lives.
-- **Kill people through the damage path, never by writing `dead`.**
-  `Npc.killBy` hurts for more than the remaining health, so `health <= 0`,
+- **Kill bodies through the damage path, never by writing `dead`.**
+  `Entity.killBy` hurts for more than the remaining health, so `health <= 0`,
   `lastHitByPlayer` and `EntityManager.reallyDied` all agree and the death
   pipeline treats a head shot or a blast exactly like any other kill.
 - **What kills a body decides how it falls.** `dismemberOnDeath` is set only by
-  a lethal blast, and only on a body that blast killed; everything else
-  ragdolls. Nothing may set it on a living NPC, and a second blast never
-  overwrites the first one's record.
+  a lethal blast, through `Entity.recordBlastDeath`, and only on a body that
+  blast killed; everything else ragdolls. Nothing may set it on a living body,
+  and a second blast never overwrites the first one's record.
 - **Light fires through `FireSystem.ignite`.** It is what holds every block
   fire — from bottles, blasts, lightning and spread alike — under one
   `MAX_ACTIVE_FIRES`, and what refuses a cell that is already burning.
 - **Ask `FireSystem.isRainedOn` before anything catches.** It is the one rain
   predicate, shared by burning blocks, campfires and pools of burning liquid;
-  do not write another sky-light test.
+  do not write another sky-light test. A body asks the same question of its
+  head's cell through `FireSystem.isPrecipitationReaching`.
 - **Keep the fragment step allocation-free.** `BodyFragmentAllocationTest` holds
   the airborne and ground-contact paths at zero with a 4 KB allowance, and
   `RuntimeBoundsTest` measures the same step over real blast trajectories with
   the fire and liquid systems at full load.
-- **Cap every new pile of debris and prove it.** Pieces, pools and their
-  remembered (NPC, spill) pairs each have a hard cap with a `RuntimeBoundsTest`
-  case that reaches it exactly and cannot pass it.
+- **Cap every new pile of debris and prove it.** Pieces and pools each have a
+  hard cap with a `RuntimeBoundsTest` case that reaches it exactly and cannot
+  pass it, and `RuntimeBudgetSnapshot` reports them (with ragdolls, burning and
+  panicking bodies and remains' fires) on the F3 overlay and in the smoke
+  report. (0.8.0's remembered (NPC, spill) pairs are gone: each body now
+  remembers its last four bottles in a fixed array.)
+- **Draw a piece only through `Animator.poseFragment` and the
+  `FragmentModels` frames.** `poseFragment` picks the piece's own body's shared
+  model, resets whatever the last body left on it, puts on a person's look and
+  applies the pose the body died in; `rootFrame`, `pieceFrame` and `cutFrame`
+  place it, its wounds and a thin piece's ground contact. Posing a shared model
+  any other way leaves a missing leg or a raider's hood on the next body drawn
+  from it. `SpeciesFragmentDrawTest` checks a piece's first frame against the
+  living body and a live body drawn after a piece against one drawn alone.
+
+## Living bodies in combat and fire: contributor rules
+
+Every living body — each species, every kind of person and the Survival player —
+comes apart in a lethal blast, catches fire from real flames and (people and
+animals) panics. The rules, numbers and APIs are in the
+[combat and fire contract](engineering/ALL_LIVING_COMBAT_FIRE_CONTRACT.md); the
+[engineering record](engineering/ALL_LIVING_COMBAT_FIRE.md) summarises them with
+the validation. What a change must respect:
+
+- **Burn a body only through `CombustionSystem`.** Flames report contacts
+  (`expose`); a bottle breaking on a body lights it (`ignite`). One fire per
+  body, the strongest contact of a tick wins, a later contact refreshes it up to
+  a cap; never add a second timer, damage a body for standing near a flame, or
+  treat light or warmth as a flame.
+- **Panic comes first.** `FirePanic.update` is the first decision of
+  `NpcAI.update`, `SettledNpcAI.update` and `CreatureAI.update`, after the dead
+  guard; a new AI branch goes after it. Panic draws only from
+  `EntityManager.nextPanicFloat`, reads neither the player nor the camera, and
+  resets a body's plans when it ends. The player never panics: nothing a fire
+  does may move the player, change speed or sprint, or turn the camera.
+- **A death is paid for once, then becomes one body.** Credit, quests, trust,
+  reputation and loot run in `EntityManager`'s death routing before the body is
+  chosen; the body is pieces if the death carries a blast record and a ragdoll
+  otherwise. Pieces and ragdolls never pay anything; an animal's harvest record
+  is the one carcass tied to its torso piece.
+- **Leave the world through `EntityManager.depart`.** A body that leaves without
+  dying (dormancy, a rescue, a party retired or gone abstract, a trader moving
+  on, a despawn) goes through `removeNpc`, `removeNpcs` or the entity tick's
+  administrative path, which forget its fire, panic, targets and conversation.
+  Never take a body out of `npcs` or `creatures` directly.
+- **Fire, panic and remains' flames are transient.** They are not saved; a load,
+  a new world, respawn and Creative start without them. A new field on
+  `BodyCombustion`, `PanicIntent` or `BurnResidue` must be cleared where they
+  are (`clear`, `depart`, the recovery, `WorldBootstrap`) and must stay
+  primitive: nothing may hold an entity past a tick.
+- **Enumerate, do not list.** Tests that must cover every body build their
+  cases from `CreatureType.values()`, `NpcArchetype.values()`,
+  `Settlement.Alignment.values()` and `Npc.PartyKind.values()`, as
+  `AllLivingEndToEndTest` does.
+
+Run `gradlew test --tests 'com.veylon.AllLivingEndToEndTest' --tests
+'*AllLivingBlastDeath*' --tests '*Combustion*' --tests '*FlameSource*'
+--tests '*FirePanic*' --tests '*Remains*' --tests '*RuntimeBounds*'` after any
+change to them, and `gradlew performanceTest --tests
+'com.veylon.AllLivingFullLoadBenchmarkTest'` for their frame cost at full load.
+
+## Burning bodies QA and contributor rules
+
+Use `VEYLON_SEED=20260919`. Every scene sets bodies alight through
+`CombustionSystem.ignite` (a fire bomb breaking low on each body's near side)
+and steps in fixed 1/60 s steps tied to elapsed seconds; `VEYLON_SHOT` names
+files by whole seconds, so pick shots with different whole parts.
+
+- *Held* scenes keep the bodies where they were put (only the fire, remains,
+  particles and ambience run; health is raised so nobody dies in the capture):
+  `body_fire_row` and `body_fire_row_night` (five NPC families in front, every
+  species behind, a bird hovering; alight at 1 s, burnt out at about 7 s;
+  shots `0.5,1.3,3,6,8,10`), `body_fire_close` (a guard, a wolf, a deer and a
+  bird close to the camera; `1.4,3,6,8`), `body_fire_out` (rain from 2.5 s on
+  four bodies in the open, a roof over three, one with its feet in water;
+  `2,3.3,4.3,5.5,8`) and `body_fire_blast` (a burning row blown apart at 2 s;
+  `1.5,2.3,3.5,5.5,9`).
+- *Live* scenes run the whole world step: `body_fire_panic` (a walled yard seen
+  from a pillar; `0.5,1.5,2.5,4,6,9`), `body_fire_rain` (the same crowd, a roof
+  over half the yard, rain from 1.5 s; `1.2,2.2,3.2,5,8`), `body_fire_ragdoll`
+  (the yard's crowd too weak to outlive its fire; `1.3,2.1,3,4.5,7,10`),
+  `body_fire_bird` (three birds alight in flight; `0.4,1.2,2.2,3.1,4.1`) and
+  `body_fire_player` (the Survival player alight with an axe in hand, a burning
+  guard ahead, rain from 5 s; `0.5,1.3,3,5.6,6.8,8`).
+- Each prints `[scene] <name> t=…` lines once a second and whenever the number
+  of bodies alight changes: bodies alight, residues, ragdolls, pieces,
+  particles, what body fire gave off last pass, bodies heard, flames drawn and
+  the rain and burnout tallies.
+
+Run `gradlew test --tests '*FlameAnchors*' --tests '*BodyFire*' --tests
+'*BodyFlames*' --tests '*Combustion*' --tests '*RuntimeBounds*'` while working
+on any of it.
+
+Contributor rules this feature adds:
+
+- **Pose a body only through `BodyPosing`.** The renderer, the attached flames
+  and the emitters all pose through it, which is what keeps flames on the pose
+  that is drawn; a second posing path would put them on another.
+- **Presentation reads the fire; it never writes it.** Anything a look needs
+  that the simulation does not keep belongs on `BodyCombustion` or
+  `BurnResidue` as a read-only value the simulation maintains (as the out
+  memory, flicker number and touch offset are), never as presentation state
+  holding entities past a pass.
+- **Share the frame, do not queue for it.** `BodyFlames.begin` shares its cap
+  over every burning body in range, a piece by its `burnShare`; draw the
+  living first. New per-frame or per-pass work goes in fixed arrays, and
+  `BodyFlamesTest`, `BodyFireEffectsTest` and `FlameAnchorsTest` hold the
+  paths at zero allocation.
+- **Nothing inside the camera.** The player's own fire is shown at the edges
+  of the view (`post_final.frag`) and round a held item's grip; never emit
+  world particles at the player's body.

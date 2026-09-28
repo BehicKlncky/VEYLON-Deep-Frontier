@@ -1169,7 +1169,7 @@ public class FactionSystem {
         }
         switch (expired.type) {
             case DEFEND_VILLAGE, CLEAR_PATROL, DRIVE_OFF, ESCORT_TRADER ->
-                    g.entities.npcs.removeIf(n -> expired.targetMissionId.equals(
+                    g.entities.removeNpcs(g, n -> expired.targetMissionId.equals(
                             n.partyMissionId));
             default -> {
                 // Captures, rescues, POIs, and counterattacks are persistent

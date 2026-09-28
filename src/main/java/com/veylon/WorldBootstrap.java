@@ -100,6 +100,10 @@ final class WorldBootstrap {
         game.settlementManager.reset();
         game.ragdolls.reset();
         game.fragments.reset();
+        // Fires live on the bodies a new world replaces; only the tallies stay here.
+        game.combustion.reset();
+        // Remains are rebuilt without the flames their bodies died with (never saved).
+        game.burnResidues.reset();
         game.particles.count = 0;
         reseedSimulation(seed);
     }
@@ -175,6 +179,8 @@ final class WorldBootstrap {
         game.simPaused = false;
         game.simPanelShown = false;
         game.uiMode = Game.UiMode.NONE;
+        // The outgoing world's speaker, even one left behind by switching screens.
+        game.activeNpc = null;
         game.targetHit = null;
         game.miningTarget = null;
         game.miningProgress = 0;

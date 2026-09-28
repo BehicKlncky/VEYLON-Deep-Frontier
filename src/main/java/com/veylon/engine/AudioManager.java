@@ -43,6 +43,8 @@ public class AudioManager {
     // 0.3.0 combat & settlement sounds (all synthesized, like everything else).
     private int bBowDraw, bBowRelease, bArrowImpact, bBulletImpact, bMusket, bPistol;
     private int bDryFire, bReload, bFuse, bExplosion, bAlarmBell, bGate;
+    // Burning bodies (BodyFireSounds).
+    private int bBodyCrackle, bBodyFlare, bBodySizzle;
 
     // Ambience loops.
     private final int[] detailBuffers = new int[4];
@@ -494,6 +496,33 @@ public class AudioManager {
         playAt(bGate, x, y, z, 0.6f, pitchVar(0.12f));
     }
 
+    /**
+     * One crackle of a burning body at {@code (x, y, z)}, louder the stronger
+     * it burns ({@code strength} 0..1). It is the fire's ambience: the
+     * ambience slider sets it, and at the lowest priority it never takes a
+     * voice from a fight.
+     */
+    public void playBodyCrackle(float x, float y, float z, float strength) {
+        if (!enabled) return;
+        playAt(bBodyCrackle, x, y, z, 0.25f + 0.45f * unit(strength), pitchVar(0.18f));
+    }
+
+    /** A body catching fire at {@code (x, y, z)}: a soft rush of flame. */
+    public void playBodyFlare(float x, float y, float z, float strength) {
+        if (!enabled) return;
+        playAt(bBodyFlare, x, y, z, 0.3f + 0.4f * unit(strength), pitchVar(0.1f));
+    }
+
+    /** Water or rain putting a burning body out at {@code (x, y, z)}: a hiss of steam. */
+    public void playBodySizzle(float x, float y, float z, float strength) {
+        if (!enabled) return;
+        playAt(bBodySizzle, x, y, z, 0.3f + 0.35f * unit(strength), pitchVar(0.12f));
+    }
+
+    private static float unit(float v) {
+        return v > 0f ? Math.min(1f, v) : 0f;
+    }
+
     /** Releases all native resources, including a partially initialized device. */
     public void shutdown() {
         enabled = false;
@@ -577,7 +606,8 @@ public class AudioManager {
 
     private void submit(int buffer, float x, float y, float z, float gain, float pitch,
                         float reference, float maximum, boolean relative) {
-        boolean ambience = false;
+        // A burning body's crackle is the fire's ambience, like the pops of a campfire.
+        boolean ambience = buffer == bBodyCrackle;
         for (int detail : detailBuffers) if (detail == buffer) ambience = true;
         boolean wet = buffer != bClick && buffer != bQuest && buffer != bDiscover;
         voices.play(new VoicePool.Request(buffer, x, y, z, gain, pitch, reference, maximum,
@@ -662,6 +692,9 @@ public class AudioManager {
         bExplosion = bank.get("Explosion");
         bAlarmBell = bank.get("AlarmBell");
         bGate = bank.get("Gate");
+        bBodyCrackle = bank.get(BodyFireSounds.CRACKLE);
+        bBodyFlare = bank.get(BodyFireSounds.FLARE);
+        bBodySizzle = bank.get(BodyFireSounds.SIZZLE);
         for (int i = 0; i < detailBuffers.length; i++) detailBuffers[i] = bank.get(AmbienceBeds.EVENT_NAMES[i]);
         variants.clear();
         for (String name : VariantBank.NAMES) {

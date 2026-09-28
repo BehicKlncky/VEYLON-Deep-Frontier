@@ -1,14 +1,20 @@
 package com.veylon.qa;
 
 import com.veylon.ai.Quest;
+import com.veylon.entity.BodyFamily;
 import com.veylon.entity.BodyFragment;
+import com.veylon.entity.Creature.CreatureType;
 import com.veylon.item.ItemType;
 import com.veylon.settlement.NpcArchetype;
 import com.veylon.world.BlockType;
 import org.junit.jupiter.api.Test;
 
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.EnumMap;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
@@ -73,6 +79,35 @@ class SerializedEnumOrderTest {
             "TORSO", "HEAD", "UPPER_ARM_L", "UPPER_ARM_R", "FOREARM_L", "FOREARM_R",
             "THIGH_L", "THIGH_R", "SHIN_L", "SHIN_R");
 
+    /** The base v3 body stores creatures and carcasses by {@code CreatureType.ordinal()}. */
+    private static final List<String> CREATURE_TYPE_ORDER = List.of(
+            "DEER", "WOLF", "BIRD", "HARE", "THORNHORN", "STALKER");
+
+    /** {@code world.remains} stores a piece's body family by ordinal. */
+    private static final List<String> BODY_FAMILY_ORDER = List.of(
+            "HUMANOID", "DEER", "WOLF", "BIRD", "HARE", "THORNHORN", "STALKER");
+
+    private static final List<String> QUADRUPED_PIECES = List.of(
+            "torso", "head", "upper_leg_fl", "upper_leg_fr", "upper_leg_bl", "upper_leg_br",
+            "lower_leg_fl", "lower_leg_fr", "lower_leg_bl", "lower_leg_br", "tail");
+
+    /** {@code world.remains} stores a piece by its id, its index in its family's list. */
+    private static final Map<BodyFamily, List<String>> FRAGMENT_PIECE_ORDER = new EnumMap<>(Map.of(
+            BodyFamily.HUMANOID, List.of("torso", "head", "upper_arm_l", "upper_arm_r",
+                    "forearm_l", "forearm_r", "thigh_l", "thigh_r", "shin_l", "shin_r"),
+            BodyFamily.DEER, QUADRUPED_PIECES,
+            BodyFamily.WOLF, withTailTip(QUADRUPED_PIECES),
+            BodyFamily.BIRD, List.of("torso", "head", "tail", "wing0_l", "wing0_r", "wing1_l", "wing1_r"),
+            BodyFamily.HARE, List.of("torso", "head", "leg_fl", "leg_fr", "leg_bl", "leg_br", "tail"),
+            BodyFamily.THORNHORN, withTailTip(QUADRUPED_PIECES),
+            BodyFamily.STALKER, withTailTip(QUADRUPED_PIECES)));
+
+    private static List<String> withTailTip(List<String> pieces) {
+        List<String> all = new ArrayList<>(pieces);
+        all.add("tail_tip");
+        return List.copyOf(all);
+    }
+
     @Test
     void blockTypeNamesAndOrderMatchTheChunkFormatSnapshot() {
         List<String> actual = Arrays.stream(BlockType.values()).map(BlockType::name).toList();
@@ -112,5 +147,28 @@ class SerializedEnumOrderTest {
         assertEquals(BODY_FRAGMENT_PIECE_ORDER,
                 Arrays.stream(BodyFragment.Piece.values()).map(BodyFragment.Piece::name).toList(),
                 "the fragment section persists BodyFragment.Piece.ordinal(); append only");
+    }
+
+    @Test
+    void creatureTypeNamesAndOrderMatchTheSaveFormatSnapshot() {
+        assertEquals(CREATURE_TYPE_ORDER,
+                Arrays.stream(CreatureType.values()).map(CreatureType::name).toList(),
+                "SaveSystem persists CreatureType.ordinal() for creatures and carcasses; append only");
+    }
+
+    @Test
+    void bodyFamilyAndEveryFamilysPieceIdsMatchTheRemainsSectionSnapshot() {
+        assertEquals(BODY_FAMILY_ORDER,
+                Arrays.stream(BodyFamily.values()).map(BodyFamily::name).toList(),
+                "the remains section persists BodyFamily.ordinal(); append only");
+        for (BodyFamily family : BodyFamily.values()) {
+            assertEquals(FRAGMENT_PIECE_ORDER.get(family),
+                    family.anatomy().pieces.stream().map(p -> p.name).toList(),
+                    "the remains section persists " + family + " piece ids; append pieces only");
+        }
+        List<String> humanoid = FRAGMENT_PIECE_ORDER.get(BodyFamily.HUMANOID).stream()
+                .map(name -> name.toUpperCase(Locale.ROOT)).toList();
+        assertEquals(BODY_FRAGMENT_PIECE_ORDER, humanoid,
+                "a person's piece id in world.remains is its world.fragments version 1 ordinal");
     }
 }

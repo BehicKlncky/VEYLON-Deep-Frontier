@@ -1,5 +1,6 @@
 package com.veylon.entity;
 
+import com.veylon.ai.PanicIntent;
 import com.veylon.world.World;
 import org.joml.Vector3f;
 
@@ -39,6 +40,11 @@ public class Creature extends Entity {
             this.g = g;
             this.b = b;
         }
+
+        /** Whether a dead body of this kind leaves a carcass to harvest; a bird is too small. */
+        public boolean leavesCarcass() {
+            return this != BIRD;
+        }
     }
 
     public enum CreatureState {
@@ -65,6 +71,8 @@ public class Creature extends Entity {
     /** Arrows lodged in the animal; recovered when the carcass is harvested. */
     public int stuckArrows;
     public com.veylon.item.ItemType stuckArrowType;
+    /** Flight from the fire on this body; written only by the AI. Transient. */
+    public final PanicIntent panic = new PanicIntent();
 
     public Creature(World world, CreatureType type) {
         super(world);
@@ -73,5 +81,11 @@ public class Creature extends Entity {
         this.height = type.height;
         this.maxHealth = type.maxHealth;
         this.health = type.maxHealth;
+    }
+
+    /** Animals keep out of torches and campfires, flying or not. */
+    @Override
+    protected boolean keepsOutOfFlames() {
+        return true;
     }
 }

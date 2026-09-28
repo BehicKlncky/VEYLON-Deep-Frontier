@@ -18,7 +18,8 @@ import java.util.List;
  *
  * <p>Quiet grounded bodies freeze after consecutive low-energy steps, with a
  * hard timeout as a backstop. Saves and the population cap also freeze bodies,
- * preserving appearance, arrows, blood and the solved joint pose.
+ * preserving appearance, arrows, blood, the solved joint pose and the fire the
+ * body died with ({@link BurnResidue}), which the corpse or carcass carries on.
  */
 public class RagdollSystem implements SimulationSystem {
 
@@ -64,8 +65,7 @@ public class RagdollSystem implements SimulationSystem {
      */
     public Ragdoll spawn(Game g, Creature c) {
         BodySkeleton skeleton = BodySkeleton.of(c.type);
-        Ragdoll r = new Ragdoll(skeleton, c.type,
-                c.type != Creature.CreatureType.BIRD);
+        Ragdoll r = new Ragdoll(skeleton, c.type, c.type.leavesCarcass());
         r.stuckArrows = c.stuckArrows;
         r.stuckArrowType = c.stuckArrowType;
         return begin(g, r, c, Math.max(0.6f, c.type.height));
@@ -108,6 +108,9 @@ public class RagdollSystem implements SimulationSystem {
         }
 
         applyAngularKick(r, e, cos, sin);
+        // The fire it died with goes on on the falling body, then its corpse.
+        r.burn = g.burnResidues.capture(e);
+        BurnResidue.hold(r.burn);
         live.add(r);
         totalSpawned++;
         burst(g, r, e, burstPower);
@@ -239,6 +242,9 @@ public class RagdollSystem implements SimulationSystem {
         dissipateProjectionEnergy(r, energyBudget);
         joints.writePose(r);
         drip(g, r, dt);
+        if (r.burn != null) {
+            r.burn.anchor(r.px[Ragdoll.TORSO], r.py[Ragdoll.TORSO], r.pz[Ragdoll.TORSO]);
+        }
 
         r.energy = measureEnergy(r);
         updateQuietWindow(r);
@@ -445,19 +451,28 @@ public class RagdollSystem implements SimulationSystem {
         float y = r.py[Ragdoll.TORSO];
         float z = r.pz[Ragdoll.TORSO];
         float groundY = lowestPoint(r);
+        // Its fire moves on with the body, never copied: one residue, one holder.
+        BurnResidue burn = r.burn;
+        r.burn = null;
         if (!r.leavesBody) {
+            BurnResidue.letGo(burn);
             return;
+        }
+        if (burn != null) {
+            burn.anchor(x, y, z);
         }
         if (r.human()) {
             HumanCorpse corpse = new HumanCorpse(x, y, z);
             corpse.appearance.copyFrom(r.appearance);
             corpse.pose.copyFrom(r.pose);
+            corpse.burn = burn;
             g.entities.corpses.add(corpse);
         } else {
             Carcass carcass = new Carcass(r.creatureType, x, y, z);
             carcass.stuckArrows = r.stuckArrows;
             carcass.stuckArrowType = r.stuckArrowType;
             carcass.pose.copyFrom(r.pose);
+            carcass.burn = burn;
             g.entities.carcasses.add(carcass);
         }
         // A kill leaves a mark. Track.describe only names a creature type on

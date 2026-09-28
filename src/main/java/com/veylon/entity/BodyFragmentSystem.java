@@ -1,7 +1,6 @@
 package com.veylon.entity;
 
 import com.veylon.Game;
-import com.veylon.entity.BodyFragment.Piece;
 import com.veylon.simulation.SimulationSystem;
 import com.veylon.world.World;
 import org.joml.Matrix3f;
@@ -12,15 +11,28 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Rigid-body flight for a person blown apart at the joints.
+ * Rigid-body flight for a body blown apart at the joints.
  *
- * <p>{@link #spawnFromNpc} turns a dying {@link Npc} into ten independent
- * {@link BodyFragment}s placed exactly where the living model drew them, each
- * thrown away from the blast in inverse proportion to its mass and spun about
- * the body's mass centre. The step then mirrors {@link RagdollSystem}: a fixed
+ * <p>A dying person, animal or player becomes the pieces of its body family's
+ * {@link FragmentAnatomy} — ten for a person, seven to twelve for an animal —
+ * each placed exactly where the living model drew it in the pose it died in,
+ * thrown away from the blast in inverse proportion to its mass (with a floor
+ * on that mass, so a wing is not fired like a bullet) and spun about the
+ * body's mass centre. The step then mirrors {@link RagdollSystem}: a fixed
  * 1/60 s step drained from a clamped accumulator, the same gravity, water, drag
  * and friction numbers, and the same voxel sweep, so a severed limb falls
  * exactly like the body it came from.
+ *
+ * <p>An animal that leaves a carcass leaves exactly one, created with its
+ * pieces and tied to its torso ({@link Carcass#remains},
+ * {@link BodyFragment#harvest}): the record lies where the torso lies, the
+ * torso stays while the record does, and the record's rot takes the torso
+ * with it.
+ *
+ * <p>A body that dies alight or scorched leaves one {@link BurnResidue} that
+ * all its pieces share ({@link BodyFragment#burn}, each its mass's share), so
+ * its flames go on where its torso flies and are never counted per piece; a
+ * piece leaving the world lets go of it.
  *
  * <p>Each piece sweeps the world-axis box of its <em>turned</em> collision box,
  * so a limb that lands lying down rests on its lowest corner instead of
@@ -38,6 +50,19 @@ import java.util.List;
  */
 public class BodyFragmentSystem implements SimulationSystem {
 
+    /**
+     * Where the pose a body died in comes from. The models the living are
+     * drawn with live outside this package, so {@code Game} supplies it;
+     * without one every body comes apart in its rest pose.
+     */
+    public interface DeathPoses {
+        /** The pose {@code c} is drawn in now. */
+        FragmentPose of(Creature c);
+
+        /** The pose {@code n} is drawn in now. */
+        FragmentPose of(Npc n);
+    }
+
     /** Push-out probe order: up first (a buried foot, a closed-in floor), then sideways. */
     private static final float[] PUSH_X = {0, 1, -1, 0, 0};
     private static final float[] PUSH_Y = {1, 0, 0, 0, 0};
@@ -51,6 +76,8 @@ public class BodyFragmentSystem implements SimulationSystem {
     private final RagdollCollision collision = new RagdollCollision();
     private final Matrix3f basis = new Matrix3f();
     private final Quaternionf previous = new Quaternionf();
+    /** Wiring, not state: survives {@link #reset}. */
+    private DeathPoses deathPoses;
 
     private double accumulator;
 
@@ -74,15 +101,25 @@ public class BodyFragmentSystem implements SimulationSystem {
     // Spawning
     // ------------------------------------------------------------------
 
+    /** Supplies the pose bodies die in; see {@link DeathPoses}. */
+    public void setDeathPoses(DeathPoses poses) {
+        deathPoses = poses;
+    }
+
+    /** The pose {@code c} dies in: as last drawn, or its rest pose without a source. */
+    public FragmentPose deathPose(Creature c) {
+        return deathPoses != null ? deathPoses.of(c) : FragmentAnatomy.of(c.type).restPose();
+    }
+
+    /** The pose {@code n} dies in: as last drawn, or the standing rest pose without a source. */
+    public FragmentPose deathPose(Npc n) {
+        return deathPoses != null ? deathPoses.of(n) : FragmentAnatomy.humanoid().restPose();
+    }
+
     /**
-     * Blows a person apart at the joints.
-     *
-     * <p>Each piece starts where the standing model drew it, turned to the
-     * person's heading, and leaves with the person's own velocity plus
-     * {@code dir × IMPULSE_BASE × strength × falloff × inverseMass}, where
-     * {@code dir} points from the blast centre to the piece and
-     * {@code falloff = clamp(1 − d / (strength × FALLOFF_RANGE), MIN_FALLOFF, 1)},
-     * plus {@link BodyFragmentConstants#UPWARD_BIAS} straight up.
+     * Blows a person apart at the joints in the standing rest pose, as a QA
+     * scene or a fixture stages it. A real death goes through the pose the
+     * person died in ({@link #deathPose(Npc)}).
      *
      * @param strength blast strength; an explosion's power
      * @return the ten new pieces, torso first
@@ -90,32 +127,122 @@ public class BodyFragmentSystem implements SimulationSystem {
     public List<BodyFragment> spawnFromNpc(Game g, Npc n,
                                            float blastX, float blastY, float blastZ,
                                            float strength) {
-        Piece[] pieces = Piece.values();
-        List<BodyFragment> spawned = new ArrayList<>(pieces.length);
-        float yaw = (float) Math.toRadians(-n.yaw);
+        return spawnFromNpc(g, n, FragmentAnatomy.humanoid().restPose(),
+                blastX, blastY, blastZ, strength);
+    }
+
+    /**
+     * Blows a person apart at the joints: the humanoid table's pieces in
+     * {@code pose}, each carrying its own copy of the person's look.
+     *
+     * @return the ten new pieces, torso first
+     * @throws IllegalArgumentException when {@code pose} is not a person's
+     */
+    public List<BodyFragment> spawnFromNpc(Game g, Npc n, FragmentPose pose,
+                                           float blastX, float blastY, float blastZ,
+                                           float strength) {
+        requireFamily(pose, BodyFamily.HUMANOID);
+        List<BodyFragment> spawned = launch(g, n, pose, blastX, blastY, blastZ, strength);
+        for (int i = 0; i < spawned.size(); i++) {
+            spawned.get(i).appearance.capture(n);
+        }
+        return spawned;
+    }
+
+    /**
+     * Blows an animal apart at its own joints, in {@code pose}. An animal
+     * that leaves a carcass leaves it now, exactly once: one record with the
+     * species' whole meat and hide yield and every arrow lodged in the
+     * animal, tied to the torso piece. The limbs carry nothing.
+     *
+     * @return the new pieces, torso first
+     * @throws IllegalArgumentException when {@code pose} is not this species'
+     */
+    public List<BodyFragment> spawnFromCreature(Game g, Creature c, FragmentPose pose,
+                                                float blastX, float blastY, float blastZ,
+                                                float strength) {
+        requireFamily(pose, BodyFamily.of(c.type));
+        List<BodyFragment> spawned = launch(g, c, pose, blastX, blastY, blastZ, strength);
+        if (c.type.leavesCarcass()) {
+            anchorHarvest(g, c, spawned.getFirst());
+        }
+        return spawned;
+    }
+
+    /**
+     * The player's remains after a lethal blast, spawned by the death
+     * transition: the humanoid's pieces in the standing rest pose (the player
+     * has no body model to take a pose from) with the neutral look, thrown
+     * from the recorded blast. The pieces copy what they need and never refer
+     * to the player, who lives on as the same object after respawning.
+     *
+     * <p>Spends the record, so the same death never comes apart twice. Does
+     * nothing, and returns no pieces, for a player with no record, one who
+     * is not really dead, or one who is invulnerable.
+     */
+    public List<BodyFragment> spawnPlayerRemains(Game g, Player p) {
+        if (!p.dismemberOnDeath || !p.dead || p.health > 0 || p.abilities.invulnerable()) {
+            return List.of();
+        }
+        List<BodyFragment> spawned = launch(g, p, FragmentAnatomy.humanoid().restPose(),
+                p.blastX, p.blastY, p.blastZ, p.blastStrength);
+        for (int i = 0; i < spawned.size(); i++) {
+            spawned.get(i).appearance.setNeutral();
+        }
+        p.clearBlastDeath();
+        return spawned;
+    }
+
+    private static void requireFamily(FragmentPose pose, BodyFamily family) {
+        if (pose.anatomy.family != family) {
+            throw new IllegalArgumentException("a " + pose.anatomy.family
+                    + " pose cannot blow apart a " + family + " body");
+        }
+    }
+
+    /**
+     * Places every piece of {@code pose}'s body where the living model drew
+     * it, turned to the body's heading, and throws it.
+     *
+     * <p>Each piece leaves with the body's own velocity plus
+     * {@code dir × IMPULSE_BASE × strength × falloff / max(mass, MIN_LAUNCH_MASS)},
+     * where {@code dir} points from the blast centre to the piece and
+     * {@code falloff = clamp(1 − d / (strength × FALLOFF_RANGE), MIN_FALLOFF, 1)},
+     * plus {@link BodyFragmentConstants#UPWARD_BIAS} straight up.
+     */
+    private List<BodyFragment> launch(Game g, Entity body, FragmentPose pose,
+                                      float blastX, float blastY, float blastZ, float strength) {
+        List<FragmentPiece> pieces = pose.anatomy.pieces;
+        List<BodyFragment> spawned = new ArrayList<>(pieces.size());
+        float yaw = (float) Math.toRadians(-body.yaw);
         float power = strength > 0 && Float.isFinite(strength) ? strength : 0;
         float reach = Math.max(1e-3f, power * BodyFragmentConstants.FALLOFF_RANGE);
 
         // The body's mass centre, which the blast spins every piece about.
         Vector3f massCentre = new Vector3f();
+        Vector3f centre = new Vector3f();
         float totalMass = 0;
-        for (Piece p : pieces) {
-            massCentre.add(p.centreX * p.mass, p.centreY * p.mass, p.centreZ * p.mass);
+        for (FragmentPiece p : pieces) {
+            pose.pieceCentre(p.id, centre);
+            massCentre.add(centre.x * p.mass, centre.y * p.mass, centre.z * p.mass);
             totalMass += p.mass;
         }
         massCentre.div(totalMass);
-        new Quaternionf().rotationY(yaw).transform(massCentre).add(n.pos);
+        new Quaternionf().rotationY(yaw).transform(massCentre).add(body.pos);
+        // One fire for the whole body, shared by its pieces by mass.
+        BurnResidue burn = g.burnResidues.capture(body);
 
         Vector3f dir = new Vector3f();
         Vector3f lever = new Vector3f();
         Vector3f tangent = new Vector3f();
         Vector3f bitangent = new Vector3f();
         Vector3f joint = new Vector3f();
-        for (Piece p : pieces) {
-            BodyFragment f = new BodyFragment(p);
-            f.appearance.capture(n);
-            f.orientation.rotationY(yaw);
-            f.orientation.transform(p.centreX, p.centreY, p.centreZ, f.pos).add(n.pos);
+        for (FragmentPiece p : pieces) {
+            BodyFragment f = new BodyFragment(p, pose);
+            f.burn = burn;
+            f.burnShare = p.mass / totalMass;
+            BurnResidue.hold(burn);
+            f.placeAt(body.pos.x, body.pos.y, body.pos.z, yaw);
             fitExtents(f);
             pushFree(g.world, f);
 
@@ -128,7 +255,8 @@ public class BodyFragmentSystem implements SimulationSystem {
                 dir.div(distance);
             }
             float falloff = Math.clamp(1f - distance / reach, BodyFragmentConstants.MIN_FALLOFF, 1f);
-            float blastSpeed = BodyFragmentConstants.IMPULSE_BASE * power * falloff * f.inverseMass;
+            float launchInverseMass = Math.min(f.inverseMass, 1f / BodyFragmentConstants.MIN_LAUNCH_MASS);
+            float blastSpeed = BodyFragmentConstants.IMPULSE_BASE * power * falloff * launchInverseMass;
 
             // Scatter strictly across the blast direction, so it can spread the
             // pieces but never turn one back towards the blast.
@@ -138,9 +266,9 @@ public class BodyFragmentSystem implements SimulationSystem {
             }
             tangent.normalize();
             bitangent.set(dir).cross(tangent);
-            int salt = p.ordinal() * 8;
+            int salt = p.id * 8;
             float scatter = blastSpeed * BodyFragmentConstants.TANGENT_JITTER;
-            f.vel.set(n.vel)
+            f.vel.set(body.vel)
                     .fma(blastSpeed, dir)
                     .fma(scatter * hash(f.pos, salt), tangent)
                     .fma(scatter * hash(f.pos, salt + 1), bitangent)
@@ -154,7 +282,7 @@ public class BodyFragmentSystem implements SimulationSystem {
                     BodyFragmentConstants.SPIN_JITTER * hash(f.pos, salt + 4));
             clampLength(f.angularVelocity, RagdollConstants.MAX_ANGULAR_SPEED);
             // Stagger the drips so ten pieces do not shed in lockstep.
-            f.dripTimer = RagdollConstants.DRIP_INTERVAL * p.ordinal() / pieces.length;
+            f.dripTimer = RagdollConstants.DRIP_INTERVAL * p.id / pieces.size();
 
             if (live.size() >= BodyFragmentConstants.MAX_LIVE_FRAGMENTS) {
                 settleOldest(g);
@@ -164,7 +292,7 @@ public class BodyFragmentSystem implements SimulationSystem {
             totalSpawned++;
 
             if (p.severed) {
-                f.modelToWorld(p.pivotX, p.pivotY, p.pivotZ, joint);
+                f.jointToWorld(p.rootJoint, joint);
                 float speed = f.vel.length();
                 if (speed > 1e-4f) {
                     g.particles.bloodBurst(joint.x, joint.y, joint.z, f.vel.x / speed,
@@ -196,6 +324,76 @@ public class BodyFragmentSystem implements SimulationSystem {
         float sq = v.lengthSquared();
         if (sq > max * max) {
             v.mul(max / (float) Math.sqrt(sq));
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // The one harvest record of an animal blown apart
+    // ------------------------------------------------------------------
+
+    /**
+     * Creates the animal's one carcass on its torso piece, first removing the
+     * oldest record and its torso together if {@link
+     * BodyFragmentConstants#MAX_ANCHORED_REMAINS} are already in the world.
+     */
+    private void anchorHarvest(Game g, Creature c, BodyFragment torso) {
+        List<Carcass> carcasses = g.entities.carcasses;
+        if (anchoredRemains(carcasses) >= BodyFragmentConstants.MAX_ANCHORED_REMAINS) {
+            for (int i = 0; i < carcasses.size(); i++) {
+                Carcass oldest = carcasses.get(i);
+                if (oldest.fragmented()) {
+                    carcasses.remove(i);
+                    removePiece(oldest.remains);
+                    break;
+                }
+            }
+        }
+        Carcass carcass = new Carcass(c.type, torso.pos.x, torso.pos.y - torso.halfHeight, torso.pos.z);
+        carcass.stuckArrows = c.stuckArrows;
+        carcass.stuckArrowType = c.stuckArrowType;
+        carcass.remains = torso;
+        torso.harvest = carcass;
+        carcasses.add(carcass);
+    }
+
+    /**
+     * Keeps a torso's harvest record where the torso lies: under its centre,
+     * on whatever it rests on — the point a carcass drawn without a solved
+     * pose stands on, and within reach wherever the torso can be seen.
+     */
+    private static void followTorso(BodyFragment torso) {
+        torso.harvest.pos.set(torso.pos.x, torso.pos.y - torso.halfHeight, torso.pos.z);
+    }
+
+    /** Harvest records in {@code carcasses} that belong to remains rather than a whole body. */
+    public static int anchoredRemains(List<Carcass> carcasses) {
+        int count = 0;
+        for (int i = 0; i < carcasses.size(); i++) {
+            if (carcasses.get(i).fragmented()) {
+                count++;
+            }
+        }
+        return count;
+    }
+
+    private void removePiece(BodyFragment f) {
+        f.harvest = null;
+        if (!live.remove(f)) {
+            settled.remove(f);
+        }
+        dropBurn(f);
+    }
+
+    /** A piece leaving the world lets go of its body's fire; the last piece to go releases it. */
+    private static void dropBurn(BodyFragment f) {
+        BurnResidue.letGo(f.burn);
+        f.burn = null;
+    }
+
+    /** Keeps the body's fire where its core piece is. */
+    private static void anchorBurn(BodyFragment f) {
+        if (f.burn != null && f.definition.parent == -1) {
+            f.burn.anchor(f.pos.x, f.pos.y, f.pos.z);
         }
     }
 
@@ -252,6 +450,10 @@ public class BodyFragmentSystem implements SimulationSystem {
         turn(world, f, dt);
         fly(world, f, dt);
         drip(g, f, dt);
+        if (f.harvest != null) {
+            followTorso(f);
+        }
+        anchorBurn(f);
 
         f.energy = f.vel.lengthSquared() + f.angularVelocity.lengthSquared();
         f.quietSteps = f.grounded && f.energy < BodyFragmentConstants.SETTLE_ENERGY
@@ -437,10 +639,60 @@ public class BodyFragmentSystem implements SimulationSystem {
     public void restoreSettled(BodyFragment f) {
         f.settled = true;
         fitExtents(f);
+        admitSettled(f);
+    }
+
+    /**
+     * Lays a torso read from a save back down with the harvest record it
+     * carried, tying the two together again as {@link #spawnFromCreature} tied
+     * them, and puts the record back under the torso. The record must already
+     * be in the world's carcass list; nothing here creates one, so a load can
+     * never add a reward.
+     *
+     * @throws IllegalArgumentException when the piece is not the core of a
+     *         body that leaves this record's kind of carcass, or either side is
+     *         already tied to something
+     */
+    public void restoreSettled(BodyFragment torso, Carcass record) {
+        if (torso.definition.parent != -1 || torso.definition.family.creature != record.type
+                || !record.type.leavesCarcass()) {
+            throw new IllegalArgumentException("the " + torso.definition + " piece cannot carry a "
+                    + record.type + " carcass");
+        }
+        if (torso.harvest != null || record.remains != null) {
+            throw new IllegalArgumentException("a torso carries one harvest record and a record one torso");
+        }
+        torso.harvest = record;
+        record.remains = torso;
+        restoreSettled(torso);
+        followTorso(torso);
+    }
+
+    /**
+     * Adds a piece to the ground, first removing the oldest piece that
+     * carries no harvest record when the settled cap is full.
+     */
+    private void admitSettled(BodyFragment f) {
         if (settled.size() >= BodyFragmentConstants.MAX_SETTLED_FRAGMENTS) {
-            settled.removeFirst();
+            evictOldestSettled();
         }
         settled.add(f);
+    }
+
+    private void evictOldestSettled() {
+        for (int i = 0; i < settled.size(); i++) {
+            if (settled.get(i).harvest == null) {
+                dropBurn(settled.remove(i));
+                return;
+            }
+        }
+        // Unreachable while MAX_ANCHORED_REMAINS < MAX_SETTLED_FRAGMENTS. Were
+        // it reached, the record would stay and fall back to a whole carcass
+        // rather than be lost or be left tied to nothing.
+        BodyFragment oldest = settled.removeFirst();
+        oldest.harvest.remains = null;
+        oldest.harvest = null;
+        dropBurn(oldest);
     }
 
     private void settleOldest(Game g) {
@@ -468,20 +720,41 @@ public class BodyFragmentSystem implements SimulationSystem {
         f.vel.zero();
         f.angularVelocity.zero();
         f.decay = RagdollConstants.CORPSE_DECAY;
-        if (settled.size() >= BodyFragmentConstants.MAX_SETTLED_FRAGMENTS) {
-            settled.removeFirst();
+        if (f.harvest != null) {
+            followTorso(f);
         }
-        settled.add(f);
+        anchorBurn(f);
+        admitSettled(f);
     }
 
     /**
      * Rots settled pieces on the corpse clock and drops those past the radius
-     * corpses despawn at. Called from the slow tick beside the corpse loop.
+     * corpses despawn at. Called from the slow tick beside the corpse loop,
+     * after the carcasses have rotted and been emptied.
+     *
+     * <p>A torso carrying a harvest record is neither rotted nor dropped by
+     * distance while its record is in the world; it takes the record's rot
+     * clock instead, so it looks exactly as rotten. When the record has left
+     * the world the torso goes with it if the record rotted away, and is
+     * otherwise released to rot as an ordinary piece (harvested empty, or
+     * cleared by other code).
      */
     public void slowTick(Game g, float dt) {
         float far = RagdollConstants.DESPAWN_DISTANCE * RagdollConstants.DESPAWN_DISTANCE;
         for (int i = settled.size() - 1; i >= 0; i--) {
             BodyFragment f = settled.get(i);
+            if (f.harvest != null) {
+                Carcass record = f.harvest;
+                if (g.entities.carcasses.contains(record)) {
+                    f.decay = Math.min(f.decay, record.decay);
+                    continue;
+                }
+                f.harvest = null;
+                if (record.decay <= 0) {
+                    dropBurn(settled.remove(i));
+                    continue;
+                }
+            }
             f.decay -= dt;
             boolean gone = f.decay <= 0;
             if (!gone && g.player != null) {
@@ -490,7 +763,7 @@ public class BodyFragmentSystem implements SimulationSystem {
                 gone = dx * dx + dz * dz > far;
             }
             if (gone) {
-                settled.remove(i);
+                dropBurn(settled.remove(i));
             }
         }
     }

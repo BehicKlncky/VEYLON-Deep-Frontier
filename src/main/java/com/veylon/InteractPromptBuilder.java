@@ -115,6 +115,14 @@ final class InteractPromptBuilder {
                 return true;
             }
         }
+        // An animal blown apart is harvested from its torso once that lands.
+        for (Carcass c : game.entities.carcasses) {
+            if (!c.atRest() && c.remains.distSqTo(game.player.pos.x, game.player.pos.y,
+                    game.player.pos.z) <= PICKUP_RANGE * PICKUP_RANGE) {
+                game.interactPrompt = "The " + c.type.displayName + " is still falling";
+                return true;
+            }
+        }
         return false;
     }
 

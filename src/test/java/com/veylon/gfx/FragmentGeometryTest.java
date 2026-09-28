@@ -57,7 +57,7 @@ class FragmentGeometryTest {
             assertEquals(boxPivot.z + box.boxZ, f.restCentreZ, 1e-5f, p + " centre z");
 
             Vector3f above = pivotSum(p.rootPart, false);
-            Vector3f anchor = FragmentModels.anchor(p, new Vector3f());
+            Vector3f anchor = new Vector3f(p.definition.anchorX, p.definition.anchorY, p.definition.anchorZ);
             assertEquals(above.x, anchor.x, 1e-5f, p + " anchor x");
             assertEquals(above.y, anchor.y, 1e-5f, p + " anchor y");
             assertEquals(above.z, anchor.z, 1e-5f, p + " anchor z");
@@ -132,13 +132,13 @@ class FragmentGeometryTest {
         Vector3f at = new Vector3f();
         Vector3f size = new Vector3f();
         for (Piece p : Piece.values()) {
-            assertEquals(counts.get(p), FragmentModels.cutCount(p), p + " cut faces");
-            total += FragmentModels.cutCount(p);
+            assertEquals(counts.get(p), FragmentModels.cutCount(p.definition), p + " cut faces");
+            total += FragmentModels.cutCount(p.definition);
             float[] centre = {p.centreX, p.centreY, p.centreZ};
             float[] half = {p.halfX, p.halfY, p.halfZ};
-            for (int i = 0; i < FragmentModels.cutCount(p); i++) {
-                FragmentModels.cutCentre(p, i, at);
-                FragmentModels.cutSize(p, i, size);
+            for (int i = 0; i < FragmentModels.cutCount(p.definition); i++) {
+                FragmentModels.cutCentre(p.definition, i, at);
+                FragmentModels.cutSize(p.definition, i, size);
                 float[] c = {at.x, at.y, at.z};
                 float[] s = {size.x, size.y, size.z};
                 int thin = s[0] <= s[1] && s[0] <= s[2] ? 0 : s[1] <= s[2] ? 1 : 2;
@@ -183,8 +183,8 @@ class FragmentGeometryTest {
         Vector3f vestAt = pivotSum("vest", true);
         ModelPart vest = model.root.find("vest");
         float vestSide = vestAt.x + vest.boxX - vest.sizeX * 0.5f;
-        Vector3f at = FragmentModels.cutCentre(Piece.TORSO, 1, new Vector3f());
-        Vector3f size = FragmentModels.cutSize(Piece.TORSO, 1, new Vector3f());
+        Vector3f at = FragmentModels.cutCentre(Piece.TORSO.definition, 1, new Vector3f());
+        Vector3f size = FragmentModels.cutSize(Piece.TORSO.definition, 1, new Vector3f());
         assertEquals(vestSide - FragmentModels.CUT_PROUD, at.x - size.x * 0.5f, 1e-5f,
                 "the left shoulder wound must stand just proud of the vest, not inside it");
     }
@@ -197,7 +197,7 @@ class FragmentGeometryTest {
         for (NpcAppearance look : FragmentIsolationTest.everyLook()) {
             for (Piece p : Piece.values()) {
                 BodyFragment f = fragment(p, look);
-                float radius = FragmentModels.radius(p);
+                float radius = FragmentModels.radius(p.definition);
                 for (Map.Entry<String, Matrix4f> box : drawnBoxes(f).entrySet()) {
                     for (int c = 0; c < 8; c++) {
                         box.getValue().transformPosition((c & 1) - 0.5f, ((c >> 1) & 1) - 0.5f,
@@ -206,9 +206,9 @@ class FragmentGeometryTest {
                                 + box.getKey() + " reaches " + corner.length() + " past radius " + radius);
                     }
                 }
-                for (int i = 0; i < FragmentModels.cutCount(p); i++) {
-                    FragmentModels.cutCentre(p, i, at).sub(f.restCentreX, f.restCentreY, f.restCentreZ);
-                    FragmentModels.cutSize(p, i, size);
+                for (int i = 0; i < FragmentModels.cutCount(p.definition); i++) {
+                    FragmentModels.cutCentre(p.definition, i, at).sub(f.restCentreX, f.restCentreY, f.restCentreZ);
+                    FragmentModels.cutSize(p.definition, i, size);
                     assertTrue(at.length() + size.length() * 0.5f <= radius, p + " cut " + i + " inside radius");
                 }
             }
@@ -288,16 +288,14 @@ class FragmentGeometryTest {
         float sum = 0;
         for (int i = 0; i < field.size(); i++) {
             BodyFragment f = field.get(i);
-            sum += FragmentModels.radius(f.piece);
+            sum += FragmentModels.radius(f) + FragmentModels.contactDrop(f);
             FragmentModels.tint(f, tint);
-            ModelPart root = Animator.poseFragment(model, f);
-            FragmentModels.pieceTransform(f, piece);
-            FragmentModels.rootTransform(f.piece, piece, base);
+            ModelPart root = Animator.poseFragment(f);
+            FragmentModels.rootFrame(f, base);
             sum += root.visible ? base.m30() : 0;
-            for (int c = 0; c < FragmentModels.cutCount(f.piece); c++) {
-                FragmentModels.cutCentre(f.piece, c, at);
-                FragmentModels.cutSize(f.piece, c, size);
-                cut.set(piece).translate(at.x, at.y - size.y * 0.5f, at.z).scale(size);
+            FragmentModels.pieceFrame(f, piece);
+            for (int c = 0; c < FragmentModels.cutCount(f.definition); c++) {
+                FragmentModels.cutFrame(f.definition, c, piece, cut);
                 sum += cut.m31() + tint.y;
             }
         }
@@ -318,8 +316,7 @@ class FragmentGeometryTest {
      */
     private Map<String, Matrix4f> drawnBoxes(BodyFragment f) {
         ModelPart top = Animator.poseFragment(model, f);
-        Matrix4f piece = FragmentModels.pieceTransform(f, new Matrix4f());
-        Matrix4f base = FragmentModels.rootTransform(f.piece, piece, new Matrix4f());
+        Matrix4f base = FragmentModels.rootFrame(f, new Matrix4f());
         Map<String, Matrix4f> out = new LinkedHashMap<>();
         collectBoxes(top, base, out);
         return out;
@@ -378,8 +375,8 @@ class FragmentGeometryTest {
     }
 
     private static void assertCut(Piece p, int i, int thinAxis, float x, float y, float z) {
-        Vector3f at = FragmentModels.cutCentre(p, i, new Vector3f());
-        Vector3f size = FragmentModels.cutSize(p, i, new Vector3f());
+        Vector3f at = FragmentModels.cutCentre(p.definition, i, new Vector3f());
+        Vector3f size = FragmentModels.cutSize(p.definition, i, new Vector3f());
         String where = p + " cut " + i;
         assertEquals(x, at.x, 1e-5f, where + " x");
         assertEquals(y, at.y, 1e-5f, where + " y");

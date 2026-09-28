@@ -128,6 +128,8 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
     public final EntityManager entities = new EntityManager();
     public final com.veylon.entity.RagdollSystem ragdolls = new com.veylon.entity.RagdollSystem();
     public final com.veylon.entity.BodyFragmentSystem fragments = new com.veylon.entity.BodyFragmentSystem();
+    public final com.veylon.entity.CombustionSystem combustion = new com.veylon.entity.CombustionSystem();
+    public final com.veylon.entity.BurnResidueSystem burnResidues = new com.veylon.entity.BurnResidueSystem();
     public final FactionSystem faction = new FactionSystem();
     // 0.3.0 world-expansion systems.
     public final com.veylon.combat.WorldNoise noise = new com.veylon.combat.WorldNoise();
@@ -320,7 +322,11 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
     public Game() { this(new AudioManager()); }
 
     /** Allows headless command tests to observe sound requests without a native device. */
-    Game(AudioManager audio) { this.audio = java.util.Objects.requireNonNull(audio, "audio"); }
+    Game(AudioManager audio) {
+        this.audio = java.util.Objects.requireNonNull(audio, "audio");
+        // Bodies come apart in the pose last drawn, on the clock the living are animated by.
+        fragments.setDeathPoses(com.veylon.gfx.model.AnatomyModels.deathPoses(() -> totalTime));
+    }
 
     public void run() {
         qa.applyResolutionOverride();
@@ -476,7 +482,7 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
         }
         window.captureCursor(appState == AppState.PLAYING && uiMode == UiMode.NONE, input);
 
-        boolean simulate = appState == AppState.PLAYING && !uiMode.pausesSimulation() && !simPaused;
+        boolean simulate = simulates();
 
         swingTimer = Math.max(0, swingTimer - dt);
         hitSoundTimer = Math.max(0, hitSoundTimer - dt);
@@ -502,19 +508,7 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
         }
 
         if (simulate) {
-            advanceClock(dtD);
-            scheduler.update(dtD, this);
-            particles.update(dt, world);
-            projectiles.update(this, dt);
-            // Per frame, not on the 20 Hz bucket: a tumbling body turns far
-            // faster than a walking one and entities are drawn without
-            // interpolation, so 20 Hz strobes. The solver sub-steps at a fixed
-            // rate internally, so behaviour stays frame-rate independent.
-            ragdolls.update(this, dt);
-            fragments.update(this, dt);
-            explosions.tickFuses(this, dt);
-            noise.update(dt);
-            updateEmitters(dt);
+            advanceWorld(dtD);
         }
 
         // Camera follows the player eye.
@@ -524,11 +518,7 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
         audio.setListener(camera.position.x, camera.position.y, camera.position.z, camera.yaw);
         audio.update(dt);
 
-        if (player.dead && !player.abilities.invulnerable() && appState == AppState.PLAYING) {
-            appState = AppState.DEATH;
-            deathTimer = 3f;
-            closeScreens();
-        }
+        enterDeathIfDue();
 
         // Stream chunks and rebuild meshes near the player.
         world.ensureChunks((int) player.pos.x, (int) player.pos.z, renderer.renderRadius(), 2);
@@ -579,8 +569,26 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
                 window.cursorToFramebufferScaleY() / ui.uiScale());
     }
 
-    /** Ambient particle and sound emitters driven by world state. */
-    private void updateEmitters(float dt) {
+    /** Whether this frame advances the world: playing, no pausing screen open, not paused. */
+    boolean simulates() {
+        return appState == AppState.PLAYING && !uiMode.pausesSimulation() && !simPaused;
+    }
+
+    /** The world's share of a simulated frame; nothing else advances a fire, a body or a residue. */
+    void advanceWorld(double dtD) {
+        float dt = (float) dtD;
+        advanceClock(dtD);
+        scheduler.update(dtD, this);
+        particles.update(dt, world);
+        projectiles.update(this, dt);
+        // Per frame, not on the 20 Hz bucket: a tumbling body turns far faster than a walking
+        // one and entities are drawn without interpolation, so 20 Hz strobes. The solvers
+        // sub-step at a fixed rate internally, so behaviour stays frame-rate independent.
+        ragdolls.update(this, dt);
+        fragments.update(this, dt);
+        burnResidues.update(this, dt);
+        explosions.tickFuses(this, dt);
+        noise.update(dt);
         ambience.updateEmitters(dt);
     }
 
@@ -899,13 +907,25 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
         return crates.transferPlayerItemToCrate(slot);
     }
 
-    private void respawn() {
+    /** The player's one death transition; a lethal blast's also leaves the player's remains. */
+    void enterDeathIfDue() {
+        if (player.dead && !player.abilities.invulnerable() && appState == AppState.PLAYING) {
+            appState = AppState.DEATH;
+            deathTimer = 3f;
+            fragments.spawnPlayerRemains(this, player);
+            closeScreens();
+        }
+    }
+
+    void respawn() {
         if (player.abilities.invulnerable()) {
             player.restoreCreativeBody();
             return;
         }
         log("You died. The frontier reclaims you... (respawned at the crash site)");
         player.dead = false;
+        player.clearBlastDeath();
+        combustion.clear(player);
         player.health = 55;
         player.hunger = Math.max(player.hunger, 50);
         player.thirst = Math.max(player.thirst, 50);
@@ -926,6 +946,7 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
     @Override
     public void fastTick(float dt) {
         player.tickNeeds(this, dt);
+        combustion.fastTick(this, dt);
         entities.fastTick(this, dt);
         settlementManager.fastTick(this, dt);
     }

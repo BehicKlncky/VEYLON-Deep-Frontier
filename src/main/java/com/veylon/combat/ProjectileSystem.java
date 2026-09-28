@@ -1,6 +1,7 @@
 package com.veylon.combat;
 
 import com.veylon.Game;
+import com.veylon.entity.CombustionSource;
 import com.veylon.entity.Creature;
 import com.veylon.entity.Entity;
 import com.veylon.entity.Npc;
@@ -22,7 +23,9 @@ import java.util.Random;
  * A scrap bomb stops against whatever it hits and goes off when its fuse ends;
  * a fire bomb is a bottle that shatters on the first thing it hits and spills
  * burning liquid ({@code LiquidFireSystem}), its fuse only a fallback for one
- * that never lands.
+ * that never lands. A bottle that breaks on a body sets that body alight
+ * ({@code CombustionSystem.ignite}) before it spills, so a bird hit in the air
+ * burns though the liquid finds no ground below it.
  */
 public class ProjectileSystem {
 
@@ -390,7 +393,13 @@ public class ProjectileSystem {
     private boolean onEntityHit(Game g, Projectile p, Entity victim, HitZone zone,
                                 float px, float py, float pz) {
         if (p.kind == Kind.FIRE_BOMB) {
-            // The bottle breaks on the body and the liquid runs to its feet.
+            // The bottle breaks on the body, which catches at once wherever it
+            // is, in the air or not; then the liquid runs to its feet.
+            if (!p.detonated) {
+                g.combustion.ignite(g, victim, CombustionSource.DIRECT_HIT,
+                        CombustionSource.DIRECT_HIT.nominalIntensity, p.fromPlayer,
+                        g.liquidFire.nextSpillId(), px, py, pz);
+            }
             return shatter(g, p, px, py, pz);
         }
         if (p.kind == Kind.BOMB) {

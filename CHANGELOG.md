@@ -4,6 +4,50 @@ All notable user-facing changes to VEYLON: Deep Frontier are recorded here.
 
 ## [Unreleased]
 
+### Changed
+
+- A scrap bomb's or a powder keg's lethal radius now kills every living body
+  inside it, not only people: every animal, including a bird in flight, and a
+  Survival player. Each comes apart at its own joints — a person into ten
+  pieces, a deer into eleven, a wolf, thornhorn or gloomstalker into twelve, a
+  hare or a bird into seven — and an animal's meat, hide and lodged arrows stay
+  with its torso, harvested once when it comes to rest. A Creative player is
+  untouched, as before.
+- Burning liquid, burning blocks, fueled campfires, placed torches and a fire
+  bomb breaking on a body set it alight. The fire stays on the body after it
+  leaves the flames, hurts it until it burns out, and goes out in deep water or
+  open rain; a roof keeps it burning. Overlapping flames burn like one. The
+  player catches too (not in Creative) and gets a burn injury after a second
+  alight, which waits until the flames are out before it hurts.
+- Burning people and animals drop whatever they were doing — fighting,
+  working, trading, sleeping, talking — and run in erratic bursts away from
+  the flames, birds by flying, then settle and decide afresh. The player keeps
+  every control.
+- A body that dies alight keeps burning briefly and then smokes on the corpse,
+  carcass or pieces it leaves. Burning bodies char, give off licks of flame,
+  embers and smoke, steam when they are put out and crackle; a burning player
+  sees flames at the edges of the view and around the item in hand.
+- People and animals no longer walk into torches and campfires.
+
+### Added
+
+- Capture scenes: `dismember_species`, `dismember_species_wall` and
+  `dismember_species_close`, and `body_fire_row`, `body_fire_row_night`,
+  `body_fire_close`, `body_fire_out`, `body_fire_blast`, `body_fire_panic`,
+  `body_fire_bird`, `body_fire_rain`, `body_fire_ragdoll` and
+  `body_fire_player`.
+- The F3 overlay and the smoke report show burning and panicking bodies,
+  ragdolls, pieces in flight and at rest, and remains still burning.
+- An engineering record, a contract and a validation of the work in
+  `docs/engineering/ALL_LIVING_COMBAT_FIRE.md`.
+
+### Compatibility
+
+- Saves gain an optional `world.remains` section for every body's pieces; the
+  0.8.0 `world.fragments` section is still written unchanged, so 0.8.0 still
+  opens these saves (without the animals' pieces). Fires on bodies and panic
+  are not saved.
+
 ## [0.8.0] - 2026-09-20
 
 ### Changed

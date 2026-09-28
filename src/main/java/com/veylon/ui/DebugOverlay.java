@@ -59,6 +59,14 @@ public class DebugOverlay {
                         + "   Paths " + budgets.cachedPathNodes()
                         + "   Pending-gen " + budgets.pendingGenerationChunks()
                         + "/" + budgets.pendingGenerationEdits(),
+                "Bodies: burning " + budgets.burningBodies() + "/" + budgets.livingBodies()
+                        + "   panicking " + budgets.panickingBodies()
+                        + "   ragdolls " + budgets.liveRagdolls() + "/"
+                        + com.veylon.entity.RagdollConstants.MAX_LIVE
+                        + "   pieces " + budgets.liveFragments() + "/"
+                        + com.veylon.entity.BodyFragmentConstants.MAX_LIVE_FRAGMENTS
+                        + " flying, " + budgets.settledFragments() + " at rest"
+                        + "   remains burning or smoking " + budgets.burnResidues(),
                 "OnGround: " + p.onGround + "  InWater: " + p.inWater + "  Exposed: " + p.exposedToSky,
                 String.format("Heap: %d / %d MB", heapUsed, heapMax),
         };

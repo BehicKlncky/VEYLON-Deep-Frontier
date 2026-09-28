@@ -34,6 +34,12 @@ public final class SettledNpcAI {
     }
 
     public static void update(Game g, Npc n, float dt) {
+        // NpcAI.update, the one caller in the game, has already run the fire
+        // panic; this repeats it (a no-op then) for anyone calling in directly,
+        // so no route reaches combat, a captive's idling or a duty while alight.
+        if (FirePanic.update(g, n, dt)) {
+            return;
+        }
         Settlement s = n.settled() ? g.world.settlements.get(n.settlementId) : null;
         NpcArchetype a = n.archetype;
         n.lastKnownAge += dt;

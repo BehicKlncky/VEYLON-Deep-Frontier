@@ -309,7 +309,7 @@ public final class CounterattackDirector {
 
         // Explicit attacker victory: retire the frontier population and replace
         // it once with a fresh hostile garrison.
-        g.entities.npcs.removeIf(n -> n.settled() && n.settlementId == target.id);
+        g.entities.removeNpcs(g, n -> n.settled() && n.settlementId == target.id);
         for (Settlement.Resident resident : target.residents) {
             resident.live = null;
         }
@@ -370,7 +370,7 @@ public final class CounterattackDirector {
     public void reconcileLoaded(Game g) {
         // Unknown/orphan group members are never allowed to become immortal
         // hostile entities after a partial or old save.
-        g.entities.npcs.removeIf(n -> n.partyKind == Npc.PartyKind.COUNTERATTACK
+        g.entities.removeNpcs(g, n -> n.partyKind == Npc.PartyKind.COUNTERATTACK
                 && (n.partyMissionId == null || !missions.containsKey(n.partyMissionId)));
         for (CounterattackMission mission : new ArrayList<>(missions.values())) {
             Settlement target = g.world.settlements.get(mission.targetSettlementId);
@@ -455,11 +455,11 @@ public final class CounterattackDirector {
 
     private void dematerialize(Game g, CounterattackMission mission, List<Npc> members) {
         syncCoarsePosition(mission, members);
-        g.entities.npcs.removeIf(n -> mission.id.equals(n.partyMissionId));
+        g.entities.removeNpcs(g, n -> mission.id.equals(n.partyMissionId));
     }
 
     private void removeMembers(Game g, String missionId) {
-        g.entities.npcs.removeIf(n -> missionId.equals(n.partyMissionId));
+        g.entities.removeNpcs(g, n -> missionId.equals(n.partyMissionId));
     }
 
     public List<Npc> members(Game g, String missionId) {

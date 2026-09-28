@@ -56,7 +56,9 @@ final class QaHarness {
     private final RainQaScene rainScene;
     private final RagdollQaScene ragdollScene;
     private final DismemberQaScene dismemberScene;
+    private final SpeciesDismemberQaScene speciesDismemberScene;
     private final MolotovQaScene molotovScene;
+    private final BodyFireQaScene bodyFireScene;
     private final HudQaScene hudScene;
 
     // Render statistics sampled across an automated run.
@@ -103,7 +105,9 @@ final class QaHarness {
         rainScene = new RainQaScene(game);
         ragdollScene = new RagdollQaScene(game);
         dismemberScene = new DismemberQaScene(game);
+        speciesDismemberScene = new SpeciesDismemberQaScene(game);
         molotovScene = new MolotovQaScene(game);
+        bodyFireScene = new BodyFireQaScene(game);
         hudScene = new HudQaScene(game);
     }
 
@@ -267,7 +271,9 @@ final class QaHarness {
         rainScene.update(elapsed);
         ragdollScene.update(elapsed);
         dismemberScene.update(elapsed);
+        speciesDismemberScene.update(elapsed);
         molotovScene.update(elapsed);
+        bodyFireScene.update(elapsed);
         hudScene.update(elapsed);
     }
 
@@ -711,10 +717,21 @@ final class QaHarness {
                 clearBenchmarkStage(site, 10, 18);
                 dismemberScene.stage(site, normalized);
             }
+            case "dismember_species", "dismember_species_wall", "dismember_species_close" -> {
+                site = moveBenchmarkToBiome(Biome.MEADOW);
+                clearBenchmarkStage(site, 12, 18);
+                speciesDismemberScene.stage(site, normalized);
+            }
             case "molotov_ground", "molotov_tree", "molotov_rain" -> {
                 site = moveBenchmarkToBiome(Biome.MEADOW);
                 clearBenchmarkStage(site, 12, 16);
                 molotovScene.stage(site, normalized);
+            }
+            case "body_fire_row", "body_fire_row_night", "body_fire_close", "body_fire_out", "body_fire_blast",
+                    "body_fire_panic", "body_fire_bird", "body_fire_rain", "body_fire_ragdoll", "body_fire_player" -> {
+                site = moveBenchmarkToBiome(Biome.MEADOW);
+                clearBenchmarkStage(site, 14, 18);
+                bodyFireScene.stage(site, normalized);
             }
             case "vfx_blood", "blood_tracks" -> {
                 site = moveBenchmarkToBiome(Biome.MEADOW);

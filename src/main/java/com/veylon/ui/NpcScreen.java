@@ -23,7 +23,8 @@ public class NpcScreen {
 
     public void update(Game g) {
         Npc n = g.activeNpc;
-        if (n == null || n.dead) {
+        // A speaker who died or is fleeing their own fire is gone from the conversation.
+        if (n == null || n.dead || n.panic.active()) {
             g.closeScreens();
             return;
         }

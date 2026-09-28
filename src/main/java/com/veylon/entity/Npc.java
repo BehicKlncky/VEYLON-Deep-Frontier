@@ -1,6 +1,7 @@
 package com.veylon.entity;
 
 import com.veylon.ai.FactionSystem;
+import com.veylon.ai.PanicIntent;
 import com.veylon.settlement.HumanFaction;
 import com.veylon.settlement.NpcArchetype;
 import com.veylon.settlement.Settlement;
@@ -113,15 +114,8 @@ public class Npc extends Entity {
      * Transient: not saved, reset only by a new {@code Npc} instance.
      */
     public int lastTorsoShotId = -1;
-    /**
-     * Set by a blast that killed this person inside its lethal radius, so the
-     * death pipeline blows the body apart instead of letting it fall as a
-     * ragdoll. The first fatal blast's record is kept. Transient: not saved;
-     * a dead NPC leaves the world on the next entity tick.
-     */
-    public boolean dismemberOnDeath;
-    /** Centre and power of that blast; meaningful only with {@link #dismemberOnDeath}. */
-    public float blastX, blastY, blastZ, blastStrength;
+    /** Flight from the fire on this body; written only by the AI. Transient. */
+    public final PanicIntent panic = new PanicIntent();
 
     public Npc(World world, String name) {
         super(world);
@@ -132,13 +126,10 @@ public class Npc extends Entity {
         health = 35;
     }
 
-    /**
-     * Kills this NPC through the ordinary damage path, so {@code dead},
-     * {@code health <= 0} and {@code lastHitByPlayer} are set exactly as by any
-     * fatal hit and the death pipeline treats it as a real death.
-     */
-    public void killBy(boolean byPlayer) {
-        hurt(health + 1f, byPlayer);
+    /** People walk round torches and campfires rather than through them. */
+    @Override
+    protected boolean keepsOutOfFlames() {
+        return true;
     }
 
     public boolean hostileToPlayer() {

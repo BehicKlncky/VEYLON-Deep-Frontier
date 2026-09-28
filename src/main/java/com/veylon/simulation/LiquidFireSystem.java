@@ -1,22 +1,17 @@
 package com.veylon.simulation;
 
 import com.veylon.Game;
-import com.veylon.entity.Affliction;
-import com.veylon.entity.Creature;
+import com.veylon.entity.BodySweep;
+import com.veylon.entity.CombustionSource;
 import com.veylon.entity.Entity;
-import com.veylon.entity.Npc;
-import com.veylon.entity.Player;
 import com.veylon.util.Vec3i;
 import com.veylon.world.BlockType;
 import com.veylon.world.World;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
-import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Random;
-import java.util.Set;
 
 import static com.veylon.simulation.LiquidFireConstants.*;
 
@@ -27,13 +22,21 @@ import static com.veylon.simulation.LiquidFireConstants.*;
  * liquid lies on the top face. It runs sideways and down, never up, and never
  * into a solid or water cell; tall grass, bushes and saplings soak it up.
  *
- * <p>Each medium tick a patch burns whoever stands in it, may set flammable
- * blocks in and beside its cell alight through {@link FireSystem#ignite},
- * lights the fuse of a neighbouring powder keg, and burns down. Block fires it
- * starts spread through {@link FireSystem} on their own. Rain, storm and snow
- * put out a patch open to the sky after {@link LiquidFireConstants#RAIN_EXTINGUISH_SECONDS};
- * it neither burns nor ignites anything meanwhile. A patch under cover burns on,
+ * <p>Each medium tick a patch may set flammable blocks in and beside its cell
+ * alight through {@link FireSystem#ignite(Game, int, int, int, boolean, int)},
+ * passing on whose bottle it was, lights the fuse of a neighbouring powder
+ * keg, and burns down. Block fires it starts spread through
+ * {@link FireSystem} on their own. Rain, storm and snow put out a patch open
+ * to the sky after {@link LiquidFireConstants#RAIN_EXTINGUISH_SECONDS}; it
+ * neither burns nor ignites anything meanwhile. A patch under cover burns on,
  * but does not light a block the rain is falling on.
+ *
+ * <p>A patch sets alight any living body whose flame box touches its flames
+ * ({@link #exposeContacts}, asked by the body-fire fast tick): the patch's
+ * cell footprint from just below its floor to {@link
+ * LiquidFireConstants#CONTACT_HALF_HEIGHT} above it, so a bird flying over the
+ * pool is out of reach. The patch does no damage of its own; the body's fire
+ * does.
  *
  * <p>Patches are not saved, like burning blocks: a save taken mid-burn loads
  * with the pool gone. A fire bomb still in the air is saved with the other
@@ -134,26 +137,12 @@ public class LiquidFireSystem implements MediumTickSystem {
     private final int[] filledZ = new int[MAX_PATCHES_PER_SPILL];
     private int filledCount;
 
-    /** Entities already burned this tick, however many patches they stand on. */
-    private final Set<Entity> burnedThisTick =
-            Collections.newSetFromMap(new IdentityHashMap<>());
-    /**
-     * (NPC, spill) pairs already burned, so an NPC counts as attacked once
-     * per bottle. Oldest first; pairs go when their spill has burned out.
-     */
-    private final Npc[] trackedNpc = new Npc[MAX_TRACKED_NPC_SPILLS];
-    private final int[] trackedSpill = new int[MAX_TRACKED_NPC_SPILLS];
-    private int trackedCount;
-
     @Override
     public void reset() {
         patches.clear();
         nextSpillId = 0;
         totalSpills = 0;
         totalPatchIgnitions = 0;
-        burnedThisTick.clear();
-        Arrays.fill(trackedNpc, null);
-        trackedCount = 0;
         frontierSize = 0;
         filledCount = 0;
     }
@@ -172,9 +161,13 @@ public class LiquidFireSystem implements MediumTickSystem {
         return patches.size();
     }
 
-    /** Remembered (NPC, spill) pairs; bounded by {@link LiquidFireConstants#MAX_TRACKED_NPC_SPILLS}. */
-    public int trackedNpcSpills() {
-        return trackedCount;
+    /**
+     * The id the next {@link #spill} will carry. A bottle that breaks on a
+     * body lights it with this id before spilling, so the body's fire, the
+     * pool and every block fire the pool starts count as one bottle.
+     */
+    public int nextSpillId() {
+        return nextSpillId;
     }
 
     /**
@@ -343,10 +336,8 @@ public class LiquidFireSystem implements MediumTickSystem {
     @Override
     public void mediumTick(Game g, float dt) {
         if (patches.isEmpty()) {
-            forgetEndedSpills();
             return;
         }
-        burnedThisTick.clear();
         int kept = 0;
         for (int i = 0; i < patches.size(); i++) {
             Patch p = patches.get(i);
@@ -357,15 +348,45 @@ public class LiquidFireSystem implements MediumTickSystem {
         for (int i = patches.size() - 1; i >= kept; i--) {
             patches.remove(i);
         }
-        burnedThisTick.clear();
-        forgetEndedSpills();
+    }
+
+    /**
+     * Offers the body a contact with every patch whose flames its sweep
+     * touched this fast tick: the patch's cell footprint, from
+     * {@link LiquidFireConstants#CONTACT_BELOW} under its floor to
+     * {@link LiquidFireConstants#CONTACT_HALF_HEIGHT} above it. A patch still
+     * wet from rain or rained on now (even before its first medium tick has
+     * started soaking it), or whose cell has been built over, flooded or
+     * undermined since its last medium tick, touches nobody.
+     */
+    public void exposeContacts(Game g, Entity e, BodySweep s) {
+        for (int i = 0; i < patches.size(); i++) {
+            Patch p = patches.get(i);
+            float floor = p.y;
+            if (p.wet > 0f
+                    || s.maxX() <= p.x || s.minX() >= p.x + 1
+                    || s.maxZ() <= p.z || s.minZ() >= p.z + 1
+                    || s.maxY() <= floor - CONTACT_BELOW || s.minY() >= floor + CONTACT_HALF_HEIGHT
+                    || !s.touches(p.x, floor - CONTACT_BELOW, p.z,
+                            p.x + 1, floor + CONTACT_HALF_HEIGHT, p.z + 1)
+                    || !liquidCanLie(g.world, p) || g.fire.isRainedOn(g, p.x, p.y, p.z)) {
+                continue;
+            }
+            g.combustion.expose(e, CombustionSource.LIQUID, p.intensity, p.byPlayer, p.spillId,
+                    s.contactX(), s.contactY(), s.contactZ());
+        }
+    }
+
+    /** Whether the patch's cell still holds liquid: open, dry, on solid ground. */
+    private static boolean liquidCanLie(World world, Patch p) {
+        BlockType cell = world.getBlock(p.x, p.y, p.z);
+        return !cell.solid && cell != BlockType.WATER && world.isSolid(p.x, p.y - 1, p.z);
     }
 
     /** Advances one patch; false when it has gone out. */
     private boolean tick(Game g, Patch p, float dt) {
         p.age += dt;
-        BlockType cell = g.world.getBlock(p.x, p.y, p.z);
-        if (cell.solid || cell == BlockType.WATER || !g.world.isSolid(p.x, p.y - 1, p.z)) {
+        if (!liquidCanLie(g.world, p)) {
             // Built over, flooded, or the ground under it burned away.
             return false;
         }
@@ -386,7 +407,6 @@ public class LiquidFireSystem implements MediumTickSystem {
             return true;
         }
         igniteTouching(g, p);
-        burnOccupants(g, p, dt);
         return true;
     }
 
@@ -410,114 +430,10 @@ public class LiquidFireSystem implements MediumTickSystem {
                     g.log("Flame catches a powder-keg fuse!");
                 }
             } else if (t.flammable && !g.fire.isRainedOn(g, bx, by, bz)
-                    && rng.nextFloat() < chance && g.fire.ignite(g, bx, by, bz)) {
+                    && rng.nextFloat() < chance
+                    && g.fire.ignite(g, bx, by, bz, p.byPlayer, p.spillId)) {
                 totalPatchIgnitions++;
             }
         }
-    }
-
-    /** Burns everyone standing in the patch who has not been burned this tick. */
-    private void burnOccupants(Game g, Patch p, float dt) {
-        Player player = g.player;
-        if (player != null && !player.dead && !player.abilities.invulnerable()
-                && standsIn(player, p) && burnedThisTick.add(player)) {
-            player.hurt(ENTITY_DPS_PLAYER * dt, false);
-            player.damageFlash = 1f;
-            if (!player.has(Affliction.BURN)
-                    && rng.nextFloat() < FireConstants.BURN_AFFLICTION_CHANCE) {
-                player.addAffliction(Affliction.BURN, FireConstants.BURN_AFFLICTION_SECONDS_MIN
-                        + rng.nextFloat() * FireConstants.BURN_AFFLICTION_SECONDS_RANGE);
-                g.log("The flames sear you - BURNS! Treat them with a herbal poultice.");
-            }
-        }
-        for (Creature c : g.entities.creatures) {
-            if (!c.dead && standsIn(c, p) && burnedThisTick.add(c)) {
-                c.hurt(ENTITY_DPS_CREATURE * dt, p.byPlayer);
-            }
-        }
-        for (Npc n : g.entities.npcs) {
-            if (!n.dead && standsIn(n, p) && burnedThisTick.add(n)) {
-                n.hurt(ENTITY_DPS_NPC * dt, p.byPlayer);
-                if (firstBurn(n, p.spillId)) {
-                    onNpcFirstBurned(g, n, p);
-                }
-            }
-        }
-    }
-
-    /**
-     * Whether the entity's feet, its footprint at {@code pos.y}, overlap the
-     * patch cell within the contact height. A body straddling two cells
-     * stands in both.
-     */
-    private static boolean standsIn(Entity e, Patch p) {
-        float feet = e.pos.y;
-        if (feet < p.y - CONTACT_BELOW || feet > p.y + CONTACT_HALF_HEIGHT) {
-            return false;
-        }
-        float hw = e.width * 0.5f;
-        return e.pos.x + hw > p.x && e.pos.x - hw < p.x + 1
-                && e.pos.z + hw > p.z && e.pos.z - hw < p.z + 1;
-    }
-
-    /**
-     * What an explosion does to an NPC it hurts, once per bottle: the NPC
-     * looks to where the fire is, and a player's bottle counts as an attack.
-     * The look is perception of the thrower, so it waits on
-     * {@link Player#isPerceivableByAi()} for a player's bottle; the attack's
-     * reputation cost does not, and applies to settled NPCs only.
-     */
-    private static void onNpcFirstBurned(Game g, Npc n, Patch p) {
-        if (!p.byPlayer || g.player == null || g.player.isPerceivableByAi()) {
-            n.lastKnown.set(p.x + 0.5f, p.y, p.z + 0.5f);
-            n.lastKnownAge = 0f;
-        }
-        if (p.byPlayer && n.settled()) {
-            g.settlementManager.onNpcAttackedByPlayer(g, n);
-        }
-    }
-
-    /** True the first time this NPC is burned by this spill, and remembers it. */
-    private boolean firstBurn(Npc n, int spillId) {
-        for (int i = 0; i < trackedCount; i++) {
-            if (trackedNpc[i] == n && trackedSpill[i] == spillId) {
-                return false;
-            }
-        }
-        if (trackedCount == MAX_TRACKED_NPC_SPILLS) {
-            // Forget the oldest pair; at worst that NPC counts twice for an old bottle.
-            System.arraycopy(trackedNpc, 1, trackedNpc, 0, trackedCount - 1);
-            System.arraycopy(trackedSpill, 1, trackedSpill, 0, trackedCount - 1);
-            trackedCount--;
-        }
-        trackedNpc[trackedCount] = n;
-        trackedSpill[trackedCount] = spillId;
-        trackedCount++;
-        return true;
-    }
-
-    /** Drops remembered pairs whose spill has no patch left burning. */
-    private void forgetEndedSpills() {
-        int kept = 0;
-        for (int i = 0; i < trackedCount; i++) {
-            if (spillBurning(trackedSpill[i])) {
-                trackedNpc[kept] = trackedNpc[i];
-                trackedSpill[kept] = trackedSpill[i];
-                kept++;
-            }
-        }
-        for (int i = kept; i < trackedCount; i++) {
-            trackedNpc[i] = null;
-        }
-        trackedCount = kept;
-    }
-
-    private boolean spillBurning(int spillId) {
-        for (int i = 0; i < patches.size(); i++) {
-            if (patches.get(i).spillId == spillId) {
-                return true;
-            }
-        }
-        return false;
     }
 }

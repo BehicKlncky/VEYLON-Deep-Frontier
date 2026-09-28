@@ -2,6 +2,7 @@ package com.veylon.entity;
 
 import com.veylon.Game;
 import com.veylon.ai.CreatureAI;
+import com.veylon.ai.FirePanic;
 import com.veylon.ai.NpcAI;
 import com.veylon.item.ItemType;
 import com.veylon.world.Biome;
@@ -36,6 +37,8 @@ public class EntityManager {
     private final Random creatureAiRng = new Random();
     private final Random npcAiRng = new Random();
     private final Random settledNpcAiRng = new Random();
+    /** Goals of people and animals fleeing the fire on their bodies ({@code ai.FirePanic}). */
+    private final Random panicRng = new Random();
 
     public void fastTick(Game g, float dt) {
         for (Iterator<Creature> it = creatures.iterator(); it.hasNext(); ) {
@@ -46,6 +49,11 @@ public class EntityManager {
             if (c.dead) {
                 onCreatureDied(g, c);
                 it.remove();
+                if (reallyDied(c)) {
+                    forgetTarget(c);
+                } else {
+                    depart(g, c);
+                }
             }
         }
         for (Iterator<Npc> it = npcs.iterator(); it.hasNext(); ) {
@@ -76,13 +84,100 @@ public class EntityManager {
                     onSettledNpcDied(g, n);
                 }
                 // A person killed inside a blast's lethal radius is blown apart
-                // by that blast; every other death falls as one body.
+                // by that blast, from the pose they died in; every other death
+                // falls as one body.
                 if (reallyDied(n) && n.dismemberOnDeath) {
-                    g.fragments.spawnFromNpc(g, n, n.blastX, n.blastY, n.blastZ, n.blastStrength);
+                    g.fragments.spawnFromNpc(g, n, g.fragments.deathPose(n),
+                            n.blastX, n.blastY, n.blastZ, n.blastStrength);
                 } else if (reallyDied(n)) {
                     g.ragdolls.spawn(g, n);
                 }
                 it.remove();
+                if (reallyDied(n)) {
+                    forgetTarget(n);
+                } else {
+                    // Routed, gone home, faded away: no body, and no fire or panic follows it.
+                    depart(g, n);
+                }
+            }
+        }
+    }
+
+    /**
+     * A person leaving the world without dying — a settlement going dormant,
+     * a party going abstract or being retired, a captive led away, a trader or
+     * a routed fighter gone — after they are out of {@link #npcs}. Their fire
+     * (with its heat, scorch and the bottles already counted against them) and
+     * their panic are forgotten rather than carried or simulated anywhere
+     * else, no AI keeps them as a target, and a conversation with them closes.
+     * Nothing is spawned, credited or reported: that belongs to a death. Their
+     * health and standing are whatever the leaving code wrote back.
+     */
+    public void depart(Game g, Npc n) {
+        g.combustion.clear(n);
+        FirePanic.forget(n);
+        forgetTarget(n);
+        if (g.activeNpc == n) {
+            if (g.uiMode == Game.UiMode.NPC) {
+                g.closeScreens();
+            } else {
+                g.activeNpc = null;
+            }
+        }
+    }
+
+    /** An animal leaving the world without dying, as {@link #depart(Game, Npc)} does for a person. */
+    public void depart(Game g, Creature c) {
+        g.combustion.clear(c);
+        FirePanic.forget(c);
+        forgetTarget(c);
+    }
+
+    /** Takes a person out of the world without a death; see {@link #depart(Game, Npc)}. */
+    public boolean removeNpc(Game g, Npc n) {
+        if (!npcs.remove(n)) {
+            return false;
+        }
+        depart(g, n);
+        return true;
+    }
+
+    /**
+     * Takes every person {@code leaving} accepts out of the world without a
+     * death, keeping the order of those who stay; see {@link #depart(Game, Npc)}.
+     * Never call this from inside {@link #fastTick}'s own iteration.
+     *
+     * @return how many left
+     */
+    public int removeNpcs(Game g, Predicate<? super Npc> leaving) {
+        int removed = 0;
+        for (int i = npcs.size() - 1; i >= 0; i--) {
+            Npc n = npcs.get(i);
+            if (leaving.test(n)) {
+                npcs.remove(i);
+                depart(g, n);
+                removed++;
+            }
+        }
+        return removed;
+    }
+
+    /**
+     * Clears every AI's hold on a body that has just left the world, dead or
+     * departed, so nothing keeps it as a target. Allocation free; runs once
+     * per departure.
+     */
+    private void forgetTarget(Entity gone) {
+        for (int i = 0; i < npcs.size(); i++) {
+            Npc n = npcs.get(i);
+            if (n.combatTarget == gone) {
+                n.combatTarget = null;
+            }
+        }
+        for (int i = 0; i < creatures.size(); i++) {
+            Creature c = creatures.get(i);
+            if (c.targetEntity == gone) {
+                c.targetEntity = null;
             }
         }
     }
@@ -165,13 +260,16 @@ public class EntityManager {
     }
 
     /**
-     * Every consequence of an animal dying, fired on the tick it died.
+     * Every consequence of an animal dying, fired on the tick it died, then
+     * exactly one body: the pieces of a blast death, or a ragdoll.
      *
-     * <p>The carcass itself is the one thing that waits: the body falls first,
-     * and {@code RagdollSystem} builds the carcass where it comes to rest, with
-     * the lodged arrows carried across. Reputation, loot and the log lines must
-     * not wait — quest credit that lagged a second behind the kill would read
-     * as a bug.
+     * <p>For a whole body the carcass is the one thing that waits: the body
+     * falls first, and {@code RagdollSystem} builds the carcass where it comes
+     * to rest, with the lodged arrows carried across. A body blown apart gets
+     * its one carcass at once, tied to its torso ({@code BodyFragmentSystem}).
+     * Reputation, loot and the log lines must not wait — quest credit that
+     * lagged a second behind the kill would read as a bug — and none of them
+     * depends on which body the animal leaves.
      */
     private void onCreatureDied(Game g, Creature c) {
         if (c.lastHitByPlayer) {
@@ -187,7 +285,10 @@ public class EntityManager {
             g.log("The " + c.type.displayName + " is down. Harvest the carcass with [F]"
                     + (g.playerHasKnife() ? "." : " (a knife would yield far more)."));
         }
-        if (reallyDied(c)) {
+        if (reallyDied(c) && c.dismemberOnDeath) {
+            g.fragments.spawnFromCreature(g, c, g.fragments.deathPose(c),
+                    c.blastX, c.blastY, c.blastZ, c.blastStrength);
+        } else if (reallyDied(c)) {
             g.ragdolls.spawn(g, c);
         }
     }
@@ -231,6 +332,7 @@ public class EntityManager {
             c.decay -= dt;
             if (c.decay <= 0 || c.empty()) {
                 it.remove();
+                BurnResidue.letGo(c.burn);
             }
         }
         // Human bodies rot on the same clock, but have nothing to be emptied of.
@@ -239,6 +341,7 @@ public class EntityManager {
             corpse.decay -= dt;
             if (corpse.decay <= 0) {
                 it.remove();
+                BurnResidue.letGo(corpse.burn);
             }
         }
         // Pieces of a body blown apart rot on that clock too, and are dropped
@@ -260,10 +363,14 @@ public class EntityManager {
         return best;
     }
 
+    /** The nearest carcass at rest within {@code range}: one whose remains are still flying is not a carcass yet. */
     public Carcass nearestCarcass(float x, float y, float z, float range) {
         Carcass best = null;
         double bestD = range * range;
         for (Carcass c : carcasses) {
+            if (!c.atRest()) {
+                continue;
+            }
             double dx = c.pos.x - x, dy = c.pos.y - y, dz = c.pos.z - z;
             double d = dx * dx + dy * dy + dz * dz;
             if (d < bestD) {
@@ -278,15 +385,25 @@ public class EntityManager {
     public void slowTick(Game g) {
         float px = g.player.pos.x, pz = g.player.pos.z;
 
-        creatures.removeIf(c -> c.distSqTo(px, c.pos.y, pz) > 170 * 170);
+        for (int i = creatures.size() - 1; i >= 0; i--) {
+            Creature c = creatures.get(i);
+            if (c.distSqTo(px, c.pos.y, pz) > 170 * 170) {
+                creatures.remove(i);
+                depart(g, c);
+            }
+        }
         // Bodies get the same radius as the wildlife that left them, so a long
         // walk cannot leave a trail of corpses accumulating behind the player.
         float far = RagdollConstants.DESPAWN_DISTANCE * RagdollConstants.DESPAWN_DISTANCE;
-        corpses.removeIf(corpse -> {
+        for (int i = corpses.size() - 1; i >= 0; i--) {
+            HumanCorpse corpse = corpses.get(i);
             float dx = corpse.pos.x - px;
             float dz = corpse.pos.z - pz;
-            return dx * dx + dz * dz > far;
-        });
+            if (dx * dx + dz * dz > far) {
+                corpses.remove(i);
+                BurnResidue.letGo(corpse.burn);
+            }
+        }
         if (g.spawningPaused()) {
             return; // R25: natural spawning only; despawning above still runs.
         }
@@ -435,11 +552,21 @@ public class EntityManager {
         rng.setSeed(seed);
     }
 
-    /** Seeds the three independent AI decision streams for this game instance. */
+    /** Seeds the four independent AI decision streams for this game instance. */
     public void setAiRandomSeed(long worldSeed) {
         creatureAiRng.setSeed(worldSeed ^ 0x435245415455L);
         npcAiRng.setSeed(worldSeed ^ 0x4c454741434eL);
         settledNpcAiRng.setSeed(worldSeed ^ 0x5345544e5043L);
+        panicRng.setSeed(worldSeed ^ 0x50414e494353L);
+    }
+
+    /**
+     * The fire panic's own stream ("PANICS"), drawn by burning people and
+     * animals in the entity tick's order. Nothing else draws from it, so a
+     * panic never shifts another decision and presentation never shifts a panic.
+     */
+    public float nextPanicFloat() {
+        return panicRng.nextFloat();
     }
 
     public float nextCreatureAiFloat() {

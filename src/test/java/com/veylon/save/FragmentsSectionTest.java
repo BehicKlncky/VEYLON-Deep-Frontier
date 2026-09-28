@@ -3,7 +3,11 @@ package com.veylon.save;
 import com.veylon.Game;
 import com.veylon.entity.BodyFragment;
 import com.veylon.entity.Npc;
+import com.veylon.entity.NpcAppearance;
 import com.veylon.entity.RagdollConstants;
+import com.veylon.gfx.model.Animator;
+import com.veylon.gfx.model.ModelPart;
+import com.veylon.gfx.model.NpcModels;
 import com.veylon.settlement.NpcArchetype;
 import com.veylon.world.BlockType;
 import com.veylon.world.Chunk;
@@ -23,6 +27,7 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -78,6 +83,33 @@ class FragmentsSectionTest {
     }
 
     @Test
+    void thePlayersRemainsKeepTheirPlainCamplessLookThroughTheUnchangedFormat() throws IOException {
+        Game original = arena(1337L);
+        original.player.pos.set(X, GROUND, Z);
+        original.player.killBy(false);
+        assertTrue(original.player.recordBlastDeath(X + 1f, GROUND + 0.5f, Z, KEG));
+        assertEquals(10, original.fragments.spawnPlayerRemains(original, original.player).size());
+        settle(original);
+
+        Path save = directory.resolve("remains.sav");
+        assertTrue(SaveSystem.save(original, save));
+        Game loaded = new Game();
+        assertTrue(SaveSystem.load(loaded, save));
+        assertEquals(10, loaded.fragments.settledCount());
+        for (BodyFragment f : loaded.fragments.settled) {
+            assertEquals(NpcAppearance.NEUTRAL_CAMP_INDEX, f.appearance.campIndex,
+                    "version 1 keeps the camp index as it is, so the remains stay campless");
+            assertNull(f.appearance.archetype);
+        }
+        BodyFragment torso = loaded.fragments.settled.stream()
+                .filter(f -> f.piece == BodyFragment.Piece.TORSO).findFirst().orElseThrow();
+        ModelPart top = Animator.poseFragment(torso);
+        assertFalse(top.find("friendlyBadge").visible, "a loaded player's torso wears no camp badge either");
+        assertTrue(top.find("vest").visible);
+        NpcModels.get().resetPose();
+    }
+
+    @Test
     void aSaveTakenMidFlightStoresSettledPieces() throws IOException {
         Game game = arena(77L);
         blowApart(game, X, 0f, NpcArchetype.GUARD, false, false, false, 0);
@@ -111,8 +143,9 @@ class FragmentsSectionTest {
         settle(original);
         Path save = directory.resolve("without-fragments.sav");
         assertTrue(SaveSystem.save(original, save));
-        Files.write(save, CreativeSaveSections.replace(Files.readAllBytes(save),
-                FragmentsSection.ID, null));
+        // Written before v0.8.0: neither this section nor the newer world.remains.
+        byte[] older = CreativeSaveSections.replace(Files.readAllBytes(save), FragmentsSection.ID, null);
+        Files.write(save, CreativeSaveSections.replace(older, RemainsSection.ID, null));
 
         // Loaded over a live world holding pieces of its own, at rest and in flight.
         Game live = arena(9002L);

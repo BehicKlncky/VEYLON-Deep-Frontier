@@ -22,7 +22,14 @@ import static com.veylon.save.SaveSystem.readCount;
 
 /**
  * Optional v3 state: the pieces of people blown apart, lying where they came
- * to rest.
+ * to rest — the version 1 format v0.8.0 reads, still written byte for byte so
+ * an older build keeps a newer save's people.
+ *
+ * <p>Since the all-living remains, {@link RemainsSection} is the authoritative
+ * record of every settled piece: when a save carries it, this section is
+ * still read and validated, so a damaged one fails the load as it always has,
+ * but its pieces are not restored. A save without {@code world.remains} — one
+ * written by v0.8.0, or re-saved by it — restores its people from here.
  *
  * <p>One record per settled {@link BodyFragment}, in the order
  * {@code BodyFragmentSystem.settled} holds them, oldest first, so after a load
@@ -96,7 +103,19 @@ final class FragmentsSection {
         return bytes.toByteArray();
     }
 
+    /** Reads the section and lays its pieces down, oldest first. */
     static void read(byte[] payload, Game game) throws IOException {
+        for (BodyFragment f : parse(payload)) {
+            game.fragments.restoreSettled(f);
+        }
+    }
+
+    /**
+     * Reads and validates the section without touching the world.
+     *
+     * @return the pieces it holds, oldest first: a person's, in the standing rest pose
+     */
+    static List<BodyFragment> parse(byte[] payload) throws IOException {
         try (DataInputStream in = new DataInputStream(new ByteArrayInputStream(payload))) {
             int version = in.readInt();
             if (version < 1 || version > VERSION) {
@@ -107,6 +126,7 @@ final class FragmentsSection {
                 throw new IOException("too many body fragments: " + count);
             }
             BodyFragment.Piece[] pieces = BodyFragment.Piece.values();
+            List<BodyFragment> read = new ArrayList<>(count);
             for (int i = 0; i < count; i++) {
                 int piece = in.readInt();
                 if (piece < 0 || piece >= pieces.length) {
@@ -127,21 +147,34 @@ final class FragmentsSection {
                 f.orientation.set(qx, qy, qz, qw).normalize();
                 f.decay = readFinite(in, "fragment decay", 0f, RagdollConstants.CORPSE_DECAY);
                 readAppearance(in, f.appearance, "fragment");
-                game.fragments.restoreSettled(f);
+                read.add(f);
             }
             if (in.available() != 0) {
                 throw new IOException("unexpected bytes after fragments section");
             }
+            return read;
         }
     }
 
-    private static float readQuaternion(DataInputStream in, String axis) throws IOException {
+    static float readQuaternion(DataInputStream in, String axis) throws IOException {
         return readFinite(in, "fragment orientation " + axis,
                 -MAX_QUATERNION_COMPONENT, MAX_QUATERNION_COMPONENT);
     }
 
-    /** Whether {@link #read} would accept this piece's record. */
+    /**
+     * Whether {@link #read} would accept this piece's record. Only a person's
+     * pieces have a version 1 id; an animal's piece is left out, and is kept
+     * by {@link RemainsSection} instead.
+     */
     private static boolean readable(BodyFragment f) {
+        return f.piece != null && placementReadable(f);
+    }
+
+    /**
+     * Whether a piece's position, orientation and rot clock are within what
+     * either fragment reader accepts. Shared with {@link RemainsSection}.
+     */
+    static boolean placementReadable(BodyFragment f) {
         float qx = f.orientation.x, qy = f.orientation.y, qz = f.orientation.z;
         float qw = f.orientation.w;
         return inRange(f.pos.x, MAX_HORIZONTAL) && inRange(f.pos.y, MAX_VERTICAL)

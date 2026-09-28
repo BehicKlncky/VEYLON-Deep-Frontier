@@ -40,11 +40,21 @@ public final class CreatureAI {
     }
 
     public static void update(Game g, Creature c, float dt) {
+        // An animal killed since its last tick (a burn this tick, a shot this
+        // frame) is removed by the entity tick; it does not get one last act.
+        if (c.dead) {
+            return;
+        }
         c.decideTimer -= dt;
         c.attackCooldown -= dt;
         c.hunger = Math.min(100, c.hunger + 0.06f * dt);
         c.fear = Math.max(0, c.fear - 0.1f * dt);
         c.bobPhase += dt * (Math.abs(c.vel.x) + Math.abs(c.vel.z)) * 2.2f;
+
+        // A burning animal flees before any species' own choice, predators included.
+        if (FirePanic.update(g, c, dt)) {
+            return;
+        }
 
         switch (c.type) {
             case BIRD -> updateBird(g, c, dt);

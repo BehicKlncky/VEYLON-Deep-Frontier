@@ -1,9 +1,10 @@
 package com.veylon.simulation;
 
 /**
- * Tuning for the burning liquid a shattered fire bomb spills. Contact
- * affliction and keg fuse values are shared with block fire through
- * {@link FireConstants} so the two kinds of flame cannot drift apart.
+ * Tuning for the burning liquid a shattered fire bomb spills. Keg fuse values
+ * are shared with block fire through {@link FireConstants} so the two kinds of
+ * flame cannot drift apart; what touching the liquid does to a body is tuned
+ * with every other flame in {@code entity.CombustionConstants}.
  */
 public final class LiquidFireConstants {
 
@@ -38,15 +39,15 @@ public final class LiquidFireConstants {
     /** Intensity lost from the centre to the rim, where it is {@code 1 - this}. */
     public static final float RIM_INTENSITY_LOSS = 0.5f;
 
-    /** Damage per second to the player standing in a patch. */
-    public static final float ENTITY_DPS_PLAYER = 6f;
-    /** Damage per second to an NPC standing in a patch. */
-    public static final float ENTITY_DPS_NPC = 10f;
-    /** Damage per second to a creature standing in a patch. */
-    public static final float ENTITY_DPS_CREATURE = 12f;
-    /** Feet up to this far above a patch's cell floor count as standing in it. */
+    /**
+     * Height above a patch's cell floor its flames reach: a body whose flame
+     * box comes lower than this over the patch's footprint touches them. A
+     * body standing in the patch always does; one flying higher never does.
+     * What a contact does is the body fire's business ({@code
+     * entity.CombustionSystem}), not the patch's.
+     */
     public static final float CONTACT_HALF_HEIGHT = 0.6f;
-    /** Feet down to this far below a patch's cell floor still count. */
+    /** How far below a patch's cell floor its flames still touch a body. */
     public static final float CONTACT_BELOW = 0.1f;
 
     /**
@@ -60,10 +61,4 @@ public final class LiquidFireConstants {
     /** Radius of the noise a bottle makes when it shatters; the fire bomb's own. */
     public static final float SPILL_NOISE_RADIUS = 40f;
     public static final float SPILL_NOISE_INTENSITY = 0.8f;
-
-    /**
-     * Hard cap on remembered (NPC, spill) pairs, which is how an NPC counts as
-     * attacked once per bottle however many ticks it stands in the fire.
-     */
-    public static final int MAX_TRACKED_NPC_SPILLS = 64;
 }
