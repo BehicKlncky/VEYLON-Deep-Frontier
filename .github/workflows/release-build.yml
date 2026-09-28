@@ -2,18 +2,60 @@ name: Release builds
 
 on:
   workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Existing tag to rebuild and publish (empty builds the selected ref only)
+        type: string
+        required: false
   push:
     tags:
       - "v*"
+    branches:
+      - "release-recovery/v*"
 
 permissions:
   contents: read
 
 jobs:
+  source:
+    name: Resolve release source
+    runs-on: ubuntu-latest
+    outputs:
+      sha: ${{ steps.resolve.outputs.sha }}
+      tag: ${{ steps.resolve.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v6
+      - name: Resolve immutable source and release tag
+        id: resolve
+        shell: bash
+        env:
+          REQUESTED_TAG: ${{ inputs.release_tag }}
+        run: |
+          set -euo pipefail
+          tag="${REQUESTED_TAG:-}"
+          case "$GITHUB_REF" in
+            refs/tags/*) tag="$GITHUB_REF_NAME" ;;
+            refs/heads/release-recovery/*) tag="${GITHUB_REF_NAME#release-recovery/}" ;;
+          esac
+          if test -n "$tag"; then
+            [[ "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]
+            git fetch --no-tags origin "refs/tags/$tag:refs/tags/$tag"
+            sha="$(git rev-parse "refs/tags/$tag^{commit}")"
+          else
+            sha="$GITHUB_SHA"
+          fi
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "Source: $sha; release tag: ${tag:-none}" >> "$GITHUB_STEP_SUMMARY"
+
   package:
+    needs: source
     name: ${{ matrix.name }}
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 30
+    # Intel hosted runners can take substantially longer on the full test suite.
+    timeout-minutes: ${{ matrix.platform == 'macos-x64' && 60 || 30 }}
+    env:
+      RELEASE_TAG: ${{ needs.source.outputs.tag }}
     strategy:
       fail-fast: false
       matrix:
@@ -39,6 +81,8 @@ jobs:
     steps:
       - name: Check out source
         uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.source.outputs.sha }}
 
       - name: Set up JDK 25
         uses: actions/setup-java@v5
@@ -49,21 +93,45 @@ jobs:
           cache: gradle
 
       - name: Verify tag matches project version
-        if: startsWith(github.ref, 'refs/tags/')
+        if: env.RELEASE_TAG != ''
         shell: bash
         run: |
           project_version="$(sed -n "s/^version = '\([^']*\)'/\1/p" build.gradle)"
-          test "$GITHUB_REF_NAME" = "v$project_version"
+          test "$RELEASE_TAG" = "v$project_version"
+          test -s "docs/releases/$RELEASE_TAG.md"
+
+      - name: Enable test progress diagnostics
+        shell: bash
+        run: |
+          cat > "$RUNNER_TEMP/release-test-logging.gradle" <<'GRADLE'
+          allprojects {
+              tasks.withType(org.gradle.api.tasks.testing.Test).configureEach {
+                  testLogging {
+                      info.events = ['started', 'passed', 'skipped', 'failed']
+                  }
+              }
+          }
+          GRADLE
 
       - name: Build Windows release archive
         if: runner.os == 'Windows'
         shell: pwsh
-        run: .\gradlew.bat clean releaseArtifacts --no-daemon --console=plain
+        run: .\gradlew.bat clean releaseArtifacts --no-daemon --console=plain --info --init-script "$env:RUNNER_TEMP/release-test-logging.gradle"
 
       - name: Build macOS release archive
         if: runner.os == 'macOS'
         shell: bash
-        run: ./gradlew clean releaseArtifacts --no-daemon --console=plain
+        run: ./gradlew clean releaseArtifacts --no-daemon --console=plain --info --init-script "$RUNNER_TEMP/release-test-logging.gradle"
+
+      - name: Upload test diagnostics
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-diagnostics-${{ matrix.platform }}
+          path: |
+            build/reports/tests/
+            build/test-results/
+          if-no-files-found: warn
 
       - name: Validate Windows archive
         if: runner.os == 'Windows'
@@ -132,15 +200,19 @@ jobs:
 
   publish:
     name: Publish GitHub release
-    if: startsWith(github.ref, 'refs/tags/')
-    needs: package
+    if: needs.source.outputs.tag != ''
+    needs: [source, package]
     runs-on: ubuntu-latest
+    env:
+      RELEASE_TAG: ${{ needs.source.outputs.tag }}
     permissions:
       contents: write
 
     steps:
       - name: Check out release notes
         uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.source.outputs.sha }}
 
       - name: Download validated platform archives
         uses: actions/download-artifact@v8
@@ -153,7 +225,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          version="${GITHUB_REF_NAME#v}"
+          version="${RELEASE_TAG#v}"
           expected=(
             "veylon-${version}-windows-x64.zip"
             "veylon-${version}-macos-arm64.zip"
@@ -177,10 +249,10 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$GITHUB_REF_NAME" \
+          gh release create "$RELEASE_TAG" \
             release-assets/*.zip \
             release-assets/SHA256SUMS.txt \
             --verify-tag \
-            --title "VEYLON: Deep Frontier ${GITHUB_REF_NAME#v}" \
-            --notes-file "docs/releases/${GITHUB_REF_NAME}.md" \
+            --title "VEYLON: Deep Frontier ${RELEASE_TAG#v}" \
+            --notes-file "docs/releases/${RELEASE_TAG}.md" \
             --latest

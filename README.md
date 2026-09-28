@@ -158,6 +158,17 @@ macOS Intel — then publishes them together in the matching GitHub Release with
 macOS may therefore require an explicit approval in **System Settings → Privacy &
 Security** on first launch.
 
+To recover an unpublished release after a workflow failure, run the current
+workflow manually with `release_tag` set to the existing tag (for example,
+`v0.8.1`), or push its workflow fix to `release-recovery/v0.8.1`. Both paths
+resolve the existing tag to one commit and rebuild all three platforms from
+that exact source before publishing. They do not move the tag. A manual run
+from a regular branch without `release_tag` only builds that ref. Intel jobs allow 60 minutes;
+other platforms allow 30. Build logs include test progress, and test reports
+are uploaded separately as `test-diagnostics-*` artifacts, including on failure
+when reports are available. Recovery is for releases that have not yet been
+published; an existing release is not overwritten.
+
 Automated OpenGL smoke test (opens a window and auto-exits; exercises save/load,
 equipment, fire and storm):
 
