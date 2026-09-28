@@ -24,6 +24,13 @@ find blueprints, master the crafting stations and **repair the distress beacon**
 
 ---
 
+Version **0.8.1 — Living Bodies & Fire** extends lethal blast dismemberment to
+every animal and the Survival player. Flames cling to living bodies, make people
+and animals flee, and follow them onto their remains. Animal torsos retain their
+harvest and lodged arrows. Existing saves remain compatible. See the
+[release notes](docs/releases/v0.8.1.md) and
+[engineering record](docs/engineering/ALL_LIVING_COMBAT_FIRE.md).
+
 Version **0.8.0 — Lethal Combat & Molotov Fire** makes a head shot fatal and a chest
 take two bullets or three arrows, kills and dismembers everyone inside a bomb's
 lethal radius, and turns the fire bomb into a molotov that spills spreading liquid
@@ -128,9 +135,9 @@ Windows x64 (PowerShell):
 ```powershell
 .\gradlew.bat build             # compile + unit tests + jar
 .\gradlew.bat performanceTest   # opt-in benchmarks calibrated for the reference PC
-.\gradlew.bat fatJar            # build\libs\veylon-0.8.0-all.jar
+.\gradlew.bat fatJar            # build\libs\veylon-0.8.1-all.jar
 .\gradlew.bat jpackage          # build\jpackage\Veylon\Veylon.exe
-.\gradlew.bat appImageZip       # build\distributions\veylon-0.8.0-windows-x64.zip
+.\gradlew.bat appImageZip       # build\distributions\veylon-0.8.1-windows-x64.zip
 .\gradlew.bat releaseArtifacts  # tests + all host-specific release artifacts
 ```
 
@@ -140,7 +147,7 @@ macOS Intel or Apple Silicon (Terminal):
 ./gradlew build
 ./gradlew fatJar
 ./gradlew jpackage          # build/jpackage/Veylon.app
-./gradlew appImageZip       # build/distributions/veylon-0.8.0-macos-{x64|arm64}.zip
+./gradlew appImageZip       # build/distributions/veylon-0.8.1-macos-{x64|arm64}.zip
 ./gradlew releaseArtifacts
 ```
 
@@ -175,7 +182,7 @@ See [CHANGELOG.md](CHANGELOG.md) for release notes.
 Run the fat JAR with the same JVM options used by the packaged launchers:
 
 ```powershell
-java --enable-native-access=ALL-UNNAMED -Xmx2G -jar build\libs\veylon-0.8.0-all.jar
+java --enable-native-access=ALL-UNNAMED -Xmx2G -jar build\libs\veylon-0.8.1-all.jar
 ```
 
 ---
@@ -440,7 +447,7 @@ poses and human corpses; 0.7.4 moves it to version 2 for three-axis joint poses 
 still reads version 1. A further section, `world.fragments`, holds the pieces of
 people blown apart once they have come to rest. It is a new section rather than a new
 version of an existing one, so **older builds still open the save** — they skip what
-they do not know and the pieces are simply absent. `world.remains` (added after 0.8.0,
+they do not know and the pieces are simply absent. `world.remains` (added in 0.8.1,
 the same way) holds the settled pieces of every body blown apart — people, animals and
 the player — in the pose each died in, with an animal's harvest record tied to its
 torso; `world.fragments` is still written unchanged, so 0.8.0 opens such a save with

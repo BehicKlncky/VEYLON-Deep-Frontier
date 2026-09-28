@@ -4,6 +4,8 @@ All notable user-facing changes to VEYLON: Deep Frontier are recorded here.
 
 ## [Unreleased]
 
+## [0.8.1] - 2026-09-28
+
 ### Changed
 
 - A scrap bomb's or a powder keg's lethal radius now kills every living body

@@ -350,7 +350,7 @@ pools and 220 block fires stepped together at 60 fps for twelve seconds — the
 fragment step allocated 24 bytes per frame against the 4 KiB allowance
 `RagdollAllocationTest` uses, and every hard limit held on every frame.
 
-## All-living combat and fire (unreleased, 2026-09-28)
+## All-living combat and fire (v0.8.1 development, 2026-09-28)
 
 The all-living work adds one tagged benchmark, `AllLivingFullLoadBenchmarkTest`,
 which splits the cost of its full load — forty people and 35 animals burning and
