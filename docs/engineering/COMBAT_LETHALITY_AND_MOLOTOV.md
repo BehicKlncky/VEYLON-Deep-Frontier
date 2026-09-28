@@ -9,14 +9,11 @@ Host: Windows 11 x64, Java 25.0.4.1 (Temurin), Gradle 9.1.0. Not the reference
 machine the repository's wall-clock budgets were recorded on.
 
 > **Superseded in part** by the all-living combat and fire work
-> ([contract](ALL_LIVING_COMBAT_FIRE_CONTRACT.md)). This record describes the
-> 0.8.0 revision. Since then a lethal blast blows every living body apart, not
-> only people (§8.1); and burning liquid, burning blocks, fueled campfires,
-> placed torches and a bottle breaking on a body set bodies alight with a fire
-> of their own (§4.1, §10.1): the pool and block-fire contact damage per medium
-> tick described under *The molotov* and in *Deliberate limits* is gone, as is
-> the `MAX_TRACKED_NPC_SPILLS` memory, and a bottle that breaks on a body in the
-> air now sets it alight.
+> ([engineering record](ALL_LIVING_COMBAT_FIRE.md),
+> [contract](ALL_LIVING_COMBAT_FIRE_CONTRACT.md)). This record describes the
+> 0.8.0 revision and is kept as it was; what no longer holds is listed in the
+> [follow-up of 2026-09-28](#follow-up-2026-09-28-all-living-combat-and-fire) at
+> the end.
 
 ## The rules
 
@@ -311,3 +308,35 @@ out at 4.00 s.
   an open cell at the reduced rate, where the rain puts it out again.
 - **Only people are dismembered.** Creatures, the player and every non-blast
   death keep whole-body ragdolls, and pieces cannot be harvested or looted.
+
+## Follow-up (2026-09-28): all-living combat and fire
+
+The all-living combat and fire work on `feature/all-living-dismemberment-combustion`
+(not yet released) changed several rules above. The sections above still describe
+0.8.0; for the current behaviour read the
+[engineering record](ALL_LIVING_COMBAT_FIRE.md). What no longer holds:
+
+- *Who the rules apply to*, *Lethal blasts and dismemberment* and the limit **Only
+  people are dismembered**: a lethal blast kills and blows apart every living body —
+  each of the six species, every kind of person and a Survival player (a Creative
+  player is untouched). `lethalToHumans` is now `lethalToLiving`. Pieces follow each
+  body's own anatomy: ten for a person, eleven for a deer, twelve for a wolf,
+  thornhorn or gloomstalker, seven for a hare or a bird. An animal's harvest record
+  (meat, hide, lodged arrows) is tied to its torso piece and harvested once. The
+  player's remains appear at the death transition. Hit zones and the other numbers
+  above are unchanged; a non-blast death still falls whole.
+- *The molotov* and the limit **A rained-on flame still ... burns whoever stands in
+  it**: pools and burning blocks no longer damage bodies on the medium tick, and the
+  (NPC, spill) memory (`MAX_TRACKED_NPC_SPILLS`) is gone. Burning liquid, burning
+  blocks, fueled campfires, placed torches and a bottle breaking on a body set a
+  body alight with one fire of its own that outlasts the contact; a pool or block
+  the rain reaches, or that is still wet, lights nobody. A bottle breaking on a body
+  in the air lights it though no pool forms.
+- *Deliberate limits*: pools and burning blocks are still not saved, and neither are
+  bodies' fires, panic or remains' flames. The torso-and-head launch speed at
+  scrap-bomb strength is unchanged and still unsigned-off; a floor on the launch
+  mass (`MIN_LAUNCH_MASS` 1.25 kg, below every person's piece) keeps a wing or a
+  hare's leg from being flung at the solver's speed clamp.
+- New since 0.8.0: burning people and animals panic; bodies show attached flames,
+  char, smoke, steam and sound; `world.remains` saves every body's pieces beside the
+  unchanged `world.fragments`.

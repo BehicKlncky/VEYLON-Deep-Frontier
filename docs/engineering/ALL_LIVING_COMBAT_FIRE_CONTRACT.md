@@ -1439,6 +1439,28 @@ on the posed body rather than emitted on the 0.12 s cadence; only released parti
 cadence. Per-body flames are 2 × anchors (+ glow) rather than `1 + 4 × area × I`, because anchors
 already scale with area.
 
+### 16.2 As built in milestone 11 (validation)
+
+No rule or number changed. Two additions:
+
+- **The runtime report bounds what this work fills.** `RuntimeBudgetSnapshot` gained
+  `liveFragments` (≤ `MAX_LIVE_FRAGMENTS` 120), `settledFragments` (≤ `MAX_SETTLED_FRAGMENTS` 600),
+  `liveRagdolls` (≤ `RagdollConstants.MAX_LIVE` 12) and `panickingBodies` (fewer than the living
+  bodies: the player never panics), in `withinHardLimits`, the smoke line
+  (`fragments={live=…,settled=…} ragdolls=… panicking=…`) and the hard-limit summary; the F3
+  overlay shows them with burning bodies and remains' fires. Every species now fills the piece and
+  ragdoll caps, which before were asserted only by their own tests.
+- **The proposed wall-clock targets are gates.** `AllLivingFullLoadBenchmarkTest` (tagged
+  `performance`) times this work at full load — 40 people and 35 animals burning and panicking,
+  every fire cap full, 120 pieces in flight, a storm — against the §16 targets: the combustion tick
+  ≤ 0.2 ms (measured 0.093 ms on the secondary host), body-fire presentation ≤ 0.5 ms a frame
+  (0.092 ms, with 75 bodies rather than the 24 the target named), and the piece step within the
+  ragdoll gate's 1 ms (0.029 ms). They were measured on a secondary machine, not the reference one.
+
+The validation itself (the registry-driven matrix through the player's commands and the frame, the
+full-load test, the mutation check, the captures) is recorded in
+[ALL_LIVING_COMBAT_FIRE.md](ALL_LIVING_COMBAT_FIRE.md) and the progress file.
+
 ## 17. Tests that encode old behaviour
 
 Replace, keeping unrelated coverage:
@@ -1481,4 +1503,5 @@ Replace, keeping unrelated coverage:
 | 08 panic (done) | §12; 06 snapshot, 07 ignition | `ai/FirePanic` hooked first in `NpcAI.update`, `SettledNpcAI.update` and `CreatureAI.update`; `PanicIntent` on `Npc.panic`/`Creature.panic` (read-only getters); seeded `EntityManager.nextPanicFloat`; NPC screen closure and a talk gate while panicking; straight-line goal checks on the pathfinder's footing, ground look-ahead, bird flight escape; recovery reset (§12.1). |
 | 09 lifecycle (done) | §6, §9, §14 | `BurnResidue` captured at the death transition by `BurnResidueSystem` (`Game.burnResidues`), moved ragdoll → corpse/carcass and shared by a body's pieces (`burnShare`), aged and bounded per frame; first-lethal-cause order; `EntityManager.depart`/`removeNpc`/`removeNpcs` for every departure; `FirePanic.forget`; `Player.tickNeeds` dead guard; `Game.simulates`/`advanceWorld`; sleep refusal and wake; dialog-target resets (§14.2). |
 | 10 presentation (done) | §16 presentation budgets, 02/04 geometry, 06/09 snapshots | `BodyFireLook` (one status-to-look mapping), `FlameAnchors` + `BodyPosing` (flames on the drawn pose), `BodyFlames` (per-frame tongues, shared cap), `BodyFireEffects` (licks, embers, smoke, steam, sound), char/glow/self-light in `entity.frag`, first-person fringe and grip flames, body-fire sounds, `BodyFireQaScene` scenes, read-only out memory / flicker / touch offset on `BodyCombustion` (§16.1). |
-| 11 validation | the whole contract | Production-path matrix tests, bounds/perf evidence, docs, updated `COMBAT_LETHALITY_AND_MOLOTOV.md` limits. |
+| 11 validation (done) | the whole contract | `AllLivingEndToEndTest` (registry-driven matrix through the throw and interaction commands and `Game.advanceWorld`, deaths paid once, a burning keg chain saved and loaded, the hunt request, Creative, every effect at its ceiling against a twin without presentation), `AllLivingFullLoadBenchmarkTest`, the extended `RuntimeBudgetSnapshot` and F3 line (§16.2), `ALL_LIVING_COMBAT_FIRE.md`, updated `ARCHITECTURE.md`, `DEVELOPING.md`, `README.md`, `CHANGELOG.md`, `PERFORMANCE_BENCHMARKS.md` and a dated follow-up in `COMBAT_LETHALITY_AND_MOLOTOV.md`. |
+| 12 merge and push | 11's validated tip | Two-parent `--no-ff` merge into `main`, both refs pushed and verified. |

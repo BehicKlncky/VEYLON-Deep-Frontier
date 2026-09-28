@@ -31,7 +31,8 @@ Checkpoints by milestone (filled in by the following milestone):
 | 07 | `1397b34d44a802b1ae0ff0a36ec0a2645626db44` — `perf(world): resolve recent chunks without boxing their key`; `5985785ab8ebbbf53efcebf576fcf19d91a5ef73` — `feat(fire): set living bodies alight from every real flame`; `621497e72167074a28e1d563aa974d6a8e3b0f72` — `test(fire): pin how every real flame sets every kind of body alight`; `67fa9b4eb194776258ef0d5206a68c754d307e3a` — `docs(combat): record fire sources connected to living bodies` |
 | 08 | `ea4befcd1f7f2fa95d016980ec3563892b13991a` — `feat(ai): make burning people and animals flee their own fire`; `be8784c31136ddaf7804d7015ec54509d856f0d8` — `test(ai): pin fire panic for every body and the player's untouched control`; `f0edea276c2fe4cfbf84d4698792d2d92596b97c` — `docs(combat): record fire panic` |
 | 09 | `d27765ca236c196d06613cfedfe12c46a6a7d274` — `feat(fire): hand a dying body's fire to its remains and to nothing else`; `c2808c74c056b6648ce10f78a566105ccfad5750` — `test(fire): pin body fire across death, saves, departures, modes, pause and sleep`; `f917f151e18422a1ecf261ba1771a0f3979e43ac` — `docs(combat): record combustion lifecycle` |
-| 10 | reported in the milestone 10 handoff; record here in 11 |
+| 10 | `5693ee5550f84882d3a1419390b7f469e24d3763` — `feat(fire): show every burning body's fire on the pose it is drawn in`; `915cee2203586f2f3e832e5bf8f509ecefa9dd09` — `feat(qa): stage burning bodies of every kind for captures`; `ee486f6f7ee0c6ddb03bc7c63ebccb2549a8bb21` — `test(fire): pin how every burning body looks, sounds and stays bounded`; `1e654847065d1e3a679fe8498175d12e4996cc4a` — `docs(combat): record body fire presentation` |
+| 11 | reported in the milestone 11 handoff; record here in 12 |
 
 ## Status
 
@@ -47,7 +48,7 @@ Checkpoints by milestone (filled in by the following milestone):
 | 08 | NPC and animal fire panic | **Complete** (every burning person and animal flees, then decides afresh; the player keeps every control) |
 | 09 | Combustion lifecycle | **Complete** (a burning death hands its fire to the one body it leaves; departures, saves, loads, resets, modes, pause and sleep leave no stale fire or panic) |
 | 10 | Body fire presentation | **Complete** (flames on the drawn pose of every body and its remains, char, smoke, embers, steam, first-person cues, sound; presentation only) |
-| 11 | End-to-end validation | Not started |
+| 11 | End-to-end validation | **Complete** (registry-driven matrix through the player's commands and the frame; full-load bounds and benchmark; native captures; docs). The one failing `performanceTest` gate is the durable-save host gap that predates this work; macOS and other GPUs are not verified |
 | 12 | Merge and push | Not started |
 
 Since 03, a lethal blast kills and blows apart every living body (all six species, every NPC
@@ -67,7 +68,13 @@ advance any of it, and nobody sleeps through a fire. Since 10 a burning body is 
 burning: flame tongues stand on the limbs of the pose it is drawn in (living, falling, dead or in
 pieces) and climb from where it caught, it chars as it burns, gives off licks of flame, embers and
 smoke that trail it on the wind, steams when water or rain puts it out, and crackles; the player sees
-their own fire at the edges of the view and round the item in hand, never inside the camera.
+their own fire at the edges of the view and round the item in hand, never inside the camera. Since 11
+the whole of it is shown end to end: every registered species, archetype, side, party kind, legacy
+person and the player blown apart by a thrown scrap bomb or a keg lit by hand and burned to death by
+a thrown bottle through the frame's world step, each death paid once; every effect at its ceiling at
+once holds every limit and leaves the simulation untouched by presentation; the runtime report and
+the F3 overlay count bodies, pieces and ragdolls; and the work has a
+[summary record](ALL_LIVING_COMBAT_FIRE.md) and contributor rules in `DEVELOPING.md`.
 
 ## Milestone 01 — source audit and contract (2026-09-26)
 
@@ -1450,3 +1457,94 @@ Remaining visible issues and gaps, none of them a gameplay effect:
   heard, residues ≤ 32; the per-frame CPU numbers above are from a throwaway probe on this host, a
   `@Tag("performance")` benchmark calibrated on the reference host would make them a gate.
 - `COMBAT_LETHALITY_AND_MOLOTOV.md` should gain the burning-body presentation among its limits.
+
+## Milestone 11 — end-to-end validation (2026-09-28)
+
+### Start state
+
+- Branch `feature/all-living-dismemberment-combustion`, tip `1e65484` (milestone 10); the four 10
+  checkpoints are now recorded in the table above. `git fetch origin`: `origin/main` still `3704f4d`,
+  no same-name remote branch. Working tree clean apart from the user's untracked `.agents/` and
+  `AGENTS.md`, which stay untracked.
+- Same host (Ryzen 5 5600X, RTX 3060 Ti, Windows 11) and portable Temurin 25.0.4.1+1 JDK; Gradle
+  9.1.0, `--no-daemon --console=plain`.
+- Read: `AGENTS.md`, the pack's `00_BASE_KNOWLEDGE.md`, `11_END_TO_END_VALIDATION.md` and
+  `12_MERGE_AND_PUSH.md`, this file and the whole contract, the `veylon-performance` skill,
+  `ARCHITECTURE.md`, `DEVELOPING.md`, `PERFORMANCE_BENCHMARKS.md`, `README.md`, `CHANGELOG.md`,
+  `COMBAT_LETHALITY_AND_MOLOTOV.md`.
+- Predecessors verified by a fresh run before any change: `gradlew build --rerun-tasks` at `1e65484`,
+  **BUILD SUCCESSFUL in 6 m 15 s, 1462 tests in 142 classes, 0 failures**
+  (`build/all-living-m11-baseline-build.log`) — the count milestone 10 recorded.
+
+### Coverage audit
+
+Every row of the milestone's matrix was mapped to the tests milestones 02–10 left. Each subsystem had
+thorough production-path tests of its own, but these were missing:
+
+| Gap | Now |
+| --- | --- |
+| No test covered every `NpcArchetype`, every alignment, or built its targets from the registries (the blast matrix listed 16 bodies by hand; residents were villager, trader and captive only) | `AllLivingEndToEndTest.everyLivingBody`: all six species, the three legacy people, every archetype as a resident on its side (headhunters, scavengers and captives hostile, settlers friendly and neutral in turn), every party kind, the Survival player — from `values()` |
+| Blasts were driven through `ExplosionSystem.explode` or `ProjectileSystem.fire`, never the player's throw command or the interaction key on a keg, and never through `Game.advanceWorld` | scrap bomb through `updateThrownWeaponCommand`, keg through `interactWithBlockAt`, both left to whole frames |
+| No test checked quests, trust, crime and loot once over time for every family | a ledger (log, inventory, trust, reputations, bounties, the fixture's settlements, quest progress) unchanged for ten seconds after each death; the hunt request by fire and by keg |
+| No test put every effect at its ceiling at once through the frame | the storm full-load test |
+| The runtime report did not bound the piece and ragdoll caps this work now fills from every species, nor count panicking bodies | `RuntimeBudgetSnapshot` extended |
+
+No feature defect was found. Every failure on the way was the fixture's (below).
+
+### Commands and results
+
+All from the repository root in PowerShell with the portable JDK on `PATH`. Logs are in the
+git-ignored `build/` directory.
+
+| Command | Result |
+| --- | --- |
+| `.\gradlew.bat test --tests com.veylon.AllLivingEndToEndTest` (first runs) | 60 tests, 40 failing at first and fewer on each run after, every one the fixture's design: the ledger compared settlements and discovery lines the world registers by itself as chunks load, and the stone-brick pens counted as camp property the keg damaged (−12 trust, real gameplay); a counterattacker without its mission is an orphan the director removes, and one whose route starts on its target arrives at once; a bird hit from 5 blocks with the cone spread missed (now 2.5; it spills nothing); a Creative-only shed was needed so nobody wandered out of the blast; a hand-made settlement cannot be restored by a load (the loader refuses a settlement with no deterministic plan), so the saved room holds a person of no settlement. Then green (`build/all-living-m11-e2e.log`). |
+| `... --tests com.veylon.AllLivingEndToEndTest --tests com.veylon.qa.RuntimeBoundsTest --tests com.veylon.CombustionIntegrationTest` | **73 tests, 0 failures**; full load 0.206 ms and 10,818 bytes per frame headless (after the fixes below, with the load past the piece and ragdoll caps: 0.212 ms and 10,896 bytes, 61 tests green). |
+| Mutation check (scratchpad `m11-mutation.ps1`: one production fault at a time, only `AllLivingEndToEndTest` run, each file restored in `finally` and its hash compared) | **11 of 14 caught** on the first pass, none unapplied, every hash matched (`build/all-living-m11-mutation.log`): blasts lethal to people only (11 failing), birds never coming apart (2), a bottle on a body lighting nothing (27), fire kills credited to nobody (28), people not panicking (4 — residents still panic through `SettledNpcAI`'s own hook), residents not panicking (16), a settled kill paid twice (12), a predator kill credited twice (1), the corpse or the carcass dropping the fire (21, 5), presentation drawing from the panic stream (1). Survivors, all test gaps: the Creative player burning (the scrap bomb had cratered the floor, so the bottle's pool lay below a Creative player a headless frame never lets fall), no ragdoll cap and no live-piece cap (the load filled each cap exactly without passing it). The Creative fire moved to intact ground with a check that the pool lies in the player's own cell; the load raised to sixteen hares and eleven wolves. **3 of 3 caught** on the rerun (`build/all-living-m11-mutation-rerun.log`): **14 of 14**. |
+| `.\gradlew.bat performanceTest` | 9 of 10 gates pass plus both rain benchmarks (before the full-load fixture was enlarged) (`build/all-living-m11-performance.log`); the new `AllLivingFullLoadBenchmarkTest` passes: combustion tick 0.0936 ms (target 0.2), piece step 0.0304 ms (1.0), presentation 0.0894 ms a frame (0.5); entity tick 0.0316 ms, emitter pass 0.1308 ms, flames 0.0712 ms, world step 0.5232 ms reported. The failure is the durable save, 5.327 ms against 2.20 ms: the host gap recorded since 0.7.4. |
+| `.\gradlew.bat performanceTest --tests com.veylon.AllLivingFullLoadBenchmarkTest` (the final fixture) | Pass (`build/all-living-m11-benchmark.log`): combustion tick 0.0931 ms, piece step 0.0291 ms, presentation 0.0921 ms a frame; entity tick 0.0287 ms, emitter pass 0.1468 ms, flames 0.0717 ms, world step 0.5204 ms. Both rain benchmarks pass again. These are the figures the docs quote. |
+| `.\gradlew.bat installDist`, then the capture script (scratchpad `m11-captures.ps1`) | 16 scene runs and a 45 s smoke run, all exit 0, 75 images, every run `glErrors=0 khrErrors=0`; smoke avgFps 142.0, `withinHardLimits=true` with the new counts (`build/qa/all-living-m11/*.log`). |
+| Frame time (scratchpad `m11-frametime.ps1`, `VEYLON_VSYNC=0`) | `body_fire_row` 0.68–0.72 ms with 11 alight, 0.67 out; `body_fire_panic` 0.75–0.77 alight, 0.75 out; `body_fire_blast` 0.80–0.84 with burning pieces in flight, 0.75–0.76 at rest. |
+| `.\gradlew.bat build --rerun-tasks` (the code committed below) | **BUILD SUCCESSFUL in 6 m 29 s: 1523 tests in 143 classes, 0 failures, 0 errors, 0 skipped**; `javadoc` (doclint) and `check` executed (`build/all-living-m11-build.log`). 10 ended at 1462 in 142; the 61 new tests are `AllLivingEndToEndTest` (the benchmark is tagged `performance` and runs only in `performanceTest`). Only Markdown changed after this build started. |
+
+### What was built
+
+| Path | Change |
+| --- | --- |
+| `qa/RuntimeBudgetSnapshot.java` | `liveFragments`, `settledFragments`, `liveRagdolls`, `panickingBodies`, bounded by `MAX_LIVE_FRAGMENTS`, `MAX_SETTLED_FRAGMENTS`, `RagdollConstants.MAX_LIVE` and fewer than the living bodies; in the smoke line and the hard-limit summary. |
+| `ui/DebugOverlay.java` | One F3 line: burning, panicking, ragdolls, pieces flying and at rest, remains burning or smoking. |
+| `src/test/.../AllLivingEndToEndTest.java` (new) | 61 tests: the registry check; the scrap-bomb matrix and the fire-bomb matrix (28 bodies each); a keg lit by hand chaining through a burning storeroom (a burning thornhorn, a hare and a bird come apart once, the thornhorn's pieces sharing one fire; a villager the fire killed first stays whole with no record; a raider leaving just before the blast leaves no body), then saved and loaded; the hunt request by fire and by keg; the Creative player on their own bomb and in their own fire; every effect at its ceiling at once, against a twin with no presentation, then a new world. |
+| `src/test/.../AllLivingFullLoadBenchmarkTest.java` (new) | `@Tag("performance")`: the parts' cost at full load against the contract's targets. |
+| docs | `ALL_LIVING_COMBAT_FIRE.md` (new: the summary record and validation); `ARCHITECTURE.md` (section heading and introduction, the frame's fixed order, extension points); `DEVELOPING.md` (a species, a role, a flame source, the contributor rules, corrected 0.8.0 rules); `README.md` (what is simulated, save format, known limits); `CHANGELOG.md` (`[Unreleased]`); `PERFORMANCE_BENCHMARKS.md` (the new benchmark); `COMBAT_LETHALITY_AND_MOLOTOV.md` (a dated follow-up, the 0.8.0 text kept); this file; the contract (§16.2, §18). |
+
+### Visual QA
+
+Captures in `build/qa/all-living-m11/screenshots/` (git-ignored, not committed), tags `m11_*`; what
+was inspected, image by image, is in the [summary record](ALL_LIVING_COMBAT_FIRE.md#native-captures).
+Nothing new was seen: the scenes look as milestones 04 and 10 recorded them, at this code.
+
+### Limitations
+
+- Not verified: macOS; other GPUs and drivers; sound by ear; a 0.8.0 build opening a new save.
+- `performanceTest`'s durable-save gate fails on this host regardless of this work; every figure is
+  from a secondary machine, and the new benchmark's gates are the contract's reference-machine targets.
+- The whole world step at full load allocates about 10.9 KB a frame; this work's steps are bounded by
+  their allocation tests, the rest (ordinary AI once bodies recover, fire spread, other systems) by
+  none.
+- Tuning is proposed, not signed off (contract §15); the 0.8.0 torso launch question is still open.
+- Open for the user (from 08, unchanged): caged captives in generated forts spawn with their heads in
+  the cage roof.
+- Observed, by design, not a defect: an emptied counterattack travels on abstractly and resolves as a
+  defender victory when it arrives.
+
+### Handoff to milestone 12
+
+- Branch `feature/all-living-dismemberment-combustion` (local only; not yet pushed), original base
+  `3704f4dea3b7870777b20656813937368a83a171`; checkpoints 01–10 in the table above, 11's reported in
+  its handoff message with the validated tip and its tree (a commit cannot hold its own SHA).
+- `origin/main` was `3704f4d` at this milestone's fetch, so the merge should need no reconciliation;
+  12 must fetch again.
+- Evidence to reuse for the unchanged tree: the final build above and the records named in the
+  summary record. Engineering record: `docs/engineering/ALL_LIVING_COMBAT_FIRE.md`; captures:
+  `build/qa/all-living-m11/screenshots/`.
+- The user's untracked `.agents/` and `AGENTS.md` must stay out of every commit.

@@ -349,3 +349,37 @@ the caps allow — twelve people blown apart into 120 pieces, seven burning liqu
 pools and 220 block fires stepped together at 60 fps for twelve seconds — the
 fragment step allocated 24 bytes per frame against the 4 KiB allowance
 `RagdollAllocationTest` uses, and every hard limit held on every frame.
+
+## All-living combat and fire (unreleased, 2026-09-28)
+
+The all-living work adds one tagged benchmark, `AllLivingFullLoadBenchmarkTest`,
+which splits the cost of its full load — forty people and 35 animals burning and
+panicking, 220 block fires, 160 burning liquid cells, 120 pieces in flight, a
+storm — by part. Its gates are the targets the implementation contract set for
+the reference machine (combustion tick 0.2 ms, body-fire presentation 0.5 ms a
+frame) and the 1 ms fixed-tick budget the ragdoll gate uses for the piece step;
+the entity tick, one emitter pass, one frame's flames and the whole world step
+are reported. Like every figure in this section it was measured on the **second
+machine** (Ryzen 5 5600X), at `1e65484` plus the milestone 11 changes, and
+re-baselines nothing. No existing baseline or budget changed. The all-living rows
+come from a rerun of that class alone on its final fixture (the full-load fixture
+was enlarged past the piece and ragdoll caps after the first run, which measured
+within 0.02 ms of these); the other rows from the full `performanceTest` run.
+
+| Benchmark | Measured | Budget | Result |
+| --- | ---: | ---: | --- |
+| All-living combat tick (contact queries) | 0.093 ms | 0.20 ms | PASS |
+| All-living piece step, 120 in flight | 0.029 ms | 1.00 ms | PASS |
+| All-living presentation a frame | 0.092 ms | 0.50 ms | PASS |
+| All-living entity tick, all panicking | 0.029 ms | reported | — |
+| All-living world step, one frame | 0.520 ms | reported | — |
+| Ragdoll, 12 live bodies | 0.410 ms | 1.00 ms | PASS |
+| `chunk tick` / `entity tick` / `settlement tick` | 0.642 / 0.533 / 0.026 ms | 0.92 / 0.95 / 0.52 ms | PASS |
+| `save` | 5.327 ms | 2.20 ms | **FAIL, as before this work** |
+
+`TickProfileTest`, the audio and music budgets and both rain benchmarks pass. The
+tick profile has no row of its own for the combustion step, which runs inside
+the fast tick; the benchmark above measures it at full load instead. The `save`
+failure is the host gap recorded for 0.7.4 and 0.8.0. Details and the native
+frame times are in the
+[engineering record](engineering/ALL_LIVING_COMBAT_FIRE.md#performance).

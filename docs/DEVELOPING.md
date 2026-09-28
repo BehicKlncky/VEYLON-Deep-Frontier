@@ -172,15 +172,33 @@ transfers, equipping) keeps the Survival rule in both modes and needs no gate.
    their articulation) unless `RemainsSection` learns the old layout.
 5. Add spawn rules to `EntityManager` (biome, time of day, density cap).
 6. Only touch `CreatureAI` if it needs behaviour the existing states don't
-   cover.
+   cover, and put any new decision after the `FirePanic` call at the top of
+   `CreatureAI.update`.
+
+Fire needs nothing more: `FlameAnchors` places the new species' flames on the
+boxes of its anatomy table, `CombustionSystem` burns any `Creature` at the
+creature rates, and `FirePanic` makes it flee (a `flying` type by
+`flightReach`, climbing). `AllLivingEndToEndTest`, `BodyCombustionTest` and
+`FirePanicTest` build their cases from `CreatureType.values()`, so the new
+species is thrown at, blown apart, set alight, made to panic and killed through
+the production commands as soon as it exists — a missing anatomy table, flame
+anchor or death payment fails there.
 
 ### An NPC role
 
 1. Append to `NpcArchetype` (loadout, job, dialogue).
-2. Add its daily schedule to `SettledNpcAI`.
-3. Add visual distinction in `NpcModels`.
+2. Add its daily schedule to `SettledNpcAI`. `FirePanic` runs before the whole
+   settlement brain, so a burning resident of the new role flees rather than
+   working, fighting or sleeping; nothing is needed for that.
+3. Add visual distinction in `NpcModels`. Kit it wears is a box of the humanoid
+   model, so its flames, char and blast pieces follow automatically.
 4. If it should be placed by settlement generation, update
    `SettlementBuilder`'s resident roster.
+
+`AllLivingEndToEndTest` stands every archetype in a settlement on the side its
+kind takes (headhunters, scavengers and captives hostile; settlers friendly or
+neutral) and blows it apart and burns it to death through the player's
+commands, checking that its death is paid for exactly once.
 
 ### A biome
 
@@ -217,6 +235,43 @@ transfers, equipping) keeps the Survival rule in both modes and needs no gate.
    extend `EventRollLadderTest`'s characterization/invariant coverage.
 5. Add whatever modifier query other systems need (`growthMul`, `thirstMul`,
    `wolfCapBonus`, …) rather than having them check `isActive` directly.
+
+### A flame that sets bodies alight
+
+Only a real, exposed flame qualifies: light, warmth, an enclosed flame (a
+lantern, a furnace), a glowing block or a held item never does (the list and
+its reasons are in the
+[combat and fire contract](engineering/ALL_LIVING_COMBAT_FIRE_CONTRACT.md) §4).
+
+1. Give the flame a volume in the world: the part of its cell where the flame
+   stands, reaching only into open neighbours so it never crosses a wall, a
+   floor or the ground (`FireSystem.touchBurningBlock` is the model).
+2. Report contacts from the system that owns the flame, in an
+   `exposeContacts(Game, Entity, BodySweep)` method called from
+   `CombustionSystem.sampleFlames`. Test the swept box with
+   `BodySweep.touches` so a body crossing the flame between two fast ticks still
+   touches it, and report with `CombustionSystem.expose(e, kind, intensity,
+   byPlayer, sourceId, contactX/Y/Z)`. Look only at the cells under the swept
+   box or at the flame's own bounded list; never load a chunk, never allocate.
+3. Decide its weather: a flame the rain puts out asks
+   `FireSystem.isRainedOn` and touches nobody while it is rained on or still
+   wet; a sheltered one (a torch, a campfire) has no rule and the rain on the
+   body's head puts the body out instead.
+4. Pick its `CombustionSource` kind. The declaration order is the dominance
+   order when several flames touch a body in one tick; each kind sets the heat
+   gain (infinite lights on first contact), the afterburn it grants (at most
+   `CombustionConstants.MAX_FUEL_SECONDS`) and its intensity. The enum is not
+   saved, so a new kind may go wherever its dominance belongs.
+5. Attribute it: `byPlayer` and the bottle's id for a flame the player's
+   bottle started (so the player's attack is counted once per bottle),
+   environmental with a stable per-cell id otherwise.
+6. If people and animals should not walk into it, treat it the way torches and
+   campfires are treated (`Entity.keepsOutOfFlames` in `VoxelPhysics`,
+   `Pathfinder.passable`, `Steering.moveToward`'s sidestep).
+7. Add its cases to `FlameSourceIgnitionTest` (catches the way it should, not
+   through a wall or floor, not when out or rained on, overlapping flames burn
+   as one), keep `CombustionAllocationTest` at zero, and add its row to the
+   contract's §4.1 source table.
 
 ### A simulation system
 
@@ -496,14 +551,18 @@ Contributor rules this feature adds:
   `MAX_ACTIVE_FIRES`, and what refuses a cell that is already burning.
 - **Ask `FireSystem.isRainedOn` before anything catches.** It is the one rain
   predicate, shared by burning blocks, campfires and pools of burning liquid;
-  do not write another sky-light test.
+  do not write another sky-light test. A body asks the same question of its
+  head's cell through `FireSystem.isPrecipitationReaching`.
 - **Keep the fragment step allocation-free.** `BodyFragmentAllocationTest` holds
   the airborne and ground-contact paths at zero with a 4 KB allowance, and
   `RuntimeBoundsTest` measures the same step over real blast trajectories with
   the fire and liquid systems at full load.
-- **Cap every new pile of debris and prove it.** Pieces, pools and their
-  remembered (NPC, spill) pairs each have a hard cap with a `RuntimeBoundsTest`
-  case that reaches it exactly and cannot pass it.
+- **Cap every new pile of debris and prove it.** Pieces and pools each have a
+  hard cap with a `RuntimeBoundsTest` case that reaches it exactly and cannot
+  pass it, and `RuntimeBudgetSnapshot` reports them (with ragdolls, burning and
+  panicking bodies and remains' fires) on the F3 overlay and in the smoke
+  report. (0.8.0's remembered (NPC, spill) pairs are gone: each body now
+  remembers its last four bottles in a fixed array.)
 - **Draw a piece only through `Animator.poseFragment` and the
   `FragmentModels` frames.** `poseFragment` picks the piece's own body's shared
   model, resets whatever the last body left on it, puts on a person's look and
@@ -512,6 +571,52 @@ Contributor rules this feature adds:
   any other way leaves a missing leg or a raider's hood on the next body drawn
   from it. `SpeciesFragmentDrawTest` checks a piece's first frame against the
   living body and a live body drawn after a piece against one drawn alone.
+
+## Living bodies in combat and fire: contributor rules
+
+Every living body — each species, every kind of person and the Survival player —
+comes apart in a lethal blast, catches fire from real flames and (people and
+animals) panics. The rules, numbers and APIs are in the
+[combat and fire contract](engineering/ALL_LIVING_COMBAT_FIRE_CONTRACT.md); the
+[engineering record](engineering/ALL_LIVING_COMBAT_FIRE.md) summarises them with
+the validation. What a change must respect:
+
+- **Burn a body only through `CombustionSystem`.** Flames report contacts
+  (`expose`); a bottle breaking on a body lights it (`ignite`). One fire per
+  body, the strongest contact of a tick wins, a later contact refreshes it up to
+  a cap; never add a second timer, damage a body for standing near a flame, or
+  treat light or warmth as a flame.
+- **Panic comes first.** `FirePanic.update` is the first decision of
+  `NpcAI.update`, `SettledNpcAI.update` and `CreatureAI.update`, after the dead
+  guard; a new AI branch goes after it. Panic draws only from
+  `EntityManager.nextPanicFloat`, reads neither the player nor the camera, and
+  resets a body's plans when it ends. The player never panics: nothing a fire
+  does may move the player, change speed or sprint, or turn the camera.
+- **A death is paid for once, then becomes one body.** Credit, quests, trust,
+  reputation and loot run in `EntityManager`'s death routing before the body is
+  chosen; the body is pieces if the death carries a blast record and a ragdoll
+  otherwise. Pieces and ragdolls never pay anything; an animal's harvest record
+  is the one carcass tied to its torso piece.
+- **Leave the world through `EntityManager.depart`.** A body that leaves without
+  dying (dormancy, a rescue, a party retired or gone abstract, a trader moving
+  on, a despawn) goes through `removeNpc`, `removeNpcs` or the entity tick's
+  administrative path, which forget its fire, panic, targets and conversation.
+  Never take a body out of `npcs` or `creatures` directly.
+- **Fire, panic and remains' flames are transient.** They are not saved; a load,
+  a new world, respawn and Creative start without them. A new field on
+  `BodyCombustion`, `PanicIntent` or `BurnResidue` must be cleared where they
+  are (`clear`, `depart`, the recovery, `WorldBootstrap`) and must stay
+  primitive: nothing may hold an entity past a tick.
+- **Enumerate, do not list.** Tests that must cover every body build their
+  cases from `CreatureType.values()`, `NpcArchetype.values()`,
+  `Settlement.Alignment.values()` and `Npc.PartyKind.values()`, as
+  `AllLivingEndToEndTest` does.
+
+Run `gradlew test --tests 'com.veylon.AllLivingEndToEndTest' --tests
+'*AllLivingBlastDeath*' --tests '*Combustion*' --tests '*FlameSource*'
+--tests '*FirePanic*' --tests '*Remains*' --tests '*RuntimeBounds*'` after any
+change to them, and `gradlew performanceTest --tests
+'com.veylon.AllLivingFullLoadBenchmarkTest'` for their frame cost at full load.
 
 ## Burning bodies QA and contributor rules
 

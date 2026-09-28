@@ -315,14 +315,24 @@ java --enable-native-access=ALL-UNNAMED -Xmx2G -jar build\libs\veylon-0.8.0-all.
   a reusable explosion system with distance falloff, cover
   occlusion, blast resistance (ancient/progression blocks are blast-proof), bounded
   powder-keg chains and single-batch world edits, plus a **lethal radius** inside
-  which a blast kills people outright and **tears them into ten pieces** that fly,
-  bounce, settle where the terrain puts them, rot like corpses and survive a save.
+  which a blast kills every living body outright — every kind of person, every
+  animal and a Survival player — and **tears it apart at its own joints** (a person
+  into ten pieces, a wolf into twelve, a hare or a bird into seven) that fly, bounce,
+  settle where the terrain puts them, rot like corpses and survive a save; an
+  animal's meat and hide stay on its torso, to be harvested once.
 - **Fire**: burning blocks spread to flammable neighbours and **climb trees and
   walls**; **rain, storm and snow put out any fire open to the sky** within seconds
   and leave its block unburnt, while fires under a roof or a canopy burn on. A
   **fire bomb** spills a pool of burning liquid that runs downhill and around
-  obstacles, burns whoever stands in it, lights what it touches and sets off
-  powder kegs beside it.
+  obstacles, lights what it touches and sets off powder kegs beside it.
+- **Burning bodies**: burning liquid, burning blocks, fueled campfires, placed torches
+  and a fire bomb breaking on a body **set it alight** — people, animals and the
+  Survival player alike — with flames that stand on its limbs and keep burning
+  after it leaves the fire, char it as they burn, and die down or are put out by
+  deep water or open rain. **Burning people and animals panic** and run (birds fly)
+  until the fire is out; the player keeps full control. A body that dies alight
+  keeps burning briefly on its corpse, carcass or pieces. Creative players never
+  catch fire.
 - **Shelter**: roof and wall-enclosure detection — affects wetness, storm wind chill,
   sleep quality and indoor campfire smoke.
 - **Wildlife**: Glowdeer, Ashwolves, Skitterwings, **Murkhares, Thornhorns (charge when
@@ -430,9 +440,14 @@ poses and human corpses; 0.7.4 moves it to version 2 for three-axis joint poses 
 still reads version 1. A further section, `world.fragments`, holds the pieces of
 people blown apart once they have come to rest. It is a new section rather than a new
 version of an existing one, so **older builds still open the save** — they skip what
-they do not know and the pieces are simply absent. Pools of burning liquid and burning
-blocks are deliberately not saved; a fire bomb still in the air is, and shatters where
-it lands.
+they do not know and the pieces are simply absent. `world.remains` (added after 0.8.0,
+the same way) holds the settled pieces of every body blown apart — people, animals and
+the player — in the pose each died in, with an animal's harvest record tied to its
+torso; `world.fragments` is still written unchanged, so 0.8.0 opens such a save with
+its people's pieces in a standing pose and each animal as a whole carcass. Pools of
+burning liquid, burning blocks, burning bodies and panic are deliberately not saved:
+a save taken mid-fire loads with every fire out and everyone calm. A fire bomb still
+in the air is saved, and shatters where it lands.
 
 **v2 saves (0.1.0–0.2.0) load via an explicit migration path**: the world is pinned to
 the legacy terrain generator (identical terrain, no silent regeneration), and all new
@@ -477,16 +492,22 @@ saves are rejected with a console message — no migration.
   than remembering exact positions (identity, health and deaths do persist).
 - Fire does not spread to powder kegs at range — only adjacent flames, fuses, and
   other explosions set them off.
-- Only people are dismembered: animals and the player keep whole-body ragdolls, and
-  a person killed by anything other than a blast — a shot, a blade, fire — falls
-  whole. Pieces cannot be harvested or looted.
-- Burning liquid and burning blocks are not saved. A save taken while the world is
-  alight loads with the fires out and the pools gone.
+- Only a lethal blast tears a body apart: a body killed by anything else — a shot, a
+  blade, fire, a blast from outside its lethal radius — falls whole. Pieces cannot be
+  looted, and an animal blown apart is harvested once, from its torso.
+- A player who burns to death leaves no body; only a lethal blast leaves the player's
+  remains.
+- Burning liquid, burning blocks, burning bodies and panic are not saved. A save taken
+  while the world is alight loads with every fire out, the pools gone and everyone
+  calm, and loaded remains show no scorch.
+- A burning body does not set fire to what it touches or to other bodies, and its
+  flames light only itself, not the ground or walls around it.
 - A wounded person's chest wounds are forgotten if they leave the world and come
   back (a save and load, or a settlement going dormant and reactivating): they
   return at their stored health, unwounded.
 - A fire bomb that breaks more than three blocks above the ground — against the side
-  of a tree canopy, say — finds no surface to pool on and spills nothing.
+  of a tree canopy, say — finds no surface to pool on and spills nothing (a body it
+  breaks on in the air still catches fire).
 
 Creative mode: [design decisions and research](docs/creative/CREATIVE_DESIGN.md),
 [milestone plan and evidence](docs/creative/CREATIVE_MODE_PLAN.md),

@@ -301,7 +301,7 @@ Consequences for contributors:
 | a block | `BlockType` (append only) | `MaterialRegistry`, `ChunkMesher` if a new shape, drops/hardness on the enum |
 | an item | `ItemType` (append only) + `ItemProps` | `IconAtlas`, a `Recipe` in `CraftingSystem` |
 | a recipe | `CraftingSystem` | the `Station` it needs |
-| a creature | `Creature.CreatureType` | `CreatureModels`, spawn rules in `EntityManager`, `CreatureAI` if behaviour differs |
+| a creature | `Creature.CreatureType` | `CreatureModels`, `BodySkeleton`, a `BodyFamily` and its `FragmentAnatomy` table (append only, pinned in `SerializedEnumOrderTest`), spawn rules in `EntityManager`, `CreatureAI` if behaviour differs (after `FirePanic`) |
 | an NPC role | `NpcArchetype` | `SettledNpcAI` job schedule, `NpcModels` |
 | a biome | `Biome` | `WorldGenerator` selection, surface/subsurface blocks, spawn tables |
 | a settlement type | `SettlementType` | `SettlementPlanner` placement, `SettlementBuilder` layout |
@@ -309,6 +309,7 @@ Consequences for contributors:
 | a weather state | `WeatherSystem.Weather` | `SkyRenderer`, `Environment`, `TemperatureSystem` |
 | a world event | `EventType`, `EventConstants`, `EventSystem.DEFINITIONS` | JavaDoc rung table, modifier query, `EventRollLadderTest` |
 | a simulation system | new class + cadence interface in `simulation/` | matching `Game` tick, `newWorld` reset, `SimulationSystemContractTest`, save/load if it holds state |
+| a flame that sets bodies alight | an `exposeContacts` adapter in the system that owns the flame, called from `CombustionSystem.sampleFlames`; a `CombustionSource` kind if none fits | `FlameSourceIgnitionTest`, `CombustionAllocationTest`, the contract's §4.1 source table |
 
 **Enum ordinals are part of the save format.** `SerializedEnumOrderTest` guards
 this: append new constants at the end, never reorder or delete. Reordering
@@ -637,11 +638,38 @@ bookkeeping. It rots on the slow tick beside carcasses and is despawned past the
 same 170 m radius wildlife uses. Birds tumble and leave nothing, as they always
 have.
 
-## Lethal combat, body fragments and molotov fire (0.8.0)
+## Lethal combat, body fragments and body fire (0.8.0, then every living body)
 
-Three rules changed what combat leaves behind, and they meet in
-`EntityManager.fastTick`, which still fires every consequence of a death where
-it always did and then decides what the body becomes.
+0.8.0 introduced hit zones, lethal blasts that tore people apart, and the molotov.
+The all-living combat and fire work that followed (not yet in a release) blows
+every living body apart — each species at its own joints, every kind of person
+and a Survival player — and gives every living body a fire of its own, a panic
+for people and animals, and flames that carry over to its remains. The
+paragraphs below describe the code as it is now; the
+[engineering record](engineering/ALL_LIVING_COMBAT_FIRE.md) summarises the work
+and its validation, and the
+[combat and fire contract](engineering/ALL_LIVING_COMBAT_FIRE_CONTRACT.md) holds
+every rule and number.
+
+The rules meet in `EntityManager.fastTick`, which still fires every consequence
+of a death where it always did and then decides what the body becomes.
+
+**One order in every frame.** A simulated frame (`Game.advanceWorld`) runs the
+fast ticks first, each in this order: the player's needs; `CombustionSystem`
+(every living body's swept box asks the flames in the world for contacts, the
+strongest one is applied, water and rain are checked, the fire is lit, refreshed
+or burns down, and damage goes through `Entity.hurt`); `EntityManager` (per body:
+fire panic before any other decision, physics, then death routing — every
+consequence of the death once, then one body: pieces if a lethal blast killed
+it, else a ragdoll); settlements. Then at most one medium tick (block and liquid
+fire spread, burn out, meet the rain and arm kegs; they no longer hurt anyone)
+and one slow tick (rot, and departures through `EntityManager.depart`). Then the
+frame's own systems: projectiles (a bottle breaking on a body lights it, a bomb
+whose fuse ends explodes), ragdolls, pieces, remains' flames, keg fuses, noise
+and the ambient emitters, which give off the bodies' sparks and smoke. The
+player's death transition comes after the world step. So in any frame a burn
+death is processed before a blast, a body the fire killed is never blown apart,
+and drawing reads a finished step.
 
 **Where a shot lands decides what it costs.** A bullet or an arrow that enters
 an `Npc` is judged by `HitZone`, the height above the feet at which the
