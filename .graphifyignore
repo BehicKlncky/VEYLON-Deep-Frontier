@@ -1,0 +1,38 @@
+# Keep Graphify scans code-only. These files remain available for direct reading.
+docs/
+.agents/
+
+# Documents, workflow prose and papers require semantic extraction.
+*.md
+*.mdx
+*.qmd
+*.skill
+*.txt
+*.rst
+*.html
+*.yaml
+*.yml
+*.pdf
+*.docx
+*.xlsx
+*.gdoc
+*.gsheet
+*.gslides
+
+# Screenshots, illustrations, audio and video are not part of the code graph.
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.webp
+*.svg
+*.mp4
+*.mov
+*.webm
+*.mkv
+*.avi
+*.m4v
+*.mp3
+*.wav
+*.m4a
+*.ogg
