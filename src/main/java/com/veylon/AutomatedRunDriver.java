@@ -72,8 +72,8 @@ final class AutomatedRunDriver {
     /**
      * Reads the environment and puts the game into its starting state.
      *
-     * @return true when this is an automated session, which suppresses mouse
-     *         look so a capture is not steered by a stray cursor
+     * @return true when this session needs suppressed mouse look; start-only
+     *         manual apartment QA retains ordinary player controls
      */
     boolean configure() {
         smoke = System.getenv("VEYLON_SMOKE") != null;
@@ -90,7 +90,8 @@ final class AutomatedRunDriver {
 
         if (automated && !frontendQa) {
             game.newWorld(game.sessionSeed, true, generator,
-                    configuredGameMode(System.getenv("VEYLON_GAME_MODE")));
+                    UrbanApartmentQaScene.manualNavigation(scene) ? GameMode.SURVIVAL
+                            : configuredGameMode(System.getenv("VEYLON_GAME_MODE")));
             game.qa.applyBenchmarkScene(scene);
             game.appState = Game.AppState.PLAYING;
             game.window.captureCursor(true, game.input);
@@ -112,7 +113,7 @@ final class AutomatedRunDriver {
         }
         shotMarks = parseShotMarks(shotEnv);
         capturePrefix = resolveCapturePrefix();
-        return automated;
+        return automated && !UrbanApartmentQaScene.manualNavigation(scene);
     }
 
     /** Strict, locale-independent parsing is only invoked for automated worlds. */
@@ -178,7 +179,9 @@ final class AutomatedRunDriver {
             return tag.trim().replaceAll("[^A-Za-z0-9._-]", "_");
         }
         if (scene != null && !scene.isBlank()) {
-            return scene;
+            return scene.equals("urban_apartments") || scene.equals("urban_apartments_night")
+                    || scene.equals("urban_apartments_lit_night")
+                    ? scene + "_scripted_camera" : scene;
         }
         if (frontendQa) {
             return "frontend_" + frontendScreen.trim().toLowerCase(Locale.ROOT);

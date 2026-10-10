@@ -35,6 +35,7 @@ final class UrbanQaScenes {
     private final Game game;
     /** Package 04: doors, windows and stairs ({@code urban_fixtures}, {@code urban_fixtures_night}). */
     private final UrbanFixtureQaScene fixtures;
+    private final UrbanApartmentQaScene apartments;
     private final PlayerMovementSystem.Command walk = new PlayerMovementSystem.Command();
     private boolean holding;
     private float holdX;
@@ -60,6 +61,7 @@ final class UrbanQaScenes {
     UrbanQaScenes(Game game) {
         this.game = game;
         this.fixtures = new UrbanFixtureQaScene(game);
+        this.apartments = new UrbanApartmentQaScene(game);
     }
 
     /** Stages one of the urban scenes; inert, with a notice, outside a street-network world. */
@@ -89,6 +91,8 @@ final class UrbanQaScenes {
                 hold(world, -21.5f, -21.5f, 20, SOUTH_EAST_YAW, 34f);
             case "urban_seam_walk" -> stageSeamWalk(world, origin);
             case "urban_fixtures", "urban_fixtures_night" -> fixtures.stage(scene);
+            case "urban_apartments", "urban_apartments_night", "urban_apartments_manual",
+                 "urban_apartments_manual_night", "urban_apartments_lit_night" -> apartments.stage(scene);
             default -> System.out.println("[urban-qa] unknown urban scene '" + scene + "'");
         }
     }
@@ -97,7 +101,8 @@ final class UrbanQaScenes {
         for (int rz = -1; rz <= 0; rz++) {
             for (int rx = -1; rx <= 0; rx++) {
                 System.out.println("[urban-qa] plan "
-                        + CityPlanDiagnostics.inspect(world.seed, world.urban.layoutRevision(), rx, rz).summary());
+                        + CityPlanDiagnostics.inspect(world.seed,
+                        world.urban.regionPlan(rx, rz).layoutRevision, rx, rz).summary());
             }
         }
         int[] spawn = world.urban.spawnColumn();
@@ -149,6 +154,7 @@ final class UrbanQaScenes {
     /** Per-frame hook, before streaming and rendering; inert unless a scene is staged. */
     void update(double elapsed) {
         fixtures.update(elapsed);
+        apartments.update(elapsed);
         if (holding) {
             apply();
         }
