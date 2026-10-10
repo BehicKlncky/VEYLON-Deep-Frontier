@@ -100,9 +100,24 @@ tasks.withType(Javadoc).configureEach {
     options.addBooleanOption('Xdoclint:all,-missing', true)
 }
 
-tasks.withType(Test).configureEach {
+tasks.withType(Test).configureEach { Test task ->
     useJUnitPlatform()
     systemProperty 'veylon.version', project.version.toString()
+    // Every test JVM gets its own data directory under build/, so nothing a
+    // test saves, settings included, can reach the player's save slot
+    // (docs/urban-survival D-23; pinned by SaveSlotIsolationTest).
+    systemProperty 'veylon.dataDir',
+            layout.buildDirectory.dir("test-data/${task.name}").get().asFile.absolutePath
+}
+
+// Native QA isolation: `-PveylonDataDir=build/qa/<name>` gives a game launched
+// with `run` its own settings, saves and captures. Development worlds
+// (VEYLON_GENERATOR) refuse to start without it.
+tasks.named('run', JavaExec) {
+    def qaDataDir = providers.gradleProperty('veylonDataDir')
+    if (qaDataDir.present) {
+        systemProperty 'veylon.dataDir', file(qaDataDir.get()).absolutePath
+    }
 }
 
 // Wall-clock budgets are calibrated for one reference machine and therefore
