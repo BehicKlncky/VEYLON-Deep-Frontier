@@ -326,6 +326,27 @@ class RuntimeBoundsTest {
     }
 
     @Test
+    void streamingAcrossManyUrbanRegionsKeepsThePlanCacheAndQueuesBounded() {
+        Game game = new Game();
+        game.newWorld(20260716L, true, World.GEN_URBAN_STREETS, com.veylon.entity.GameMode.SURVIVAL);
+        // A diagonal walk through thirty regions, streaming chunks as a player would.
+        for (int region = 0; region < 30; region++) {
+            int x = region * 256 + 120;
+            int z = -region * 256 + 40;
+            game.world.ensureChunks(x, z, 1, 100);
+            RuntimeBudgetSnapshot snapshot = RuntimeBudgetSnapshot.capture(game);
+            assertTrue(snapshot.withinHardLimits(), snapshot.occupancySummary());
+            assertTrue(snapshot.urbanRegionPlans() <= com.veylon.world.urban.UrbanWorldState.MAX_REGION_PLANS);
+            assertEquals(0, snapshot.pendingGenerationChunks(), "urban slices never queue edits");
+        }
+        assertEquals(com.veylon.world.urban.UrbanWorldState.MAX_REGION_PLANS,
+                RuntimeBudgetSnapshot.capture(game).urbanRegionPlans(), "the cache filled and stayed at its cap");
+        assertTrue(RuntimeBudgetSnapshot.hardLimitSummary().contains("urbanPlans="));
+        assertTrue(RuntimeBudgetSnapshot.capture(game).occupancySummary().contains("urbanPlans=16"));
+        assertTrue(game.entities.creatures.isEmpty(), "no surface wildlife spawned on the way");
+    }
+
+    @Test
     void repeatedPathQueriesStayBudgetedAndNeverLoadChunks() {
         Game game = new Game();
         game.newWorld(-1234567L, true);
