@@ -41,9 +41,9 @@ runs. All are inert when unset. Everything below is handled by `QaHarness`;
 |---|---|
 | `VEYLON_SEED` | Fixed world seed (a non-numeric value is hashed) |
 | `VEYLON_GAME_MODE=survival\|creative` | Initial mode for automated world runs only; absent means Survival. Invalid values fail explicitly. Ignored for normal title sessions and frontend-only captures. |
-| `VEYLON_GENERATOR=urban-dev` | Development selector: NEW FRONTIER and automated worlds use the newest urban generator (`UrbanRevision.DEVELOPMENT_GENERATOR`, now `World.GEN_URBAN_PLANS`: generator 6, frozen template-1 building plans with layout-2 streets still stamped alone). No buildings yet. Absent keeps the ordinary default. Any other value fails, and so does `urban-dev` without an isolated data directory (see below). |
+| `VEYLON_GENERATOR=urban-dev` | Development selector: NEW FRONTIER and automated worlds use the newest urban generator (`UrbanRevision.DEVELOPMENT_GENERATOR`, now `World.GEN_URBAN_APARTMENTS`: generator 7, layout 4 / frozen furnished template 2 on layout-2 city plans). Absent keeps the ordinary default. Any other value fails, and so does `urban-dev` without an isolated data directory (see below). |
 | `VEYLON_SMOKE=<seconds>` | Release smoke gate: save/load, fire, storm, a fortress approach, then a pass/fail report. Throws on failure |
-| `VEYLON_SCENE=<name>` | Stage a deterministic benchmark scene (`day`, `pinefog`, `nightfire`, `ruin`, `toxic`, `ao_shadow`, `phase4`, `ashwolf`, `silhouette30`, `vfx_blood`, `vfx_mining`, `vfx_beacon`, `death_ragdoll_showcase`, `death_ragdoll_sequence`, `dismember_showcase`, `dismember_wall`, `dismember_bomb` (a real scrap bomb thrown into a group of six, one outside the lethal radius; it goes off at 2.4 s), `dismember_species`, `dismember_species_wall` and `dismember_species_close` (every species, a guard and the player's remains blown apart at 1 s; open meadow, a step and a wall, and a close view of the small bodies), `molotov_ground`, `molotov_tree` and `molotov_rain` (a real fire bomb thrown at 0.5 s onto a dry clearing at dusk, beside a round tree that catches, or with rain from 3 s that puts the pool out; shots `0.7,1.2,3,7,11`, `1,4,10,20` and `2,3.5,5`), the burning-body scenes `body_fire_row`, `body_fire_row_night`, `body_fire_close`, `body_fire_out`, `body_fire_blast`, `body_fire_panic`, `body_fire_bird`, `body_fire_rain`, `body_fire_ragdoll` and `body_fire_player` (see "Burning bodies QA" below), `movement`, `inventory`, `ui_cycle`, `held_*`, `creative_flight` with `VEYLON_GAME_MODE=creative`, which flies east at Shift speed and prints a `[flight]` streaming report at 29 s, and the urban scenes `urban_streets`, `urban_intersection`, `urban_seam_walk`, `urban_fixtures` and `urban_fixtures_night` with `VEYLON_GENERATOR=urban-dev` (see "Urban planning QA" below)) |
+| `VEYLON_SCENE=<name>` | Stage a deterministic benchmark scene (`day`, `pinefog`, `nightfire`, `ruin`, `toxic`, `ao_shadow`, `phase4`, `ashwolf`, `silhouette30`, `vfx_blood`, `vfx_mining`, `vfx_beacon`, `death_ragdoll_showcase`, `death_ragdoll_sequence`, `dismember_showcase`, `dismember_wall`, `dismember_bomb` (a real scrap bomb thrown into a group of six, one outside the lethal radius; it goes off at 2.4 s), `dismember_species`, `dismember_species_wall` and `dismember_species_close` (every species, a guard and the player's remains blown apart at 1 s; open meadow, a step and a wall, and a close view of the small bodies), `molotov_ground`, `molotov_tree` and `molotov_rain` (a real fire bomb thrown at 0.5 s onto a dry clearing at dusk, beside a round tree that catches, or with rain from 3 s that puts the pool out; shots `0.7,1.2,3,7,11`, `1,4,10,20` and `2,3.5,5`), the burning-body scenes `body_fire_row`, `body_fire_row_night`, `body_fire_close`, `body_fire_out`, `body_fire_blast`, `body_fire_panic`, `body_fire_bird`, `body_fire_rain`, `body_fire_ragdoll` and `body_fire_player` (see "Burning bodies QA" below), `movement`, `inventory`, `ui_cycle`, `held_*`, `creative_flight` with `VEYLON_GAME_MODE=creative`, which flies east at Shift speed and prints a `[flight]` streaming report at 29 s, and the urban scenes `urban_streets`, `urban_intersection`, `urban_seam_walk`, `urban_fixtures`, `urban_fixtures_night`, `urban_apartments`, `urban_apartments_night`, `urban_apartments_lit_night`, `urban_apartments_manual` and `urban_apartments_manual_night` with `VEYLON_GENERATOR=urban-dev` (see "Urban planning QA" below)) |
 | `VEYLON_SHOT="5,10"` | Capture screenshots at those elapsed seconds |
 | `VEYLON_FRONTEND=<name>` | Pin a front-end screen (`options`, `audio`, `loading`, `death`, `victory`, `glyphs`, `newworld`). `newworld-save` shows the replace-save notice without writing a save. `pause` and `gamemode` stage a Survival world with the pause menu or the mode confirmation open; `pause-creative`, `gamemode-creative` and `victory-creative` stage a Creative world; `catalog`, `catalog-tools`, `catalog-search` (query "iron") and `catalog-inventory` open the Creative catalog; `worldcontrols` and `worldcontrols-held` open the Creative world controls, the second with dusk, a frozen clock, a locked storm and paused spawning already applied |
 | `VEYLON_RESOLUTION=1920x1080` | Framebuffer override |
@@ -93,6 +93,9 @@ the spawn column.
 | `urban_seam_walk` | Real player movement east along a local street from x −40 to x 40, across the region seam at x 0; at 24 s it prints `[urban-qa] seam-walk ... pass=true` when the walk crossed the seam and at least four chunk borders without a collision, an unloaded column or a change of ground height |
 | `urban_fixtures` | Package 04's `FixtureShowcase` house beside the spawn: the facade (0–4 s); at 4 s the front door and a window are opened and the other window shattered through the production commands (facade again to 7 s); the door closed and seen from inside with its HUD prompt (7–10 s); the windows from inside (10–13 s); the stairs from their foot (13–16 s) and from the roof (16–19 s); at 19 s a real walk in through the front door and up the stairs, reporting `[urban-qa] fixtures-walk ... pass=true` at 32 s |
 | `urban_fixtures_night` | The same house at 23:00 with lanterns lit inside: facade, windows from inside, stairs, the door from inside (shots at 3, 6, 9 and 12 s) |
+| `urban_apartments`, `urban_apartments_night` | Actual generated boundary-spanning multi-storey apartment with B1. Six scripted camera holds: street, entrance, kitchen, upper floor, basement, exit. Capture at `3,7,11,15,19,23`. Logs and default filenames explicitly label scripted-camera appearance evidence; these views do not prove navigation. No staged structure, world lights or loot. |
+| `urban_apartments_lit_night` | Supplemental 23:00 appearance sequence with the same six scripted views. Adds exactly four QA portable torches through ordinary recorded block edits in previously empty cells, preserving structure and fixtures. Logs and default filenames identify the portable-light instrumentation; this is readability evidence, not generated utilities or human navigation. |
+| `urban_apartments_manual`, `urban_apartments_manual_night` | Start-only positioning outside the same generated apartment, forced Survival, normal mouse look/movement/F interactions afterward. Without `VEYLON_SHOT`, stays open for a human walk. Record the seed, building id, mode, actual route, clipping/stair findings and exit. The scene itself never records a manual success. |
 
 ```powershell
 $env:VEYLON_GENERATOR='urban-dev'; $env:VEYLON_SEED='20260731'
@@ -101,9 +104,39 @@ $env:VEYLON_SCENE='urban_seam_walk'; $env:VEYLON_SHOT='3,9,14,25'
 ```
 
 Keep a shot at or after 25 s for the walk, because the run closes after its last
-shot (33 s for `urban_fixtures`). Parcels are flat reserved lots until building
-generation arrives; the HUD still shows the legacy camp line and climate biome
+shot (33 s for `urban_fixtures`). Generators 4–6 keep their unbuilt parcels;
+generator 7 builds furnished interiors. The HUD still shows the legacy camp line and climate biome
 (packages 08, 13 and 21).
+
+For the generated apartment appearance sequence use an isolated directory and a
+tag such as `m06_scripted_camera_day`. Change the scene to
+`urban_apartments_night` and use a separate night directory/tag for night evidence.
+The night scene equips a handheld torch; the held model does not light terrain.
+Native lighting/readability must therefore be assessed from actual captures.
+Capture `urban_apartments_lit_night` separately to inspect interiors with portable
+lights. Retain the raw night views; the supplemental scene does not establish
+that abandoned buildings have power or that the player walked the route.
+
+For the required human route, start with:
+
+```powershell
+$env:JAVA_HOME = (Resolve-Path build/tools/jdk25/jdk-25.0.4.1+1).Path # or another JDK 25
+$env:VEYLON_GENERATOR = 'urban-dev'
+$env:VEYLON_SEED = '20260731'
+$env:VEYLON_SCENE = 'urban_apartments_manual'
+Remove-Item Env:VEYLON_SHOT -ErrorAction SilentlyContinue
+Remove-Item Env:VEYLON_FRONTEND -ErrorAction SilentlyContinue
+Remove-Item Env:VEYLON_SMOKE -ErrorAction SilentlyContinue
+.\gradlew.bat run -PveylonDataDir=build/qa/m06-manual --console=plain
+```
+
+Walk from the street through the front door (F), find the kitchen, climb to an
+upper room, descend to B1, then return outside. WASD/mouse and normal Survival
+auto-step apply; no flight, teleport or scripted movement is used by this scene.
+Headless `UrbanApartmentQaSceneTest` walks a continuous generated route through
+production movement and door commands with swept-clearance routing;
+`GeneratedApartmentTraversalTest` covers all four frontages and both modes.
+These are automated physical checks, distinct from the human native gate.
 
 For gameplay HUD work, use `VEYLON_SCENE=hud_showcase` with
 `VEYLON_SHOT=3,7,11,16` for bow draw, reload, thrown weapon and mining states.

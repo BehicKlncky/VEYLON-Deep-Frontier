@@ -199,7 +199,16 @@ revision 1 is selected by generator 6, with one flat per floor and combined
 functions on shallow parcels (D-58–D-61). It retains the reserved entrances/core
 and validates both entry and exit routes before returning a plan. The twelve
 functions above exist; there is no generated building geometry or rolled loot
-yet. [BUILDING_PLANS.md](BUILDING_PLANS.md) records real floor diagrams and diagnostics.
+yet under generator 6. [BUILDING_PLANS.md](BUILDING_PLANS.md) records real floor diagrams and diagnostics.
+
+**Implemented in 06:** generator 7 selects furnished template 2, stamps all parcel
+families as whole-plan chunk slices, and preserves the earlier generations.
+Apartment/service/shop rooms have modest functional furnishings and contextual
+search reservations without rolled contents. Damage/clutter/growth are part of
+the validated proposal. Live room/floor, sky/cover, shelter and climate queries
+avoid roof-as-ground and apartment-as-cave classifications. Generated physical,
+state and day/night appearance evidence is recorded separately from the required
+human walk in [PROGRESS.md](PROGRESS.md) and [VALIDATION.md](VALIDATION.md).
 
 ## 6. Occupied sites and the player's refuge (D-21, D-22)
 
@@ -350,9 +359,9 @@ The table is in dependency order: an item may depend only on items above it. Sec
 | 1 | Generator version `GEN_URBAN` | Persistent | `World` | 02 | — | v3 base int; values above `MAX_SUPPORTED_GENERATOR` rejected | Fixed per `World` | — |
 | 2 | Urban content revision | Persistent | `UrbanRevision` | 02 | 1 | `urban.meta`; absent means 1 | New and load | — |
 | 3 | Region, district, street and parcel plans | Derived | `CityPlanner` | 03 | 1, 2 | Not saved | Cache per `World` | ≤ 16 regions |
-| 4 | Building, floor, room and fixture plans | Derived | `BuildingPlanner` / `BuildingPlan` | 05 | 3 | Template revision 1 selected by saved generator 6; layout 3 validated by unchanged `urban.meta` v1; plans not serialized | Cache per `World`, discarded on new/load | ≤ 256 buildings; ≤ 73,984 cells/plan |
+| 4 | Building, floor, room and fixture plans | Derived | `BuildingPlanner` / `BuildingPlan` | 05–06 | 3 | Template 1 / layout 3 selected by saved generator 6; furnished template 2 / layout 4 by generator 7; unchanged `urban.meta` v1 validates the layout; plans not serialized | Cache per `World`, discarded on new/load | ≤ 256 buildings; ≤ 73,984 cells/plan |
 | 5 | Generated blocks plus edits | Derived plus deltas | Generator and `World` | 03, 06 | 3, 4 | `changedBlocks` (v3 base, last-write log, B-29) | — | 4,000,000 edits |
-| 6 | Fixture state: door or window open, keyed lock or one-sided bar (broken is a recorded block edit); barricade health later | Persistent, touched cells only | `FixtureStates` on `World` | 04 | 4 | `world.fixtures` v1 (D-49); absent means as generated or edited, unlocked | Load replaces; reapplied after structure on chunk generation | ≤ 32,768 cells on write and read |
+| 6 | Fixture state: door or window open, keyed lock or one-sided bar (broken is a recorded block edit); barricade health later | Persistent, touched cells only | `FixtureStates` on `World` | 04, 06 | 4 | `world.fixtures` v1 (D-49); absent follows generated lock defaults, or unlocked for edited/player-placed fixtures; explicit saved unlock overrides the plan | Load replaces; reapplied after structure and recorded edits on chunk generation | ≤ 32,768 cells on write and read |
 | 7 | Container state: contents, emptied, destroyed, owner | Persistent, touched only | `UrbanContainers` | 07 | 2, 4 | `urban.containers`; absent means unrolled | Load replaces; never re-rolled | Capped, write ≤ read cap |
 | 8 | Search and rummage progress | Transient | Transaction system | 07 | 7 | Not saved; cancelled on load | Reset | — |
 | 9 | Refuge claims, respawn anchor, starter refuge | Persistent | `RefugeSystem` | 08, 18 | 4 | `urban.refuges`; absent means the starter refuge for a fresh world, nothing on load | New sets the starter; load replaces | ≤ 3 claims |

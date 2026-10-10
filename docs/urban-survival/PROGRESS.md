@@ -6,10 +6,10 @@ This is the running record for the 26-package urban-survival roadmap. The pack i
 
 | Item | Value |
 | --- | --- |
-| Last completed package | **05 — Building plans and accessibility** (2026-10-10). Deterministic apartment/shop proposals have bounded, physical entry/exit validation, stable reservations and finite repair. Generated building stamping and furnished exploration remain 06. |
-| Source revision | Milestones 01–04 are committed on `feature/urban-survival`, ending at `bdecf6f`; their reconstructed implementation matched `e452dc1`. Milestone 05 starts from that clean checkpoint and has its own scoped handoff below. |
-| Default new world | Legacy (`World.DEFAULT_NEW_WORLD_GENERATOR = GEN_CAVE_IDENTITIES`), unchanged until 26 passes. Isolated `VEYLON_GENERATOR=urban-dev` now creates generator 6 (`GEN_URBAN_PLANS`, layout 3 / template 1, with layout-2 streets stamped alone). Generators 4 and 5 stay loadable. |
-| Next package | **06 — Generated apartments and interiors**. Start from the completed template-1 proposals and preserve generator 6; see the concrete handoff below. |
+| Last completed package | **05 — Building plans and accessibility** (2026-10-10). **06 is PARTIAL**: furnished generation, indoor queries and automated physical/state checks are implemented; the required human native walk remains pending. |
+| Source revision | 06 started from clean `8ef0cba` on `feature/urban-survival`. Local code handoff: `88ef0b8` edit index → `7cad9ea` generated interiors/environment → `2a53f80` generated regressions → `6bf7248` generated QA. The records follow in a separate documentation commit. |
+| Default new world | Legacy (`World.DEFAULT_NEW_WORLD_GENERATOR = GEN_CAVE_IDENTITIES`), unchanged until 26 passes. Isolated `VEYLON_GENERATOR=urban-dev` creates generator 7 (`GEN_URBAN_APARTMENTS`, layout 4 / furnished template 2 on frozen layout-2 city plans). Generators 4–6 stay loadable. |
+| Next package | **Finish 06's human native navigation gate before 07.** Use the start-only Survival scene and record a real entry/kitchen/upper/B1/exit walk. |
 | Commits | Separate `feat`, `test`, `docs` and `chore` commits on `feature/urban-survival`; see the reconstruction ledger below. `main` stays at `923345f`. Original combined commit retained at `backup/urban-m01-m04-before-split`. No merge, push, tag or publication. |
 
 ## Package ledger
@@ -23,7 +23,7 @@ The status vocabulary is NOT STARTED, IN PROGRESS, PARTIAL, BLOCKED or COMPLETE.
 | 03 | City plans and street network | 02 | New `world/urban/CityPlanner`, `DistrictPlan`, `StreetNetwork`, `ParcelPlan`, `UrbanChunkStamper`; `World` urban queries and the loaded-column query; `EntityManager` and `EventSystem` urban gating (D-28); `UrbanQaScenes` | Across the seed, region and order matrix: roads join at borders, parcels respect reservations, blocks and ids are identical in every chunk order, and no wilderness POI, ore, cave or legacy settlement appears. A walkable starter street network exists. Streetscape captures and a native seam walk. | **COMPLETE** (2026-10-08) |
 | 04 | Urban materials and interactions | 03 | `world/BlockType` (appended, budgeted), `gfx/MaterialRegistry`, `gfx/ProceduralTextures`, `engine/AudioManager` footsteps, `WorldInteractions`, `InteractPromptBuilder`, `PlayerBlockActions`, `ai/Pathfinder` door passability, new `FixtureStates` and `world.fixtures` | A fixture shows a player and an NPC opening a door, using a window entry and climbing stairs; breaking a fixture; recognising a searchable object. Collision, raycast, rendering and navigation agree. Fixture state round-trips. Creative and Survival gates hold. Natives show both sides of doors and night readability. | **COMPLETE** (final verification 2026-10-10) |
 | 05 | Building plans and accessibility | 03–04 | `world/urban/{BuildingPlanner,BuildingTemplates,BuildingPlan,PlanVolume,AccessibilityValidator,BuildingPlanDiagnostics}`; shared `VoxelAccess`/`VoxelClearance`; generator 6 / layout 3 / template 1 | No unreachable room/container/quest reservation, invalid stairs, overlap or overflow; invalid fixtures rejected; stable shuffled access/eviction; bounded work. Native plan debug optional, furnished exploration is 06. | **COMPLETE** (2026-10-10; focused checks, portable build, graph and scoped local handoff) |
-| 06 | Generated apartments and interiors | 04–05 | `UrbanChunkStamper`; `World` height and light hooks; `simulation/TemperatureSystem`, `AmbienceSystem`, `AudioSceneState` urban indoor state (D-19); `UrbanBootstrap` | Generated apartments and a shop have recognisable rooms, usable stairs, matching windows and exits. Blocks and ids are identical in every order. Persisted breaks survive. Native street-to-basement walks in day and night. | NOT STARTED |
+| 06 | Generated apartments and interiors | 04–05 | `UrbanBuildingStamper`, `BuildingFurnishing`, `UrbanIndoorQueries`; `World`/`Chunk` height/light/state hooks; shelter, temperature, ambience/audio; generated QA scenes | Generated apartments and a shop have recognisable rooms, usable stairs, matching windows and exits. Blocks and ids are identical in every order. Persisted breaks survive. Native street-to-basement walks in day and night. | **PARTIAL** (2026-10-10; human native navigation gate pending) |
 | 07 | Contextual loot and persistence | 06, 02 | New `UrbanContainers`, `LootTables`, `urban.containers`; `CrateTransactionSystem`, `ui/CrateScreen`, `simulation/ItemConditionSystem`, one removal path for hand, blast, fire and salvage | Open, partially loot, leave, reload, revisit, break and replace: no refill or duplication. Abandoned property is not theft; owned property has a consequence. Interrupted search, full-inventory and corruption tests. Native searching while the world runs. | NOT STARTED |
 | 08 | Urban spawn and survival progression | 07 | `UrbanBootstrap` (spawn, refuge, provisional camp), `item/CraftingSystem` urban recipe set, `item/ItemType` (appended), `WorldInteractions` fuel, water and cooking, `SleepSystem`, onboarding text | Fixed starter seeds reach shelter, food, water, treatment, sleep and a first upgrade from urban sources only, on a production route with no tree and no ore. Creative bootstrap is intact. A fresh native session. | NOT STARTED |
 | 09 | Infected threats and encounters | 08 | Entity kind (D-20, appended enums), a new AI brain, `gfx/model`, `engine/AudioManager`, new `UrbanEncounterDirector` and `urban.population`, caps in `qa/RuntimeBudgetSnapshot` | Infected notice the player fairly, pursue in a fixture, attack through the damage gates, react to fire and die cleanly. Defeated state survives save, load and reactivation. Caps and sanctuary hold. Creative twin. Natives in a street and a ground-floor apartment. | NOT STARTED |
@@ -547,6 +547,106 @@ Documents: architecture/development guidance, the four urban records and example
   preserve stable reservations and cross-chunk order, then validate furnishing,
   indoor light/shelter and native day/night basement/roof exploration.
   No 06 implementation was started here.
+
+## Milestone 06 — generated apartments and interiors (2026-10-10)
+
+**Status: PARTIAL.** Implemented geometry, furnishings, indoor integration and
+automated physical/state validation. Scripted native views are appearance
+evidence only; no human walk has been performed or claimed by this session.
+Do not start 07 until the remaining native gate is met.
+
+### Start state and decisions
+
+- Read the full base from `../VEYLON-Urban-Survival-Roadmap/00_BASE_KNOWLEDGE.md`,
+  pack README, current `AGENTS.md` and commit workflow, urban design/progress/
+  decisions and relevant architecture/development/save-compatibility guidance.
+  The linked root base file does not exist; the progress record located the pack.
+  The owner later identified `build/`; the current
+  `build/urban-survival-roadmap/00_BASE_KNOWLEDGE.md` was read in full and its
+  README checked. Its current local-commit section delegates to the shared
+  workflow already used for this dependency-ordered handoff.
+- Clean branch/index/worktree at `8ef0cba`; no unrelated changes were present.
+  Local commits are authorized by the base's local-commit policy. No push, merge,
+  tag or release.
+- D-62–D-66 record generator 7/template 2, whole-plan furnishings and owned slices,
+  indexed edit replay, live indoor observations and evidence/matrix boundaries.
+
+### Resulting behavior and paths
+
+- `UrbanRevision` selects layout 4/furnished template 2 before bootstrap;
+  generators 1–6, template 1 and the ordinary default retain their contracts.
+  `BuildingFurnishing` adds modest beds, basin/collector forms, tables, cabinets,
+  shelves, lockers, varied floors, clutter, broken partition panels and sparse
+  growth. Every apartment/service/shop parcel is furnished and explorable.
+  Contextual reservations are searchable through the existing empty backend;
+  no starter-crate contents or permanent loot policy is introduced before 07.
+- `UrbanBuildingStamper` clips the whole validated proposal to the parcel/chunk
+  intersection, carving B1 and stamping foundations, floors/walls/doors/windows,
+  switchback stairs and roof. Streets receive real urban materials in generator
+  7 only. No neighbour writes, creation-order choices or generation-state entries.
+- `ChunkBlockEdits` indexes deltas by chunk. Structure is followed by recorded
+  destruction, then saved fixture overrides and one height/light finalisation.
+  Defaults consume no fixture-state capacity; explicit saved unlock and player
+  replacement defeat the original lock. Recorded breaks/removals persist.
+- `UrbanIndoorQueries`, `World` and `Chunk` add loaded-only opening light,
+  roof/glass weather cover, derived precipitation bounds and room/floor location.
+  Shelter uses live enclosure; temperature/audio use street depth, so roofs never
+  turn all indoor floors into deep caves. Sky edits dirty neighbouring meshes,
+  including diagonal samples. No codec, enum, simulation stream or persistent
+  indoor state is added. CPU chunk retention and block-light wall leakage remain
+  the existing limits owned by 24 and 22 respectively.
+- `UrbanApartmentQaScene`, `UrbanQaScenes`, `QaHarness`, `AutomatedRunDriver`
+  provide generated scripted views and start-only manual Survival scenes.
+  Raw day/night scenes do not stage lights; a separately labelled night variant
+  adds four portable QA torches in empty cells for supplemental readability.
+  The scripts do not claim player navigation. See [DEVELOPING](../DEVELOPING.md#urban-planning-qa)
+  for commands and [VALIDATION](VALIDATION.md) for actual evidence.
+
+### Verification and handoff
+
+- The furnished proposal matrix covers 320 nominal cases and 4,112 actual parcels
+  over six seeds/eight regions with zero repairs. Actual generated spatial checks
+  cover all rooms/reservations of every parcel in six complete origin regions.
+  The 16 x 16 region exception to the usual 15 x 15 test window prevents omitting
+  boundary parcels. Seven chunk orders, negatives, region seams and far regions
+  compare blocks, heights, lights and reservation fingerprints.
+- Production player movement walks generated stairs in four frontages and both
+  modes, plus one continuous Survival street/kitchen/upper/B1/exit route with
+  real F actions. The old pathfinder selected an unswept stair-side drop; the
+  physical route test uses production swept-clearance transitions. This does not
+  implement or prove package 10's multi-floor AI routing.
+- Generated save round-trip over a live world and reverse-order regeneration
+  preserve explicit unlocks, open doors, broken windows and removed furniture.
+  Empty inventories are not refilled. Generator 7 terrain/full-building and six
+  template-2 reservation fingerprints are pinned; earlier pins are retained.
+- Commands, outcomes, captures and pending checks are in the 06 evidence entry
+  of [VALIDATION.md](VALIDATION.md). Commit boundaries are the reusable edit
+  index, generation/indoor behavior with coupled assertions, additional generated
+  regressions, generated QA behavior, and documentation. Each code boundary is
+  checked against its actual contents; the final portable build includes doclint.
+- Final native appearance matrix: 36 captures at two fixed seeds, six views each
+  in daylight, raw night and explicitly instrumented portable-light night. All
+  six sessions exited successfully with zero GL, KHR error and native audio
+  errors. Day/portable-light interiors read clearly; raw night interiors remain
+  very dark because the held torch does not illuminate terrain.
+- Code graph updated once with `graphify update . --no-cluster`: 7,375 nodes,
+  28,105 edges, no clustering or document/image extraction. Existing Gradle
+  parser limitations remain; build configuration is authoritative.
+- Final `.\gradlew.bat build --console=plain` passed in 7 min 6 s: 1,704 tests,
+  zero failures/errors, one Windows symlink-privilege skip, plus Javadoc/doclint.
+  All code was frozen before this run. Documentation resolved 53 relative links
+  and passed whitespace checks. No task-owned source work remains uncommitted.
+
+### Pending gate and exact resume step
+
+Run `urban_apartments_manual` in the documented isolated directory with seed
+`20260731`, using normal Survival input only. Walk street → entrance → kitchen →
+upper floor → B1 → outside; record building id, findings and actual controls.
+Repeat at night as needed for the native gate. No desktop/manual-input tool is
+available to this agent, so camera holds and headless movement cannot supply this
+evidence. The owner explicitly requested keeping this gate pending. Fix any
+actual clipping/stair defect, rerun affected checks, then close 06 before
+starting contextual loot in 07.
 
 ## Resume rules
 

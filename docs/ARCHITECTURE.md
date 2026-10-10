@@ -255,8 +255,9 @@ regenerating under a newer generator.
 
 Generator versions form an explicit set (`World.isSupportedGenerator`): 1 legacy,
 2 deep, 3 cave identities, 4 the urban street datum, 5 the urban street network,
-and 6 the same street geometry plus frozen building plans (layout 3, template 1),
-which the development selector creates. New worlds use
+6 the same street geometry plus frozen building plans (layout 3, template 1),
+and 7 generated furnished apartments and shops (layout 4, template 2), which the
+development selector creates. New worlds use
 `World.DEFAULT_NEW_WORLD_GENERATOR` (3, until the urban rollout); a load accepts any
 supported version and rejects the rest, including anything above
 `MAX_SUPPORTED_GENERATOR`, before it replaces the live world. Feature gates name
@@ -341,10 +342,10 @@ in a city that is a roof. Legacy worlds keep both unchanged.
 
 Generator 6 pins `BuildingTemplates` revision 1 before bootstrap through
 `UrbanRevision.buildingTemplateRevisionOf`. Its city fabric explicitly comes
-from layout 2; it never changes generator 5's plans or stamps interiors. A later
-generator will stamp the new buildings. `urban.meta` v1 and the frozen v3 base
+from layout 2; it never changes generator 5's plans or stamps interiors. Generator
+7 stamps furnished template 2 on the same city fabric. `urban.meta` v1 and the frozen v3 base
 layout are unchanged. A build supporting at most generator 5 rejects a generator-6
-save; this build still re-derives generators 1–5 under their original contracts.
+save; this build still re-derives generators 1–6 under their original contracts.
 
 `BuildingPlanner` derives a whole immutable `BuildingPlan` from seed, template
 revision and parcel. Nested floor/room/fixture/stair records carry stable packed
@@ -366,10 +367,52 @@ fails explicitly. No world or random stream is touched.
 
 Occupied front-door locks have a proven unlatched rear route. A plan's
 `fixtureStateAt` gives saved touched entries precedence over defaults, including
-an explicit saved unlock. Connecting defaults to actual stamped fixtures belongs
-to 06, where there will first be generated doors. No keyed-tool dependency is
+an explicit saved unlock. Generator 7 resolves these defaults through
+`World.fixtureLockAt` without populating the touched-state map. Edited/replaced
+doors do not regain a generated lock. No keyed-tool dependency is
 invented here. See [urban floor examples](urban-survival/BUILDING_PLANS.md) and
 [decisions D-58–D-61](urban-survival/DECISIONS.md#1-decision-log).
+
+### Generated apartments and indoor observations
+
+`BuildingFurnishing` overlays frozen template 1 to produce template 2 before any
+chunk geometry is written. It adds facade-side beds, basins, prep/living tables,
+storage, varied floors, sparse clutter, broken partition panels and restrained
+growth. Search reservations have derived room/container functions and stable
+ids; no inventory or loot is generated. Shops and service parcels also have
+real rooms. The same production validator checks all playable room cells,
+interaction targets and reversible stairs after furnishings; budgets remain six
+fixtures/three containers per room and three to six containers per flat.
+
+`UrbanBuildingStamper` intersects whole plans with each chunk and parcel. It
+writes only owned footprint cells, including AIR to carve B1, never the proposal's
+paving halo or a neighbour's chunk. Generator 7 also maps streets to the real
+urban materials. Generation has no contents, fixture-state or cross-chunk edit
+side effects. `AccessibilityValidator.inspectGenerated` reads loaded actual
+blocks, including approach context, and applies the same physical proof without
+mistaking surrounding structures for geometry owned by the inspected plan.
+
+`ChunkBlockEdits` keeps the public delta-map contract with a per-chunk index.
+Generation restores that chunk's recorded edits after structure and before
+saved fixture overrides, then finalises heights/lights once and dirties adjacent
+meshes. The index adds transient memory proportional to the edit log; CPU chunks
+are still retained (eviction remains package 24). No codec or enum changes.
+
+`UrbanIndoorQueries` observes loaded voxels, never generating columns. A derived
+precipitation-height map (1 KiB/chunk) treats opaque roofs and closed glass as
+cover. Direct sky/glass transmission and bounded eight-block cardinal opening
+rays provide daylight; diffuse interior light stays below the fire/collector
+rain threshold. Roof/window edits refresh exposure and adjacent mesh lighting,
+including diagonal vertex samples. This is a bounded approximation; block-light
+wall leakage and presentation polish remain package 22.
+
+Infrequent `World.urbanLocation` resolves building/floor/room metadata.
+Room-aware shelter still checks live enclosure, so damage is observed. Generated
+urban temperature/audio use depth below the street datum rather than below the
+roof. Covered rooms retain seasons, buffer weather/day-night variation and
+reduce altitude cooling; ground and upper floors no longer become deep caves.
+Generators 1–6 retain their original light/weather/environment behavior. No
+new simulation random stream or persistent indoor state is introduced.
 
 ### Doors, windows and urban fixtures
 
@@ -398,8 +441,10 @@ Creative or salvage can bring one into a legacy world.
   chunk does not exist yet waits for `World.getOrCreateChunk`, which applies saved
   state after generation and drops stale entries. Forcing, shattering and
   dismantling are ordinary recorded edits, and `World.setBlock` drops the state of a
-  cell that stops being an operable fixture. An absent section means "as built,
-  unlocked". An older build skips the section and loads doors and windows closed;
+  cell that stops being an operable fixture. An absent section retains generated
+  or edited defaults: generator 7 still derives occupied-door locks from its plan,
+  while an explicit saved unlock overrides them. Earlier generators default to
+  unlocked. An older build skips the section and loads doors and windows closed;
   before package 04 a build reads their ids as air. A malformed section fails the
   whole load.
 - **Player.** F on an aimed door or window comes before nearby people

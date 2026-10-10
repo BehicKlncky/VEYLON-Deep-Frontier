@@ -495,3 +495,149 @@ new generator. Contents/depletion are 07. Saved generator 6 pins template 1 and
 uses unchanged `urban.meta` v1; builds supporting at most generator 5 reject that
 save, established from dispatch code, not older-binary execution. Ordinary new
 worlds remain generator 3. No merge, push, tag or publication is authorized here.
+
+### Milestone 06 (2026-10-10)
+
+Fresh work began at clean `8ef0cba` on `feature/urban-survival`, with 04–05
+committed. Read the complete external base at
+`../VEYLON-Urban-Survival-Roadmap/00_BASE_KNOWLEDGE.md` before the current project
+instructions and relevant records; the requested repository-root copy is absent.
+The installed Temurin 25.0.4.1+1 supplied JDK 25. An initial command without
+`JAVA_HOME` and a sandboxed JDK security-file read failed before validation;
+approved execution supplied the existing JDK/cache access. All data and artifacts
+below remain isolated under ignored `build/`.
+
+After the owner clarified the pack location, read
+`build/urban-survival-roadmap/00_BASE_KNOWLEDGE.md` in full and checked its README.
+The build copy replaces the external copy's older section-6 commit wording with
+the shared `docs/COMMIT_WORKFLOW.md`; the independent commit order and validation
+used here follow that current policy. The owner explicitly chose to keep the
+human-walk gate pending.
+
+```powershell
+$env:JAVA_HOME = (Resolve-Path build/tools/jdk25/jdk-25.0.4.1+1).Path
+```
+
+| Check | Fresh result / evidence |
+| --- | --- |
+| Isolated edit-index boundary: `.\gradlew.bat -p build/m06-index-check/tree test --tests 'com.veylon.world.ChunkBlockEditsTest' --console=plain` | Passed in 11 s, two tests. Snapshot contained baseline `8ef0cba` plus only the reusable index and its tests. Local commit `88ef0b8`. XML: `build/m06-index-check/tree/build/test-results/test/TEST-com.veylon.world.ChunkBlockEditsTest.xml`. |
+| Isolated generation/environment boundary: `.\gradlew.bat -p build/m06-behavior-check/tree test --tests 'com.veylon.world.urban.BuildingFurnishingTest' --tests 'com.veylon.UrbanIndoorEnvironmentTest' --tests 'com.veylon.world.WorldGeneratorFingerprintTest' --tests 'com.veylon.world.urban.AccessibilityValidatorTest' --tests 'com.veylon.world.urban.BuildingPlannerTest' --tests 'com.veylon.UrbanDevelopmentSelectorTest' --tests 'com.veylon.world.UrbanGeneratorDispatchTest' --tests 'com.veylon.world.urban.UrbanRevisionTest' --tests 'com.veylon.WorldSeedDeterminismTest' --tests 'com.veylon.save.FixtureStatesSectionTest' --console=plain` | Passed in 42 s: 75 tests, zero failures/errors/skips across ten suites. Snapshot contained `88ef0b8` plus exactly the 24 generation/environment paths, checked by file hashes before staging; no generated QA or later regression suites. Local commit `7cad9ea`. Log: `build/m06-behavior-check/test.log`. |
+| Isolated additional regressions: `.\gradlew.bat -p build/m06-behavior-check/tree test --tests 'com.veylon.world.UrbanApartmentGenerationTest' --tests 'com.veylon.save.GeneratedApartmentStateTest' --tests 'com.veylon.entity.GeneratedApartmentTraversalTest' --console=plain` | Passed in 5 s, seven tests. Added only these three suites to the validated generation tree; hashes matched before staging. Local commit `2a53f80`. Log: `build/m06-regressions-check.log`. |
+| Integrated focused selection: `.\gradlew.bat test --tests 'com.veylon.world.ChunkBlockEditsTest' --tests 'com.veylon.world.UrbanApartmentGenerationTest' --tests 'com.veylon.world.urban.BuildingFurnishingTest' --tests 'com.veylon.world.urban.BuildingPlannerTest' --tests 'com.veylon.world.urban.AccessibilityValidatorTest' --tests 'com.veylon.world.WorldGeneratorFingerprintTest' --tests 'com.veylon.world.UrbanGeneratorDispatchTest' --tests 'com.veylon.world.urban.UrbanRevisionTest' --tests 'com.veylon.UrbanDevelopmentSelectorTest' --tests 'com.veylon.UrbanApartmentQaSceneTest' --tests 'com.veylon.entity.GeneratedApartmentTraversalTest' --tests 'com.veylon.UrbanIndoorEnvironmentTest' --tests 'com.veylon.EnvironmentalSimulationTest' --tests 'com.veylon.AudioSceneStateTest' --tests 'com.veylon.CreativeBodyTest' --tests 'com.veylon.CreativeHazardsTest' --tests 'com.veylon.AmbienceRainTest' --tests 'com.veylon.save.GeneratedApartmentStateTest' --tests 'com.veylon.save.FixtureStatesSectionTest' --console=plain` | Passed in 52 s (`build/m06-focused-2.log`). Precedes the final replacement-lock assertion, new fingerprint pins and supplemental QA. Those are covered by the later isolated checks and final build. |
+| Initial portable build: `.\gradlew.bat build --console=plain` | Passed in 7 min 7 s: 1,703 tests, zero failures/errors, one skipped Windows symlink-privilege case (`AppPathsTest`), 170 suites; Javadoc/doclint included. Log: `build/m06-build.log`; XML archived in `build/m06-initial-build-results/`. Compiled before the final entrance-camera adjustment and supplemental night scene. |
+| Final generated-QA selection: `.\gradlew.bat test --tests 'com.veylon.UrbanApartmentQaSceneTest' --tests 'com.veylon.entity.GeneratedApartmentTraversalTest' --console=plain` | Passed in 5 s: five QA tests plus the frontage/mode traversal test, zero failures/errors. Includes inherited city-plan diagnostic dispatch and explicit portable-light instrumentation at both capture seeds. Log: `build/qa/m06-qa-final-tests.log`. |
+| Final portable build: `.\gradlew.bat build --console=plain` | Passed in 7 min 6 s after all code and final QA sources were frozen: 1,704 tests across 170 suites, zero failures/errors, one Windows symlink-privilege skip in `AppPathsTest`. Javadoc/doclint passed. Log: `build/m06-final-build.log`. |
+
+`BuildingFurnishingTest` covers 320 nominal combinations, all room functions and
+4,112 actual parcels across six seeds and eight regions, with zero repairs.
+`UrbanApartmentGenerationTest` generates each complete origin region at six
+seeds and validates every parcel's rooms and interaction targets against live
+blocks through the production entry/return proof. Its 16 x 16 chunk window is an
+explicit exception to the usual 15 x 15 bound so boundary parcels are included.
+Seven loading orders cover row, reverse, column, three shuffles and spiral, with
+additional negative/seam/far samples. Blocks, heightmaps, light lists, moisture
+and plan/reservation fingerprints match; no pending neighbour edits or initial
+inventories are created. Repeated stamping is identical and generation finalises
+height/light once.
+
+Production save/load over an existing Creative world preserves the saved
+Survival mode, template-2 identity, explicit unlock, open doors, shattered glass
+and removed storage. A fresh world with restored deltas recreates the parcel in
+reverse chunk order without resurrection or refill. Saved generator versions
+1–6 and template 1 retain their existing fingerprints; new generator-7 terrain,
+complete refuge/shop geometry and six template-2 plan fingerprints are pinned.
+No codec or persisted enum ordinal changed; an older executable was not run.
+
+`GeneratedApartmentTraversalTest` walks every stair flight in both directions,
+four frontages and Survival/Creative using production physics without jump or
+flight. `UrbanApartmentQaSceneTest` walks one continuous Survival route from
+street to kitchen, upper room, B1 and outside, opening actual doors through the
+production interaction command. These are headless automated physical checks.
+The legacy NPC pathfinder initially selected an unswept stair-side drop; the
+test now routes with production swept-clearance transitions. Multi-floor AI
+routing remains package 10 and is not proved here.
+
+The first focused run failed four checks: the now-supported template revision
+was still expected to throw, the weather assertion omitted CLEAR's +1 offset,
+proposal halo ownership was incorrectly applied to neighbouring live blocks,
+and the old pathfinder chose the invalid drop described above. The corrected
+52 s run passed. The first native launch stopped before any capture because its
+diagnostic used layout 4 with the frozen layout-2 city planner; the dispatcher
+now reports the inherited plan revision, with a regression test. Direct execution
+of the local matrix `.ps1` was denied by PowerShell policy; identical inline
+commands ran without changing that policy. These failures are not passing
+evidence.
+
+**Native appearance and remaining gate.** The six holds are street, entrance,
+kitchen, upper floor, basement and exit at `3,7,11,15,19,23` seconds. Logs and
+filenames explicitly identify scripted camera evidence. Raw day/night scenes
+use actual generator-7 geometry with no staged structure, lights or loot. The
+separate `urban_apartments_lit_night` scene adds exactly four portable QA torches
+through ordinary recorded edits in empty cells, preserving generated fixtures
+and routes. It is supplemental light instrumentation, not generated utilities.
+The raw night views remain part of the evidence: a held torch model does not
+illuminate terrain, and unlit interior readability is poor.
+
+Final native matrix used the following common environment and one `run` per row
+below. Set `VEYLON_SEED`, `VEYLON_SCENE` and `VEYLON_CAPTURE_TAG` from the row,
+then run `.\gradlew.bat run -PveylonDataDir=build/qa/<directory> --console=plain`.
+Every row completed in 25 s with six 1280 x 720 captures, zero GL/KHR errors and
+zero native audio errors. KHR pixel-transfer synchronization performance
+messages came from screenshot capture; these runs are not frame benchmarks.
+Logs are `build/qa/<directory>.log`; images are
+`build/qa/<directory>/screenshots/<tag>_<seconds>s.png`.
+
+```powershell
+$env:VEYLON_GENERATOR = 'urban-dev'
+$env:VEYLON_GAME_MODE = 'survival'
+$env:VEYLON_SHOT = '3,7,11,15,19,23'
+$env:VEYLON_RESOLUTION = '1280x720'
+$env:VEYLON_UI_SCALE = '1'
+$env:VEYLON_FULLSCREEN = '0'
+$env:VEYLON_VSYNC = '0'
+$env:VEYLON_GL_DIAGNOSTICS = '1'
+Remove-Item Env:VEYLON_FRONTEND -ErrorAction SilentlyContinue
+Remove-Item Env:VEYLON_SMOKE -ErrorAction SilentlyContinue
+```
+
+| Seed | Scene | Directory | Capture tag |
+| --- | --- | --- | --- |
+| `20260731` | `urban_apartments` | `m06_generated_day_final` | `m06_scripted_camera_day_final` |
+| `20260731` | `urban_apartments_night` | `m06_generated_night_final` | `m06_scripted_camera_night_final` |
+| `20260731` | `urban_apartments_lit_night` | `m06_generated_lit_night` | `m06_scripted_camera_portable_torches_night` |
+| `-4242` | `urban_apartments` | `m06_seed_minus4242_day` | `m06_seed_minus4242_scripted_camera_day` |
+| `-4242` | `urban_apartments_night` | `m06_seed_minus4242_night` | `m06_seed_minus4242_scripted_camera_night` |
+| `-4242` | `urban_apartments_lit_night` | `m06_seed_minus4242_lit_night` | `m06_seed_minus4242_scripted_camera_portable_torches_night` |
+
+The selected real apartments are `urban:building:0,0:0:0`, INTACT, three storeys
+and B1, bounds `(6,6)..(32,17)` at seed `20260731`; and
+`urban:building:0,0:2:0`, PICKED_CLEAN, five storeys and B1, bounds
+`(6,43)..(33,60)` at seed `-4242`. Both cross chunk boundaries. Day and
+portable-light views show readable cabinets, room floors, windows, upper rooms,
+basement storage and exits. Visual inspection covered entrance, kitchen and
+basement across both seeds, including the first seed's search-cabinet prompt.
+The original first-seed day retry and raw night captures remain in
+`build/qa/m06_generated_day/` and `build/qa/m06_generated_night/`; the final matrix
+above supersedes their earlier entrance-camera pose, not their recorded outcome.
+
+`graphify update . --no-cluster` completed once, exit 0, with 7,375 nodes and
+28,105 edges (`build/m06-graph.log`). This was local code analysis only, without
+clustering, semantic extraction agents or document/image extraction. Existing
+Groovy `build.gradle` parsing and symbol-free `settings.gradle` warnings remain;
+Gradle and source are authoritative. The read-only relative Markdown link/anchor
+checker resolved 53 links. Working and staged whitespace checks passed; all six
+documentation paths were explicitly staged and reviewed. The four local code
+commits have validation bodies, coherent dependency-ordered scopes and no
+co-author trailers. The documentation handoff follows separately; no task-owned
+source edits remain outside those commits.
+
+The mandatory human Survival walk remains **PENDING**. This session has no
+desktop/manual-input capability, so neither camera holds nor automated physics
+close that gate. Use the start-only scene and command in
+[DEVELOPING.md](../DEVELOPING.md#urban-planning-qa), record the actual route,
+building id, controls and clipping/stair findings, fix any defect and rerun the
+affected checks. Milestone 06 remains **PARTIAL**; do not begin 07 yet.
+
+No manual listening, wall-clock performance benchmark, native release package,
+merge, push, tag or publication was performed. Existing block-light wall leakage
+and CPU chunk retention remain the recorded package-22 and package-24 limits.
