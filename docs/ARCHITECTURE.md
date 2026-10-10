@@ -116,10 +116,13 @@ notifications), not for reaching sideways into an unrelated subsystem.
 
 ### World creation
 
-`newWorld(seed, fresh, generatorVersion)` is the single path that produces a
+`newWorld(seed, fresh, generatorVersion, mode)` is the single path that produces a
 playable world, used by New Game, by save loading and by the QA harness. The
-rules live in `WorldBootstrap`; `Game.newWorld` is the entry point every caller
-still uses. It **resets before it constructs**, in this order:
+rules live in `WorldBootstrap`; `Game.newWorld` and its shorter overloads are the
+entry points every caller still uses. Ordinary new worlds take
+`World.DEFAULT_NEW_WORLD_GENERATOR`; a load passes the version its save recorded.
+An unsupported version is refused before anything is reset. It **resets before it
+constructs**, in this order:
 
 1. Release GPU meshes of the outgoing world (`releaseWorldMeshes`).
 2. Reset every cross-world system: scheduler, audio, time, weather, temperature, fire,
@@ -134,10 +137,15 @@ still uses. It **resets before it constructs**, in this order:
    made a settlement test intermittently fail. Presentation-only randomness
    (`AudioManager`, `NpcScreen`) is deliberately excluded.
 4. Construct `World`, bind it to audio occlusion, then construct `Player`; register `Game` as `world.listener`.
-5. Clear entities and the event log; reset faction standing and the clock.
+   A fresh urban world records its content revision here, before any chunk generates.
+5. Clear entities and the event log; reset faction standing, the camp position and the clock.
 6. Clear player action state: UI mode, mining, bow draw, reload, sleep, theft
    event bookkeeping.
-7. Generate chunks around spawn synchronously, find dry land, place the camp.
+7. Generate chunks around spawn synchronously, find dry land, place the camp. An
+   urban world instead stands the player on its planned ground (`UrbanBootstrap`)
+   and raises no crash camp: on the street network, the courtyard walk in front of
+   the starter refuge's door; on the bare street datum of generator 4, a fixed
+   street column.
 
 `GameLoopIntegrationTest.newWorldClearsSimulationQueuesAndPlayerActionState`
 pins steps 2–6. If you add a system with cross-world state, add its `reset()`
@@ -216,18 +224,20 @@ Two invariants, both pinned by `GameLoopIntegrationTest`:
 
 ### World edits
 
-Every block change funnels through `World.setBlock(x, y, z, type, notify)`.
-When `notify` is true it calls `world.listener.onBlockChanged(...)`, which is
-`Game`. That hook is how lighting, meshing, fire, water and settlement systems
-learn about a change without polling. **Bulk edits pass `notify = false` and
-fix up heightmaps and lights once at the end** — see the QA staging code and
-`ExplosionSystem` for the pattern.
+Runtime block changes funnel through `World.setBlock(x, y, z, type, record)`.
+The boolean controls persistence in `changedBlocks`, not notifications. Every
+actual change calls `world.listener.onBlockChanged(...)`, which currently routes
+to the water system through `Game`; heightmaps, mesh dirtiness and light-emitter
+updates are handled in `World`. Fixture toggles pass `record = false` because
+`world.fixtures` owns their saved state, while still notifying the listener and
+dirtying meshes. Bulk edits use `beginBatch` / `endBatch` to defer heightmap and
+light rebuilds, and still notify the listener for each change.
 
 ```
 player action ─┐
 explosion ─────┼─→ World.setBlock ─→ chunk data + heightmap + dirty flag
 fire spread ───┤                  └─→ Game.onBlockChanged ─→ dependent systems
-QA staging ────┘                       (skipped when notify == false)
+QA staging ────┘                       (independent of record)
 ```
 
 ### Save / load
@@ -242,6 +252,142 @@ from the seed plus the generator version. Only deltas and dynamic state are
 serialized. This is why `world.generatorVersion` is part of the save — pinning
 it is what lets v2 saves load with identical terrain instead of silently
 regenerating under a newer generator.
+
+Generator versions form an explicit set (`World.isSupportedGenerator`): 1 legacy,
+2 deep, 3 cave identities, 4 the urban street datum and 5 the urban street network,
+which the development selector creates. New worlds use
+`World.DEFAULT_NEW_WORLD_GENERATOR` (3, until the urban rollout); a load accepts any
+supported version and rejects the rest, including anything above
+`MAX_SUPPORTED_GENERATOR`, before it replaces the live world. Feature gates name
+their versions (`hasDeepFrontier`, `hasCaveIdentities`, `isUrbanGenerator`) instead
+of comparing with `>=`, so a new generator inherits nothing by accident, and
+`WorldGeneratorFingerprintTest` pins the output of every version.
+
+An urban world's layout revision follows from its generator, so it is known
+before bootstrap generates a chunk; a geometry change means a new generator
+version, never a change under an old one (`UrbanRevision`). Its content revision
+(the rolled loot, encounter and trade tables) is saved in the optional
+`urban.meta` section, which only urban worlds write. Until that section, or its
+absent default, has been read, a loading world's content revision cannot be read
+at all. Compatibility directions:
+
+- this build, a legacy save: unchanged, and no urban state is created;
+- this build, an urban save: the same geometry through its generator, the content
+  revision from `urban.meta` (absent means revision 1);
+- an older build, an urban save: refused as an unsupported generator before the
+  live world is touched;
+- an `urban.meta` in a non-urban world, a newer section version, a layout
+  revision that does not match the generator, an unsupported content revision or
+  trailing bytes: the whole load fails.
+
+Urban ids (`world.urban.UrbanIds`) are packed from plan coordinates, never from
+visit or list order. No section stores one yet; the policy for those that will is
+to check each with `UrbanIds.requireKind` and fail the whole load on an invalid or
+wrong-kind id, never to resolve it to some other object.
+
+### Urban city plans
+
+Generator 5 (layout revision 2) builds the city from pure plans rather than
+from terrain noise. `world.urban.CityPlanner.plan(seed, layoutRevision, rx, rz)`
+plans one 256 × 256-block region and reads nothing else: no world state, no
+other region and no visit order. Every decision is a `UrbanHash` derivation of
+the seed, the layout revision, stable coordinates and one salt from
+`UrbanSalts`; there is no `Random` stream, so `reseedSimulation` is unaffected.
+
+- **Streets** (`StreetNetwork`): avenues 12 wide on every region edge, each region
+  stamping its half, and three north-south and three east-west local streets per
+  region, 8 wide. A north-south street's x depends only on the region column and
+  an east-west street's z only on the region row, so streets continue straight
+  across every avenue and the lattice is connected everywhere. An avenue
+  segment's profile (plain or boulevard) is a function of the edge and the
+  segment, so both regions agree without seeing each other.
+- **Superblocks and parcels** (`DistrictPlan`, `SuperblockPlan`, `ParcelPlan`): 16
+  superblocks per region, each courtyard housing (six parcels around a courtyard
+  reached through two passages), a shop row (parcels back to back along a service
+  alley), a park or a plaza. A parcel is 12–32 blocks a side, has index
+  `superblock * 8 + slot` and a packed `UrbanIds` parcel id, a primary street
+  entrance, a rear entrance onto its courtyard or alley, a reserved stair-core
+  footprint and a storey envelope. Region (0, 0) reserves the starter refuge and a
+  corner shop on one block, and the spawn anchor in front of the refuge door.
+- **Overlap priority**: streets, then alleys and passages, then parcels, then open
+  space, then tree beds. A cell is never taken from an earlier claimant; a
+  collision is counted, not resolved.
+- **Stamping** (`UrbanChunkStamper`): a chunk writes only its own blocks, from the
+  plan of the one region that contains it, so `pendingGen` stays empty. Every
+  surface is flush at the street datum (y 40) over stone fill; parcels are flat
+  reserved lots until building generation arrives under a later generator. The
+  blocks are a temporary mapping to existing ids (`UrbanSurfaceMaterials`).
+- **Queries** (`UrbanWorldState`): `groundY`, `plannedRoofY` (a parcel's storey
+  envelope, not a built roof), `surfaceAt`, `parcelAt`, `districtAt` and
+  `spawnColumn` answer from the plan and never generate chunks. Use them, not
+  `World.surfaceHeight`, which reports a tree crown today and a roof once
+  buildings stand. `World.isColumnLoaded` tells an unloaded column from air
+  without generating it.
+- **Bounds**: at most `UrbanWorldState.MAX_REGION_PLANS` (16) plans are cached, in
+  `BoundedPlanCache`; an evicted plan is rebuilt identically. Plans hold nothing
+  persistent. `RuntimeBudgetSnapshot` reports the cache against its cap.
+- **Diagnostics**: `CityPlanDiagnostics.inspect` checks a region against its four
+  neighbours (overlaps, parcel rules, routes, seams) with a bounded message list;
+  the urban QA scenes print it.
+- Regions beyond the range `UrbanIds` can name (about 33.5 million blocks out) are
+  the flat street datum.
+
+Urban worlds spawn no surface wildlife and roll no event that places wolves, a
+trader or a meteor at the column top (`EntityManager.slowTick`, `EventSystem`), since
+in a city that is a roof. Legacy worlds keep both unchanged.
+
+### Doors, windows and urban fixtures
+
+Urban package 04 appended 21 block ids (`ASPHALT` … `DEBRIS`): restrained urban
+materials whose weathered and damaged looks are position-hash material variants,
+not more ids; doors, windows and stairs; furniture. The rules live in
+`world.Fixtures` (families and openings), `world.FixtureStates` (state no id
+expresses), `world.FixtureGeometry` (thin boxes) and `FixtureActions` (what the
+player and residents do). They apply in every world, legacy included, though only
+Creative or salvage can bring one into a legacy world.
+
+- **Families.** A door or window kind has a closed, an open and a broken id. Closed
+  is a solid full cell (glass is solid but not opaque), open is a non-solid leaf
+  along the low jamb, broken is a non-solid frame in the wall plane. Collision,
+  pathing and meshing read the ids, so they agree; the targeting raycast and the
+  mesher share `FixtureGeometry`, so the crosshair passes an open doorway and hits
+  only the drawn leaf. An opening is a vertical stack of one kind, at most three
+  cells; a door acts as a whole, a window pane shatters alone.
+  Placement requires both door cells inside the world in a loaded column, with
+  replaceable space and no body occupying either cell.
+- **State and persistence.** Toggling swaps the id with `record = false` and writes
+  the state to `World.fixtures`, keyed by block position: open, a keyed lock (both
+  sides) or a bar (one side, with its axis and side). `world.fixtures` v1 saves it,
+  only when non-empty, sorted, capped at `FixtureStates.MAX_ENTRIES` on both write
+  and read. On load an entry turns the edited block into its variant; an entry whose
+  chunk does not exist yet waits for `World.getOrCreateChunk`, which applies saved
+  state after generation and drops stale entries. Forcing, shattering and
+  dismantling are ordinary recorded edits, and `World.setBlock` drops the state of a
+  cell that stops being an operable fixture. An absent section means "as built,
+  unlocked". An older build skips the section and loads doors and windows closed;
+  before package 04 a build reads their ids as air. A malformed section fails the
+  whole load.
+- **Player.** F on an aimed door or window comes before nearby people
+  (`WorldInteractions.interact`, `InteractPromptBuilder`, one decision). Crouch and F
+  bars a door or latches a window from the player's side; in Creative it toggles a
+  keyed lock. A Survival break forces a closed door into a broken doorway, shatters a
+  pane (a bare hand is cut through `Player.hurtPhysical`), or dismantles an open
+  fixture into its one item; Creative removes the block. Opening, closing, failed
+  entry, forcing and shattering emit `WorldNoise` through its Creative gate.
+- **Residents.** `Pathfinder` treats a closed, unlocked door as passable at the gate's
+  cost and a locked or barred one as a wall; residents open doors on their path and
+  `FixtureActions.tickResidentDoors` (settlement fast tick) shuts them behind,
+  never on a body. Those timers are transient and bounded (`MAX_TRANSIT`); the save
+  writes such a door shut. In urban worlds `Npc` steps up one full block, so
+  residents climb full-block stairs by walking.
+- **Containers and salvage.** Shelving, cabinets and lockers use the crate storage
+  (until package 07). A break of an urban block whose contents or salvage would not
+  fit is refused rather than losing items; salvage is at most the one item that
+  places the block, so breaking and placing never multiplies material. A blast or
+  fire takes an urban container's contents with it (`World.setBlock`); the legacy
+  crate keeps its old behaviour. Transfers from an open urban storage screen
+  revalidate its furniture and inventory identity, closing the screen when either
+  is gone so destroyed contents cannot be taken and deposits cannot disappear.
 
 Transient state is deliberately **not** serialized: an in-flight reload is
 cancelled on load, and bow draw resets. Combat and fire add more of it. An

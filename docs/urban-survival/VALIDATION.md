@@ -368,3 +368,87 @@ Host and JDK as for 02: Windows 11 Pro, NVIDIA GeForce RTX 3060 Ti, Temurin `25.
 | `graphify update . --no-cluster`, run once after the code was final | Graph rebuilt: 6,753 nodes, 25,327 edges (`build/m03-graphify.log`) |
 
 Not run: `performanceTest` (03 adds a bounded per-chunk planning cost, not a per-frame cost, and this host is not the calibrated reference) and `releaseArtifacts`. No older binary was executed: the rejection of a generator-5 save by the package-02 build and by 0.8.1 is established by reading their version checks. No manual keyboard play was done.
+
+### Milestone 04 (2026-10-08)
+
+Host and JDK as for 02 and 03: Windows 11 Pro, NVIDIA GeForce RTX 3060 Ti, Temurin `25.0.4.1+1` from the scratchpad. Commands ran from the repository root through Git Bash. Logs are in `build/m04-*.log` (ignored by git, never cleaned); native captures are under `build/qa/m04-*/screenshots/`.
+
+| Check | Result |
+| --- | --- |
+| Read-only survey workflow before design (7 readers: rendering, physics, navigation, interaction, persistence, items and audio, QA) | 5 of 7 returned; the navigation and physics readers stopped on the account session limit, and those areas (`Pathfinder`, `Entity`, `VoxelPhysics`, `Raycaster`, `Steering`) were read directly in the main session instead |
+| Focused existing suites after the enum, material, audio and palette changes: `SerializedEnumOrderTest`, `item.*`, `gfx.*`, `AudioCharacterizationTest`, `BodyFireSoundsTest`, `CreativeBuildingTest`, `CreativePaletteWorldTest`, `ai.PathfinderTest`, `SurvivalCreativeParityTest`, `OrchestratorSizeTest` (`build/m04-focused-1.log`) | BUILD SUCCESSFUL. Appended enums pinned, palette now 21, existing sounds unchanged, line budgets held |
+| New suites: `UrbanFixtureGameplayTest`, `ai.UrbanResidentFixtureTest`, `save.FixtureStatesSectionTest`, `world.FixturesTest`, `gfx.UrbanMaterialsTest`, with `qa.RuntimeBoundsTest` and `GameLoopIntegrationTest` (`build/m04-focused-2.log`) | 59 tests, 1 failure. In `anOpenWindowLetsThePlayerClimbOverTheSillIntoTheRoom` the player had climbed through, but was still dropping off the sill (y 41.13) when the walk reached its target column. The test now lets the body land before checking the floor; it passed in `build/m04-focused-3.log` (17 of 17) |
+| `UrbanFixtureQaSceneTest` (`build/m04-focused-4.log`) | The headless day timeline opened, shattered and closed fixtures through the production commands, and its walk reported `waypoints=5/5 ... onRoof=true pass=true`. One assertion was wrong: it expected no recorded edits, but the two production pane breaks are recorded. It now asserts exactly those two |
+| Native `urban_fixtures`, first run: `VEYLON_GENERATOR=urban-dev VEYLON_SEED=20260731 VEYLON_SCENE=urban_fixtures VEYLON_SHOT=3,6,9,12,15,18,23,27,33 VEYLON_CAPTURE_TAG=m04_fixtures ./gradlew.bat run -PveylonDataDir=build/qa/m04-fixtures` | `[materials] 76 materials, 104 of 160 texture layers`. `fixtures-walk frames=573 waypoints=5/5 blockedFrames=20 onRoof=true pass=true`; 0 GL errors. The captures showed the facade, the open and shattered windows, both sides of the doors and the stairs. The cracked-concrete variant and the stair edge strips read too heavy and were toned down before the rerun |
+| Native `urban_fixtures_night` (`VEYLON_SHOT=3,6,9,12,14`, `build/qa/m04-night`) | 23:00 with lanterns lit. `m04_night_3s.png`: the facade reads at night, with warm light behind the window panes. `m04_night_6s.png`: the closed panes from inside, prompt `[F] Open window (crouch: latch it from this side)`. `m04_night_9s.png`: the stair edges and the interior door, lit by the lantern. `m04_night_12s.png`: the closed metal door from inside, prompt `[F] Open door (crouch: bar it from this side)`. Lantern light also shows through the brick, the legacy unoccluded block light (B-20, D-19). 0 GL errors |
+| Native `urban_fixtures`, rerun with the toned textures and shots during the walk (`VEYLON_SHOT=3,6,9,12,15,18,20,21,22,33`, `build/qa/m04-fixtures-2`) | `fixtures-walk frames=554 waypoints=5/5 blockedFrames=20 end=95.38,45.00,108.77 onRoof=true pass=true`; 0 GL errors. `m04_fixtures_3s.png`: the facade with its closed metal door and four-pane window. `m04_fixtures_6s.png`: the door leaf open on its jamb, a casement open and a shattered pane. `m04_fixtures_9s.png`: the door from inside with its prompt. `m04_fixtures_12s.png`: the windows from inside, with the open sash against the jamb and shards in the broken frame. `m04_fixtures_15s.png` and `_18s.png`: the stairs from their foot and from the roof. `m04_fixtures_20s.png`: the walk, through the door and in the west room at the stair foot. The walk is real player movement through `Game.applyMovementCommand`, driven by script, not by a keyboard |
+| `.\gradlew.bat build --console=plain` before the review (`build/m04-build-1.log`) | BUILD SUCCESSFUL in 6 min 47 s. 160 test classes, 1,646 tests, 0 failures, 1 skipped (the symlink case that needs a privilege on this host); javadoc and doclint included |
+| Native isolated urban smoke: `VEYLON_GENERATOR=urban-dev VEYLON_SEED=20260731 VEYLON_SMOKE=10 VEYLON_SHOT=4 VEYLON_CAPTURE_TAG=m04_urban_smoke ./gradlew.bat run -PveylonDataDir=build/qa/m04-smoke` (`build/m04-native-smoke.log`) | Exit 0: isolated save and load true; `assets={materials=76 ... itemIcons=126/126}`; 0 GL and 0 KHR errors; runtime within every hard limit, the new `fixtureStates=32768 residentDoors=256` caps listed; average 141.9 fps (p95 7.00 ms, max 121.01 ms on the first frame while the spawn area generates) at 1280 × 720 with VSync on; `performanceGate=true`. Nothing was written outside `build/qa/m04-smoke` |
+
+### Milestone 04 completion (2026-10-10)
+
+These are fresh checks from the resumed working tree on `923345f`, including the late container-transfer guard and the final door-placement bounds correction. The earlier 2026-10-08 results above remain historical. Windows PowerShell used the existing Temurin `25.0.4.1+1` at `build/tools/jdk25/jdk-25.0.4.1+1` through `JAVA_HOME`; the restricted process could not read its security configuration, so Gradle checks used approved execution with JDK/cache access. All test and native save/settings paths remained under `build/`.
+
+| Check | Result |
+| --- | --- |
+| `.\gradlew.bat test --tests 'com.veylon.UrbanFixtureGameplayTest' --tests 'com.veylon.UrbanFixtureQaSceneTest' --tests 'com.veylon.ai.UrbanResidentFixtureTest' --tests 'com.veylon.world.FixturesTest' --tests 'com.veylon.gfx.UrbanMaterialsTest' --tests 'com.veylon.save.*' --tests 'com.veylon.qa.SerializedEnumOrderTest' --tests 'com.veylon.qa.RuntimeBoundsTest' --tests 'com.veylon.GameLoopIntegrationTest' --tests 'com.veylon.world.WorldGeneratorFingerprintTest' --console=plain` (`build/m04-resume-focused.log`) | BUILD SUCCESSFUL in 1 min 20 s. This verified the recovered checkpoint before the final placement correction. |
+| `.\gradlew.bat test --tests 'com.veylon.UrbanFixtureGameplayTest' --tests 'com.veylon.save.FixtureStatesSectionTest' --console=plain` (`build/m04-resume-final-focused.log`) | BUILD SUCCESSFUL in 4 s after the correction. Includes ceiling/unloaded placement conservation, locked/forced door round-trip, failed entry, full-inventory salvage/spill refusals and destroyed open storage. |
+| `.\gradlew.bat build --console=plain` (`build/m04-resume-build.log`) | BUILD SUCCESSFUL in 6 min 40 s. XML report aggregation: 160 classes, 1,650 tests, 0 failures, 0 errors, 1 skipped (`AppPathsTest` symbolic-link creation requires a host privilege). Javadoc/doclint included. Covers the full always set and all required 04 regression suites. |
+| Day native: `VEYLON_GENERATOR=urban-dev VEYLON_SEED=20260731 VEYLON_SCENE=urban_fixtures VEYLON_SHOT=3,6,9,12,15,18,20,21,22,33 VEYLON_CAPTURE_TAG=m04_resume_day .\gradlew.bat run -PveylonDataDir=build/qa/m04-resume-day --console=plain` (`build/m04-resume-native-day.log`) | Exit 0, BUILD SUCCESSFUL. `[materials] 76 materials, 104 of 160 texture layers`; 10 captures, 1280 × 720. `fixtures-walk frames=555 waypoints=5/5 blockedFrames=19 end=95.38,45.00,108.77 onRoof=true pass=true`. 0 GL, 0 KHR errors, 0 native audio errors. Capture synchronization produced KHR performance messages, not errors. |
+| Night native: same generator/seed, `VEYLON_SCENE=urban_fixtures_night VEYLON_SHOT=3,6,9,12 VEYLON_CAPTURE_TAG=m04_resume_night .\gradlew.bat run -PveylonDataDir=build/qa/m04-resume-night --console=plain` (`build/m04-resume-native-night.log`) | Exit 0, BUILD SUCCESSFUL. 4 captures, 1280 × 720, 23:00. 0 GL, 0 KHR errors, 0 native audio errors. |
+| Visual inspection through `view_image` | Inspected day captures 3/6/9/12/15/18 s in `build/qa/m04-resume-day/screenshots/`: front door closed/open outside and closed inside with the F hint, windows closed outside and open/shattered from both sides, stairs from foot and roof. Inspected all four night captures in `build/qa/m04-resume-night/screenshots/`: readable facade, window frame and latch hint, stair edges, inside door and bar hint. The known unoccluded lantern light remains; no new visual mismatch was found. The native walk was scripted through production movement, not manual exploration or listening. |
+| `graphify update . --no-cluster` (`build/m04-resume-graph.log`) | Exit 0. Code graph updated to 7,054 nodes and 26,691 edges; no LLM/document/image extraction or clustering. Parser warnings for Groovy `build.gradle` and symbol-free `settings.gradle`; Java extraction completed. |
+| PowerShell relative Markdown path/anchor check over the seven changed documentation files | 38 local links/anchors resolved, including the completion entry. |
+| `git diff --cached --stat`, staged diff review and `git diff --cached --check` | Reviewed the explicit 102-path catch-up scope for milestones 01–04. No unrelated work or generated build/QA/graph output was staged; whitespace checks passed. |
+
+The completion handoff groups the coupled, accumulated 01–04 code/tests/docs in a local commit under the owner's revised policy. Existing generator fingerprints and historical save fixtures are preserved; older binaries were not executed. Generated buildings, lock-plan defaults and room planning remain packages 05 and 06, and atmospheric/light polish remains deferred as already recorded.
+
+### Local history reconstruction (2026-10-10)
+
+The owner's subsequent request supersedes the combined-commit arrangement above.
+This task reorganizes the completed 01-04 implementation; it adds no gameplay
+and does not begin 05. The unpushed original `e452dc1` is retained at
+`backup/urban-m01-m04-before-split`. `main` and the local `origin/main` reference
+remain at `923345f`; development continues on `feature/urban-survival`. The scoped
+commit ledger is in [PROGRESS.md](PROGRESS.md#local-commit-history-reconstruction-2026-10-10).
+
+Fresh checks below ran on reconstructed intermediate snapshots using Windows
+PowerShell, the existing Temurin 25.0.4.1+1 JDK and the Gradle wrapper. JDK/cache
+access required approved execution; test data remained below `build/`. Logs are
+retained under ignored `build/history-split/`; each corresponding feature/test
+commit records the exact test command in its `Validation:` body. Earlier native
+and build results above remain evidence from their original sessions.
+
+```powershell
+$env:JAVA_HOME = (Resolve-Path build/tools/jdk25/jdk-25.0.4.1+1).Path
+```
+
+| Reconstructed snapshot / focused selection | Fresh result | Log under `build/history-split/` |
+| --- | --- | --- |
+| QA isolation: `AppPathsTest`, `SaveSlotIsolationTest` | Passed, 8 s | `isolation-test.log` |
+| Before generator changes: generator fingerprints, cave identities, migration, runtime bounds | Passed, 8 s with unchanged production generator code | `legacy-pins-test.log` |
+| Generator-4 foundation: `com.veylon.save.*`, fingerprints, cave identities, runtime bounds and game-loop integration | Passed, 1 min 12 s | `foundation-existing-test.log` |
+| Foundation ids/cache/revisions, dispatch, selector, metadata, seeded replay and reset; Javadoc/doclint | Passed, 16 s | `foundation-regressions.log` |
+| Generator-5 city plans: foundation suites, all five terrain pins and city-plan pins; Javadoc/doclint | Passed, 15 s | `city-existing-test.log` |
+| City planner/salts, generated street seams and order, urban spawn gates, legacy event ladder, runtime bounds | Passed, 7 s | `city-regressions.log` |
+| Street QA: `.\gradlew.bat classes compileTestJava javadoc --console=plain` | Passed, 6 s on the milestone-03-only harness | `city-qa-compile.log` |
+| Urban materials/state: serialized enums, Creative palette, unchanged generator fingerprints; Javadoc/doclint | Passed, 10 s | `material-existing-test.log` |
+| `FixturesTest`, `UrbanMaterialsTest` | Passed, 1 s | `material-regressions.log` |
+| Player/resident commands: fixture/material tests, runtime bounds, `com.veylon.ai.*`, game-loop integration; Javadoc/doclint | Passed, 39 s | `fixture-existing-test.log` |
+| Fixture gameplay, resident traversal, `FixtureStatesSectionTest`, runtime bounds and game-loop integration | Passed, 9 s after including the shared showcase dependency in the same commit | `fixture-regressions.log` |
+| `UrbanFixtureQaSceneTest`; Javadoc/doclint | Passed, 8 s; production interaction/break commands and the roof walk exercised headlessly | `fixture-qa-test.log` |
+| Foundation smoke-guard placement: generator fingerprints and corrupt-save resilience; Javadoc/doclint | Passed, 27 s after moving the shared urban smoke guards into the foundation commit | `foundation-smoke-guards.log` |
+| Final portable build: `.\gradlew.bat build --console=plain` | BUILD SUCCESSFUL in 6 min 49 s; fresh XML aggregation: 160 classes, 1,650 tests, 0 failures, 0 errors, 1 skipped Windows symlink-privilege case in `AppPathsTest`. Javadoc/doclint executed successfully | `final-build.log` |
+| `graphify update . --no-cluster` | Completed once: 7,054 nodes, 26,691 edges; no clustering or document/image extraction. Existing Groovy parsing limitations remain; Gradle is authoritative | `graphify-update.log` |
+| `git diff --exit-code e452dc1 -- src build.gradle gradle.properties settings.gradle gradlew gradlew.bat gradle` | Exit 0, no implementation differences | Git comparison |
+| `build/history-split/audit-history.ps1` | The 15 commits preceding this final documentation commit passed subject, `Validation:`, per-commit whitespace and trailer checks. Original 102-path scope preserved; `main` and local `origin/main` at `923345f` | Git audit |
+| `build/history-split/check-docs.ps1 -IncludeGeneral`, `git diff --check`, `git diff --cached --check` | 40 local links/anchors resolved across all seven documentation files; working and staged whitespace checks passed | Documentation/Git checks |
+
+Preparatory checks caught and resolved a misplaced Gradle `--tests` option and
+the regression arena's dependency on the shared `FixtureShowcase` builder. The
+builder now lands with those tests, before native QA registration. These
+corrections changed grouping only; final production and test sources remain
+identical to the original combined commit.
+
+No new native session/capture, manual keyboard or listening pass, older binary,
+wall-clock performance benchmark, release package, merge, push or tag was run.

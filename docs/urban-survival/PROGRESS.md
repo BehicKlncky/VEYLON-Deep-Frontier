@@ -6,12 +6,11 @@ This is the running record for the 26-package urban-survival roadmap. The pack i
 
 | Item | Value |
 | --- | --- |
-| Last completed package | **03 - City plans and street network**; this commit series reconstructs the accumulated 01-04 work in dependency order. |
-| Branch | `feature/urban-survival`, based on `923345f`; `main` remains at that baseline until a separately authorized integration. |
-| Source revision | The source and configuration are reconstructed from `e452dc1`; final equality is checked after the split. Dated checks below belong to the original implementation sessions. |
-| Default new world | Legacy generator 3 until package 26. The explicit urban development selector requires an isolated data directory. |
-| Next package | **04 - Urban materials and interactions**; see the handoff below. |
-| Commits | Local, scoped `feat`, `test`, `docs` and `chore` commits on the feature branch. No merge, push, tag or publication is part of this reconstruction. |
+| Last completed package | **04 — Urban materials and interactions** (final verification and handoff 2026-10-10). Doors, windows, stairs, urban materials and searchable furniture exist and work for the player and residents; no generated building uses them yet (packages 05 and 06). Package 03 gave urban worlds districts, a connected street network and reserved parcels. |
+| Source revision | Milestones 01-04 are reconstructed as scoped local commits on `feature/urban-survival`, based on `923345f`. The final source, resources and build configuration match the original combined commit `e452dc1` exactly. |
+| Default new world | Legacy (`World.DEFAULT_NEW_WORLD_GENERATOR = GEN_CAVE_IDENTITIES`), unchanged until 26 passes. Urban worlds are reachable only through `VEYLON_GENERATOR=urban-dev` with an isolated data directory, which now creates generator 5 (`GEN_URBAN_STREETS`, the street network); generator 4 stays loadable. |
+| Next package | **05 — Building plans and accessibility**; the entry point is under milestone 04 below |
+| Commits | Separate `feat`, `test`, `docs` and `chore` commits on `feature/urban-survival`; see the reconstruction ledger below. `main` stays at `923345f`. Original combined commit retained at `backup/urban-m01-m04-before-split`. No merge, push, tag or publication. |
 
 ## Package ledger
 
@@ -22,7 +21,7 @@ The status vocabulary is NOT STARTED, IN PROGRESS, PARTIAL, BLOCKED or COMPLETE.
 | 01 | Design and repository audit | — | `docs/urban-survival/` | The four records exist, are cross-linked and pass the link and path check; the entry point for 02 is recorded | **COMPLETE** |
 | 02 | Versioned urban foundation | 01 | `world/World` (`GEN_URBAN`, predicates, default and maximum constants), `world/WorldGenerator` (dispatch), `Game`, `WorldBootstrap`, `FrontendController` (explicit generator path), `save/SaveSystem`, `save/V3ExtensionSections` (`urban.meta`), `util/AppPaths`, `build.gradle` (QA data dir), new `world/urban/UrbanIds`, `UrbanRevision`, `UrbanBootstrap` skeleton | Production bootstrap creates an urban-dev world and its generator and revision round-trip. Legacy dispatch, fingerprints and the new gen-2 pin are unchanged. Old saves without urban state load safely. Unsupported or corrupt revisions fail per policy. Reset over a live world clears foundation state. A tested QA data-dir seam exists. | **COMPLETE** (2026-10-07) |
 | 03 | City plans and street network | 02 | New `world/urban/CityPlanner`, `DistrictPlan`, `StreetNetwork`, `ParcelPlan`, `UrbanChunkStamper`; `World` urban queries and the loaded-column query; `EntityManager` and `EventSystem` urban gating (D-28); `UrbanQaScenes` | Across the seed, region and order matrix: roads join at borders, parcels respect reservations, blocks and ids are identical in every chunk order, and no wilderness POI, ore, cave or legacy settlement appears. A walkable starter street network exists. Streetscape captures and a native seam walk. | **COMPLETE** (2026-10-08) |
-| 04 | Urban materials and interactions | 03 | `world/BlockType` (appended, budgeted), `gfx/MaterialRegistry`, `gfx/ProceduralTextures`, `engine/AudioManager` footsteps, `WorldInteractions`, `InteractPromptBuilder`, `PlayerBlockActions`, `ai/Pathfinder` door passability, new `FixtureStates` and `world.fixtures` | A fixture shows a player and an NPC opening a door, using a window entry and climbing stairs; breaking a fixture; recognising a searchable object. Collision, raycast, rendering and navigation agree. Fixture state round-trips. Creative and Survival gates hold. Natives show both sides of doors and night readability. | NOT STARTED |
+| 04 | Urban materials and interactions | 03 | `world/BlockType` (appended, budgeted), `gfx/MaterialRegistry`, `gfx/ProceduralTextures`, `engine/AudioManager` footsteps, `WorldInteractions`, `InteractPromptBuilder`, `PlayerBlockActions`, `ai/Pathfinder` door passability, new `FixtureStates` and `world.fixtures` | A fixture shows a player and an NPC opening a door, using a window entry and climbing stairs; breaking a fixture; recognising a searchable object. Collision, raycast, rendering and navigation agree. Fixture state round-trips. Creative and Survival gates hold. Natives show both sides of doors and night readability. | **COMPLETE** (final verification 2026-10-10) |
 | 05 | Building plans and accessibility | 03–04 | New `world/urban/BuildingPlanner`, `BuildingTemplates`, `FloorPlan`, `RoomPlan`, `FixtureSlot`, `AccessibilityValidator` (reusing `Pathfinder` semantics and `PlayerConstants`) | Across the template × rotation × seed matrix: no unreachable room, container or quest reservation; valid stairs; no overlap or overflow. Invalid fixtures are rejected. Plans match under shuffled access. Validator work is bounded. | NOT STARTED |
 | 06 | Generated apartments and interiors | 04–05 | `UrbanChunkStamper`; `World` height and light hooks; `simulation/TemperatureSystem`, `AmbienceSystem`, `AudioSceneState` urban indoor state (D-19); `UrbanBootstrap` | Generated apartments and a shop have recognisable rooms, usable stairs, matching windows and exits. Blocks and ids are identical in every order. Persisted breaks survive. Native street-to-basement walks in day and night. | NOT STARTED |
 | 07 | Contextual loot and persistence | 06, 02 | New `UrbanContainers`, `LootTables`, `urban.containers`; `CrateTransactionSystem`, `ui/CrateScreen`, `simulation/ItemConditionSystem`, one removal path for hand, blast, fire and salvage | Open, partially loot, leave, reload, revisit, break and replace: no refill or duplication. Abandoned property is not theft; owned property has a consequence. Interrupted search, full-inventory and corruption tests. Native searching while the world runs. | NOT STARTED |
@@ -271,6 +270,164 @@ See [VALIDATION.md §7, milestone 03](VALIDATION.md#milestone-03-2026-10-08). In
 2. Decide whether 04 changes any stamped street or parcel block. If it does, allocate generator 6 with layout revision 3 and keep generator 5 pinned (D-04, D-39). If 04 only adds fixture blocks for later buildings, generator 5 stays as it is.
 3. Build doors, windows, stairs and fixtures as appended `BlockType` ids within budget, with materials and textures; measure the texture-layer count at boot. Add the `FixtureState` side map and the `urban.fixtures` section with its codec, absence default, reset and corruption tests (D-17, D-18). Prove D-31 (AI stair climbing) on a stair fixture.
 4. Use the plan queries (D-43) for any placement, never `surfaceHeight`; use `World.isColumnLoaded` before trusting `getBlock`.
+
+## Milestone 04 — urban materials and interactions (2026-10-08)
+
+**Status: COMPLETE**, with final verification and commit handoff resumed on 2026-10-10 (see the continuation below). Doors, windows, stairs, urban materials and searchable furniture exist and behave in every world. **No generated building uses them yet**: package 05 plans buildings and 06 stamps them. The fixtures are proven on `FixtureShowcase`, a small house that the tests and the QA scenes build beside the spawn.
+
+### Start state
+
+- `main` at `923345f`, with milestones 01 to 03 uncommitted. `git status` showed only that work.
+- The scratchpad Temurin `25.0.4.1+1` from 2026-10-07 still ran.
+
+### Implemented behaviour
+
+- **Block ids** (D-54): 21 appended at 57–77 (`ASPHALT` … `DEBRIS`). Weathered and damaged looks are material variants, not ids. Three unpersisted shapes (`LEAF`, `PANE`, `TABLE`). 16 item forms: 14 salvage forms and 2 Creative palette forms.
+- **Doors and windows** (D-48, D-50):
+  - Closed, open and broken ids per kind. Openings are stacks of up to 3 cells.
+  - F opens and closes the whole opening, but never onto a body.
+  - A keyed lock holds from both sides: F is a failed entry, with a rattle and a noise event.
+  - Crouch and F bars a door or latches a window from the player's side, and only that side can lift it. In Creative it toggles a keyed lock, for staging.
+  - A Survival break forces a door (loud, irreversible), shatters a pane (loud; a bare hand is cut through the damage gate), or dismantles an open fixture into its single item. Creative removes the block.
+  - An aimed door or window outranks a nearby person for F, and the HUD prompt comes from the same decision.
+- **State and persistence** (D-48, D-49):
+  - Toggles are fixture state, not block edits. `World.fixtures` is keyed by position and saved in `world.fixtures` v1, only when non-empty.
+  - Saved state is applied on load and, for chunks not yet generated, at generation; stale entries are dropped.
+  - Forced, shattered and dismantled fixtures are recorded edits.
+  - Capped at 32,768 cells on write and read.
+- **Residents** (D-52, D-53):
+  - `Pathfinder` passes closed unlocked doors at the gate's cost and walls off locked or barred ones and closed glass. An open window over a sill is an ordinary step-up.
+  - Residents open doors on their path, and the doors swing shut behind them after 4 s (transient, at most 256 timers, saved shut).
+  - In urban worlds residents step up one full block, so they climb stairs by walking (D-31).
+- **Stairs**: `STAIRS` is a full-block step with worn safety-orange edge strips (A3).
+- **Containers and salvage** (D-51):
+  - Shelving, cabinets and lockers are searched through the crate backend.
+  - A break that cannot fit its contents or its salvage is refused, never lossy.
+  - Salvage is at most the item that places the block.
+  - A blast or a fire destroys an urban container's contents with it. The legacy crate is unchanged.
+- **Agreement** (D-55): the mesher and the targeting raycast share `FixtureGeometry`, so the crosshair passes an open doorway and hits only the drawn leaf. Collision and navigation read the same ids.
+- **Presentation** (D-54, D-56):
+  - 31 procedural tiles (`UrbanTextures`); the measured total is 104 of 160 layers.
+  - Door, window and stair icons.
+  - Seven fixture sounds from their own seed.
+  - Footsteps: urban materials, stone brick and basalt now sound like stone.
+  - Glass dust no longer shows black specks.
+- **QA** (`UrbanFixtureQaScene`, `FixtureShowcase`): `VEYLON_SCENE=urban_fixtures` and `urban_fixtures_night`; see `docs/DEVELOPING.md`.
+- **Bounds**: `RuntimeBudgetSnapshot` reports `fixtures={states,residentDoors}` against their caps.
+
+### Changed paths
+
+- **Production**, under `src/main/java/com/veylon/`:
+  - New: `world/{Fixtures,FixtureStates,FixtureGeometry}.java`, `FixtureActions.java`, `FixtureShowcase.java`, `UrbanFixtureQaScene.java`, `gfx/UrbanTextures.java`, `engine/UrbanFixtureSounds.java`, `save/FixtureStatesSection.java`.
+  - Edited: `world/{BlockType,World,ChunkMesher,Raycaster}.java`, `item/{ItemType,CreativePalette,CreativeCatalog}.java`, `gfx/{MaterialRegistry,ProceduralTextures,IconAtlas}.java`, `engine/{AudioManager,ProceduralAudio,ParticleSystem}.java`, `PlayerBlockActions.java`, `WorldInteractions.java`, `InteractPromptBuilder.java`, `CrateTransactionSystem.java`, `ui/CrateScreen.java`, `ai/{Pathfinder,SettledNpcAI,FirePanic}.java`, `settlement/SettlementManager.java` (one line; 1,420 of 1,500), `entity/{Entity,Npc}.java`, `save/V3ExtensionSections.java`, `qa/RuntimeBudgetSnapshot.java`, `QaHarness.java` (one line; 1,493 of 1,500), `UrbanQaScenes.java`. `Game.java` is untouched (994).
+- **Tests**, under `src/test/java/com/veylon/`:
+  - New: `UrbanFixtureArena`, `UrbanFixtureGameplayTest`, `UrbanFixtureQaSceneTest`, `ai/UrbanResidentFixtureTest`, `save/FixtureStatesSectionTest`, `world/FixturesTest`, `gfx/UrbanMaterialsTest`.
+  - Extended: `qa/SerializedEnumOrderTest` (appended names), `item/CreativePaletteTest` (palette 21), `qa/RuntimeBoundsTest`, `GameLoopIntegrationTest`.
+- **Documents**: `docs/ARCHITECTURE.md` ("Doors, windows and urban fixtures"), `docs/DEVELOPING.md` (scenes; adding a block), `docs/graphics/ASSET_PIPELINE.md` (the real icon hook), and these four records.
+
+### Stable ids, schema and compatibility
+
+- **Enums**: `BlockType` 57 → 78 and `ItemType` 110 → 126, appended only and pinned by `SerializedEnumOrderTest`. `BlockType.Shape` is not persisted.
+- **New section**: `world.fixtures` v1 (D-49), written only when a fixture has state, so legacy and untouched urban saves keep exactly their sections.
+- **Generators**: no stamped street or parcel block changed, so generator 5 is unchanged and keeps its fingerprints (D-54).
+- **Verified by tests on this build**:
+  - Open, barred, shattered and resident-held fixtures round-trip through the production save path; a resident's door is saved shut.
+  - Saves without fixture state carry no section.
+  - An absent section leaves fixtures as built.
+  - Stale entries are dropped, and entries for chunks that do not exist yet never generate them.
+  - 13 malformed payloads fail the load without touching the live world, on the title screen too.
+- **Established by reading code, not by running it**:
+  - A package-03 build knows generator 5, so it loads a 04 urban save. It reads the new block ids as air (`BlockType.byId`) and skips `world.fixtures` by its length, so doors, windows and fixtures vanish and their state is lost on re-save.
+  - 0.8.1 still refuses any urban save as an unsupported generator.
+  - A legacy save holding placed fixtures loads in 0.8.1 with those blocks as air.
+  - No older binary was run.
+
+### Commands and results
+
+See [VALIDATION.md §7, milestone 04](VALIDATION.md#milestone-04-2026-10-08).
+
+### Limitations and deferred items
+
+- **No generated building uses the fixtures** until 05 and 06. Only Creative staging creates a keyed lock. Keys, tools that open a lock, and planned lock defaults (an absent entry falling back to the building plan) arrive with 05 and 06. Barricades and infected breaking doors are 18 and 09.
+- **Streets keep generator 5's temporary materials** (D-42). They switch to asphalt and paving only under a later generator.
+- **Interior light is still the legacy model** (D-19, package 06):
+  - Windows let in no daylight.
+  - Lantern light passes through walls, visible in the night captures (B-20).
+  - Cutout glass casts a full shadow.
+  - The target outline and crack overlay draw a full cell around thin fixtures.
+- **Open leaves have no collider**: a body hugging the jamb may overlap the 0.125-thick leaf.
+- **Containers use the crate backend until 07**: every placed container is saved (B-30) and spoils its food (B-47). The legacy crate keeps its orphan-on-blast and full-inventory loss (D-12).
+- **Residents**: step-up only for people in urban worlds. Animals neither open doors nor step. Native evidence of residents is headless only; the native scenes show the player.
+- **Climate is the legacy biome noise** (cold breath at −3.5 °C on the facade capture). That is packages 08 and 13.
+
+### Next unmet prerequisite: entry point for 05
+
+1. Read `00_BASE_KNOWLEDGE.md`, prompt 05, DESIGN §5 (A1–A12) and §13 rows 4 and 6, DECISIONS D-10, D-11, D-41 and D-48 to D-57, and VALIDATION §5 row 05. Check `git status` and preserve unrelated work. The accumulated 01–04 commit handoff is required before starting 05.
+2. Plan with the 04 vocabulary:
+   - doors and windows are `Fixtures.Kind` stacks;
+   - a storey's window sits over a one-block sill in rows +2 and +3 of the storey;
+   - a flight is four full-block steps per storey under an opening in the slab above, as `FixtureShowcase` shows;
+   - containers are `Fixtures.isUrbanContainer`.
+3. Give locked openings a plan default: an absent `World.fixtures` entry should fall back to the building plan's lock, with saved entries as overrides. Make sure every generated lock has an attainable tool or alternate entry (A5).
+4. Build `AccessibilityValidator` on `Pathfinder.passable` and `standable` semantics (doors included) and the real colliders. Stamping geometry needs a new generator version (D-04); generator 5 stays pinned.
+
+### Continuation and local commit handoff (2026-10-10)
+
+- **Recovered checkpoint:** `main` still at `923345f`, no staged changes and no urban commits. All dirty paths matched the 01–04 handoffs; no unrelated work was found. The previous session's last edits guarded transfers from destroyed furniture and strengthened raycast/state and container-save regressions. Its final focused run and mutation probes were recorded only in ignored logs; the full build and native runs in the 2026-10-08 record preceded those edits. Fresh verification was therefore required.
+- **Context read:** the revised urban `00_BASE_KNOWLEDGE.md` and pack README are in the ignored `build/urban-survival-roadmap/` copy, rather than the repository root. The current `AGENTS.md`, urban records and save-compatibility skill were read. The base file's section 6 explicitly authorizes the local catch-up commit; historical no-commit notes above describe the earlier policy only.
+- **Final correction:** `FixtureActions.doorFits` now requires a loaded column and room for both halves below `Chunk.SY`. A ceiling placement previously could spend a door item on only its lower half. `UrbanFixtureGameplayTest` now exercises ceiling and unloaded-column refusals through the production placement command, preserving the item and world. `FixtureStatesSectionTest` now checks that a keyed lock still refuses entry audibly after reload and a forced whole door remains broken without a surviving lock or salvage.
+- **Documentation:** corrected the `World.setBlock` record/notification contract in `ARCHITECTURE.md`, documented invalidated storage screens, and replaced the current superseded no-commit summary. D-57 records the placement contract; generator output, existing ids and the fixture codec layout did not change.
+- **Fresh native evidence:** 10 day captures and 4 night captures at 1280 × 720, zero GL/KHR errors and zero native audio errors in both runs. Day captures at 3, 6, 9, 12, 15 and 18 s were inspected for the closed/open front door, closed/open/shattered windows from both sides, and the stair flight from below and above. All four night captures were inspected for facade, glass, step edges and door/HUD readability. The scripted production walk reached 5/5 waypoints on the roof (`pass=true`); this was not a manual keyboard or listening pass. Existing light leakage, cutout shadows and thin-leaf collision limitations remain explicitly deferred above.
+- **Fresh portable verification:** the broad focused selection passed, followed by the two affected fixture suites after the placement correction. `.\gradlew.bat build --console=plain` passed in 6 min 40 s: 1,650 tests in 160 classes, zero failures/errors, one skipped Windows symlink-privilege case in `AppPathsTest`; Javadoc/doclint included. All required headless and native gates for 04 are met. Exact commands, logs and visual evidence are in [VALIDATION.md](VALIDATION.md#milestone-04-completion-2026-10-10).
+- **Graph:** `graphify update . --no-cluster` completed (7,054 nodes, 26,691 edges), with no document/image extraction or clustering. Its Groovy parser could not extract `build.gradle`; `settings.gradle` has no symbols. The Gradle build is the authority for those files.
+- **Commit scope:** all accumulated 01–04 task-owned paths, including coupled production code, regression tests and the four records. No later package was implemented. The final handoff supplies the actual new hash and subject; a commit cannot contain its own hash.
+
+## Local commit history reconstruction (2026-10-10)
+
+The owner requested the same feature-branch workflow used by earlier large updates.
+The original combined commit `e452dc1` was local and unpushed; it is preserved at
+`backup/urban-m01-m04-before-split`. `main` was restored to `923345f`, also the
+unchanged local `origin/main` reference. Development continues on
+`feature/urban-survival`; integration belongs to a separate authorized task.
+
+The preceding continuation describes the original implementation session and its
+evidence. Its one-commit handoff is superseded by this series, reconstructed from
+the same content in dependency order. Shared source/test edits are split by
+milestone: generator 4 precedes generator 5, fixture state precedes its commands,
+and the shared showcase builder accompanies the tests that need it. The urban
+smoke generator guards land with the foundation. Behavior, save layouts,
+serialized ordinals, generator fingerprints and final test sources are unchanged.
+
+| Milestone | Commit | Subject |
+| --- | --- | --- |
+| 01 | `939b185` | `docs(urban): define the city survival roadmap and compatibility contract` |
+| 02 | `c85d442` | `chore(qa): isolate test and native development data directories` |
+| 02 | `e60909f` | `test(world): pin legacy generator output before the urban split` |
+| 02 | `c2c4463` | `feat(world): add the versioned urban foundation and save metadata` |
+| 02 | `8a7de3f` | `test(save): cover urban revisions, identities and bootstrap isolation` |
+| 02 | `c401b8f` | `docs(urban): record the versioned foundation and save compatibility policy` |
+| 03 | `09e60c7` | `feat(world): generate deterministic districts and connected city streets` |
+| 03 | `525063a` | `test(world): cover street seams, parcel reservations and bounded planning` |
+| 03 | `d4f68d6` | `feat(qa): stage city streets and a production seam walk` |
+| 03 | `02a7e7f` | `docs(urban): record city planning invariants and the street-network gate` |
+| 04 | `d13411d` | `feat(world): add urban materials and persistent fixture geometry` |
+| 04 | `c941d34` | `test(gfx): pin urban material budgets and shared fixture geometry` |
+| 04 | `ca93289` | `feat(world): connect urban entry, salvage and resident traversal commands` |
+| 04 | `3f26102` | `test(world): cover urban entry, salvage, resident movement and fixture saves` |
+| 04 | `e510b77` | `feat(qa): stage urban fixtures by day and night with a production roof walk` |
+| 04 / handoff | This documentation commit | Architecture, development guidance, final fixture records and reconstruction evidence |
+
+Fresh focused checks and Javadoc/doclint verified the reconstructed foundation,
+city-plan, material, interaction and fixture-QA snapshots. Exact final build,
+tree-equality, documentation and Git checks are recorded in
+[VALIDATION.md](VALIDATION.md#local-history-reconstruction-2026-10-10). Earlier native
+captures remain dated historical evidence for the identical final implementation;
+no new native session, performance benchmark or release package is claimed here.
+
+The first four packages remain complete. Package 05 is the next work item and was
+not started by this history-only task. Future milestone work should commit scoped
+changes on `feature/urban-survival` and preserve `main` until integration is
+explicitly authorized. No co-author trailers or agent signatures were added.
 
 ## Resume rules
 

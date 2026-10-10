@@ -51,7 +51,7 @@ run, stalk, attack, rest, death…). To add a creature: build its part tree in
   top/side textures.
 - Everything else → category template (tool silhouettes, food, medical, gear,
   material pouch…) tinted with the item's color, plus per-item overrides.
-To customize a single icon: add a case in `IconAtlas.drawSpecific()`.
+To customize a single placeable icon: add a case in `IconAtlas.decoratePlaceable()` (the door, window and stair items of urban package 04 draw their silhouettes there).
 
 ## Particles
 

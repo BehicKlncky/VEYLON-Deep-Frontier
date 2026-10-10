@@ -41,8 +41,9 @@ runs. All are inert when unset. Everything below is handled by `QaHarness`;
 |---|---|
 | `VEYLON_SEED` | Fixed world seed (a non-numeric value is hashed) |
 | `VEYLON_GAME_MODE=survival\|creative` | Initial mode for automated world runs only; absent means Survival. Invalid values fail explicitly. Ignored for normal title sessions and frontend-only captures. |
+| `VEYLON_GENERATOR=urban-dev` | Development selector: NEW FRONTIER and automated worlds use the newest urban generator (`UrbanRevision.DEVELOPMENT_GENERATOR`, now `World.GEN_URBAN_STREETS`: districts, streets and reserved parcels, no buildings yet). Absent keeps the ordinary default. Any other value fails, and so does `urban-dev` without an isolated data directory (see below). |
 | `VEYLON_SMOKE=<seconds>` | Release smoke gate: save/load, fire, storm, a fortress approach, then a pass/fail report. Throws on failure |
-| `VEYLON_SCENE=<name>` | Stage a deterministic benchmark scene (`day`, `pinefog`, `nightfire`, `ruin`, `toxic`, `ao_shadow`, `phase4`, `ashwolf`, `silhouette30`, `vfx_blood`, `vfx_mining`, `vfx_beacon`, `death_ragdoll_showcase`, `death_ragdoll_sequence`, `dismember_showcase`, `dismember_wall`, `dismember_bomb` (a real scrap bomb thrown into a group of six, one outside the lethal radius; it goes off at 2.4 s), `dismember_species`, `dismember_species_wall` and `dismember_species_close` (every species, a guard and the player's remains blown apart at 1 s; open meadow, a step and a wall, and a close view of the small bodies), `molotov_ground`, `molotov_tree` and `molotov_rain` (a real fire bomb thrown at 0.5 s onto a dry clearing at dusk, beside a round tree that catches, or with rain from 3 s that puts the pool out; shots `0.7,1.2,3,7,11`, `1,4,10,20` and `2,3.5,5`), the burning-body scenes `body_fire_row`, `body_fire_row_night`, `body_fire_close`, `body_fire_out`, `body_fire_blast`, `body_fire_panic`, `body_fire_bird`, `body_fire_rain`, `body_fire_ragdoll` and `body_fire_player` (see "Burning bodies QA" below), `movement`, `inventory`, `ui_cycle`, `held_*`, and `creative_flight` with `VEYLON_GAME_MODE=creative`, which flies east at Shift speed and prints a `[flight]` streaming report at 29 s) |
+| `VEYLON_SCENE=<name>` | Stage a deterministic benchmark scene (`day`, `pinefog`, `nightfire`, `ruin`, `toxic`, `ao_shadow`, `phase4`, `ashwolf`, `silhouette30`, `vfx_blood`, `vfx_mining`, `vfx_beacon`, `death_ragdoll_showcase`, `death_ragdoll_sequence`, `dismember_showcase`, `dismember_wall`, `dismember_bomb` (a real scrap bomb thrown into a group of six, one outside the lethal radius; it goes off at 2.4 s), `dismember_species`, `dismember_species_wall` and `dismember_species_close` (every species, a guard and the player's remains blown apart at 1 s; open meadow, a step and a wall, and a close view of the small bodies), `molotov_ground`, `molotov_tree` and `molotov_rain` (a real fire bomb thrown at 0.5 s onto a dry clearing at dusk, beside a round tree that catches, or with rain from 3 s that puts the pool out; shots `0.7,1.2,3,7,11`, `1,4,10,20` and `2,3.5,5`), the burning-body scenes `body_fire_row`, `body_fire_row_night`, `body_fire_close`, `body_fire_out`, `body_fire_blast`, `body_fire_panic`, `body_fire_bird`, `body_fire_rain`, `body_fire_ragdoll` and `body_fire_player` (see "Burning bodies QA" below), `movement`, `inventory`, `ui_cycle`, `held_*`, `creative_flight` with `VEYLON_GAME_MODE=creative`, which flies east at Shift speed and prints a `[flight]` streaming report at 29 s, and the urban scenes `urban_streets`, `urban_intersection`, `urban_seam_walk`, `urban_fixtures` and `urban_fixtures_night` with `VEYLON_GENERATOR=urban-dev` (see "Urban planning QA" below)) |
 | `VEYLON_SHOT="5,10"` | Capture screenshots at those elapsed seconds |
 | `VEYLON_FRONTEND=<name>` | Pin a front-end screen (`options`, `audio`, `loading`, `death`, `victory`, `glyphs`, `newworld`). `newworld-save` shows the replace-save notice without writing a save. `pause` and `gamemode` stage a Survival world with the pause menu or the mode confirmation open; `pause-creative`, `gamemode-creative` and `victory-creative` stage a Creative world; `catalog`, `catalog-tools`, `catalog-search` (query "iron") and `catalog-inventory` open the Creative catalog; `worldcontrols` and `worldcontrols-held` open the Creative world controls, the second with dusk, a frozen clock, a locked storm and paused spawning already applied |
 | `VEYLON_RESOLUTION=1920x1080` | Framebuffer override |
@@ -58,6 +59,51 @@ Example:
 ```bash
 VEYLON_SEED=20260716 VEYLON_SCENE=day VEYLON_SHOT=6 ./gradlew run
 ```
+
+#### Isolated QA data
+
+Saves, settings and captures live in the data directory, which on Windows is the
+working directory — the checkout itself when you run from Gradle. Keep QA away
+from the real save slot:
+
+- Tests always run with `-Dveylon.dataDir=build/test-data/<task>`, set by
+  `build.gradle` for every `Test` task and checked by `SaveSlotIsolationTest`.
+- For a native QA session pass `-PveylonDataDir=build/qa/<name>` to `run`. The
+  game then reads and writes only there, including F5 saves.
+- `VEYLON_GENERATOR=urban-dev` refuses to start unless the data directory is
+  set and differs from the player's own (`AppPaths.isolatedFromPlayerData`).
+
+```powershell
+$env:VEYLON_GENERATOR='urban-dev'; $env:VEYLON_SEED='20260731'
+.\gradlew.bat run -PveylonDataDir=build/qa/urban
+```
+
+#### Urban planning QA
+
+The urban scenes need the street network (`VEYLON_GENERATOR=urban-dev`) and an
+isolated data directory; on any other world they print a notice and do nothing.
+Each prints `[urban-qa] plan ...` diagnostics for the four regions that meet at
+the origin (overlaps, parcel rules, routes and seams, all expected to be 0) and
+the spawn column.
+
+| Scene | What it shows |
+|---|---|
+| `urban_streets` | Eye level on a corner sidewalk, looking north up a local street to the avenue on the region edge |
+| `urban_intersection` | An elevated view of the avenue crossing where four regions meet at the origin |
+| `urban_seam_walk` | Real player movement east along a local street from x −40 to x 40, across the region seam at x 0; at 24 s it prints `[urban-qa] seam-walk ... pass=true` when the walk crossed the seam and at least four chunk borders without a collision, an unloaded column or a change of ground height |
+| `urban_fixtures` | Package 04's `FixtureShowcase` house beside the spawn: the facade (0–4 s); at 4 s the front door and a window are opened and the other window shattered through the production commands (facade again to 7 s); the door closed and seen from inside with its HUD prompt (7–10 s); the windows from inside (10–13 s); the stairs from their foot (13–16 s) and from the roof (16–19 s); at 19 s a real walk in through the front door and up the stairs, reporting `[urban-qa] fixtures-walk ... pass=true` at 32 s |
+| `urban_fixtures_night` | The same house at 23:00 with lanterns lit inside: facade, windows from inside, stairs, the door from inside (shots at 3, 6, 9 and 12 s) |
+
+```powershell
+$env:VEYLON_GENERATOR='urban-dev'; $env:VEYLON_SEED='20260731'
+$env:VEYLON_SCENE='urban_seam_walk'; $env:VEYLON_SHOT='3,9,14,25'
+.\gradlew.bat run -PveylonDataDir=build/qa/seam-walk
+```
+
+Keep a shot at or after 25 s for the walk, because the run closes after its last
+shot (33 s for `urban_fixtures`). Parcels are flat reserved lots until building
+generation arrives; the HUD still shows the legacy camp line and climate biome
+(packages 08, 13 and 21).
 
 For gameplay HUD work, use `VEYLON_SCENE=hud_showcase` with
 `VEYLON_SHOT=3,7,11,16` for bow draw, reload, thrown weapon and mining states.
@@ -83,6 +129,18 @@ and headless layout checks.
 5. If it is interactable, add a prompt case in `InteractPromptBuilder` and a
    handler case in `WorldInteractions.rightClick` /
    `WorldInteractions.interactWithTargetBlock`.
+6. Append its name to `SerializedEnumOrderTest.BLOCK_TYPE_ORDER`, and give it an
+   item form (an appended `ItemType` with `places`) or a written reason in
+   `CreativePalette.EXCLUDED` — `CreativePaletteTest` requires exactly one.
+   `UrbanMaterialsTest` builds the whole material registry headlessly
+   (`MaterialRegistry.census()`) and fails on a missing texture or material or on
+   more than `MAX_LAYERS` layers; a weathered or damaged look is a material
+   variant, not a new id.
+7. Urban blocks (appended after `CAGE_BARS`) follow package 04's salvage rule in
+   `FixtureActions`: a break yields at most the one item that places the block,
+   and is refused when that item, or a container's contents, would not fit. A new
+   door or window kind goes into `Fixtures.Kind` with its closed, open and broken
+   ids; lock and bar state then comes for free from `World.fixtures`.
 
 ### An item
 
