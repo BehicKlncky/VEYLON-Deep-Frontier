@@ -4,9 +4,9 @@ package com.veylon.world;
  * The one definition of where a thin fixture sits inside its cell, shared by
  * {@link ChunkMesher} and {@link Raycaster} so what the player sees is what the
  * crosshair hits. An open door or casement ({@link BlockType.Shape#LEAF}) is a
- * leaf along a jamb of the opening; a broken door or a
- * shattered window ({@link BlockType.Shape#PANE}) is a frame in the wall plane.
- * Both are non-solid, so the rest of the cell is open passage.
+ * leaf along a jamb of the opening. Closed doors, broken doors and shattered
+ * windows ({@link BlockType.Shape#PANE}) sit in the wall plane. Closed doors
+ * retain a solid cell for collision; the open and broken forms are passable.
  *
  * <p>The wall an opening sits in is read from its neighbours: the axis with
  * more solid or fixture cells beside the opening is the wall's direction, ties
@@ -16,6 +16,8 @@ public final class FixtureGeometry {
 
     /** Thickness of an open door or casement leaf. */
     public static final float LEAF_THICKNESS = 0.125f;
+    /** Thickness of a closed door panel, matching its open leaf. */
+    public static final float CLOSED_DOOR_THICKNESS = LEAF_THICKNESS;
     /** Thickness of a broken door or window frame. */
     public static final float PANE_THICKNESS = 0.10f;
 
@@ -84,7 +86,7 @@ public final class FixtureGeometry {
                 set(out, x, y, z + offset, x + 1, y + 1, z + offset + LEAF_THICKNESS);
             }
         } else {
-            float h = PANE_THICKNESS / 2f;
+            float h = (Fixtures.isClosedDoor(t) ? CLOSED_DOOR_THICKNESS : PANE_THICKNESS) / 2f;
             if (alongX) {
                 set(out, x, y, z + 0.5f - h, x + 1, y + 1, z + 0.5f + h);
             } else {
@@ -127,7 +129,7 @@ public final class FixtureGeometry {
                 z1 = z0 + LEAF_THICKNESS;
             }
         } else {
-            double h = PANE_THICKNESS / 2.0;
+            double h = (Fixtures.isClosedDoor(t) ? CLOSED_DOOR_THICKNESS : PANE_THICKNESS) / 2.0;
             if (alongX) {
                 x0 = x;
                 x1 = x + 1.0;

@@ -179,8 +179,8 @@ public final class Raycaster {
             if (hit && advanced && FixtureGeometry.isThin(type)
                     && !FixtureGeometry.rayHitsThin(world, x, y, z, type, ox, oy, oz, dx, dy, dz,
                     maxDist)) {
-                // An open door or a broken frame fills only a sliver of its
-                // cell: aim through the rest of the doorway at what lies beyond.
+                // Door panels, open leaves and broken frames fill only a sliver
+                // of their cells: target only the volume the mesher draws.
                 hit = false;
             }
             if (hit && advanced) {

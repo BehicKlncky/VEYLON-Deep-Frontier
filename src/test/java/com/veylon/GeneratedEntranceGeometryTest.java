@@ -51,6 +51,17 @@ class GeneratedEntranceGeometryTest {
                 new Vec3i(entrance.x2(), 41, entrance.z2())};
         for (Vec3i leaf : leaves) {
             assertTrue(castAt(game.world, leaf, entrance.facing(), .5f, true), "closed entrance is targetable");
+            for (int h = 0; h < 2; h++) {
+                int y = leaf.y() + h;
+                BlockType closed = game.world.getBlock(leaf.x(), y, leaf.z());
+                assertTrue(closed.solid && closed.opaque, "the thin panel still blocks movement and world light");
+                float[] box = new float[6];
+                assertTrue(FixtureGeometry.thinBox(game.world, leaf.x(), y, leaf.z(), closed, box));
+                int axis = alongX ? 2 : 0;
+                int coordinate = alongX ? leaf.z() : leaf.x();
+                assertEquals(coordinate + .5f - FixtureGeometry.CLOSED_DOOR_THICKNESS / 2, box[axis]);
+                assertEquals(coordinate + .5f + FixtureGeometry.CLOSED_DOOR_THICKNESS / 2, box[axis + 3]);
+            }
             game.player.pos.set(leaf.x() + .5f + entrance.facing().dx,
                     leaf.y(), leaf.z() + .5f + entrance.facing().dz);
             assertTrue(game.interactWithBlockAt(leaf));
@@ -87,6 +98,30 @@ class GeneratedEntranceGeometryTest {
         if (!outside) { direction.negate(); }
         Raycaster.Hit hit = Raycaster.cast(world, origin, direction, 2, false);
         return hit != null && hit.x() == cell.x() && hit.y() == cell.y() && hit.z() == cell.z();
+    }
+
+    @Test
+    void closedDoorSideTargetingHitsThePanelAndPassesItsFormerCubeFaces() {
+        for (BlockType type : new BlockType[]{BlockType.WOOD_DOOR, BlockType.METAL_DOOR}) {
+            for (boolean alongX : new boolean[]{true, false}) {
+                World world = new World(7, World.GEN_URBAN);
+                world.getOrCreateChunk(0, 0);
+                int dx = alongX ? 1 : 0, dz = alongX ? 0 : 1;
+                world.setBlock(8 - dx, 45, 8 - dz, BlockType.BRICK, false);
+                world.setBlock(8 + dx, 45, 8 + dz, BlockType.BRICK, false);
+                world.setBlock(8, 45, 8, type, false);
+                Vector3f direction = new Vector3f(dx, 0, dz);
+                Vector3f origin = new Vector3f(8.5f - dx, 45.5f, 8.5f - dz);
+                Raycaster.Hit panel = Raycaster.cast(world, origin, direction, 1, false);
+                assertNotNull(panel);
+                assertEquals(type, panel.type());
+                assertEquals(8, panel.x());
+                assertEquals(8, panel.z());
+                // A sideways ray in the front half-cell no longer targets a full cube face.
+                origin.add(alongX ? 0 : -.3f, 0, alongX ? -.3f : 0);
+                assertNull(Raycaster.cast(world, origin, direction, 1, false));
+            }
+        }
     }
 
     @Test

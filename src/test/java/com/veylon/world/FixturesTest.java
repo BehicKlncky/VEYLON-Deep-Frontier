@@ -185,7 +185,7 @@ class FixturesTest {
         assertEquals(FixtureGeometry.LEAF_THICKNESS, box[3], 1e-6f);
         assertEquals(0f, box[2]);
         assertEquals(1f, box[5]);
-        assertFalse(FixtureGeometry.thinBox(w, 0, Y, 0, BlockType.WOOD_DOOR, box), "a cube has no thin box");
+        assertFalse(FixtureGeometry.thinBox(w, 0, Y, 0, BlockType.BRICK, box), "a cube has no thin box");
 
         // A pane in a wall running along z faces x.
         for (int y = Y; y < Y + 2; y++) {

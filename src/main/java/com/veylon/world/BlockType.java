@@ -84,9 +84,9 @@ public enum BlockType {
     PLASTER("Plaster Wall", Shape.CUBE, true, true, false, 1.5f, ToolKind.PICKAXE, false, ItemType.PLASTER, 1, 0, 0f, 0.80f, 0.77f, 0.70f),
     SHEET_METAL("Sheet Metal", Shape.CUBE, true, true, false, 8.0f, ToolKind.PICKAXE, true, ItemType.SHEET_METAL, 1, 0, 0f, 0.45f, 0.48f, 0.50f),
     RUBBLE("Rubble", Shape.CUBE, true, true, false, 1.2f, ToolKind.PICKAXE, false, ItemType.GRAVEL, 1, 0, 0f, 0.50f, 0.48f, 0.45f),
-    WOOD_DOOR("Wooden Door", Shape.CUBE, true, true, true, 3.0f, ToolKind.AXE, false, null, 0, 0, 0f, 0.52f, 0.38f, 0.24f),
+    WOOD_DOOR("Wooden Door", Shape.PANE, true, true, true, 3.0f, ToolKind.AXE, false, null, 0, 0, 0f, 0.52f, 0.38f, 0.24f),
     WOOD_DOOR_OPEN("Wooden Door (open)", Shape.LEAF, false, false, true, 3.0f, ToolKind.AXE, false, null, 0, 0, 0f, 0.52f, 0.38f, 0.24f),
-    METAL_DOOR("Metal Door", Shape.CUBE, true, true, false, 9.0f, ToolKind.PICKAXE, true, null, 0, 0, 0f, 0.38f, 0.42f, 0.44f),
+    METAL_DOOR("Metal Door", Shape.PANE, true, true, false, 9.0f, ToolKind.PICKAXE, true, null, 0, 0, 0f, 0.38f, 0.42f, 0.44f),
     METAL_DOOR_OPEN("Metal Door (open)", Shape.LEAF, false, false, false, 9.0f, ToolKind.PICKAXE, true, null, 0, 0, 0f, 0.38f, 0.42f, 0.44f),
     BROKEN_DOOR("Broken Doorway", Shape.PANE, false, false, true, 0.6f, ToolKind.AXE, false, null, 0, 0, 0f, 0.36f, 0.28f, 0.20f),
     WINDOW("Window", Shape.CUBE, true, false, false, 0.4f, ToolKind.NONE, false, null, 0, 0, 0f, 0.62f, 0.72f, 0.78f),
@@ -107,7 +107,7 @@ public enum BlockType {
         NONE, CUBE, CROSS, LIQUID, TORCH, CAMPFIRE, PANEL, RACK, BASIN,
         /** An open door or casement: a thin leaf along one jamb ({@code FixtureGeometry}). */
         LEAF,
-        /** A thin panel in the wall plane: broken doors and shattered windows. */
+        /** A thin panel in the wall plane: closed/broken doors and shattered windows. */
         PANE,
         /** A table top on four legs over a full-cell collider. */
         TABLE

@@ -207,14 +207,19 @@ public class ChunkMesher {
     private boolean opaqueAt(int x, int y, int z) {
         int i = cidx(x, y, z);
         if (i < 0) {
-            return world.getBlock(x, y, z).opaque;
+            return occludesFace(world.getBlock(x, y, z));
         }
         byte v = solidCache[i];
         if (v == 0) {
-            v = world.getBlock(x, y, z).opaque ? (byte) 1 : (byte) 2;
+            v = occludesFace(world.getBlock(x, y, z)) ? (byte) 1 : (byte) 2;
             solidCache[i] = v;
         }
         return v == 1;
+    }
+
+    private static boolean occludesFace(BlockType block) {
+        // Thin closed doors still block world light, but leave the jamb faces visible.
+        return block.opaque && !FixtureGeometry.isThin(block);
     }
 
     private void ensureLight(int x, int y, int z, int i) {
@@ -252,9 +257,6 @@ public class ChunkMesher {
         int variant = m.variantOf(x, y, z);
         // Subtle per-block value jitter breaks up large same-material areas.
         float jitter = 0.95f + hash(x, y, z) * 0.1f;
-        // A closed door shows its lower or upper panel depending on the cell below.
-        int doorSide = Fixtures.isClosedDoor(t) ? doorLayer(t, x, y, z) : -1;
-
         for (int d = 0; d < 6; d++) {
             int[] n = NORMAL[d];
             int nx = x + n[0], ny = y + n[1], nz = z + n[2];
@@ -269,7 +271,7 @@ public class ChunkMesher {
             int layer = switch (d) {
                 case 0 -> m.topLayer[variant];
                 case 1 -> m.bottomLayer[variant];
-                default -> doorSide >= 0 ? doorSide : m.sideLayer[variant];
+                default -> m.sideLayer[variant];
             };
             int flags = 0;
             if (m.tint == TintMode.FOLIAGE || (m.tint == TintMode.GRASS_TOP && d == 0)) {
@@ -370,7 +372,7 @@ public class ChunkMesher {
                 : (upper ? "door_wood_upper" : "door_wood_lower"));
     }
 
-    /** Open leaves and broken frames, at exactly the box the raycast targets. */
+    /** Door panels, open leaves and broken frames, at exactly the box the raycast targets. */
     private void emitThin(BlockType t, int x, int y, int z) {
         if (!FixtureGeometry.thinBox(world, x, y, z, t, thinBox)) {
             return;
