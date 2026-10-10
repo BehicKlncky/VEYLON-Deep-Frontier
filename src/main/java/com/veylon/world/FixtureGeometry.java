@@ -4,7 +4,7 @@ package com.veylon.world;
  * The one definition of where a thin fixture sits inside its cell, shared by
  * {@link ChunkMesher} and {@link Raycaster} so what the player sees is what the
  * crosshair hits. An open door or casement ({@link BlockType.Shape#LEAF}) is a
- * leaf along the jamb on the low side of the opening; a broken door or a
+ * leaf along a jamb of the opening; a broken door or a
  * shattered window ({@link BlockType.Shape#PANE}) is a frame in the wall plane.
  * Both are non-solid, so the rest of the cell is open passage.
  *
@@ -44,6 +44,21 @@ public final class FixtureGeometry {
         return t.solid || Fixtures.isFixture(t) ? 1 : 0;
     }
 
+    /** Paired doors swing against their outer jambs rather than into the middle of the opening. */
+    private static boolean highJamb(World w, int x, int y, int z, BlockType t, boolean alongX) {
+        Fixtures.Kind kind = Fixtures.kindOf(t);
+        if (kind == null || !kind.door) { return false; }
+        int dx = alongX ? 1 : 0, dz = alongX ? 0 : 1;
+        // Another door leaf (including a broken partner) is part of the opening, not a jamb.
+        // The remaining leaf also stays against its jamb after its partner is removed.
+        return jamb(w.getBlock(x + dx, y, z + dz))
+                && !jamb(w.getBlock(x - dx, y, z - dz));
+    }
+
+    private static boolean jamb(BlockType t) {
+        return t.solid && !Fixtures.isFixture(t);
+    }
+
     /** True for the shapes whose visible and targetable volume is a thin box. */
     public static boolean isThin(BlockType t) {
         return t.shape == BlockType.Shape.LEAF || t.shape == BlockType.Shape.PANE;
@@ -61,11 +76,12 @@ public final class FixtureGeometry {
         }
         boolean alongX = wallAlongX(w, x, y, z);
         if (t.shape == BlockType.Shape.LEAF) {
-            // Swung open against the low jamb: perpendicular to the wall.
+            // Swung open against the jamb: perpendicular to the wall.
+            float offset = highJamb(w, x, y, z, t, alongX) ? 1f - LEAF_THICKNESS : 0f;
             if (alongX) {
-                set(out, x, y, z, x + LEAF_THICKNESS, y + 1, z + 1);
+                set(out, x + offset, y, z, x + offset + LEAF_THICKNESS, y + 1, z + 1);
             } else {
-                set(out, x, y, z, x + 1, y + 1, z + LEAF_THICKNESS);
+                set(out, x, y, z + offset, x + 1, y + 1, z + offset + LEAF_THICKNESS);
             }
         } else {
             float h = PANE_THICKNESS / 2f;
@@ -98,16 +114,17 @@ public final class FixtureGeometry {
         double x0, y0 = y, z0, x1, y1 = y + 1.0, z1;
         boolean alongX = wallAlongX(w, x, y, z);
         if (t.shape == BlockType.Shape.LEAF) {
+            double offset = highJamb(w, x, y, z, t, alongX) ? 1.0 - LEAF_THICKNESS : 0.0;
             if (alongX) {
-                x0 = x;
-                x1 = x + LEAF_THICKNESS;
+                x0 = x + offset;
+                x1 = x0 + LEAF_THICKNESS;
                 z0 = z;
                 z1 = z + 1.0;
             } else {
                 x0 = x;
                 x1 = x + 1.0;
-                z0 = z;
-                z1 = z + LEAF_THICKNESS;
+                z0 = z + offset;
+                z1 = z0 + LEAF_THICKNESS;
             }
         } else {
             double h = PANE_THICKNESS / 2.0;
