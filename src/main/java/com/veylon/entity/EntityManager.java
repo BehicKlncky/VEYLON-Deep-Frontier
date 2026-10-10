@@ -407,6 +407,12 @@ public class EntityManager {
         if (g.spawningPaused()) {
             return; // R25: natural spawning only; despawning above still runs.
         }
+        if (g.world.isUrban()) {
+            // Wildlife lands at surfaceHeight + 1, which in a city is a roof or a
+            // tree crown. Urban worlds spawn none until anchor-based encounters
+            // replace it (decision D-28).
+            return;
+        }
 
         int deer = 0, wolves = 0, birds = 0, hares = 0, thornhorns = 0, stalkers = 0;
         for (Creature c : creatures) {
@@ -442,10 +448,11 @@ public class EntityManager {
         int playerSurface = g.world.surfaceHeight((int) px, (int) pz);
         WorldGenerator.CaveZone playerZone = g.world.generator.caveZoneAt(
                 (int) px, (int) g.player.pos.y, (int) pz);
-        boolean playerInBasalt = g.world.generatorVersion >= World.GEN_CAVE_IDENTITIES
+        // Urban worlds have no Basalt depths: a basement under a roof is not one.
+        boolean playerInBasalt = World.hasCaveIdentities(g.world.generatorVersion)
                 ? (playerZone == WorldGenerator.CaveZone.BASALT
                 || playerZone == WorldGenerator.CaveZone.RESONANT)
-                : g.player.pos.y < playerSurface - 6;
+                : !g.world.isUrban() && g.player.pos.y < playerSurface - 6;
         if (playerInBasalt && stalkers < 2 && rng.nextFloat() < 0.4f) {
             trySpawnStalker(g, px, pz);
         }

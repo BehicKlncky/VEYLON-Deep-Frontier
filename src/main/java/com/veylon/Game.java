@@ -400,7 +400,15 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
     // ------------------------------------------------------------------
 
     public void newWorld(long seed, boolean fresh) {
-        newWorld(seed, fresh, World.CURRENT_GENERATOR);
+        newWorld(seed, fresh, World.DEFAULT_NEW_WORLD_GENERATOR);
+    }
+
+    public void newWorld(long seed, boolean fresh, int generatorVersion) {
+        newWorld(seed, fresh, generatorVersion, GameMode.SURVIVAL);
+    }
+
+    public void newWorld(long seed, boolean fresh, GameMode mode) {
+        newWorld(seed, fresh, World.DEFAULT_NEW_WORLD_GENERATOR, mode);
     }
 
     /**
@@ -408,12 +416,8 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
      * loading and by the QA harness. See {@link WorldBootstrap} for the reset
      * ordering it guarantees and the tests that pin it.
      */
-    public void newWorld(long seed, boolean fresh, int generatorVersion) {
-        bootstrap.newWorld(seed, fresh, generatorVersion);
-    }
-
-    public void newWorld(long seed, boolean fresh, GameMode mode) {
-        bootstrap.newWorld(seed, fresh, World.CURRENT_GENERATOR, mode);
+    public void newWorld(long seed, boolean fresh, int generatorVersion, GameMode mode) {
+        bootstrap.newWorld(seed, fresh, generatorVersion, mode);
     }
 
     public GameMode gameMode() { return gameModes.mode(); }

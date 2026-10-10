@@ -79,6 +79,10 @@ final class V3ExtensionSections {
         sections.add(new V3Section(BodiesSection.ID, BodiesSection.write(g)));
         sections.add(new V3Section(FragmentsSection.ID, FragmentsSection.write(g)));
         sections.add(new V3Section(RemainsSection.ID, RemainsSection.write(g)));
+        if (g.world.isUrban()) {
+            // Legacy saves stay byte-identical: the section exists only for urban worlds.
+            sections.add(new V3Section(UrbanMetaSection.ID, UrbanMetaSection.write(g)));
+        }
         out.writeInt(V3_SECTION_ENVELOPE_MAGIC);
         out.writeInt(sections.size());
         for (V3Section section : sections) {
@@ -314,6 +318,9 @@ final class V3ExtensionSections {
                 fragments = payload;
             } else if (RemainsSection.ID.equals(id)) {
                 remains = payload;
+
+            } else if (UrbanMetaSection.ID.equals(id)) {
+                UrbanMetaSection.read(payload, g);
             }
             // Unknown stable IDs are intentionally skipped using their bounded length.
         }

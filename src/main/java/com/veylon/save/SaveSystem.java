@@ -423,8 +423,10 @@ public final class SaveSystem {
             long seed = in.readLong();
             // v2 worlds keep their legacy terrain forever; v3 records the version.
             int generatorVersion = version >= 3 ? in.readInt() : com.veylon.world.World.GEN_LEGACY;
-            if (generatorVersion < World.GEN_LEGACY
-                    || generatorVersion > World.CURRENT_GENERATOR) {
+            // Checked before newWorld replaces anything. The version also fixes
+            // an urban world's layout revision, so geometry is never built under
+            // the wrong one; its content revision comes later, from urban.meta.
+            if (!World.isSupportedGenerator(generatorVersion)) {
                 throw new IOException("unsupported world generator version " + generatorVersion);
             }
             g.newWorld(seed, false, generatorVersion);
@@ -694,6 +696,7 @@ public final class SaveSystem {
                     readV3Extension(in, g);
                 }
             }
+            UrbanMetaSection.finishLoad(g);
             g.settlementManager.onWorldLoaded(g);
             return true;
         } catch (IOException ex) {

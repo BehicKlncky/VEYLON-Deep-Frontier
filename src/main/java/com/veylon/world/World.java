@@ -5,6 +5,7 @@ import com.veylon.settlement.Settlement;
 import com.veylon.settlement.SettlementBuilder;
 import com.veylon.settlement.SettlementPlanner;
 import com.veylon.util.Vec3i;
+import com.veylon.world.urban.UrbanWorldState;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -32,12 +33,22 @@ public class World {
     public static final int GEN_DEEP = 2;
     /** Release 0.3.0 generator with distinct Root/Basalt cave identities. */
     public static final int GEN_CAVE_IDENTITIES = 3;
-    public static final int CURRENT_GENERATOR = GEN_CAVE_IDENTITIES;
+    /**
+     * Urban-survival development generator, layout revision 1: the street datum
+     * alone ({@link com.veylon.world.urban.UrbanPlaceholderTerrain}). Used only by explicit development and QA paths.
+     */
+    public static final int GEN_URBAN = 4;
+    /** The generator of every ordinary new world; generator 3 until the urban rollout. */
+    public static final int DEFAULT_NEW_WORLD_GENERATOR = GEN_CAVE_IDENTITIES;
+    /** The highest generator version a save may name; a load rejects anything above it. */
+    public static final int MAX_SUPPORTED_GENERATOR = GEN_URBAN;
 
     public final long seed;
     /** Persisted in save v3; legacy (v2) saves always load as {@link #GEN_LEGACY}. */
     public final int generatorVersion;
     public final WorldGenerator generator;
+    /** Urban foundation state; present exactly when the generator is urban. */
+    public final UrbanWorldState urban;
     private final Map<Long, Chunk> chunks = new HashMap<>();
     /** Blocks set during gameplay, persisted in saves (value = BlockType ordinal). */
     public final Map<Vec3i, Byte> changedBlocks = new HashMap<>();
@@ -92,13 +103,51 @@ public class World {
     public Vec3i campPos;
 
     public World(long seed) {
-        this(seed, CURRENT_GENERATOR);
+        this(seed, DEFAULT_NEW_WORLD_GENERATOR);
     }
 
+    /**
+     * @throws IllegalArgumentException for a generator version this build cannot build
+     */
     public World(long seed, int generatorVersion) {
+        if (!isSupportedGenerator(generatorVersion)) {
+            throw new IllegalArgumentException("unsupported world generator version "
+                    + generatorVersion);
+        }
         this.seed = seed;
         this.generatorVersion = generatorVersion;
+        this.urban = isUrbanGenerator(generatorVersion)
+                ? new UrbanWorldState(seed, generatorVersion) : null;
         this.generator = new WorldGenerator(this, seed);
+    }
+
+    // Generator feature gates. Each names its versions explicitly rather than
+    // comparing with >= or <, so a newer generator inherits nothing by accident:
+    // the urban generator gets none of the wilderness features (decision D-02).
+
+    /** True for every generator version this build can build and load. */
+    public static boolean isSupportedGenerator(int version) {
+        return version == GEN_LEGACY || version == GEN_DEEP
+                || version == GEN_CAVE_IDENTITIES || isUrbanGenerator(version);
+    }
+
+    /** Generator 4: the urban street datum. */
+    public static boolean isUrbanGenerator(int version) {
+        return version == GEN_URBAN;
+    }
+
+    /** Generators 2 and 3: deep caves, underground POIs, cave mouths and settlements. */
+    public static boolean hasDeepFrontier(int version) {
+        return version == GEN_DEEP || version == GEN_CAVE_IDENTITIES;
+    }
+
+    /** Generator 3: depth-derived cave identities, fumaroles and Gloomstalker depths. */
+    public static boolean hasCaveIdentities(int version) {
+        return version == GEN_CAVE_IDENTITIES;
+    }
+
+    public boolean isUrban() {
+        return urban != null;
     }
 
     /**
@@ -106,7 +155,7 @@ public class World {
      * Safe to call from any chunk in any order; registration is idempotent.
      */
     public Settlement settlementForRegion(int rx, int rz) {
-        if (generatorVersion < GEN_DEEP) {
+        if (!hasDeepFrontier(generatorVersion)) {
             return null;
         }
         long key = Settlement.packId(rx, rz);
@@ -237,6 +286,18 @@ public class World {
             pendingGen.computeIfAbsent(key(cx, cz), k -> new ArrayList<>())
                     .add(new int[]{lx, y, lz, t.id(), soft ? 1 : 0});
         }
+    }
+
+    /**
+     * True when a column's chunk has been generated. Unlike
+     * {@link #surfaceHeight} this never generates anything, and unlike
+     * {@link #getBlock} it tells an unloaded column apart from open air, so
+     * placement, spawning and movement checks can refuse a column the world
+     * does not hold yet.
+     */
+    public boolean isColumnLoaded(int x, int z) {
+        Chunk c = getChunk(Math.floorDiv(x, 16), Math.floorDiv(z, 16));
+        return c != null && c.generated;
     }
 
     public BlockType getBlock(int x, int y, int z) {
@@ -592,7 +653,7 @@ public class World {
         // common thing in that volume while exposed sulfur underfoot is the
         // rarest. Testing air first paid three chunk lookups per cell to
         // reject; testing the floor first pays one.
-        if (generatorVersion < GEN_CAVE_IDENTITIES
+        if (!hasCaveIdentities(generatorVersion)
                 || getBlock(x, y - 1, z) != BlockType.SULFUR_ORE
                 || getBlock(x, y, z) != BlockType.AIR
                 || getBlock(x, y + 1, z) != BlockType.AIR

@@ -222,7 +222,7 @@ class CorruptSaveResilienceTest {
             throws IOException {
         Path save = fixture(dir, 40_113L);
         // magic + save version + seed = 16 bytes before generatorVersion.
-        Path futureGenerator = corrupt(dir, save, 16, World.CURRENT_GENERATOR + 1);
+        Path futureGenerator = corrupt(dir, save, 16, World.MAX_SUPPORTED_GENERATOR + 1);
         Game target = new Game();
         target.newWorld(91_338L, true);
         World liveWorld = target.world;

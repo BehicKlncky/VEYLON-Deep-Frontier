@@ -7,6 +7,8 @@ import com.veylon.save.SaveSystem;
 import com.veylon.simulation.WeatherSystem;
 import com.veylon.util.AppPaths;
 import com.veylon.world.BlockType;
+import com.veylon.world.World;
+import com.veylon.world.urban.UrbanRevision;
 
 import java.nio.file.Path;
 import java.util.Locale;
@@ -82,9 +84,13 @@ final class AutomatedRunDriver {
         frontendQa = frontendScreen != null && !frontendScreen.isBlank();
         boolean automated = smoke || (scene != null && !scene.isBlank())
                 || (shotEnv != null && !shotEnv.isBlank()) || frontendQa;
+        int generator = configuredGenerator(System.getenv("VEYLON_GENERATOR"),
+                AppPaths.isolatedFromPlayerData());
+        game.frontend.newWorldGenerator = generator;
 
         if (automated && !frontendQa) {
-            game.newWorld(game.sessionSeed, true, configuredGameMode(System.getenv("VEYLON_GAME_MODE")));
+            game.newWorld(game.sessionSeed, true, generator,
+                    configuredGameMode(System.getenv("VEYLON_GAME_MODE")));
             game.qa.applyBenchmarkScene(scene);
             game.appState = Game.AppState.PLAYING;
             game.window.captureCursor(true, game.input);
@@ -118,6 +124,35 @@ final class AutomatedRunDriver {
             throw new IllegalArgumentException("VEYLON_GAME_MODE must be survival or creative: " + configured,
                     invalid);
         }
+    }
+
+    /** The {@code VEYLON_GENERATOR} value that selects the urban development generator. */
+    static final String URBAN_DEVELOPMENT_GENERATOR = "urban-dev";
+
+    /**
+     * The development selector: {@code VEYLON_GENERATOR=urban-dev} makes NEW
+     * FRONTIER and automated worlds urban; unset keeps the ordinary default.
+     *
+     * <p>It refuses to run unless {@code veylon.dataDir} points away from the
+     * player's data directory, so a development world can never be saved over a
+     * real save. Invalid values fail explicitly, like {@code VEYLON_GAME_MODE}.
+     *
+     * @param isolatedDataDirectory {@link AppPaths#isolatedFromPlayerData()}
+     */
+    static int configuredGenerator(String configured, boolean isolatedDataDirectory) {
+        if (configured == null || configured.isBlank()) {
+            return World.DEFAULT_NEW_WORLD_GENERATOR;
+        }
+        if (!URBAN_DEVELOPMENT_GENERATOR.equals(configured.trim().toLowerCase(Locale.ROOT))) {
+            throw new IllegalArgumentException("VEYLON_GENERATOR must be "
+                    + URBAN_DEVELOPMENT_GENERATOR + " or unset: " + configured);
+        }
+        if (!isolatedDataDirectory) {
+            throw new IllegalStateException("VEYLON_GENERATOR=" + URBAN_DEVELOPMENT_GENERATOR
+                    + " needs an isolated data directory so it cannot replace a real save: run"
+                    + " with -Dveylon.dataDir=<dir> (Gradle: -PveylonDataDir=build/qa/<name>)");
+        }
+        return UrbanRevision.DEVELOPMENT_GENERATOR;
     }
 
     /** {@code VEYLON_SHOT="5,10"} captures the framebuffer at those elapsed seconds. */
@@ -244,7 +279,9 @@ final class AutomatedRunDriver {
     private void igniteStressStack() {
         int fx = (int) game.player.pos.x + 4;
         int fz = (int) game.player.pos.z + 4;
-        int fy = game.world.surfaceHeight(fx, fz) + 1;
+        // A city's column top may be a tree crown; its plan knows the ground.
+        int fy = (game.world.isUrban() ? game.world.urban.groundY(fx, fz)
+                : game.world.surfaceHeight(fx, fz)) + 1;
         game.world.setBlock(fx, fy, fz, BlockType.LOG, true);
         game.world.setBlock(fx, fy + 1, fz, BlockType.LOG, true);
         game.world.setBlock(fx + 1, fy, fz, BlockType.PLANK, true);

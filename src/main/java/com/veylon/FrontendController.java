@@ -7,6 +7,7 @@ import com.veylon.ui.AudioOptionsScreen;
 import com.veylon.ui.NewFrontierScreen;
 import com.veylon.ui.PresentationOverlay;
 import com.veylon.ui.TitleScreen;
+import com.veylon.world.World;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -39,6 +40,12 @@ final class FrontendController {
     private boolean loadingPresented;
     /** The mode chosen on the new-frontier screen; transient, consumed by one load. */
     private GameMode newWorldMode = GameMode.SURVIVAL;
+    /**
+     * The generator of NEW FRONTIER worlds and staged frontend captures for this
+     * session. Only the {@code VEYLON_GENERATOR} development selector changes it
+     * ({@code AutomatedRunDriver.configuredGenerator}).
+     */
+    int newWorldGenerator = World.DEFAULT_NEW_WORLD_GENERATOR;
     /** The single save slot. Visible for testing so routing tests use an isolated file. */
     Path savePath = SaveSystem.SAVE_PATH;
 
@@ -175,7 +182,7 @@ final class FrontendController {
         if (loadRequest == LoadRequest.LOAD_GAME) {
             loaded = SaveSystem.load(game, savePath);
         } else {
-            game.newWorld(game.sessionSeed, true, newWorldMode);
+            game.newWorld(game.sessionSeed, true, newWorldGenerator, newWorldMode);
             loaded = true;
         }
         loadRequest = null;
@@ -237,7 +244,8 @@ final class FrontendController {
     /**
      * Opens a specific screen for the VEYLON_FRONTEND QA captures. A
      * {@code -creative} suffix stages the world in Creative; {@code newworld-save}
-     * shows the replace notice without writing a save file.
+     * shows the replace notice without writing a save file. Staged worlds use the
+     * session's new-world generator, so the development selector applies to them too.
      */
     void openForQa(String screen) {
         GameMode qaMode = screen.endsWith("-creative") ? GameMode.CREATIVE : GameMode.SURVIVAL;
@@ -258,7 +266,7 @@ final class FrontendController {
             case "newworld" -> openNewFrontier(Files.exists(savePath));
             case "newworld-save" -> openNewFrontier(true);
             case "pause", "pause-creative", "gamemode", "gamemode-creative" -> {
-                game.newWorld(game.sessionSeed, true, qaMode);
+                game.newWorld(game.sessionSeed, true, newWorldGenerator, qaMode);
                 game.appState = Game.AppState.PLAYING;
                 game.uiMode = Game.UiMode.PAUSE;
                 if (screen.startsWith("gamemode")) {
@@ -266,17 +274,17 @@ final class FrontendController {
                 }
             }
             case "worldcontrols", "worldcontrols-held" -> {
-                game.newWorld(game.sessionSeed, true, GameMode.CREATIVE);
+                game.newWorld(game.sessionSeed, true, newWorldGenerator, GameMode.CREATIVE);
                 game.appState = Game.AppState.PLAYING;
                 game.creativeQa.openWorldControlsForQa(screen);
             }
             case "catalog", "catalog-tools", "catalog-search", "catalog-inventory" -> {
-                game.newWorld(game.sessionSeed, true, GameMode.CREATIVE);
+                game.newWorld(game.sessionSeed, true, newWorldGenerator, GameMode.CREATIVE);
                 game.appState = Game.AppState.PLAYING;
                 game.creativeQa.openCatalogForQa(screen);
             }
             case "death", "victory", "victory-creative" -> {
-                game.newWorld(game.sessionSeed, true, qaMode);
+                game.newWorld(game.sessionSeed, true, newWorldGenerator, qaMode);
                 game.appState = "death".equals(screen)
                         ? Game.AppState.DEATH : Game.AppState.VICTORY;
                 game.deathTimer = 30f;

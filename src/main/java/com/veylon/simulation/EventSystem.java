@@ -152,18 +152,19 @@ public class EventSystem implements SlowTickSystem {
      *   <tr><td>0.19 (+0.06 wet)</td><td>Berry bloom</td><td>average soil
      *       moisture above {@link EventConstants#BERRY_BLOOM_MIN_MOISTURE}</td>
      *       <td>none; drives {@link #berryMul()}</td></tr>
-     *   <tr><td>0.23</td><td>Predator migration</td><td>none</td><td>spawns
+     *   <tr><td>0.23</td><td>Predator migration</td><td>not an urban world</td><td>spawns
      *       {@link EventConstants#MIGRATION_WOLVES} hungry wolves on a ring
      *       around the player and raises the wolf cap</td></tr>
      *   <tr><td>0.27</td><td>Trader visit</td><td>camp trust above
-     *       {@link EventConstants#TRADER_MIN_TRUST} and the camp not hostile</td>
+     *       {@link EventConstants#TRADER_MIN_TRUST}, the camp not hostile and not an
+     *       urban world</td>
      *       <td>spawns a trader NPC with a leave timer, subject to the NPC
      *       budget</td></tr>
      *   <tr><td>0.30</td><td>Toxic fog</td><td>none</td><td>none here; the
      *       sickness and fog tint are read from {@link #toxicFog()}</td></tr>
      *   <tr><td>0.325</td><td>Ashfall</td><td>none</td><td>none here; drives
      *       {@link #growthMul()} and {@link #skyLightMul()}</td></tr>
-     *   <tr><td>0.345</td><td>Meteor shower</td><td>none</td><td>arms
+     *   <tr><td>0.345</td><td>Meteor shower</td><td>not an urban world</td><td>arms
      *       {@code meteorTimer}, so subsequent slow ticks carve craters until the
      *       event expires</td></tr>
      *   <tr><td>0.365</td><td>Predator raid</td><td>the starter camp exists</td>
@@ -175,7 +176,7 @@ public class EventSystem implements SlowTickSystem {
      *   <tr><td>0.405</td><td>Camp illness</td><td>see the exception above</td>
      *       <td>marks one healthy, non-trader, non-raider NPC sick; cleared by
      *       {@link #onCampCured()}</td></tr>
-     *   <tr><td>0.43</td><td>Lone meteor</td><td>none</td><td>carves a crater
+     *   <tr><td>0.43</td><td>Lone meteor</td><td>not an urban world</td><td>carves a crater
      *       with an ore core near the player and imposes the longer meteor
      *       cooldown; silently does nothing if the target chunk is unloaded</td>
      *       </tr>
@@ -197,8 +198,10 @@ public class EventSystem implements SlowTickSystem {
             }
         }
 
-        // Meteor showers keep dropping shards while active.
-        if (isActive(EventType.METEOR_SHOWER)) {
+        // Meteor showers keep dropping shards while active. A shower restored
+        // from a save into a city drops none: the crater would open on a roof
+        // (decision D-28), and new urban showers are never rolled.
+        if (isActive(EventType.METEOR_SHOWER) && !g.world.isUrban()) {
             meteorTimer -= dt;
             if (meteorTimer <= 0) {
                 meteorTimer = METEOR_INTERVAL_MIN + rng.nextInt(METEOR_INTERVAL_RANGE);
@@ -239,6 +242,16 @@ public class EventSystem implements SlowTickSystem {
     /** True when {@code type} is not already running. The common guard. */
     private static EventDefinition.Precondition idle(EventType type) {
         return (events, g) -> !events.isActive(type);
+    }
+
+    /**
+     * {@link #idle}, and never in an urban world: these events place wolves or
+     * meteors at the column top, which in a city is a roof (decision D-28). A
+     * legacy world's roll sequence is unchanged; an urban world's rejected roll
+     * falls through to the next rung like any other rejection.
+     */
+    private static EventDefinition.Precondition idleOffTheStreets(EventType type) {
+        return (events, g) -> !events.isActive(type) && !g.world.isUrban();
     }
 
     /**
@@ -285,7 +298,7 @@ public class EventSystem implements SlowTickSystem {
                             1f, "Berry bloom! Bushes regrow rapidly.")),
 
             EventDefinition.of(EventType.PREDATOR_MIGRATION, PREDATOR_MIGRATION_ROLL,
-                    idle(EventType.PREDATOR_MIGRATION),
+                    idleOffTheStreets(EventType.PREDATOR_MIGRATION),
                     (events, g) -> {
                         events.start(g, EventType.PREDATOR_MIGRATION,
                                 PREDATOR_MIGRATION_SECONDS, 1f,
@@ -298,7 +311,8 @@ public class EventSystem implements SlowTickSystem {
             // A camp that distrusts you, or has turned on you, sends no trader.
             EventDefinition.of(EventType.TRADER_VISIT, TRADER_VISIT_ROLL,
                     (events, g) -> !events.isActive(EventType.TRADER_VISIT)
-                            && g.faction.trust > TRADER_MIN_TRUST && !g.faction.hostile,
+                            && g.faction.trust > TRADER_MIN_TRUST && !g.faction.hostile
+                            && !g.world.isUrban(),
                     (events, g) -> {
                         events.start(g, EventType.TRADER_VISIT, TRADER_VISIT_SECONDS, 1f,
                                 "A wandering trader is approaching - look for them nearby "
@@ -319,7 +333,7 @@ public class EventSystem implements SlowTickSystem {
                             1f, "Ashfall darkens the sky. Plants choke under the grey dust.")),
 
             EventDefinition.of(EventType.METEOR_SHOWER, METEOR_SHOWER_ROLL,
-                    idle(EventType.METEOR_SHOWER),
+                    idleOffTheStreets(EventType.METEOR_SHOWER),
                     (events, g) -> {
                         events.start(g, EventType.METEOR_SHOWER,
                                 METEOR_SHOWER_SECONDS_MIN
@@ -362,9 +376,10 @@ public class EventSystem implements SlowTickSystem {
                     EventSystem::afflictCampWithIllness),
 
             // The bottom of the table: no "already active" guard, because a lone
-            // meteor is an instant, and every roll this far up is spent.
+            // meteor is an instant, and every roll this far up is spent. A city
+            // never takes it: the crater would open on a roof (decision D-28).
             EventDefinition.of(EventType.METEOR_SHARD, LONE_METEOR_ROLL,
-                    (events, g) -> true,
+                    (events, g) -> !g.world.isUrban(),
                     (events, g) -> events.meteorShard(g, true)));
 
     /** Makes one healthy camp resident sick, or does nothing if there is none. */
