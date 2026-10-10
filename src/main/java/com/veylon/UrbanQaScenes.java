@@ -36,6 +36,7 @@ final class UrbanQaScenes {
     /** Package 04: doors, windows and stairs ({@code urban_fixtures}, {@code urban_fixtures_night}). */
     private final UrbanFixtureQaScene fixtures;
     private final UrbanApartmentQaScene apartments;
+    private final UrbanLootQaScene loot;
     private final PlayerMovementSystem.Command walk = new PlayerMovementSystem.Command();
     private boolean holding;
     private float holdX;
@@ -62,6 +63,7 @@ final class UrbanQaScenes {
         this.game = game;
         this.fixtures = new UrbanFixtureQaScene(game);
         this.apartments = new UrbanApartmentQaScene(game);
+        this.loot = new UrbanLootQaScene(game);
     }
 
     /** Stages one of the urban scenes; inert, with a notice, outside a street-network world. */
@@ -93,6 +95,7 @@ final class UrbanQaScenes {
             case "urban_fixtures", "urban_fixtures_night" -> fixtures.stage(scene);
             case "urban_apartments", "urban_apartments_night", "urban_apartments_manual",
                  "urban_apartments_manual_night", "urban_apartments_lit_night" -> apartments.stage(scene);
+            case "urban_loot" -> loot.stage();
             default -> System.out.println("[urban-qa] unknown urban scene '" + scene + "'");
         }
     }
@@ -155,6 +158,7 @@ final class UrbanQaScenes {
     void update(double elapsed) {
         fixtures.update(elapsed);
         apartments.update(elapsed);
+        loot.update(elapsed);
         if (holding) {
             apply();
         }
