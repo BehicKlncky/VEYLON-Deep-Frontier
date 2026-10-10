@@ -86,6 +86,9 @@ final class V3ExtensionSections {
         if (g.world.isUrban()) {
             // Legacy saves stay byte-identical: the section exists only for urban worlds.
             sections.add(new V3Section(UrbanMetaSection.ID, UrbanMetaSection.write(g)));
+            if (com.veylon.world.urban.UrbanContainers.manages(g.world)) {
+                sections.add(new V3Section(UrbanContainersSection.ID, UrbanContainersSection.write(g)));
+            }
         }
         out.writeInt(V3_SECTION_ENVELOPE_MAGIC);
         out.writeInt(sections.size());
@@ -284,6 +287,7 @@ final class V3ExtensionSections {
         boolean restoredLanterns = false;
         byte[] fragments = null;
         byte[] remains = null;
+        byte[] containers = null;
         for (int i = 0; i < sectionCount; i++) {
             String id = in.readUTF();
             if (id.isBlank() || !seen.add(id)) {
@@ -326,10 +330,14 @@ final class V3ExtensionSections {
                 FixtureStatesSection.read(payload, g);
             } else if (UrbanMetaSection.ID.equals(id)) {
                 UrbanMetaSection.read(payload, g);
+            } else if (UrbanContainersSection.ID.equals(id)) {
+                containers = payload;
             }
             // Unknown stable IDs are intentionally skipped using their bounded length.
         }
         readSettledPieces(fragments, remains, g);
+        UrbanMetaSection.finishLoad(g);
+        if (containers != null) { UrbanContainersSection.read(containers,g); }
         if (restoredLanterns) {
             g.world.refreshLoadedLights();
         }

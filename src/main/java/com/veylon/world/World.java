@@ -405,8 +405,9 @@ public class World implements VoxelAccess {
             }
             return;
         }
-        c.set(lx, y, lz, t);
         Vec3i pos = new Vec3i(x, y, z);
+        if (urban != null && !urban.containers.changing(this,pos,old,t)) { return; }
+        c.set(lx, y, lz, t);
         if (old == BlockType.POWDER_KEG) {
             kegFuses.remove(pos);
             kegFusePlayerAttribution.remove(pos);

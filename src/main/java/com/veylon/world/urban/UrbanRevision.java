@@ -55,7 +55,7 @@ public final class UrbanRevision {
     public static final int BUILDING_TEMPLATE_SHAPED_STAIRS = 3;
 
     /** Content revision every new urban world records. */
-    public static final int CURRENT_CONTENT = 1;
+    public static final int CURRENT_CONTENT = 2;
     /** Oldest content revision this build still loads. */
     public static final int MIN_SUPPORTED_CONTENT = 1;
     /**

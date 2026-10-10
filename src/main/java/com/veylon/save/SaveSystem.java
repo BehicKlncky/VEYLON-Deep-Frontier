@@ -128,6 +128,9 @@ public final class SaveSystem {
         Path target = savePath.toAbsolutePath();
         Path temporary = null;
         try {
+            if (com.veylon.world.urban.UrbanContainers.manages(g.world)) {
+                g.world.urban.containers.prepareSave(g.world);
+            }
             Path parent = target.getParent();
             Files.createDirectories(parent);
             temporary = Files.createTempFile(parent, "veylon-save-", ".tmp");
@@ -697,6 +700,7 @@ public final class SaveSystem {
                 }
             }
             UrbanMetaSection.finishLoad(g);
+            UrbanContainersSection.finishLoad(g);
             g.settlementManager.onWorldLoaded(g);
             return true;
         } catch (IOException ex) {

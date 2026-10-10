@@ -54,6 +54,10 @@ public final class UrbanSalts {
     public static final long BUILDING_VARIANT = 0x5642_5549_4c44_5641L;
     /** Whether a revision-one walk-up has a first basement. */
     public static final long BUILDING_BASEMENT = 0x5642_5549_4c44_4241L;
+    /** Independent content-revision loot decisions, never layout or simulation RNG draws. */
+    public static final long LOOT_PRESENCE = 0x564c_4f4f_545f_5052L;
+    public static final long LOOT_COUNT = 0x564c_4f4f_545f_434eL;
+    public static final long LOOT_CONDITION = 0x564c_4f4f_545f_4344L;
 
     private UrbanSalts() {
     }

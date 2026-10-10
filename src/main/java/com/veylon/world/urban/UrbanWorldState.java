@@ -57,6 +57,8 @@ public final class UrbanWorldState {
     private final int buildingTemplateRevision;
     private final BoundedPlanCache<Long, BuildingPlan> buildingPlans;
     private int contentRevision = UNRESOLVED;
+    /** Persistent sparse state, separate from evictable pure plan caches. */
+    public final UrbanContainers containers = new UrbanContainers();
 
     /**
      * @throws IllegalArgumentException for a generator that is not urban
