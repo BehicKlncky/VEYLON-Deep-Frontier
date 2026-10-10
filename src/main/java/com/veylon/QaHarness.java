@@ -60,6 +60,7 @@ final class QaHarness {
     private final MolotovQaScene molotovScene;
     private final BodyFireQaScene bodyFireScene;
     private final HudQaScene hudScene;
+    private final UrbanQaScenes urbanScene;
 
     // Render statistics sampled across an automated run.
     private long profiledRenderFrames;
@@ -109,6 +110,7 @@ final class QaHarness {
         molotovScene = new MolotovQaScene(game);
         bodyFireScene = new BodyFireQaScene(game);
         hudScene = new HudQaScene(game);
+        urbanScene = new UrbanQaScenes(game);
     }
 
     // ------------------------------------------------------------------
@@ -275,6 +277,7 @@ final class QaHarness {
         molotovScene.update(elapsed);
         bodyFireScene.update(elapsed);
         hudScene.update(elapsed);
+        urbanScene.update(elapsed);
     }
 
     /**
@@ -770,6 +773,7 @@ final class QaHarness {
                 updateUiCycle(0);
             }
             case "creative_flight" -> game.creativeQa.stageFlightScene();
+            case "urban_streets", "urban_intersection", "urban_seam_walk" -> urbanScene.stage(normalized);
             default -> System.out.println("[scene] unknown VEYLON_SCENE '" + scene + "'");
         }
         System.out.println("[scene] applied benchmark scene '" + scene + "'");
