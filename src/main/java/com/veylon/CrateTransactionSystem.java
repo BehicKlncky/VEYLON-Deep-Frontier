@@ -67,6 +67,14 @@ final class CrateTransactionSystem {
         this.game = game;
     }
 
+    /** Blast/fire attribution captured from the actual container before removal. */
+    void onSurvivorStorageDestroyed(long ownerId) {
+        if (ownerId != com.veylon.world.urban.UrbanIds.NONE) {
+            game.settlementManager.addReputation(game,HumanFaction.FREE_SETTLERS,-15,
+                    "Destroying survivor storage harms your standing.");
+        }
+    }
+
     /** Clears theft bookkeeping so a new or loaded world starts unattributed. */
     void reset() {
         nextTheftEventId = 1;

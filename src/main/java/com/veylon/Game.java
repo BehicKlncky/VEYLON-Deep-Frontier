@@ -239,6 +239,9 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
     /** Eating, drinking, treating wounds and wearing gear. */
     final PlayerConsumables consumables = new PlayerConsumables(this);
 
+    /** Death transition, remains and respawn rules. */
+    private final PlayerLifeCycle lifeCycle = new PlayerLifeCycle(this);
+
     /** F-key and right-click handlers against world state, NPCs and stations. */
     final WorldInteractions interactions = new WorldInteractions(this);
 
@@ -924,42 +927,16 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
     public String crateTitle() { return crates.containerTitle(); }
     /** Blast/fire attribution captured from the actual container before its removal. */
     public void onSurvivorStorageDestroyed(long ownerId) {
-        if (ownerId != com.veylon.world.urban.UrbanIds.NONE) {
-            settlementManager.addReputation(this,com.veylon.settlement.HumanFaction.FREE_SETTLERS,-15,
-                    "Destroying survivor storage harms your standing.");
-        }
+        crates.onSurvivorStorageDestroyed(ownerId);
     }
 
     /** The player's one death transition; a lethal blast's also leaves the player's remains. */
     void enterDeathIfDue() {
-        if (player.dead && !player.abilities.invulnerable() && appState == AppState.PLAYING) {
-            appState = AppState.DEATH;
-            deathTimer = 3f;
-            fragments.spawnPlayerRemains(this, player);
-            closeScreens();
-        }
+        lifeCycle.enterDeathIfDue();
     }
 
     void respawn() {
-        if (player.abilities.invulnerable()) {
-            player.restoreCreativeBody();
-            return;
-        }
-        log("You died. The frontier reclaims you... (respawned at the crash site)");
-        player.dead = false;
-        player.clearBlastDeath();
-        combustion.clear(player);
-        player.health = 55;
-        player.hunger = Math.max(player.hunger, 50);
-        player.thirst = Math.max(player.thirst, 50);
-        player.bodyTemp = 37;
-        player.afflictions.clear();
-        player.smokeExposure = 0;
-        player.protein = Math.max(player.protein, 40);
-        player.vitamins = Math.max(player.vitamins, 40);
-        player.vel.set(0, 0, 0);
-        player.pos.set(spawnPos);
-        sleeping = false;
+        lifeCycle.respawn();
     }
 
     // ------------------------------------------------------------------
