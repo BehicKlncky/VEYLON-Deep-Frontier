@@ -51,8 +51,8 @@ class GeneratedApartmentStateTest {
         Vec3i cabinet = plan.fixtures().stream().filter(f -> f.kind() == BuildingPlan.FixtureKind.CONTAINER)
                 .findFirst().orElseThrow().position();
         assertTrue(original.openCrateAt(cabinet));
-        assertTrue(original.openCrate.isEmpty(), "07 has not rolled contents");
-        original.openCrate.add(ItemType.BANDAGE, 2);
+        assertTrue(original.crateSearching(), "07 searches on the normal simulation tick");
+        original.world.crateContents.get(cabinet).add(ItemType.BANDAGE, 2);
         original.closeScreens();
         original.world.setBlock(cabinet.x(), cabinet.y(), cabinet.z(), BlockType.AIR, true);
         assertFalse(original.world.crateContents.containsKey(cabinet));

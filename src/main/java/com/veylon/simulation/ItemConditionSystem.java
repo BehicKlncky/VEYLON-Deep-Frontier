@@ -33,10 +33,18 @@ public class ItemConditionSystem implements SlowTickSystem {
             tickInventory(g, g.player.inventory, envRate * dt, true);
         }
 
-        for (Map.Entry<Vec3i, Inventory> e : g.world.crateContents.entrySet()) {
+        for (var iterator = g.world.crateContents.entrySet().iterator(); iterator.hasNext();) {
+            Map.Entry<Vec3i, Inventory> e = iterator.next();
             Vec3i p = e.getKey();
             float crateTemp = g.temperature.envTempAt(g, p.x() + 0.5f, p.y() + 0.5f, p.z() + 0.5f);
             tickInventory(g, e.getValue(), spoilRate(crateTemp) * dt, false);
+            if (com.veylon.world.urban.UrbanContainers.manages(g.world) && e.getValue().isEmpty()) {
+                var entry = g.world.urban.containers.at(p);
+                if (entry != null && entry.state.revealed()) {
+                    entry.state = com.veylon.world.urban.UrbanContainers.State.EMPTY;
+                }
+                if (g.world.urban.contentRevision() != 1) { iterator.remove(); }
+            }
         }
 
         tickRacks(g, dt);

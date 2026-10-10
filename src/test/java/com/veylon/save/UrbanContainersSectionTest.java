@@ -128,6 +128,37 @@ class UrbanContainersSectionTest {
     }
 
     @Test
+    void coreUrbanInventoriesRejectOversizedDuplicateAndInvalidStacksBeforePublication() throws Exception {
+        var f=UrbanLootFixture.create(BuildingPlan.Variant.INTACT); Game g=f.game();
+        g.world.urban.containers.touch(g.world,f.position());
+        Path save=directory.resolve("core-good.sav"); assertTrue(SaveSystem.save(g,save));
+        byte[] good=Files.readAllBytes(save);
+        byte[] marker=ByteBuffer.allocate(16).putInt(f.position().x()).putInt(f.position().y()).putInt(f.position().z()).putInt(12).array();
+        int offset=-1;
+        for (int i=0;i<=good.length-marker.length;i++) {
+            if (Arrays.equals(marker,Arrays.copyOfRange(good,i,i+marker.length))) {
+                assertEquals(-1,offset,"unique core inventory marker"); offset=i;
+            }
+        }
+        assertTrue(offset>=4); assertEquals(1,ByteBuffer.wrap(good).getInt(offset-4));
+        byte[][] bad={good.clone(),good.clone(),good.clone(),good.clone(),good.clone(),new byte[good.length+256]};
+        ByteBuffer.wrap(bad[0]).putInt(offset+12,13);
+        ByteBuffer.wrap(bad[1]).putInt(offset-4,UrbanContainers.MAX_ENTRIES+1);
+        ByteBuffer.wrap(bad[2]).putInt(offset+16,9999);
+        ByteBuffer.wrap(bad[3]).putInt(offset+20,0);
+        ByteBuffer.wrap(bad[4]).putFloat(offset+28,Float.NaN);
+        System.arraycopy(good,0,bad[5],0,offset+256);
+        System.arraycopy(good,offset,bad[5],offset+256,256);
+        System.arraycopy(good,offset+256,bad[5],offset+512,good.length-offset-256);
+        ByteBuffer.wrap(bad[5]).putInt(offset-4,2);
+        World preserved=g.world;
+        for (int i=0;i<bad.length;i++) {
+            Path corrupt=directory.resolve("core-bad-"+i+".sav"); Files.write(corrupt,bad[i]);
+            assertFalse(SaveSystem.load(g,corrupt),"core corruption "+i); assertSame(preserved,g.world);
+        }
+    }
+
+    @Test
     void ledgerCapacityRejectsMutationBeforeChangingBlocksOrContents() {
         var f=UrbanLootFixture.create(BuildingPlan.Variant.INTACT); Game g=f.game();
         var state=g.world.urban.containers;

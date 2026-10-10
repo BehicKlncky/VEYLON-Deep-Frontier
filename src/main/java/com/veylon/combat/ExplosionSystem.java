@@ -266,7 +266,11 @@ public class ExplosionSystem {
                     if (strength < blastResistance(t)) {
                         continue;
                     }
+                    long urbanOwner = byPlayer && com.veylon.world.Fixtures.isContainer(t)
+                            ? com.veylon.world.urban.UrbanContainers.survivorOwner(g.world,new Vec3i(bx,by,bz)) : 0;
                     g.world.setBlock(bx, by, bz, BlockType.AIR, true);
+                    if (g.world.getBlock(bx,by,bz) == t) { continue; }
+                    g.onSurvivorStorageDestroyed(urbanOwner);
                     collectBlockConsequence(g, bx, by, bz, t, byPlayer);
                     destroyed++;
                     if (destroyed <= 24 && rng.nextFloat() < 0.4f) {

@@ -127,14 +127,18 @@ final class UrbanContainersSection {
         for (int i=0;i<inventory.size();i++) {
             var stack=inventory.get(i);
             if (stack==null) { continue; }
-            var weapon=com.veylon.combat.WeaponRegistry.of(stack.type);
-            if (stack.count<=0 || stack.count>stack.type.maxStack || !Float.isFinite(stack.durability)
-                    || !Float.isFinite(stack.freshness) || stack.durability< -1
-                    || stack.durability>stack.type.maxDurability || stack.freshness< -1
-                    || stack.freshness>stack.type.spoilSeconds || stack.charge<0
-                    || stack.charge>(weapon==null ? 0 : weapon.magazine)) {
-                throw new IOException("invalid urban inventory stack metadata");
-            }
+            validateStack(stack);
+        }
+    }
+
+    static void validateStack(com.veylon.item.ItemStack stack) throws IOException {
+        var weapon=com.veylon.combat.WeaponRegistry.of(stack.type);
+        if (stack.count<=0 || stack.count>stack.type.maxStack || !Float.isFinite(stack.durability)
+                || !Float.isFinite(stack.freshness)
+                || (stack.type.hasDurability() ? stack.durability<0 || stack.durability>stack.type.maxDurability : stack.durability!= -1)
+                || (stack.type.spoils() ? stack.freshness<0 || stack.freshness>stack.type.spoilSeconds : stack.freshness!= -1)
+                || stack.charge<0 || stack.charge>(weapon==null ? 0 : weapon.magazine)) {
+            throw new IOException("invalid urban inventory stack metadata");
         }
     }
 

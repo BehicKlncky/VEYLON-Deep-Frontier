@@ -611,6 +611,7 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
 
 
     public void closeScreens() {
+        crates.closeSearch();
         if (player != null && player.abilities.instantBuild()) blockActions.reset();
         uiMode = UiMode.NONE;
         openCrate = null;
@@ -905,10 +906,28 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
     public int transferCrateItemToPlayer(int slot) {
         return crates.transferCrateItemToPlayer(slot);
     }
+    public int transferCrateItemToPlayer(int slot, int count) {
+        return crates.transferCrateItemToPlayer(slot,count);
+    }
 
     /** Real crate-UI deposit command; returned supplies are attributed by crate position. */
     public int transferPlayerItemToCrate(int slot) {
         return crates.transferPlayerItemToCrate(slot);
+    }
+    public int transferPlayerItemToCrate(int slot, int count) {
+        return crates.transferPlayerItemToCrate(slot,count);
+    }
+
+    public boolean crateSearching() { return crates.searching(); }
+    public float crateSearchProgress() { return crates.searchProgress(); }
+    public String crateStatus() { return crates.storageStatus(); }
+    public String crateTitle() { return crates.containerTitle(); }
+    /** Blast/fire attribution captured from the actual container before its removal. */
+    public void onSurvivorStorageDestroyed(long ownerId) {
+        if (ownerId != com.veylon.world.urban.UrbanIds.NONE) {
+            settlementManager.addReputation(this,com.veylon.settlement.HumanFaction.FREE_SETTLERS,-15,
+                    "Destroying survivor storage harms your standing.");
+        }
     }
 
     /** The player's one death transition; a lethal blast's also leaves the player's remains. */
@@ -953,6 +972,7 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
         combustion.fastTick(this, dt);
         entities.fastTick(this, dt);
         settlementManager.fastTick(this, dt);
+        crates.fastTick(dt);
     }
 
     @Override

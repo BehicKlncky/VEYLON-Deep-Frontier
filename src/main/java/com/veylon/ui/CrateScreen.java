@@ -10,6 +10,7 @@ import com.veylon.world.Fixtures;
 import java.util.Locale;
 
 import static org.lwjgl.glfw.GLFW.GLFW_MOUSE_BUTTON_LEFT;
+import static org.lwjgl.glfw.GLFW.GLFW_MOUSE_BUTTON_RIGHT;
 
 /** Storage crate UI: click an item to transfer it between crate and inventory. */
 public class CrateScreen {
@@ -18,7 +19,7 @@ public class CrateScreen {
 
     public void update(Game g) {
         Inventory crate = g.openCrate;
-        if (crate == null) {
+        if (g.openCratePos == null) {
             return;
         }
         UiRenderer ui = g.ui;
@@ -28,24 +29,30 @@ public class CrateScreen {
         float x0 = w / 2f - pw / 2f, y0 = h / 2f - ph / 2f;
         ui.panel(x0, y0, pw, ph);
         ui.textCentered(w / 2f, y0 + 10, 2f, title(g), 1f, 1f, 1f, 1f);
-        ui.textCentered(w / 2f, y0 + ph - 22, 1.2f, "Click an item to transfer it. [F or Esc] close",
+        ui.textCentered(w / 2f, y0 + ph - 22, 1.2f, "Left click: stack. Right click: one. [F or Esc] close.",
                 0.7f, 0.7f, 0.7f, 1f);
 
         double mx = g.input.cursorX(), my = g.input.cursorY();
         boolean click = g.input.wasMousePressed(GLFW_MOUSE_BUTTON_LEFT);
+        boolean single = g.input.wasMousePressed(GLFW_MOUSE_BUTTON_RIGHT);
 
         // Crate grid: 4x3.
-        ui.textShadow(x0 + 20, y0 + 42, 1.4f, "Crate", 0.9f, 0.85f, 0.6f, 1f);
+        ui.textShadow(x0 + 20, y0 + 42, 1.1f, g.crateStatus(), 0.9f, 0.85f, 0.6f, 1f);
         int moveFromCrate = drawGrid(g, ui, crate, x0 + 20, y0 + 62, 4, mx, my);
+        if (g.crateSearching()) {
+            ui.textShadow(x0 + 250, y0 + 95, 1.2f, "Rummaging makes noise.", 0.95f, 0.8f, 0.55f, 1f);
+            ui.textShadow(x0 + 250, y0 + 120, 1.2f, "Stay close. The world keeps moving.", 0.8f, 0.85f, 0.9f, 1f);
+            ui.textShadow(x0 + 250, y0 + 145, 1.2f, "Closing keeps your progress.", 0.8f, 0.85f, 0.9f, 1f);
+        }
         // Player grid: 9x4 (smaller slots).
         ui.textShadow(x0 + 20, y0 + 232, 1.4f, "Your inventory", 0.7f, 0.85f, 0.95f, 1f);
         int moveFromPlayer = drawGridSmall(g, ui, g.player.inventory, x0 + 20, y0 + 252, 9, mx, my);
 
-        if (click) {
+        if ((click || single) && !g.crateSearching()) {
             if (moveFromCrate >= 0) {
-                g.transferCrateItemToPlayer(moveFromCrate);
+                g.transferCrateItemToPlayer(moveFromCrate,single ? 1 : Integer.MAX_VALUE);
             } else if (moveFromPlayer >= 0) {
-                g.transferPlayerItemToCrate(moveFromPlayer);
+                g.transferPlayerItemToCrate(moveFromPlayer,single ? 1 : Integer.MAX_VALUE);
             }
         }
     }
@@ -53,14 +60,14 @@ public class CrateScreen {
     private int drawGrid(Game g, UiRenderer ui, Inventory inv, float x0, float y0, int cols,
                          double mx, double my) {
         int hover = -1;
-        for (int i = 0; i < inv.size(); i++) {
+        for (int i = 0; i < (inv == null ? 12 : inv.size()); i++) {
             float x = x0 + (i % cols) * SLOT;
             float y = y0 + (i / cols) * SLOT;
             boolean inside = mx >= x && mx < x + SLOT && my >= y && my < y + SLOT;
             if (inside) {
                 hover = i;
             }
-            drawSlot(ui, inv.get(i), x, y, SLOT, inside);
+            drawSlot(ui, inv == null ? null : inv.get(i), x, y, SLOT, inside);
         }
         return hover;
     }
@@ -91,6 +98,7 @@ public class CrateScreen {
 
     /** The open container's name: "STORAGE CRATE", or the cabinet, shelving or locker being searched. */
     private static String title(Game g) {
+        if (g.crateTitle() != null) { return g.crateTitle(); }
         BlockType t = g.openCratePos == null ? BlockType.CRATE
                 : g.world.getBlock(g.openCratePos.x(), g.openCratePos.y(), g.openCratePos.z());
         return t == BlockType.CRATE || !Fixtures.isUrbanContainer(t)

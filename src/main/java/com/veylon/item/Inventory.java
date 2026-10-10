@@ -60,7 +60,8 @@ public class Inventory {
         if (type.maxStack > 1) {
             for (int i = 0; i < slots.length && stack.count > 0; i++) {
                 ItemStack s = slots[i];
-                if (s != null && s.type == type && s.count < type.maxStack) {
+                if (s != null && s != stack && s.type == type && s.count < type.maxStack
+                        && s.durability == stack.durability && s.charge == stack.charge) {
                     int move = Math.min(stack.count, type.maxStack - s.count);
                     // Mixed freshness merges to the count-weighted average.
                     if (type.spoils()) {

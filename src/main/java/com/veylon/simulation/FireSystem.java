@@ -222,7 +222,10 @@ public class FireSystem implements MediumTickSystem {
                     case LOG, PLANK, WALL, WORKBENCH, CRATE -> BlockType.ASH;
                     default -> BlockType.AIR;
                 };
+                long urbanOwner = burn.byPlayer && com.veylon.world.Fixtures.isContainer(t)
+                        ? com.veylon.world.urban.UrbanContainers.survivorOwner(g.world,p) : 0;
                 g.world.setBlock(p.x(), p.y(), p.z(), result, true);
+                if (g.world.getBlock(p.x(),p.y(),p.z()) != t) { g.onSurvivorStorageDestroyed(urbanOwner); }
                 it.remove();
                 burn.out = true;
             }

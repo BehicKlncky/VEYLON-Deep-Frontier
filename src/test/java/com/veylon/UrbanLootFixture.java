@@ -11,6 +11,7 @@ public record UrbanLootFixture(Game game, BuildingPlan building, BuildingPlan.Fi
     public static UrbanLootFixture create(BuildingPlan.Variant variant) {
         Game game=new Game();
         game.newWorld(20260731,true,World.GEN_URBAN_SHAPED_STAIRS,GameMode.SURVIVAL);
+        game.appState=Game.AppState.PLAYING;
         for (var parcel : game.world.urban.regionPlan(0,0).parcels()) {
             BuildingPlan building=game.world.urban.buildingAt(parcel.x0(),parcel.z0());
             if (building.variant()!=variant) { continue; }

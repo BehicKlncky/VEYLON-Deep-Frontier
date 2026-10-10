@@ -67,6 +67,15 @@ public final class UrbanContainers {
     public Collection<Entry> entries() { return Collections.unmodifiableCollection(entries.values()); }
     public Entry byId(long id) { return entries.get(id); }
     public Entry at(Vec3i position) { return active.get(position); }
+    /** Attribution before destruction, without rolling contents or allocating an inventory. */
+    public static long survivorOwner(World world, Vec3i position) {
+        if (!manages(world)) { return UrbanIds.NONE; }
+        Entry entry=world.urban.containers.at(position);
+        if (entry!=null) { return entry.owner==Owner.SURVIVOR ? entry.ownerId : UrbanIds.NONE; }
+        Planned plan=planned(world,position);
+        return plan!=null && !world.urban.containers.entries.containsKey(plan.fixture.id())
+                && plan.building.variant()==BuildingPlan.Variant.OCCUPIED ? plan.building.id() : UrbanIds.NONE;
+    }
     public static boolean manages(World world) {
         return world.urban != null && world.urban.hasGeneratedBuildings();
     }

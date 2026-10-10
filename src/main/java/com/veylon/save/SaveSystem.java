@@ -511,11 +511,16 @@ public final class SaveSystem {
 
             // Crates.
             Map<Vec3i, Inventory> crates = new HashMap<>();
-            int nCrates = readCount(in, "crate");
+            boolean urbanStorage = com.veylon.world.urban.UrbanContainers.manages(g.world);
+            int nCrates = readCount(in, "crate",urbanStorage
+                    ? com.veylon.world.urban.UrbanContainers.MAX_ENTRIES : MAX_SERIALIZED_ENTRIES);
             for (int i = 0; i < nCrates; i++) {
                 Vec3i pos = readVec(in);
+                if (urbanStorage && (pos.y() < 0 || pos.y() >= com.veylon.world.Chunk.SY || crates.containsKey(pos))) {
+                    throw new IOException("invalid or duplicate urban crate position");
+                }
                 Inventory inv = new Inventory(12);
-                readInventory(in, inv, version);
+                readInventory(in, inv, version,urbanStorage);
                 crates.put(pos, inv);
             }
             g.world.crateContents.clear();
@@ -1088,6 +1093,10 @@ public final class SaveSystem {
     }
 
     private static ItemStack readStack(DataInputStream in, int version) throws IOException {
+        return readStack(in,version,false);
+    }
+
+    private static ItemStack readStack(DataInputStream in, int version, boolean urbanStorage) throws IOException {
         int ord = in.readInt();
         int count = in.readInt();
         float durability = in.readFloat();
@@ -1095,12 +1104,16 @@ public final class SaveSystem {
         int charge = version >= 3 ? in.readInt() : 0;
         ItemType[] types = ItemType.values();
         if (ord < 0 || ord >= types.length || count <= 0) {
+            if (urbanStorage && (ord != -1 || count != 0 || durability != 0 || freshness != 0 || charge != 0)) {
+                throw new IOException("invalid urban item stack");
+            }
             return null;
         }
         ItemStack s = new ItemStack(types[ord], count);
         s.durability = durability;
         s.freshness = freshness;
         s.charge = charge;
+        if (urbanStorage) { UrbanContainersSection.validateStack(s); }
         return s;
     }
 
@@ -1113,9 +1126,15 @@ public final class SaveSystem {
 
     private static void readInventory(DataInputStream in, Inventory inv, int version)
             throws IOException {
-        int size = readCount(in, "inventory slot", PlayerConstants.INVENTORY_SLOTS);
+        readInventory(in,inv,version,false);
+    }
+
+    private static void readInventory(DataInputStream in, Inventory inv, int version, boolean urbanStorage)
+            throws IOException {
+        int size = readCount(in, "inventory slot", urbanStorage ? 12 : PlayerConstants.INVENTORY_SLOTS);
+        if (urbanStorage && size != 12) { throw new IOException("invalid urban inventory capacity"); }
         for (int i = 0; i < size; i++) {
-            ItemStack stack = readStack(in, version);
+            ItemStack stack = readStack(in, version,urbanStorage);
             if (i < inv.size()) {
                 inv.set(i, stack);
             }

@@ -8,6 +8,10 @@ import com.veylon.settlement.SettlementManager;
 import com.veylon.util.Vec3i;
 import com.veylon.world.BlockType;
 import com.veylon.world.Fixtures;
+import com.veylon.world.urban.LootTables;
+import com.veylon.world.urban.UrbanContainers;
+import com.veylon.world.urban.BuildingFurnishing;
+import com.veylon.settlement.HumanFaction;
 
 /**
  * Opening crates and moving items in and out of them, including the crime
@@ -53,6 +57,11 @@ final class CrateTransactionSystem {
      * crates keep their rules (D-12).
      */
     private Vec3i openUrbanContainer;
+    private UrbanContainers.Entry openEntry;
+    private float searchDuration;
+    private float searchHealth;
+    private float rummageCooldown;
+    private String containerTitle;
 
     CrateTransactionSystem(Game game) {
         this.game = game;
@@ -65,12 +74,46 @@ final class CrateTransactionSystem {
         activeTheftEventCrate = null;
         activeTheftTransferCount = 0;
         openUrbanContainer = null;
+        closeSearch();
     }
 
     /** Opens a real world crate or urban container; both RMB/F interaction paths use this command. */
     boolean openCrateAt(Vec3i pos) {
         if (pos == null || !Fixtures.isContainer(game.world.getBlock(pos.x(), pos.y(), pos.z()))) {
             return false;
+        }
+        if (UrbanContainers.manages(game.world)) {
+            var entry = game.world.urban.containers.touch(game.world,pos);
+            if (entry == null) {
+                game.log("This container cannot be changed: the world's storage record is full.");
+                return false;
+            }
+            openEntry = entry;
+            var plan = entry.id > 0 ? UrbanContainers.planned(game.world,pos) : null;
+            containerTitle = plan == null ? entry.block.displayName : switch (BuildingFurnishing.containerUse(plan.building(),plan.fixture())) {
+                case KITCHEN_CABINET -> "Kitchen cupboard";
+                case FRIDGE -> "Fridge shelf";
+                case PANTRY_SHELF -> "Pantry shelf";
+                case BATHROOM_CABINET -> "Bathroom cabinet";
+                case WARDROBE -> "Wardrobe";
+                case DRESSER_DESK -> "Dresser";
+                case UTILITY_LOCKER -> "Utility locker";
+                case SHOP_SHELF -> "Shop shelf";
+                case STOCKROOM_CRATE -> "Supply cupboard";
+            };
+            if (plan != null && plan.table() == LootTables.Table.SECURED) { containerTitle = "Secured supply locker"; }
+            containerTitle = containerTitle.toUpperCase(java.util.Locale.ROOT);
+            searchHealth = game.player.health;
+            rummageCooldown = 0;
+            if (!entry.state.revealed()) {
+                searchDuration = LootTables.searchSeconds(plan.table());
+                entry.state = UrbanContainers.State.SEARCHING;
+            }
+            game.openCrate = entry.state.revealed() ? game.world.crateContents.get(pos) : null;
+            game.openCratePos = pos;
+            game.uiMode = Game.UiMode.CRATE;
+            openUrbanContainer = null;
+            return true;
         }
         game.settlementManager.onRestrictedStorageOpened(game, pos);
         game.openCrate = game.world.crateContents.computeIfAbsent(
@@ -87,6 +130,20 @@ final class CrateTransactionSystem {
      * that is gone: no longer that furniture, or no longer holding this inventory.
      */
     private boolean openUrbanContainerGone() {
+        if (openEntry != null) {
+            Vec3i p = openEntry.position;
+            if (game.uiMode == Game.UiMode.CRATE && p.equals(game.openCratePos)
+                    && game.world.isColumnLoaded(p.x(),p.z())
+                    && game.world.urban.containers.at(p) == openEntry
+                    && game.world.getBlock(p.x(),p.y(),p.z()) == openEntry.block
+                    && !game.player.dead && game.player.health >= searchHealth
+                    && p.distSq(game.player.pos.x,game.player.pos.y,game.player.pos.z) <= 25) {
+                return false;
+            }
+            game.closeScreens();
+            game.log("Search interrupted. Your progress is kept.");
+            return true;
+        }
         Vec3i p = openUrbanContainer;
         if (p == null || !p.equals(game.openCratePos)) {
             return false;
@@ -99,6 +156,58 @@ final class CrateTransactionSystem {
         game.closeScreens();
         game.log("There is nothing left to search.");
         return true;
+    }
+
+    /** Transient session target only; durable progress remains on the world entry. */
+    void closeSearch() {
+        openEntry = null;
+        rummageCooldown = 0;
+        searchDuration = 0;
+        containerTitle = null;
+    }
+
+    /** Runs on the normal fast simulation tick; CRATE never pauses threats, needs or fire. */
+    void fastTick(float dt) {
+        if (openEntry == null || openUrbanContainerGone()) { return; }
+        searchHealth = game.player.health;
+        if (!openEntry.state.revealed()) {
+            openEntry.progress += dt;
+            rummageCooldown -= dt;
+            if (rummageCooldown <= 0) {
+                rummageCooldown = 1;
+                Vec3i p = openEntry.position;
+                game.noise.emit(game,p.x()+.5f,p.y()+.5f,p.z()+.5f,12,.3f,"rummage",true,game.player);
+                game.audio.playBlockHit(openEntry.block,p.x()+.5f,p.y()+.5f,p.z()+.5f);
+            }
+            if (openEntry.progress >= searchDuration) {
+                openEntry.progress = 0;
+                openEntry.state = UrbanContainers.State.SEARCHED;
+                game.world.urban.containers.compact(game.world,openEntry);
+            }
+        }
+        game.openCrate = openEntry.state.revealed() ? game.world.crateContents.get(openEntry.position) : null;
+    }
+
+    boolean searching() { return openEntry != null && !openEntry.state.revealed(); }
+    String containerTitle() { return containerTitle; }
+    float searchProgress() { return searching() ? Math.min(1,openEntry.progress / searchDuration) : 1; }
+    String storageStatus() {
+        if (openEntry == null) { return "Click an item to transfer it."; }
+        String owner = switch (openEntry.owner) {
+            case ABANDONED -> "Abandoned property";
+            case SURVIVOR -> "Survivor storage: taking supplies is theft";
+            case PLAYER -> "Your storage";
+        };
+        return owner + (searching() ? " | Searching " + Math.round(searchProgress()*100) + "%"
+                : openEntry.state == UrbanContainers.State.EMPTY ? " | Empty (searched)" : " | Searched");
+    }
+
+    /** Hand salvage is one consequential action, including an empty owned cupboard. */
+    void onContainerSalvaged(UrbanContainers.Entry entry) {
+        if (entry.owner == UrbanContainers.Owner.SURVIVOR) {
+            game.settlementManager.addReputation(game,HumanFaction.FREE_SETTLERS,-15,
+                    "Dismantling survivor storage harms your standing.");
+        }
     }
 
     /** Called by the crate UI; taking from camp crates is stealing unless trusted. */
@@ -135,6 +244,15 @@ final class CrateTransactionSystem {
             activeTheftTransferCount = 0;
         }
         if (!rememberTheftTransfer(transferId)) {
+            return;
+        }
+        if (UrbanContainers.manages(game.world)) {
+            var entry = game.world.urban.containers.at(cratePos);
+            if (newEvent && entry != null && entry.owner == UrbanContainers.Owner.SURVIVOR) {
+                game.settlementManager.addReputation(game,HumanFaction.FREE_SETTLERS,
+                        -Math.min(CAMP_THEFT_PENALTY_MAX,CAMP_THEFT_PENALTY_BASE+count),
+                        "Taking survivor supplies harms your standing.");
+            }
             return;
         }
         if (newEvent && game.world.campPos != null && game.faction.trust < CAMP_TRUST_THRESHOLD
@@ -178,9 +296,16 @@ final class CrateTransactionSystem {
 
     /** Real crate-UI transfer command used by mouse input and integration tests. */
     int transferCrateItemToPlayer(int slot) {
+        return transferCrateItemToPlayer(slot,Integer.MAX_VALUE);
+    }
+
+    int transferCrateItemToPlayer(int slot, int count) {
+        if (count <= 0) { return 0; }
         if (openUrbanContainerGone()) {
             return 0;
         }
+        if (searching()) { game.log("Finish searching before taking supplies."); return 0; }
+        if (openEntry != null) { game.openCrate = game.world.crateContents.get(openEntry.position); }
         Inventory crate = game.openCrate;
         if (crate == null || slot < 0 || slot >= crate.size()) {
             return 0;
@@ -190,43 +315,68 @@ final class CrateTransactionSystem {
             return 0;
         }
         ItemType type = stack.type;
-        int before = stack.count;
-        int leftover = game.player.inventory.addStack(stack);
+        ItemStack offered = stack.copy();
+        offered.count = Math.min(count,stack.count);
+        int before = offered.count;
+        int leftover = game.player.inventory.addStack(offered);
         int taken = before - leftover;
-        crate.set(slot, leftover > 0 ? stack : null);
+        stack.count -= taken;
+        crate.set(slot, stack.count > 0 ? stack : null);
         if (taken > 0) {
             game.audio.playClick();
             long eventId = nextLogicalTheftEventId();
             onCrateItemTaken(type, taken, eventId, eventId);
+            if (openEntry != null) {
+                game.world.urban.containers.compact(game.world,openEntry);
+                game.openCrate = game.world.crateContents.get(openEntry.position);
+            }
         }
+        if (leftover > 0) { game.log(taken > 0 ? "Some supplies remain: your inventory is full." : "Your inventory is full."); }
         return taken;
     }
 
     /** Real crate-UI deposit command; returned supplies are attributed by crate position. */
     int transferPlayerItemToCrate(int slot) {
+        return transferPlayerItemToCrate(slot,Integer.MAX_VALUE);
+    }
+
+    int transferPlayerItemToCrate(int slot, int count) {
+        if (count <= 0) { return 0; }
         if (openUrbanContainerGone()) {
             return 0;
         }
+        if (searching()) { game.log("Finish searching before storing supplies."); return 0; }
         Inventory crate = game.openCrate;
-        if (crate == null || slot < 0 || slot >= game.player.inventory.size()) {
+        if (slot < 0 || slot >= game.player.inventory.size()) {
             return 0;
         }
         ItemStack stack = game.player.inventory.get(slot);
         if (stack == null) {
             return 0;
         }
+        if (openEntry != null) {
+            crate = game.world.crateContents.computeIfAbsent(openEntry.position,k -> new Inventory(CRATE_SLOTS));
+            game.openCrate = crate;
+        }
+        if (crate == null) { return 0; }
         ItemType type = stack.type;
-        int before = stack.count;
-        int leftover = crate.addStack(stack);
+        ItemStack offered = stack.copy();
+        offered.count = Math.min(count,stack.count);
+        int before = offered.count;
+        int leftover = crate.addStack(offered);
         int deposited = before - leftover;
-        game.player.inventory.set(slot, leftover > 0 ? stack : null);
+        stack.count -= deposited;
+        game.player.inventory.set(slot, stack.count > 0 ? stack : null);
         if (deposited > 0) {
             game.audio.playClick();
-            if (game.openCratePos != null) {
+            if (openEntry != null) {
+                game.world.urban.containers.compact(game.world,openEntry);
+            } else if (game.openCratePos != null) {
                 game.settlementManager.onSuppliesReturned(
                         game, game.openCratePos, type, deposited);
             }
         }
+        if (leftover > 0) { game.log("The container is full. Remaining items stay with you."); }
         return deposited;
     }
 }

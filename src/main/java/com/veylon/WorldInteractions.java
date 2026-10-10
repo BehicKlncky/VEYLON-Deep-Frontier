@@ -257,13 +257,14 @@ final class WorldInteractions {
     /**
      * Gameplay block-interaction command shared by the real F-key path and
      * integration tests. It deliberately covers world-state interactions;
-     * UI-only containers and stations remain on their existing screen path.
+     * Container searching is a timed world-state interaction; stations keep their screen path.
      */
     boolean interactWithBlockAt(Vec3i pos) {
         if (pos == null) {
             return false;
         }
         return switch (game.world.getBlock(pos.x(), pos.y(), pos.z())) {
+            case CRATE, SHELF, CABINET, LOCKER -> game.openCrateAt(pos);
             case CAMPFIRE -> {
                 campfireInteract(pos);
                 yield true;

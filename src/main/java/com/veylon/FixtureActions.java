@@ -439,12 +439,13 @@ public final class FixtureActions {
      * player is told why.
      */
     static boolean mayBreak(Game g, Vec3i pos, BlockType t, ItemStack held) {
-        if (!isUrbanBlock(t)) {
+        boolean managedContainer = com.veylon.world.urban.UrbanContainers.manages(g.world) && Fixtures.isContainer(t);
+        if (!isUrbanBlock(t) && !managedContainer) {
             return true;
         }
         boolean creative = g.player.abilities.instantBuild();
         List<ItemStack> incoming = new ArrayList<>();
-        if (Fixtures.isUrbanContainer(t)) {
+        if (Fixtures.isUrbanContainer(t) || managedContainer) {
             Inventory contents = g.world.crateContents.get(pos);
             if (contents != null) {
                 for (int i = 0; i < contents.size(); i++) {
@@ -456,7 +457,8 @@ public final class FixtureActions {
         }
         if (!creative) {
             boolean toolOk = !t.requiresTool || (held != null && held.type.tool == t.preferredTool);
-            ItemStack salvage = toolOk ? salvageOf(g.world, pos, t) : null;
+            ItemStack salvage = toolOk ? t == BlockType.CRATE ? new ItemStack(ItemType.CRATE,1)
+                    : salvageOf(g.world, pos, t) : null;
             if (salvage != null) {
                 incoming.add(salvage);
             }
@@ -464,7 +466,7 @@ public final class FixtureActions {
         if (incoming.isEmpty() || fits(g.player.inventory, incoming)) {
             return true;
         }
-        g.log(Fixtures.isUrbanContainer(t)
+        g.log(Fixtures.isUrbanContainer(t) || managedContainer
                 ? "No room for what is inside. Empty the " + t.displayName.toLowerCase(Locale.ROOT)
                 + " first."
                 : "No room to carry the " + t.displayName.toLowerCase(Locale.ROOT) + ".");

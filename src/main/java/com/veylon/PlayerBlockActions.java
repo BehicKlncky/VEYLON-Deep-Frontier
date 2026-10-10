@@ -228,9 +228,21 @@ final class PlayerBlockActions {
                 && (held == null || held.type.tool != type.preferredTool))) {
             return false;
         }
+        com.veylon.world.urban.UrbanContainers.Entry container = null;
+        if (com.veylon.world.urban.UrbanContainers.manages(game.world) && Fixtures.isContainer(type)) {
+            container = game.world.urban.containers.touch(game.world,pos);
+            if (container == null) {
+                game.log("This container cannot be changed: the world's storage record is full.");
+                return false;
+            }
+        }
         // Urban blocks never lose what they hold or give: refuse instead (D-51).
         if (!FixtureActions.mayBreak(game, pos, type, held)) {
             return false;
+        }
+        if (container != null) {
+            game.crates.onContainerSalvaged(container);
+            game.world.urban.containers.moved(container);
         }
         breakBlock(pos, type, held);
         return true;
@@ -366,6 +378,7 @@ final class PlayerBlockActions {
 
     /** Camp trust and settlement reputation both react to destroyed property. */
     private void applyVandalismConsequences(Vec3i pos, BlockType t, int brokenCrateContents) {
+        if (com.veylon.world.urban.UrbanContainers.manages(game.world) && Fixtures.isContainer(t)) { return; }
         if (game.world.campPos != null && !game.faction.hostile
                 && isCampProperty(t)
                 && pos.distSq(game.world.campPos.x(), game.world.campPos.y(),
@@ -427,12 +440,16 @@ final class PlayerBlockActions {
             game.world.setBlock(px, py + 1, pz, place, true);
         }
         Vec3i pos = new Vec3i(px, py, pz);
-        if (Fixtures.isUrbanContainer(place)) {
+        if (Fixtures.isUrbanContainer(place) && !com.veylon.world.urban.UrbanContainers.manages(game.world)) {
             game.world.crateContents.put(pos, new Inventory(CRATE_SLOTS));
         }
         switch (place) {
             case CAMPFIRE -> game.world.campfireFuel.put(pos, CAMPFIRE_INITIAL_FUEL);
-            case CRATE -> game.world.crateContents.put(pos, new Inventory(CRATE_SLOTS));
+            case CRATE -> {
+                if (!com.veylon.world.urban.UrbanContainers.manages(game.world)) {
+                    game.world.crateContents.put(pos, new Inventory(CRATE_SLOTS));
+                }
+            }
             case RAIN_COLLECTOR -> game.world.collectorWater.put(pos, 0f);
             case LANTERN -> game.log(
                     "Lantern placed empty. Hold charcoal and press [F] to refuel it.");
