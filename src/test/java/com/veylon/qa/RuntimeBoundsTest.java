@@ -347,6 +347,29 @@ class RuntimeBoundsTest {
     }
 
     @Test
+    void residentsOpeningManyDoorsKeepTheirSwingShutTimersBounded() {
+        Game game = new Game();
+        game.newWorld(20260716L, true, World.GEN_URBAN_STREETS, com.veylon.entity.GameMode.SURVIVAL);
+        game.world.ensureChunks(10, 7, 1, 100);
+        int doors = 0;
+        for (int x = 0; x < 20; x++) {
+            for (int z = 0; z < 15; z++) {
+                game.world.setBlock(x, 41, z, com.veylon.world.BlockType.WOOD_DOOR, true);
+                game.world.setBlock(x, 42, z, com.veylon.world.BlockType.WOOD_DOOR, true);
+                assertTrue(com.veylon.FixtureActions.residentOpens(game, x, 41, z));
+                doors++;
+            }
+        }
+        assertEquals(300, doors);
+        RuntimeBudgetSnapshot snapshot = RuntimeBudgetSnapshot.capture(game);
+        assertTrue(snapshot.withinHardLimits(), snapshot.occupancySummary());
+        assertEquals(com.veylon.world.FixtureStates.MAX_TRANSIT, snapshot.residentDoors(),
+                "past the cap doors still open, but no further timers are kept");
+        assertEquals(600, snapshot.fixtureStates());
+        assertTrue(RuntimeBudgetSnapshot.hardLimitSummary().contains("residentDoors="));
+    }
+
+    @Test
     void repeatedPathQueriesStayBudgetedAndNeverLoadChunks() {
         Game game = new Game();
         game.newWorld(-1234567L, true);

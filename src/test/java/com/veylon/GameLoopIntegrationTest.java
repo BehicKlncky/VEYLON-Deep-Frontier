@@ -464,9 +464,15 @@ class GameLoopIntegrationTest {
         assertUrbanFoundationOnly(game);
         Path urbanSave = AppPaths.dataDirectory().resolve("build/qa/game-loop-urban.dat");
         assertTrue(SaveSystem.save(game, urbanSave));
+        // Door and window state belongs to its world (package 04).
+        game.world.fixtures.set(5, 41, 5, com.veylon.world.FixtureStates.LOCK_KEYED);
+        game.world.fixtures.transitTimers().put(new com.veylon.util.Vec3i(5, 41, 5), 3f);
+
         game.newWorld(777L, true, World.GEN_CAVE_IDENTITIES);
         assertNull(game.world.urban, "a legacy world carries no urban state");
         assertNotNull(game.faction.campPos);
+        assertTrue(game.world.fixtures.isEmpty(), "no fixture state carried over");
+        assertTrue(game.world.fixtures.transitTimers().isEmpty(), "no residents' doors carried over");
 
         assertTrue(SaveSystem.load(game, urbanSave), "an urban load over a live legacy world");
         assertUrbanFoundationOnly(game);
