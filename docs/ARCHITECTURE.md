@@ -254,7 +254,8 @@ it is what lets v2 saves load with identical terrain instead of silently
 regenerating under a newer generator.
 
 Generator versions form an explicit set (`World.isSupportedGenerator`): 1 legacy,
-2 deep, 3 cave identities, 4 the urban street datum and 5 the urban street network,
+2 deep, 3 cave identities, 4 the urban street datum, 5 the urban street network,
+and 6 the same street geometry plus frozen building plans (layout 3, template 1),
 which the development selector creates. New worlds use
 `World.DEFAULT_NEW_WORLD_GENERATOR` (3, until the urban rollout); a load accepts any
 supported version and rejects the rest, including anything above
@@ -335,6 +336,40 @@ the seed, the layout revision, stable coordinates and one salt from
 Urban worlds spawn no surface wildlife and roll no event that places wolves, a
 trader or a meteor at the column top (`EntityManager.slowTick`, `EventSystem`), since
 in a city that is a roof. Legacy worlds keep both unchanged.
+
+### Building plans and physical accessibility
+
+Generator 6 pins `BuildingTemplates` revision 1 before bootstrap through
+`UrbanRevision.buildingTemplateRevisionOf`. Its city fabric explicitly comes
+from layout 2; it never changes generator 5's plans or stamps interiors. A later
+generator will stamp the new buildings. `urban.meta` v1 and the frozen v3 base
+layout are unchanged. A build supporting at most generator 5 rejects a generator-6
+save; this build still re-derives generators 1–5 under their original contracts.
+
+`BuildingPlanner` derives a whole immutable `BuildingPlan` from seed, template
+revision and parcel. Nested floor/room/fixture/stair records carry stable packed
+ids and an immutable, bounded `PlanVolume` carries the proposed geometry.
+`UrbanWorldState.buildingAt` never creates a chunk, fixture state, container or
+loot. Its per-world LRU holds at most 256 buildings and is recreated on new/load.
+There is no persistent state in the cache; eviction recomputes identical plans.
+
+`AccessibilityValidator` uses `VoxelClearance`, which owns the unchanged AABB
+body collision shared by `Entity.collidesAt` and the passability/standing policy
+shared by `Pathfinder`. It opens only physically declared unlocked doors in a
+private proposal, keeps locks solid, and sweeps cardinal moves with step/drop
+clearance. Directed forward/reverse floods prove access and escape for room
+interiors, landings, roofs and fixture/container/quest interaction reservations.
+Stair routes also need two-wide flights and reversible swept transitions.
+Validation has fixed volume/metadata/edge/message limits, and a failed proposal
+has at most three deterministic candidate/alternate/minimal attempts. Exhaustion
+fails explicitly. No world or random stream is touched.
+
+Occupied front-door locks have a proven unlatched rear route. A plan's
+`fixtureStateAt` gives saved touched entries precedence over defaults, including
+an explicit saved unlock. Connecting defaults to actual stamped fixtures belongs
+to 06, where there will first be generated doors. No keyed-tool dependency is
+invented here. See [urban floor examples](urban-survival/BUILDING_PLANS.md) and
+[decisions D-58–D-61](urban-survival/DECISIONS.md#1-decision-log).
 
 ### Doors, windows and urban fixtures
 

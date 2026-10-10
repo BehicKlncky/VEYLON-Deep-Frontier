@@ -258,7 +258,7 @@ The **always** set runs for every code package, together with the portable build
 | 02 | `save.SaveMigrationTest`, `save.CorruptSaveResilienceTest`, `GameLoopIntegrationTest`, `world.CaveIdentityGenerationTest`, `world.DeepCaveGenTest`, `util.AppPathsTest`, `ModeSelectionRoutingTest` | Absolute gen-2 fingerprint; dispatch and revision round trip through production bootstrap; unsupported-revision rejection; absent urban section in old saves; reset over a live world; QA data-dir isolation test | Only if a user-visible selector is added |
 | 03 | `settlement.SettlementPlannerTest`, `world.WorldCoordinateContractTest` | Plan and generated-chunk seam and order matrix (DESIGN §11); "no wilderness features" assertions | Streetscape and intersection captures; a seam walk |
 | 04 | `input.PlayerInteractionSystemTest`, `CreativeBuildingTest`, `ai.PathfinderTest`, `world.RaycasterTest`, `gfx.VisualIdTest`, `gfx.ProceduralTexturesTest`, `SurvivalCreativeParityTest` | Door, window, stair and fixture interaction; collision, raycast and navigation agree; fixture-state round trip; failed entry; full-inventory drop; texture-layer count check | Both sides of doors, stairs and windows; night readability |
-| 05 | `ai.PathfinderTest` | Production validator on valid and intentionally invalid fixtures; template × rotation × seed matrix; shuffled order; bounded validator work | Optional plan-debug geometry |
+| 05 | `ai.PathfinderTest`, `world.urban.{BuildingPlannerTest,AccessibilityValidatorTest}`, `entity.BuildingPlanTraversalTest`, `save.UrbanMetaSectionTest`, `qa.RuntimeBoundsTest` | Production validator on valid/invalid voxels; 768 nominal proposals; 4,112 frozen-matrix parcels; shuffled access/eviction; real player stairs; saved revision; bounded work | Optional plan-debug geometry; no 06 exploration claim |
 | 06 | `simulation.EnvironmentalSimulationTest`, `PlayerEnvironmentSystemTest`, `engine.AudioEnvironmentTest` | Generation, accessibility and state checks over all playable rooms; persisted breaks survive regeneration; indoor classification | Street → entrance → kitchen → upper floor → basement/exit, day and night; a manual Survival walk |
 | 07 | `settlement.SettlementTheftTransactionTest`, `settlement.SettlementReputationGameplayTest`, `save.*` | Round trip; interrupted search; full inventory; destroyed-container tombstone through hand, blast and fire; corruption; ownership | Searching a generated kitchen and an owned cupboard while the world runs |
 | 08 | `ModeSelectionRoutingTest`, `item.ExpansionProgressionTest`, `BeaconEndgameIntegrationTest`, `entity.PlayerTreatmentSystemTest`, `SurvivalCreativeParityTest` | Starter guarantees per seed; a production route with no tree and no ore; consumed or full-inventory supplies never strand progression | A fresh opt-in urban session: spawn and first scavenging return |
@@ -291,6 +291,7 @@ Test names in the table are relative to `com.veylon.`. Run them with `.\gradlew.
 | Urban generator 4 (placeholder) | `20260731`, `-4242`, `7` (fingerprint); the six design candidates for the datum, dispatch and order checks (`world.UrbanGeneratorDispatchTest`) | 02 | In force, frozen with generator 4 |
 | Urban design | `20260731`, `-4242`, `7`, `0`, `987654321`, `-9000000000000000000`, over the regions `(0,0)`, `(-1,-1)`, `(1,-1)`, `(-1,1)`, `(2,3)`, `(-3,-2)`, `(4096,-4096)` and `(-4097,4095)` (`world.urban.CityPlannerTest`, `world.UrbanStreetNetworkGenerationTest`); generator-5 fingerprints over `20260731`, `-4242`, `7` | 03 | **Frozen** (2026-10-08) |
 | Starter | — | 08 | Not yet frozen |
+| Building template 1 | Family fingerprints at `20260731`, `-4242`, `7`; nominal matrix at all six urban-design seeds, four footprint sizes, four frontages, four variants and both families; actual parcels across all eight frozen design regions | 05 | Frozen by generator 6 / layout 3; existing generator 1–5 pins retained |
 | Slice regression | — | 11 | Not yet frozen |
 | Districts | — | 13 | Not yet frozen |
 | Economy | — | 23 | Not yet frozen |
@@ -452,3 +453,45 @@ identical to the original combined commit.
 
 No new native session/capture, manual keyboard or listening pass, older binary,
 wall-clock performance benchmark, release package, merge, push or tag was run.
+
+### Milestone 05 (2026-10-10)
+
+Fresh evidence from `feature/urban-survival`, baseline `bdecf6f`, initially clean
+index/tree. The Git ledger and final 04 handoff establish committed prerequisites
+01–04. No other live agent or index lock was present; no catch-up commit was
+duplicated. The installed Temurin `25.0.4.1+1` at
+`build/tools/jdk25/jdk-25.0.4.1+1` supplied JDK 25 through `JAVA_HOME`.
+The sandbox initially denied reading `conf/security/java.security`; approved
+execution with JDK/Gradle-cache access ran the checks below. Saves/settings stayed
+under the existing isolated `build/` test-data seam.
+
+| Check | Fresh result / evidence |
+| --- | --- |
+| `.\gradlew.bat test --tests 'com.veylon.world.urban.*' --tests 'com.veylon.entity.BuildingPlanTraversalTest' --tests 'com.veylon.entity.PlayerMovementSystemTest' --tests 'com.veylon.ai.PathfinderTest' --tests 'com.veylon.ai.UrbanResidentFixtureTest' --tests 'com.veylon.save.*' --tests 'com.veylon.world.WorldGeneratorFingerprintTest' --tests 'com.veylon.world.UrbanGeneratorDispatchTest' --tests 'com.veylon.UrbanDevelopmentSelectorTest' --tests 'com.veylon.WorldSeedDeterminismTest' --tests 'com.veylon.simulation.UrbanSurfaceSpawnGateTest' --tests 'com.veylon.qa.RuntimeBoundsTest' --tests 'com.veylon.qa.SerializedEnumOrderTest' --tests 'com.veylon.GameLoopIntegrationTest' --console=plain` | BUILD SUCCESSFUL in 1 min 25 s (`build/m05-final-focused.log`). All save suites, legacy pins, production movement, revision/reset, spawn and bound checks passed. Precedes the final room-floor/headroom safeguard. |
+| `.\gradlew.bat test --tests 'com.veylon.world.urban.BuildingPlannerTest' --tests 'com.veylon.world.urban.AccessibilityValidatorTest' --tests 'com.veylon.entity.BuildingPlanTraversalTest' --console=plain` | BUILD SUCCESSFUL in 9 s after the safeguard and bounded stair-diagnostic priority correction (`build/m05-final-clearance.log`). Includes all matrix, fingerprint, invalid-fixture, fallback and actual stair-physics checks. |
+| Nominal template matrix (`BuildingPlannerTest`) | 4 sizes (12 x 16, 16 x 20, 20 x 24, 12 x 12) x 4 frontages x 4 variants x 2 families x 6 seeds = 768 valid proposals, each reproduced identically. Apartment storeys span 2–5, optional B1; shops use two with the ordinary one-storey choice also covered by actual parcels. All twelve room functions occur. Counts stay within explicit cell/edge bounds. |
+| Actual city plan matrix (`BuildingPlannerTest`) | `building-city-matrix plans=4112 repaired=0`, six frozen design seeds x all eight frozen design regions, including negative and far coordinates. Production validator checks every parcel, external route reservation and neighbouring footprint. No unreachable target, invalid flight, missing floor, overlap or overflow accepted. Final ordinary candidates require no repair. |
+| Intentionally invalid plans (`AccessibilityValidatorTest`) | Reject solid walls merely declared as doors; all entries locked with reservations behind the lock; low doors and windows crossing slab bands; low stair departure ceiling, missing tread and narrow flight; blocked furniture/quest targets; an attainable three-block drop without an exit; missing room footing/headroom; missing floor metadata, vertical overflow, invalid core, unsupported template and oversized metadata. Message cap and pre-voxel bound rejection are asserted. A malformed core exhausts exactly three candidates without returning a shell. |
+| Production movement (`BuildingPlanTraversalTest`) | Headless proposal staging in loaded worlds, all four frontages x Survival/Creative. `PlayerMovementSystem` walks every B1-to-roof flight up/down without jumping or flight; `Pathfinder` accepts each flight. This is not native generated/furnished exploration. |
+| Determinism, persistence and runtime (`BuildingPlannerTest`, `UrbanMetaSectionTest`, `RuntimeBoundsTest`, legacy suites) | Common reservation ids/positions survive variants; plans match reversed/shuffled chunk/region access and cache eviction. Queries do not create chunks, block edits, fixture states or contents. The 256-building cache fills and remains bounded. Production save/load selects template 1 from generator 6 before bootstrap; absent meta retains it, mismatched layout rejects without touching the live world, new/load caches reset, and generator 5 still has no buildings/plans. Existing 1–5 fingerprints and historical save fixtures are retained. Gen-6 stamped streets match the existing gen-5 pins; six new plan pins cover both families at three seeds. |
+| `java -cp build/classes/java/main com.veylon.world.urban.BuildingPlanDiagnostics` | Exit 0 after `.\gradlew.bat classes --console=plain`; output `build/m05-plan-examples.txt`. Pure ASCII floors, functions, ids/fingerprints and counters reproduced in [BUILDING_PLANS.md](BUILDING_PLANS.md). Invalid departure ceiling: one stair violation; deterministic alternate succeeds at attempt 2. No World, save, GL or OpenAL resource is created by this command. |
+| `.\gradlew.bat build --console=plain` | BUILD SUCCESSFUL in 6 min 47 s (`build/m05-build.log`). Fresh XML aggregation: 163 classes, 1,672 tests, zero failures, zero errors, one skipped Windows symlink-privilege case in `AppPathsTest`. Javadoc/doclint executed successfully. |
+| `graphify update . --no-cluster` | Exit 0 once: 7,224 nodes, 27,334 edges (`build/m05-graph.log`). Local AST extraction, no clustering, semantic agents or document/image extraction. Existing Groovy `build.gradle` parser warning and symbol-free `settings.gradle`; Gradle remains authoritative. |
+| Existing read-only `build/history-split/check-docs.ps1 -IncludeGeneral` (invoked inline under the local script policy); `git diff --check`, `git diff --cached --stat`, staged diff review, `git diff --cached --check` | 47 local links/anchors resolved. Reviewed all 34 explicitly staged milestone paths; working/staged whitespace checks passed. No unrelated changes or generated build/QA/graph output is included. The local commit uses the configured Git identity and has no co-author trailer or agent signature. |
+
+The broad matrix initially found window interaction targets on occupied tables;
+targets now stand one cell inward, within F reach, leaving furniture clearances
+intact. Final review added missing-room-floor/headroom rejection. Its first check
+exposed stair diagnostics being displaced by the 32-message cap on a deliberately
+impossible core; prioritizing flight diagnostics fixed the evidence test, with
+the final focused run above passing. No accepted template voxel or fingerprint
+changed in that diagnostic correction.
+
+No native run/capture, manual exploration/listening, older executable, wall-clock
+performance benchmark or release package was run. Native plan debug is optional
+for 05. Generated/furnished exploration, lock-default application to stamped
+fixtures and native day/night street-to-basement/roof walks belong to 06, with a
+new generator. Contents/depletion are 07. Saved generator 6 pins template 1 and
+uses unchanged `urban.meta` v1; builds supporting at most generator 5 reject that
+save, established from dispatch code, not older-binary execution. Ordinary new
+worlds remain generator 3. No merge, push, tag or publication is authorized here.

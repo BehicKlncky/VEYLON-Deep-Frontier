@@ -193,6 +193,14 @@ Room functions (*initial*): entry/hall, kitchen, living room, bedroom, bathroom,
 
 Variety comes from constraints, rotation, damage and occupation states (intact, damaged, picked clean, occupied) as well as templates. Every variant keeps the rules in §5.1.
 
+**Implemented in 05:** `BuildingPlan` contains immutable nested `Floor`, `Room`,
+`Fixture` and `Stair` records plus the exact proposed voxel volume. Template
+revision 1 is selected by generator 6, with one flat per floor and combined
+functions on shallow parcels (D-58–D-61). It retains the reserved entrances/core
+and validates both entry and exit routes before returning a plan. The twelve
+functions above exist; there is no generated building geometry or rolled loot
+yet. [BUILDING_PLANS.md](BUILDING_PLANS.md) records real floor diagrams and diagnostics.
+
 ## 6. Occupied sites and the player's refuge (D-21, D-22)
 
 | Site | Role in the loop | Spatial basis | Population (*initial*) | Interaction and consequence | Packages |
@@ -261,7 +269,7 @@ These are bounded starting scope, not a wish list. Packages may change a number 
 | --- | --- |
 | 03 | Region plan cache ≤ 16 regions (LRU); 6 district ids defined; residential and commercial reservations implemented |
 | 04 | ≤ 24 new block ids (budget in DECISIONS §3); ≤ 6 container visual forms; doors, windows and stairs from standard blocks plus a few dedicated ids |
-| 05 | Apartment family: 3 footprints (about 12 × 16, 16 × 20, 20 × 24), 2–5 storeys, optional B1, 2–4 units per floor. Shop family: 1 storey plus optional flat above, sales floor, stockroom, back door. 12 room functions |
+| 05 | Implemented revision 1: compact/standard/court apartment layouts adapting about 12 × 16, 16 × 20, 20 × 24 to reserved parcels, up to 5 storeys, optional B1, one flat per floor (D-59). Shop: 1 storey plus optional flat, sales floor, stockroom/utility, back door. 12 room functions; shallow parcels combine functions. |
 | 06 | ≤ 6 fixtures per room, of which ≤ 3 containers; 3–6 containers per apartment unit; decorative props are blocks, not entities |
 | 07 | 9 container kinds (kitchen cabinet, fridge, pantry shelf, bathroom cabinet, wardrobe, dresser or desk, utility locker, shop shelf, stockroom crate); about 14 room-and-kind loot tables; 6 district bias rows; ≤ 12 slots per container |
 | 08 | Starter guarantees in §4.4; ≤ 20 new items; ≤ 15 urban recipes |
@@ -342,7 +350,7 @@ The table is in dependency order: an item may depend only on items above it. Sec
 | 1 | Generator version `GEN_URBAN` | Persistent | `World` | 02 | — | v3 base int; values above `MAX_SUPPORTED_GENERATOR` rejected | Fixed per `World` | — |
 | 2 | Urban content revision | Persistent | `UrbanRevision` | 02 | 1 | `urban.meta`; absent means 1 | New and load | — |
 | 3 | Region, district, street and parcel plans | Derived | `CityPlanner` | 03 | 1, 2 | Not saved | Cache per `World` | ≤ 16 regions |
-| 4 | Building, floor, room and fixture plans | Derived | `BuildingPlanner` | 05 | 3 | Not saved | Cache per `World` | ≤ 256 buildings |
+| 4 | Building, floor, room and fixture plans | Derived | `BuildingPlanner` / `BuildingPlan` | 05 | 3 | Template revision 1 selected by saved generator 6; layout 3 validated by unchanged `urban.meta` v1; plans not serialized | Cache per `World`, discarded on new/load | ≤ 256 buildings; ≤ 73,984 cells/plan |
 | 5 | Generated blocks plus edits | Derived plus deltas | Generator and `World` | 03, 06 | 3, 4 | `changedBlocks` (v3 base, last-write log, B-29) | — | 4,000,000 edits |
 | 6 | Fixture state: door or window open, keyed lock or one-sided bar (broken is a recorded block edit); barricade health later | Persistent, touched cells only | `FixtureStates` on `World` | 04 | 4 | `world.fixtures` v1 (D-49); absent means as generated or edited, unlocked | Load replaces; reapplied after structure on chunk generation | ≤ 32,768 cells on write and read |
 | 7 | Container state: contents, emptied, destroyed, owner | Persistent, touched only | `UrbanContainers` | 07 | 2, 4 | `urban.containers`; absent means unrolled | Load replaces; never re-rolled | Capped, write ≤ read cap |
