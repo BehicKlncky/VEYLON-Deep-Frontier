@@ -358,7 +358,7 @@ class RuntimeBoundsTest {
     }
 
     private static World generate(long seed, List<int[]> chunks) {
-        World world = new World(seed, World.CURRENT_GENERATOR);
+        World world = new World(seed, World.GEN_CAVE_IDENTITIES);
         for (int[] chunk : chunks) {
             world.getOrCreateChunk(chunk[0], chunk[1]);
         }

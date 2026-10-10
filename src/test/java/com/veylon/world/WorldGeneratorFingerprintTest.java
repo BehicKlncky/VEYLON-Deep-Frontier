@@ -22,19 +22,27 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  *
  * <p>Terrain is not an implementation detail here. It is the save format. Saves
  * store deltas and re-derive structure from the seed and the generator version
- * ({@code World.CURRENT_GENERATOR}), so a change in generator output silently
- * rewrites the terrain under every existing save pinned to that version: the
- * shelter someone dug into a hillside opens onto a different hillside.
+ * recorded in the save, so a change in generator output silently rewrites the
+ * terrain under every existing save pinned to that version: the shelter
+ * someone dug into a hillside opens onto a different hillside.
  *
  * <p>So these fingerprints are recorded constants. If a change moves one, that
  * is the test working. The response is a deliberate decision — either the
- * change was not meant to alter output and is wrong, or it was, and then
- * {@code CURRENT_GENERATOR} must be incremented so old saves keep their old
- * terrain, exactly as {@code GEN_DEEP} and {@code GEN_CAVE_IDENTITIES} did.
- * Re-recording the constant on its own is never the right answer.
+ * change was not meant to alter output and is wrong, or it was, and then a new
+ * generator version must be added so old saves keep their old terrain, exactly
+ * as {@code GEN_DEEP} and {@code GEN_CAVE_IDENTITIES} did. Re-recording the
+ * constant on its own is never the right answer.
  *
- * <p>Recorded 2026-07-31 against generator {@code GEN_CAVE_IDENTITIES} (3) at
- * {@code 3414dbf}, before the v0.5.0 generator optimizations.
+ * <p>Each pin names its generator explicitly rather than "the current one":
+ * the generator new worlds use and the generators a save may name are
+ * different questions, and a pin that followed the default would silently
+ * re-point at a new generator when the default moves.
+ *
+ * <p>Generator {@code GEN_CAVE_IDENTITIES} (3) was recorded 2026-07-31 at
+ * {@code 3414dbf}, before the v0.5.0 generator optimizations. Generators
+ * {@code GEN_LEGACY} (1) and {@code GEN_DEEP} (2) were recorded 2026-10-07 at
+ * {@code 923345f}, before the urban generator split, from unchanged generator
+ * code.
  */
 class WorldGeneratorFingerprintTest {
 
@@ -51,34 +59,55 @@ class WorldGeneratorFingerprintTest {
     private static final long[] COLUMN_QUERY_FINGERPRINTS = {
             0xc7e914449117bdd9L, 0x82273c0c999fcdc6L, 0xde29e867023f323cL};
 
+    /** Generator 1, which every v2 save and gen-1 v3 save re-derives. */
+    private static final long[] LEGACY_TERRAIN_FINGERPRINTS = {
+            0x575ff79c72c5e75cL, 0xaf2846b2fa8fb028L, 0xd53be542e8a9ac72L};
+
+    /** Generator 2, the pre-identity 0.3.0 development generator. */
+    private static final long[] DEEP_TERRAIN_FINGERPRINTS = {
+            0x0ac52031ca6ac5bcL, 0x23bc80e5d60717e2L, 0xb40fceda52cad351L};
+
     /** Chunks fingerprinted per seed: origin, offset, and two negative ones. */
     private static final int[][] CHUNKS = {{0, 0}, {3, -2}, {-1, -1}, {-4, 5}};
 
     @Test
     void generatedTerrainMatchesTheRecordedFingerprint() {
+        assertTerrainPinned(World.GEN_CAVE_IDENTITIES, TERRAIN_FINGERPRINTS);
+    }
+
+    @Test
+    void olderGeneratorsMatchTheirRecordedFingerprints() {
+        // Before these, generators 1 and 2 were pinned only relative to each
+        // other or through one historical save, so a shared refactor could move
+        // both and stay green.
+        assertTerrainPinned(World.GEN_LEGACY, LEGACY_TERRAIN_FINGERPRINTS);
+        assertTerrainPinned(World.GEN_DEEP, DEEP_TERRAIN_FINGERPRINTS);
+    }
+
+    private static void assertTerrainPinned(int generatorVersion, long[] recorded) {
         List<String> moved = new ArrayList<>();
         for (int i = 0; i < SEEDS.length; i++) {
-            long actual = terrainFingerprint(SEEDS[i]);
-            if (actual != TERRAIN_FINGERPRINTS[i]) {
+            long actual = terrainFingerprint(SEEDS[i], generatorVersion);
+            if (actual != recorded[i]) {
                 moved.add(String.format("seed %d: recorded 0x%016xL, generated 0x%016xL",
-                        SEEDS[i], TERRAIN_FINGERPRINTS[i], actual));
+                        SEEDS[i], recorded[i], actual));
             }
         }
         assertTrue(moved.isEmpty(), () -> """
-                Generator output changed for %d of %d seeds:
+                Generator %d output changed for %d of %d seeds:
                   %s
 
                 Terrain is part of the save contract: saves re-derive it from the
-                seed plus World.CURRENT_GENERATOR, so this rewrites the world under
-                every existing save pinned to generator %d.
+                seed plus the generator version they recorded, so this rewrites the
+                world under every existing save pinned to generator %d.
 
                 If the change was not meant to alter output, it is a bug -- a
                 refactor or optimization must be bit-identical. If it was meant to,
                 add a new generator version and leave the old one producing the old
                 terrain, as GEN_DEEP and GEN_CAVE_IDENTITIES did. Updating these
                 constants alone silently breaks saved worlds.""".formatted(
-                moved.size(), SEEDS.length, String.join("\n  ", moved),
-                World.CURRENT_GENERATOR));
+                generatorVersion, moved.size(), SEEDS.length, String.join("\n  ", moved),
+                generatorVersion));
     }
 
     @Test
@@ -105,10 +134,10 @@ class WorldGeneratorFingerprintTest {
         // its world. Two versions of one seed must disagree, and each must
         // agree with itself.
         long legacy = terrainFingerprint(SEEDS[0], World.GEN_LEGACY);
-        long current = terrainFingerprint(SEEDS[0], World.CURRENT_GENERATOR);
+        long identities = terrainFingerprint(SEEDS[0], World.GEN_CAVE_IDENTITIES);
 
-        assertNotEquals(legacy, current,
-                "the legacy generator must not have collapsed onto the current one");
+        assertNotEquals(legacy, identities,
+                "the legacy generator must not have collapsed onto generator 3");
         assertEquals(legacy, terrainFingerprint(SEEDS[0], World.GEN_LEGACY),
                 "the legacy generator must still be deterministic");
     }
@@ -116,7 +145,7 @@ class WorldGeneratorFingerprintTest {
     @Test
     void theFingerprintWouldNoticeASingleChangedBlock() {
         // A fingerprint that ignored most of the chunk would pass forever.
-        World world = new World(SEEDS[0], World.CURRENT_GENERATOR);
+        World world = new World(SEEDS[0], World.GEN_CAVE_IDENTITIES);
         Chunk chunk = world.getOrCreateChunk(0, 0);
         long before = hashChunk(chunk);
 
@@ -129,10 +158,6 @@ class WorldGeneratorFingerprintTest {
     }
 
     // ------------------------------------------------------------------
-
-    private static long terrainFingerprint(long seed) {
-        return terrainFingerprint(seed, World.CURRENT_GENERATOR);
-    }
 
     private static long terrainFingerprint(long seed, int generatorVersion) {
         World world = new World(seed, generatorVersion);
@@ -173,7 +198,7 @@ class WorldGeneratorFingerprintTest {
 
     /** The pure per-column queries, sampled over a wide, sparse grid. */
     private static long columnQueryFingerprint(long seed) {
-        World world = new World(seed, World.CURRENT_GENERATOR);
+        World world = new World(seed, World.GEN_CAVE_IDENTITIES);
         WorldGenerator generator = world.generator;
         long hash = 0xcbf29ce484222325L;
         for (int x = -600; x <= 600; x += 37) {
