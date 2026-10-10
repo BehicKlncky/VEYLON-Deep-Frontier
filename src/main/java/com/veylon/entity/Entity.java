@@ -54,27 +54,7 @@ public abstract class Entity {
     }
 
     public boolean collidesAt(float px, float py, float pz) {
-        if (py < 0) {
-            return true;
-        }
-        float hw = width / 2f;
-        int x0 = (int) Math.floor(px - hw);
-        int x1 = (int) Math.floor(px + hw - 1e-4f);
-        int y0 = (int) Math.floor(py);
-        int y1 = (int) Math.floor(py + height - 1e-4f);
-        int z0 = (int) Math.floor(pz - hw);
-        int z1 = (int) Math.floor(pz + hw - 1e-4f);
-        for (int x = x0; x <= x1; x++) {
-            for (int y = y0; y <= y1; y++) {
-                for (int z = z0; z <= z1; z++) {
-                    BlockType t = world.getBlock(x, y, z);
-                    if (t.solid || flamesBlock && isFlameCell(t)) {
-                        return true;
-                    }
-                }
-            }
-        }
-        return false;
+        return com.veylon.world.VoxelClearance.collides(world, px, py, pz, width, height, flamesBlock);
     }
 
     /**

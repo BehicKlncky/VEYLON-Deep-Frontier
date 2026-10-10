@@ -2,7 +2,6 @@ package com.veylon.ai;
 
 import com.veylon.util.Vec3i;
 import com.veylon.world.BlockType;
-import com.veylon.world.FixtureStates;
 import com.veylon.world.Fixtures;
 import com.veylon.world.World;
 
@@ -25,7 +24,7 @@ public final class Pathfinder {
     /** Maximum straight-line range accepted for a query. */
     public static final int MAX_RANGE = 56;
     /** Deepest safe drop while following a path. */
-    public static final int MAX_DROP = 3;
+    public static final int MAX_DROP = com.veylon.world.VoxelClearance.MAX_DROP;
     /** Defensive ceiling for a reconstructed cached path. */
     public static final int MAX_PATH_NODES = 512;
 
@@ -60,19 +59,7 @@ public final class Pathfinder {
      * that set a body alight.
      */
     static boolean passable(World w, int x, int y, int z) {
-        BlockType t = w.getBlock(x, y, z);
-        if (t == BlockType.GATE) {
-            return true; // NPCs shoulder gates open; cost handled below
-        }
-        if (Fixtures.isClosedDoor(t)) {
-            // An unlocked door is opened on the way (cost below); a locked or
-            // barred one is a wall until someone forces or unbars it.
-            return w.fixtures.lockAt(x, y, z) == FixtureStates.LOCK_NONE;
-        }
-        if (t == BlockType.TORCH || t == BlockType.CAMPFIRE) {
-            return false;
-        }
-        return !t.solid || t.isClimbable();
+        return com.veylon.world.VoxelClearance.passable(w, x, y, z);
     }
 
     private static boolean chunkLoaded(World w, int x, int z) {
@@ -81,15 +68,7 @@ public final class Pathfinder {
 
     /** A cell an NPC can stand in: 2-high clearance over solid ground. */
     public static boolean standable(World w, int x, int y, int z) {
-        if (!chunkLoaded(w, x, z)) {
-            return false;
-        }
-        if (!passable(w, x, y, z) || !passable(w, x, y + 1, z)) {
-            return false;
-        }
-        BlockType below = w.getBlock(x, y - 1, z);
-        BlockType feet = w.getBlock(x, y, z);
-        return below.solid || feet.isClimbable() || feet == BlockType.WATER;
+        return com.veylon.world.VoxelClearance.standable(w, x, y, z);
     }
 
     private static float moveCost(World w, int x, int y, int z) {

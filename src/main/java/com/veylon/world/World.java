@@ -16,7 +16,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-public class World {
+public class World implements VoxelAccess {
 
     public interface BlockListener {
         void onBlockChanged(int x, int y, int z, BlockType oldType, BlockType newType);
@@ -159,6 +159,11 @@ public class World {
 
     public boolean isUrban() {
         return urban != null;
+    }
+
+    @Override
+    public int fixtureLockAt(int x, int y, int z) {
+        return fixtures.lockAt(x, y, z);
     }
 
     /**

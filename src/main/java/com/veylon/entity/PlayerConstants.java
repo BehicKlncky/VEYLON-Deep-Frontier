@@ -26,8 +26,8 @@ public final class PlayerConstants {
      * the inventory rather than separate storage.
      */
     public static final int HOTBAR_SLOTS = 9;
-    public static final float BODY_WIDTH = 0.6f;
-    public static final float BODY_HEIGHT = 1.8f;
+    public static final float BODY_WIDTH = com.veylon.world.VoxelClearance.BODY_WIDTH;
+    public static final float BODY_HEIGHT = com.veylon.world.VoxelClearance.BODY_HEIGHT;
     public static final float MAX_HEALTH = 100f;
     public static final float EYE_HEIGHT_STANDING = 1.62f;
     public static final float EYE_HEIGHT_CROUCHED = 1.32f;
