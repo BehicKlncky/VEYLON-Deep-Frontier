@@ -107,6 +107,8 @@ public class World {
     public static final float LANTERN_MAX_FUEL = 4 * LANTERN_FUEL_PER_CHARCOAL;
     /** Finite lantern state keyed by the placed block position. */
     public final Map<Vec3i, LanternState> lanterns = new HashMap<>();
+    /** Door and window state no block id expresses: open, locks and bars (D-48). */
+    public final FixtureStates fixtures = new FixtureStates();
 
     public BlockListener listener;
     public Vec3i campPos;
@@ -262,6 +264,10 @@ public class World {
                     }
                 }
             }
+            if (!fixtures.isEmpty()) {
+                // Saved door and window state outlives the generated structure.
+                fixtures.applyToNewChunk(c);
+            }
             c.recomputeAllHeights();
             c.rebuildLights(this);
             c.generated = true;
@@ -381,6 +387,18 @@ public class World {
         if (t == BlockType.LANTERN) {
             lanterns.put(pos, new LanternState(0, false));
         }
+        Fixtures.Kind oldKind = Fixtures.kindOf(old);
+        if (oldKind != null && Fixtures.kindOf(t) != oldKind) {
+            // Forced, shattered, dismantled, burnt or blown out: the fixture is
+            // gone, so its lock, bar and open state go with it.
+            fixtures.remove(x, y, z);
+        }
+        if (Fixtures.isUrbanContainer(old)) {
+            // One owner for the contents: a hand break has already moved them
+            // out; a blast or a fire destroys them with the furniture, so they
+            // can never reappear in whatever is built here next.
+            crateContents.remove(pos);
+        }
         if (batching) {
             batchChunks.add(key(cx, cz));
             if (record) {
@@ -480,6 +498,30 @@ public class World {
             refreshLightsAt(pos);
         }
         return state.lit == lit;
+    }
+
+    /**
+     * Save loader hook for one door or window cell. A cell in a generated chunk
+     * takes the saved variant at once, or the entry is dropped as stale when the
+     * cell holds no operable fixture any more. A cell whose chunk does not exist
+     * yet keeps the entry until the chunk is generated: stale state never loads
+     * a chunk.
+     *
+     * @return false only for a state byte no save may hold
+     */
+    public boolean restoreFixtureState(Vec3i pos, int state) {
+        if (pos == null || !FixtureStates.isValid(state) || pos.y() < 0 || pos.y() >= Chunk.SY) {
+            return false;
+        }
+        if (!isColumnLoaded(pos.x(), pos.z())) {
+            return fixtures.set(pos.x(), pos.y(), pos.z(), state);
+        }
+        Fixtures.Kind kind = Fixtures.kindOf(getBlock(pos.x(), pos.y(), pos.z()));
+        if (kind == null) {
+            return true;
+        }
+        setBlock(pos.x(), pos.y(), pos.z(), kind.variant(FixtureStates.isOpen(state)), false);
+        return fixtures.set(pos.x(), pos.y(), pos.z(), state);
     }
 
     /** Save loader hook: validates the block and defers the one-time light rebuild. */

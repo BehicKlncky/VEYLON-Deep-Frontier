@@ -70,10 +70,47 @@ public enum BlockType {
     GATE_OPEN("Gate (open)", Shape.RACK, false, false, true, 2.6f, ToolKind.AXE, false, null, 0, 0, 0f, 0.44f, 0.34f, 0.22f),
     STONE_BRICK("Stone Brick", Shape.CUBE, true, true, false, 7.5f, ToolKind.PICKAXE, false, ItemType.STONE, 1, 0, 0f, 0.44f, 0.44f, 0.48f),
     ALARM_BELL("Alarm Bell", Shape.TORCH, false, false, false, 1.4f, ToolKind.NONE, false, ItemType.SCRAP, 1, 0, 0f, 0.75f, 0.60f, 0.25f),
-    CAGE_BARS("Cage Bars", Shape.CUBE, true, true, false, 5.0f, ToolKind.PICKAXE, false, ItemType.SCRAP, 1, 0, 0f, 0.36f, 0.38f, 0.42f);
+    CAGE_BARS("Cage Bars", Shape.CUBE, true, true, false, 5.0f, ToolKind.PICKAXE, false, ItemType.SCRAP, 1, 0, 0f, 0.36f, 0.38f, 0.42f),
 
+    // ---- Urban materials and fixtures (urban package 04; append-only, budget <= 24) ----
+    // Doors and windows are closed/open/broken id pairs (Fixtures); lock and bar
+    // state lives in World.fixtures. A broken door or window, the open halves and
+    // the fixture items are handled by Fixtures and FixtureActions, so their
+    // BlockType drop is null.
+    ASPHALT("Asphalt", Shape.CUBE, true, true, false, 4.5f, ToolKind.PICKAXE, false, ItemType.ASPHALT, 1, 0, 0f, 0.20f, 0.20f, 0.22f),
+    PAVING("Paving Slabs", Shape.CUBE, true, true, false, 4.0f, ToolKind.PICKAXE, false, ItemType.PAVING, 1, 0, 0f, 0.58f, 0.57f, 0.55f),
+    CONCRETE("Concrete", Shape.CUBE, true, true, false, 7.0f, ToolKind.PICKAXE, false, ItemType.CONCRETE, 1, 0, 0f, 0.62f, 0.62f, 0.60f),
+    BRICK("Brick", Shape.CUBE, true, true, false, 6.0f, ToolKind.PICKAXE, false, ItemType.BRICK, 1, 0, 0f, 0.55f, 0.30f, 0.24f),
+    PLASTER("Plaster Wall", Shape.CUBE, true, true, false, 1.5f, ToolKind.PICKAXE, false, ItemType.PLASTER, 1, 0, 0f, 0.80f, 0.77f, 0.70f),
+    SHEET_METAL("Sheet Metal", Shape.CUBE, true, true, false, 8.0f, ToolKind.PICKAXE, true, ItemType.SHEET_METAL, 1, 0, 0f, 0.45f, 0.48f, 0.50f),
+    RUBBLE("Rubble", Shape.CUBE, true, true, false, 1.2f, ToolKind.PICKAXE, false, ItemType.GRAVEL, 1, 0, 0f, 0.50f, 0.48f, 0.45f),
+    WOOD_DOOR("Wooden Door", Shape.CUBE, true, true, true, 3.0f, ToolKind.AXE, false, null, 0, 0, 0f, 0.52f, 0.38f, 0.24f),
+    WOOD_DOOR_OPEN("Wooden Door (open)", Shape.LEAF, false, false, true, 3.0f, ToolKind.AXE, false, null, 0, 0, 0f, 0.52f, 0.38f, 0.24f),
+    METAL_DOOR("Metal Door", Shape.CUBE, true, true, false, 9.0f, ToolKind.PICKAXE, true, null, 0, 0, 0f, 0.38f, 0.42f, 0.44f),
+    METAL_DOOR_OPEN("Metal Door (open)", Shape.LEAF, false, false, false, 9.0f, ToolKind.PICKAXE, true, null, 0, 0, 0f, 0.38f, 0.42f, 0.44f),
+    BROKEN_DOOR("Broken Doorway", Shape.PANE, false, false, true, 0.6f, ToolKind.AXE, false, null, 0, 0, 0f, 0.36f, 0.28f, 0.20f),
+    WINDOW("Window", Shape.CUBE, true, false, false, 0.4f, ToolKind.NONE, false, null, 0, 0, 0f, 0.62f, 0.72f, 0.78f),
+    WINDOW_OPEN("Window (open)", Shape.LEAF, false, false, false, 0.4f, ToolKind.NONE, false, null, 0, 0, 0f, 0.62f, 0.72f, 0.78f),
+    BROKEN_WINDOW("Shattered Window", Shape.PANE, false, false, false, 0.3f, ToolKind.NONE, false, null, 0, 0, 0f, 0.45f, 0.48f, 0.50f),
+    STAIRS("Concrete Stairs", Shape.CUBE, true, true, false, 6.0f, ToolKind.PICKAXE, false, ItemType.STAIRS, 1, 0, 0f, 0.60f, 0.60f, 0.58f),
+    SHELF("Shelving Unit", Shape.CUBE, true, true, true, 2.0f, ToolKind.AXE, false, ItemType.SHELF, 1, 0, 0f, 0.55f, 0.44f, 0.30f),
+    CABINET("Cabinet", Shape.CUBE, true, true, true, 2.0f, ToolKind.AXE, false, ItemType.CABINET, 1, 0, 0f, 0.62f, 0.52f, 0.38f),
+    LOCKER("Metal Locker", Shape.CUBE, true, true, false, 4.0f, ToolKind.PICKAXE, false, ItemType.LOCKER, 1, 0, 0f, 0.40f, 0.48f, 0.46f),
+    TABLE("Table", Shape.TABLE, true, false, true, 1.5f, ToolKind.AXE, false, ItemType.TABLE, 1, 0, 0f, 0.58f, 0.44f, 0.28f),
+    DEBRIS("Debris", Shape.PANEL, false, false, false, 0.15f, ToolKind.NONE, false, null, 0, 0, 0f, 0.48f, 0.46f, 0.42f);
+
+    /**
+     * How a block is meshed. Not persisted: only {@link BlockType} ordinals are
+     * saved, so shapes may be appended or reordered freely.
+     */
     public enum Shape {
-        NONE, CUBE, CROSS, LIQUID, TORCH, CAMPFIRE, PANEL, RACK, BASIN
+        NONE, CUBE, CROSS, LIQUID, TORCH, CAMPFIRE, PANEL, RACK, BASIN,
+        /** An open door or casement: a thin leaf along one jamb ({@code FixtureGeometry}). */
+        LEAF,
+        /** A thin panel in the wall plane: broken doors and shattered windows. */
+        PANE,
+        /** A table top on four legs over a full-cell collider. */
+        TABLE
     }
 
     public final String displayName;
@@ -131,7 +168,7 @@ public enum BlockType {
 
     /** Blocks the player can place another block into. */
     public boolean isReplaceable() {
-        return this == AIR || this == WATER || this == TALL_GRASS;
+        return this == AIR || this == WATER || this == TALL_GRASS || this == DEBRIS;
     }
 
     /** Blocks that can be targeted by the mining raycast. */

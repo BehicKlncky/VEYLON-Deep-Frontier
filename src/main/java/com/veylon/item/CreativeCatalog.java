@@ -153,7 +153,9 @@ public final class CreativeCatalog {
             case MUSKET_BALL, SCRAP_SHOT, ARROW, IRON_ARROW, RIFLE_CARTRIDGE -> {
                 return Category.WEAPONS;
             }
-            case DIRT, STONE, SAND, GRAVEL, CLAY, SNOW, LOG, PLANK, WALL, ROPE_LADDER, TRAIL_MARKER -> {
+            case DIRT, STONE, SAND, GRAVEL, CLAY, SNOW, LOG, PLANK, WALL, ROPE_LADDER, TRAIL_MARKER,
+                 ASPHALT, PAVING, CONCRETE, BRICK, PLASTER, SHEET_METAL, STAIRS, WOOD_DOOR, METAL_DOOR,
+                 WINDOW -> {
                 return Category.BUILDING;
             }
             default -> {

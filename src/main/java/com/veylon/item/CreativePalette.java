@@ -57,7 +57,9 @@ public final class CreativePalette {
             ItemType.SALTPETER_ORE_BLOCK,
             ItemType.GLOW_FUNGUS_BLOCK,
             ItemType.STONE_BRICK_BLOCK,
-            ItemType.CAGE_BARS_BLOCK));
+            ItemType.CAGE_BARS_BLOCK,
+            ItemType.RUBBLE_BLOCK,
+            ItemType.DEBRIS_BLOCK));
 
     /** Every block deliberately left without an item form, with its reason. */
     private static final Map<BlockType, String> EXCLUDED;
@@ -97,6 +99,15 @@ public final class CreativePalette {
         excluded.put(BlockType.BEACON_LIT,
                 "endgame state written by the beacon installation; it is unbreakable"
                         + " and placing one would fake a transmitting beacon");
+        String openHalf = "the open state of a door or window: F swings the placed closed form"
+                + " open and World.fixtures records it; pick block gives the closed item";
+        excluded.put(BlockType.WOOD_DOOR_OPEN, openHalf);
+        excluded.put(BlockType.METAL_DOOR_OPEN, openHalf);
+        excluded.put(BlockType.WINDOW_OPEN, openHalf);
+        String brokenHalf = "irreversible remains of a forced door or shattered pane; they exist"
+                + " only as the result of breaking the closed form";
+        excluded.put(BlockType.BROKEN_DOOR, brokenHalf);
+        excluded.put(BlockType.BROKEN_WINDOW, brokenHalf);
         EXCLUDED = Collections.unmodifiableMap(excluded);
     }
 

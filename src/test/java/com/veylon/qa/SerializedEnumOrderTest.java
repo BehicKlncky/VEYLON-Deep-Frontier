@@ -33,7 +33,12 @@ class SerializedEnumOrderTest {
             // 0.3.0 world expansion — appended, never reordered.
             "BASALT", "SULFUR_ORE", "SALTPETER_ORE", "GLOW_FUNGUS", "LADDER", "LANTERN",
             "TRAIL_MARKER", "POWDER_KEG", "GATE", "GATE_OPEN", "STONE_BRICK", "ALARM_BELL",
-            "CAGE_BARS");
+            "CAGE_BARS",
+            // Urban package 04 materials and fixtures — appended, never reordered.
+            "ASPHALT", "PAVING", "CONCRETE", "BRICK", "PLASTER", "SHEET_METAL", "RUBBLE",
+            "WOOD_DOOR", "WOOD_DOOR_OPEN", "METAL_DOOR", "METAL_DOOR_OPEN", "BROKEN_DOOR",
+            "WINDOW", "WINDOW_OPEN", "BROKEN_WINDOW", "STAIRS", "SHELF", "CABINET", "LOCKER",
+            "TABLE", "DEBRIS");
 
     private static final List<String> ITEM_TYPE_ORDER = List.of(
             "DIRT", "STONE", "SAND", "GRAVEL", "CLAY", "SNOW", "LOG", "PLANK", "WALL", "STICK",
@@ -58,7 +63,11 @@ class SerializedEnumOrderTest {
             "COAL_ORE_BLOCK", "COPPER_ORE_BLOCK", "IRON_ORE_BLOCK", "ASH_BLOCK",
             "WRECKAGE_BLOCK", "POD_HULL_BLOCK", "RUIN_STONE_BLOCK", "BONE_PILE_BLOCK",
             "BASALT_BLOCK", "SULFUR_ORE_BLOCK", "SALTPETER_ORE_BLOCK", "GLOW_FUNGUS_BLOCK",
-            "STONE_BRICK_BLOCK", "CAGE_BARS_BLOCK");
+            "STONE_BRICK_BLOCK", "CAGE_BARS_BLOCK",
+            // Urban package 04 salvage and palette forms — appended, never reordered.
+            "ASPHALT", "PAVING", "CONCRETE", "BRICK", "PLASTER", "SHEET_METAL", "STAIRS",
+            "WOOD_DOOR", "METAL_DOOR", "WINDOW", "SHELF", "CABINET", "LOCKER", "TABLE",
+            "RUBBLE_BLOCK", "DEBRIS_BLOCK");
 
     private static final List<String> QUEST_TYPE_ORDER = List.of(
             "FETCH", "HUNT_PREDATOR", "INVESTIGATE",

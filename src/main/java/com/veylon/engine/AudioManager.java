@@ -43,6 +43,8 @@ public class AudioManager {
     // 0.3.0 combat & settlement sounds (all synthesized, like everything else).
     private int bBowDraw, bBowRelease, bArrowImpact, bBulletImpact, bMusket, bPistol;
     private int bDryFire, bReload, bFuse, bExplosion, bAlarmBell, bGate;
+    // Doors and windows (UrbanFixtureSounds).
+    private int bDoorOpen, bDoorClose, bMetalDoor, bDoorRattle, bDoorForced, bGlassBreak, bWindowSlide;
     // Burning bodies (BodyFireSounds).
     private int bBodyCrackle, bBodyFlare, bBodySizzle;
 
@@ -289,8 +291,10 @@ public class AudioManager {
         }
         int buf = switch (under) {
             case STONE, GRAVEL, COAL_ORE, COPPER_ORE, IRON_ORE, RUIN_STONE, FURNACE, ASH,
-                 SCRAP_BLOCK, POD_HULL, ICE -> bFootStone;
-            case PLANK, LOG, WORKBENCH, CRATE, WALL, MAP_TABLE, HERB_STATION -> bFootWood;
+                 SCRAP_BLOCK, POD_HULL, ICE, STONE_BRICK, BASALT, ASPHALT, PAVING, CONCRETE,
+                 BRICK, PLASTER, SHEET_METAL, RUBBLE, STAIRS, LOCKER, METAL_DOOR -> bFootStone;
+            case PLANK, LOG, WORKBENCH, CRATE, WALL, MAP_TABLE, HERB_STATION, WOOD_DOOR, SHELF,
+                 CABINET, TABLE -> bFootWood;
             case SNOW -> bFootSnow;
             default -> bFootGrass;
         };
@@ -496,6 +500,37 @@ public class AudioManager {
         playAt(bGate, x, y, z, 0.6f, pitchVar(0.12f));
     }
 
+    /** A door swinging open or shut; a metal door clanks either way. */
+    public void playDoor(float x, float y, float z, boolean opening, boolean metal) {
+        if (!enabled) return;
+        int buf = metal ? bMetalDoor : opening ? bDoorOpen : bDoorClose;
+        playAt(buf, x, y, z, metal ? 0.7f : 0.6f, metal && opening ? 1.08f : pitchVar(0.1f));
+    }
+
+    /** A sash or casement moved in its frame. */
+    public void playWindow(float x, float y, float z) {
+        if (!enabled) return;
+        playAt(bWindowSlide, x, y, z, 0.45f, pitchVar(0.12f));
+    }
+
+    /** A locked or barred handle tried: the sound of a failed entry. */
+    public void playDoorRattle(float x, float y, float z) {
+        if (!enabled) return;
+        playAt(bDoorRattle, x, y, z, 0.6f, pitchVar(0.1f));
+    }
+
+    /** A door forced off its frame; carries like the noise it makes. */
+    public void playDoorForced(float x, float y, float z) {
+        if (!enabled) return;
+        playAtFar(bDoorForced, x, y, z, 0.85f, pitchVar(0.08f));
+    }
+
+    /** A pane shattering; carries like the noise it makes. */
+    public void playGlassBreak(float x, float y, float z) {
+        if (!enabled) return;
+        playAtFar(bGlassBreak, x, y, z, 0.8f, pitchVar(0.1f));
+    }
+
     /**
      * One crackle of a burning body at {@code (x, y, z)}, louder the stronger
      * it burns ({@code strength} 0..1). It is the fire's ambience: the
@@ -617,7 +652,8 @@ public class AudioManager {
     private VoicePool.Priority priority(int buffer, boolean ambience) {
         if (buffer == bExplosion || buffer == bHurt || buffer == bAlarmBell) return VoicePool.Priority.CRITICAL;
         if (buffer == bMusket || buffer == bPistol || buffer == bHowl || buffer == bGrowl
-                || buffer == bClick || buffer == bDiscover || buffer == bQuest || buffer == bToolBreak)
+                || buffer == bClick || buffer == bDiscover || buffer == bQuest || buffer == bToolBreak
+                || buffer == bGlassBreak || buffer == bDoorForced)
             return VoicePool.Priority.IMPORTANT;
         if (ambience || buffer == bFootGrass || buffer == bFootStone || buffer == bFootWood
                 || buffer == bFootSnow || buffer == bFootWater || buffer == bChirp || buffer == bFlap)
@@ -692,6 +728,13 @@ public class AudioManager {
         bExplosion = bank.get("Explosion");
         bAlarmBell = bank.get("AlarmBell");
         bGate = bank.get("Gate");
+        bDoorOpen = bank.get(UrbanFixtureSounds.DOOR_OPEN);
+        bDoorClose = bank.get(UrbanFixtureSounds.DOOR_CLOSE);
+        bMetalDoor = bank.get(UrbanFixtureSounds.METAL_DOOR);
+        bDoorRattle = bank.get(UrbanFixtureSounds.DOOR_RATTLE);
+        bDoorForced = bank.get(UrbanFixtureSounds.DOOR_FORCED);
+        bGlassBreak = bank.get(UrbanFixtureSounds.GLASS_BREAK);
+        bWindowSlide = bank.get(UrbanFixtureSounds.WINDOW_SLIDE);
         bBodyCrackle = bank.get(BodyFireSounds.CRACKLE);
         bBodyFlare = bank.get(BodyFireSounds.FLARE);
         bBodySizzle = bank.get(BodyFireSounds.SIZZLE);

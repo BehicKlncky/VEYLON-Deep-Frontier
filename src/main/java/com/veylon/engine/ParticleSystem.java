@@ -279,9 +279,10 @@ public class ParticleSystem {
         for (int i = 0; i < scaled(n); i++) {
             float shade = 0.75f + rng.nextFloat() * 0.4f;
             float r, g, b;
-            if (tile != null) {
+            int p = tile != null ? tile[rng.nextInt(tile.length)] : 0;
+            if (tile != null && (p >>> 24) >= 0x80) {
                 // Sample a random texel so debris matches the block's actual texture.
-                int p = tile[rng.nextInt(tile.length)];
+                // A cutout texel the shader discards (clear glass) is not debris.
                 r = ((p >> 16) & 0xFF) / 255f * shade;
                 g = ((p >> 8) & 0xFF) / 255f * shade;
                 b = (p & 0xFF) / 255f * shade;

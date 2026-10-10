@@ -176,6 +176,13 @@ public final class Raycaster {
         for (int i = 0; i < 512; i++) {
             BlockType type = world.getBlock(x, y, z);
             boolean hit = includeFluids ? type != BlockType.AIR : type.isTargetable();
+            if (hit && advanced && FixtureGeometry.isThin(type)
+                    && !FixtureGeometry.rayHitsThin(world, x, y, z, type, ox, oy, oz, dx, dy, dz,
+                    maxDist)) {
+                // An open door or a broken frame fills only a sliver of its
+                // cell: aim through the rest of the doorway at what lies beyond.
+                hit = false;
+            }
             if (hit && advanced) {
                 result.set(x, y, z, nx, ny, nz, t, type);
                 return true;

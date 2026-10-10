@@ -181,7 +181,28 @@ public enum ItemType {
             .color(0.78f, 0.76f, 0.66f)),
     GLOW_FUNGUS_BLOCK("Glow Fungus", p().places("GLOW_FUNGUS").weight(0.2f).color(0.42f, 0.78f, 0.62f)),
     STONE_BRICK_BLOCK("Stone Brick", p().places("STONE_BRICK").weight(1.7f).color(0.44f, 0.44f, 0.48f)),
-    CAGE_BARS_BLOCK("Cage Bars", p().places("CAGE_BARS").weight(1.5f).color(0.36f, 0.38f, 0.42f));
+    CAGE_BARS_BLOCK("Cage Bars", p().places("CAGE_BARS").weight(1.5f).color(0.36f, 0.38f, 0.42f)),
+
+    // ---- Urban materials and fixtures (urban package 04; append-only) ----
+    // Salvage forms: each block drops at most its own form, so breaking and
+    // placing never multiplies material. The two _BLOCK entries are Creative
+    // palette forms: rubble drops gravel and debris drops nothing.
+    ASPHALT("Asphalt", p().places("ASPHALT").weight(1.8f).color(0.20f, 0.20f, 0.22f)),
+    PAVING("Paving Slab", p().places("PAVING").weight(1.8f).color(0.58f, 0.57f, 0.55f)),
+    CONCRETE("Concrete", p().places("CONCRETE").weight(2.0f).color(0.62f, 0.62f, 0.60f)),
+    BRICK("Brick", p().places("BRICK").weight(1.6f).color(0.55f, 0.30f, 0.24f)),
+    PLASTER("Plaster", p().places("PLASTER").weight(0.8f).color(0.80f, 0.77f, 0.70f)),
+    SHEET_METAL("Sheet Metal", p().places("SHEET_METAL").weight(1.5f).color(0.45f, 0.48f, 0.50f)),
+    STAIRS("Concrete Stairs", p().places("STAIRS").weight(2.2f).color(0.60f, 0.60f, 0.58f)),
+    WOOD_DOOR("Wooden Door", p().stack(4).places("WOOD_DOOR").weight(6f).color(0.52f, 0.38f, 0.24f)),
+    METAL_DOOR("Metal Door", p().stack(2).places("METAL_DOOR").weight(14f).color(0.38f, 0.42f, 0.44f)),
+    WINDOW("Window", p().stack(8).places("WINDOW").weight(2.5f).color(0.62f, 0.72f, 0.78f)),
+    SHELF("Shelving Unit", p().stack(4).places("SHELF").weight(5f).color(0.55f, 0.44f, 0.30f)),
+    CABINET("Cabinet", p().stack(4).places("CABINET").weight(6f).color(0.62f, 0.52f, 0.38f)),
+    LOCKER("Metal Locker", p().stack(4).places("LOCKER").weight(9f).color(0.40f, 0.48f, 0.46f)),
+    TABLE("Table", p().stack(4).places("TABLE").weight(5f).color(0.58f, 0.44f, 0.28f)),
+    RUBBLE_BLOCK("Rubble", p().places("RUBBLE").weight(1.6f).color(0.50f, 0.48f, 0.45f)),
+    DEBRIS_BLOCK("Debris", p().places("DEBRIS").weight(0.3f).color(0.48f, 0.46f, 0.42f));
 
     public final String displayName;
     public final int maxStack;

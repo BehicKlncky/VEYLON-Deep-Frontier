@@ -473,6 +473,39 @@ public final class IconAtlas {
                 c.circle(7, 22, 4, 0xFFC5A66D);
                 c.line(9, 19, 9, 26, 1, 0xFF4A392A);
             }
+            // Urban fixtures read by their silhouette, not as a cube of their texture.
+            case WOOD_DOOR -> {
+                c.clear();
+                c.rect(9, 2, 23, 29, 0xFF4E3824);
+                c.rect(10, 3, 22, 28, 0xFF7A5A3C);
+                c.rect(12, 5, 20, 13, 0xFF664A30);
+                c.rect(12, 16, 20, 26, 0xFF664A30);
+                c.circle(19, 15, 1, 0xFFD8D0B8);
+            }
+            case METAL_DOOR -> {
+                c.clear();
+                c.rect(9, 2, 23, 29, 0xFF3A3D42);
+                c.rect(10, 3, 22, 28, 0xFF56606A);
+                c.rect(13, 5, 19, 11, 0xFF2A3A44);
+                c.line(11, 16, 21, 16, 1, 0xFF9AA2A8);
+                c.rect(10, 24, 22, 28, 0xFF6E767C);
+            }
+            case WINDOW -> {
+                c.clear();
+                c.rect(6, 5, 26, 27, 0xFFBFB8A8);
+                c.rect(8, 7, 24, 25, 0xFF4A6070);
+                c.line(9, 20, 15, 9, 1, 0xFFB8CCD8);
+                c.line(14, 23, 22, 10, 1, 0xFF9FB6C4);
+                c.line(8, 16, 24, 16, 1, 0xFFBFB8A8);
+            }
+            case STAIRS -> {
+                c.clear();
+                c.polygon(new int[]{4, 4, 12, 12, 20, 20, 28, 28},
+                        new int[]{28, 22, 22, 15, 15, 8, 8, 28}, 0xFF8A8A86);
+                c.line(4, 22, 12, 22, 1, 0xFFC8742E);
+                c.line(12, 15, 20, 15, 1, 0xFFC8742E);
+                c.line(20, 8, 28, 8, 1, 0xFFC8742E);
+            }
             default -> {
                 // The real material projection is already the distinguishing mark.
             }

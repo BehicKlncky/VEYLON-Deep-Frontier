@@ -53,6 +53,8 @@ public class ChunkMesher {
     private final float[] faceAo = new float[4];
     private final float[] faceSky = new float[4];
     private final float[] faceBlock = new float[4];
+    /** Scratch box for {@link FixtureGeometry#thinBox}. */
+    private final float[] thinBox = new float[6];
     private static final int[] QUAD_ORDER = {0, 1, 2, 0, 2, 3};
     private static final int[] FLIPPED_QUAD_ORDER = {1, 2, 3, 1, 3, 0};
 
@@ -121,7 +123,8 @@ public class ChunkMesher {
                         }
                         case PANEL -> {
                             BlockMaterial m = MaterialRegistry.of(t);
-                            float ph = t == BlockType.ANVIL ? 0.55f : (t == BlockType.CAMP_BED ? 0.40f : 0.18f);
+                            float ph = t == BlockType.ANVIL ? 0.55f : t == BlockType.CAMP_BED ? 0.40f
+                                    : t == BlockType.DEBRIS ? 0.06f : 0.18f;
                             box(wx + 0.06f, y, wz + 0.06f, wx + 0.94f, y + ph, wz + 0.94f,
                                     m.topLayer[0], wx, y, wz, 1f, 1f, 1f);
                             if (t == BlockType.BEDROLL || t == BlockType.CAMP_BED) {
@@ -164,6 +167,8 @@ public class ChunkMesher {
                                     layer("water_still"), wx, y, wz, 0.7f, 0.85f, 1f);
                         }
                         case LIQUID -> emitWater(wx, y, wz);
+                        case LEAF, PANE -> emitThin(t, wx, y, wz);
+                        case TABLE -> emitTable(t, wx, y, wz);
                         case NONE -> {
                         }
                     }
@@ -247,6 +252,8 @@ public class ChunkMesher {
         int variant = m.variantOf(x, y, z);
         // Subtle per-block value jitter breaks up large same-material areas.
         float jitter = 0.95f + hash(x, y, z) * 0.1f;
+        // A closed door shows its lower or upper panel depending on the cell below.
+        int doorSide = Fixtures.isClosedDoor(t) ? doorLayer(t, x, y, z) : -1;
 
         for (int d = 0; d < 6; d++) {
             int[] n = NORMAL[d];
@@ -254,10 +261,15 @@ public class ChunkMesher {
             if (opaqueAt(nx, ny, nz)) {
                 continue;
             }
+            if (t == BlockType.WINDOW && world.getBlock(nx, ny, nz) == BlockType.WINDOW) {
+                // Panes of one opening share faces; drawing them would put a
+                // sheet of glass inside the window at an angle.
+                continue;
+            }
             int layer = switch (d) {
                 case 0 -> m.topLayer[variant];
                 case 1 -> m.bottomLayer[variant];
-                default -> m.sideLayer[variant];
+                default -> doorSide >= 0 ? doorSide : m.sideLayer[variant];
             };
             int flags = 0;
             if (m.tint == TintMode.FOLIAGE || (m.tint == TintMode.GRASS_TOP && d == 0)) {
@@ -343,6 +355,43 @@ public class ChunkMesher {
 
     private static int cornerAxis(int[] corner, int axis) {
         return corner[axis];
+    }
+
+    // ------------------------------------------------------------------
+    // Urban fixtures: door halves, thin leaves and panes, tables
+    // ------------------------------------------------------------------
+
+    /** The panel tile of a door cell: the upper panel when the cell below is the same door. */
+    private int doorLayer(BlockType t, int x, int y, int z) {
+        Fixtures.Kind kind = Fixtures.kindOf(t);
+        boolean upper = kind != null && Fixtures.kindOf(world.getBlock(x, y - 1, z)) == kind;
+        boolean metal = kind == Fixtures.Kind.METAL_DOOR;
+        return layer(metal ? (upper ? "door_metal_upper" : "door_metal_lower")
+                : (upper ? "door_wood_upper" : "door_wood_lower"));
+    }
+
+    /** Open leaves and broken frames, at exactly the box the raycast targets. */
+    private void emitThin(BlockType t, int x, int y, int z) {
+        if (!FixtureGeometry.thinBox(world, x, y, z, t, thinBox)) {
+            return;
+        }
+        int layer = Fixtures.kindOf(t) != null && Fixtures.kindOf(t).door
+                ? doorLayer(t, x, y, z) : MaterialRegistry.of(t).sideLayer[0];
+        box(thinBox[0], thinBox[1], thinBox[2], thinBox[3], thinBox[4], thinBox[5],
+                layer, x, y, z, 1f, 1f, 1f);
+    }
+
+    /** A table top on four legs; the collider is the whole cell, as for any solid block. */
+    private void emitTable(BlockType t, int x, int y, int z) {
+        BlockMaterial m = MaterialRegistry.of(t);
+        int top = m.topLayer[0];
+        int leg = m.sideLayer[0];
+        box(x, y + 0.84f, z, x + 1, y + 1, z + 1, top, x, y, z, 1f, 1f, 1f);
+        float a = 0.06f, b = 0.17f;
+        box(x + a, y, z + a, x + b, y + 0.84f, z + b, leg, x, y, z, 0.9f, 0.9f, 0.9f);
+        box(x + 1 - b, y, z + a, x + 1 - a, y + 0.84f, z + b, leg, x, y, z, 0.9f, 0.9f, 0.9f);
+        box(x + a, y, z + 1 - b, x + b, y + 0.84f, z + 1 - a, leg, x, y, z, 0.9f, 0.9f, 0.9f);
+        box(x + 1 - b, y, z + 1 - b, x + 1 - a, y + 0.84f, z + 1 - a, leg, x, y, z, 0.9f, 0.9f, 0.9f);
     }
 
     // ------------------------------------------------------------------
