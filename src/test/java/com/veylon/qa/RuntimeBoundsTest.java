@@ -347,6 +347,31 @@ class RuntimeBoundsTest {
     }
 
     @Test
+    void buildingPlanCacheEvictsAndRebuildsIdenticallyWithoutGeneratingChunksOrState() {
+        Game game = new Game();
+        game.newWorld(20260731, true, World.GEN_URBAN_PLANS, com.veylon.entity.GameMode.SURVIVAL);
+        var firstParcel = game.world.urban.regionPlan(0, 0).refuge();
+        var first = game.world.urban.buildingAt(firstParcel.x0(), firstParcel.z0());
+        int chunks = game.world.loadedCount();
+        int plans = 0;
+        for (int region = 0; plans <= com.veylon.world.urban.UrbanWorldState.MAX_BUILDING_PLANS; region++) {
+            var district = game.world.urban.regionPlan(region, -region);
+            for (var parcel : district.parcels()) {
+                game.world.urban.buildingAt(parcel.x0(), parcel.z0());
+                plans++;
+            }
+            assertTrue(RuntimeBudgetSnapshot.capture(game).withinHardLimits());
+        }
+        assertEquals(com.veylon.world.urban.UrbanWorldState.MAX_BUILDING_PLANS,
+                RuntimeBudgetSnapshot.capture(game).urbanBuildingPlans());
+        assertEquals(first, game.world.urban.buildingAt(firstParcel.x1(), firstParcel.z1()));
+        assertEquals(chunks, game.world.loadedCount());
+        assertTrue(game.world.changedBlocks.isEmpty());
+        assertTrue(game.world.crateContents.isEmpty());
+        assertEquals(0, game.world.fixtures.size());
+    }
+
+    @Test
     void residentsOpeningManyDoorsKeepTheirSwingShutTimersBounded() {
         Game game = new Game();
         game.newWorld(20260716L, true, World.GEN_URBAN_STREETS, com.veylon.entity.GameMode.SURVIVAL);
