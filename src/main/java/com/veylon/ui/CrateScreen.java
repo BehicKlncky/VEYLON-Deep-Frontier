@@ -27,9 +27,9 @@ public class CrateScreen {
 
         float pw = 620, ph = 470;
         float x0 = w / 2f - pw / 2f, y0 = h / 2f - ph / 2f;
-        ui.panel(x0, y0, pw, ph);
+        ui.panel(x0, y0, pw, ph, 8);
         ui.textCentered(w / 2f, y0 + 10, 2f, title(g), 1f, 1f, 1f, 1f);
-        ui.textCentered(w / 2f, y0 + ph - 22, 1.2f, "Left click: stack. Right click: one. [F or Esc] close.",
+        ui.textCentered(w / 2f, y0 + ph - 22, 1.4f, "Left click: stack. Right click: one. [F or Esc] close.",
                 0.7f, 0.7f, 0.7f, 1f);
 
         double mx = g.input.cursorX(), my = g.input.cursorY();
@@ -37,12 +37,12 @@ public class CrateScreen {
         boolean single = g.input.wasMousePressed(GLFW_MOUSE_BUTTON_RIGHT);
 
         // Crate grid: 4x3.
-        ui.textShadow(x0 + 20, y0 + 42, 1.1f, g.crateStatus(), 0.9f, 0.85f, 0.6f, 1f);
+        ui.textShadow(x0 + 20, y0 + 42, 1.4f, g.crateStatus(), 0.9f, 0.85f, 0.6f, 1f);
         int moveFromCrate = drawGrid(g, ui, crate, x0 + 20, y0 + 62, 4, mx, my);
         if (g.crateSearching()) {
-            ui.textShadow(x0 + 250, y0 + 95, 1.2f, "Rummaging makes noise.", 0.95f, 0.8f, 0.55f, 1f);
-            ui.textShadow(x0 + 250, y0 + 120, 1.2f, "Stay close. The world keeps moving.", 0.8f, 0.85f, 0.9f, 1f);
-            ui.textShadow(x0 + 250, y0 + 145, 1.2f, "Closing keeps your progress.", 0.8f, 0.85f, 0.9f, 1f);
+            ui.textShadow(x0 + 250, y0 + 95, 1.4f, "Rummaging makes noise.", 0.95f, 0.8f, 0.55f, 1f);
+            ui.textShadow(x0 + 250, y0 + 120, 1.4f, "Stay close. The world keeps moving.", 0.8f, 0.85f, 0.9f, 1f);
+            ui.textShadow(x0 + 250, y0 + 145, 1.4f, "Closing keeps your progress.", 0.8f, 0.85f, 0.9f, 1f);
         }
         // Player grid: 9x4 (smaller slots).
         ui.textShadow(x0 + 20, y0 + 232, 1.4f, "Your inventory", 0.7f, 0.85f, 0.95f, 1f);
