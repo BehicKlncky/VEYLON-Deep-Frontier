@@ -1,6 +1,8 @@
 package com.veylon;
 
+import com.veylon.entity.GameMode;
 import com.veylon.simulation.SimulationScheduler;
+import com.veylon.world.World;
 import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Field;
@@ -109,6 +111,21 @@ class WorldSeedDeterminismTest {
     }
 
     @Test
+    void anUrbanWorldReplaysIdenticallyAfterALegacyWorldRanInTheSameProcess() {
+        // The urban branch takes the same reset and reseed as every world and
+        // adds no random stream of its own that could carry state across: its
+        // plans are pure derivations, not streams (decision D-38).
+        for (int generator : new int[]{World.GEN_URBAN}) {
+            String first = simulate(20260716L, null, generator);
+            String afterLegacyWorld = simulate(20260716L, 20260716L, generator);
+            assertEquals(first, afterLegacyWorld,
+                    "an urban world must not inherit RNG state from a legacy world before it");
+            assertNotEquals(first, simulate(20260716L, null, World.GEN_CAVE_IDENTITIES),
+                    "the fingerprint must see which generator built the world");
+        }
+    }
+
+    @Test
     void differentSeedsStillProduceDifferentWorlds() {
         // Guards against "fixed" meaning "constant": seeding must not collapse
         // every world onto the same outcome.
@@ -123,16 +140,21 @@ class WorldSeedDeterminismTest {
      * randomness feeds into.
      */
     private static String simulate(long seed, Long warmupSeed) {
+        return simulate(seed, warmupSeed, World.DEFAULT_NEW_WORLD_GENERATOR);
+    }
+
+    /** As above, building the measured world with {@code generator}; the warm-up is legacy. */
+    private static String simulate(long seed, Long warmupSeed, int generator) {
         Game game = new Game();
         if (warmupSeed != null) {
-            game.newWorld(warmupSeed, true);
+            game.newWorld(warmupSeed, true, World.GEN_CAVE_IDENTITIES);
             for (int i = 0; i < 40; i++) {
                 game.fastTick(SimulationScheduler.FAST_DT);
             }
             game.mediumTick(SimulationScheduler.MEDIUM_DT);
             game.slowTick(SimulationScheduler.SLOW_DT);
         }
-        game.newWorld(seed, true);
+        game.newWorld(seed, true, generator, GameMode.SURVIVAL);
         for (int i = 0; i < 60; i++) {
             game.fastTick(SimulationScheduler.FAST_DT);
         }

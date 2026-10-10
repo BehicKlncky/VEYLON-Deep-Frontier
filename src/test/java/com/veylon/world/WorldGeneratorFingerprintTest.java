@@ -67,6 +67,17 @@ class WorldGeneratorFingerprintTest {
     private static final long[] DEEP_TERRAIN_FINGERPRINTS = {
             0x0ac52031ca6ac5bcL, 0x23bc80e5d60717e2L, 0xb40fceda52cad351L};
 
+    /**
+     * Generator 4, urban layout revision 1: the street datum placeholder,
+     * recorded 2026-10-07 when it was introduced. Saved generator-4 worlds
+     * re-derive it, so the city replaces it under a new generator version
+     * rather than by changing this one ({@code UrbanRevision}). Its blocks are
+     * the same everywhere; only the climate biome's soil moisture varies, which
+     * is why two seeds share a value.
+     */
+    private static final long[] URBAN_TERRAIN_FINGERPRINTS = {
+            0x2a0067f62e235b25L, 0x4e5a3a9063303cfeL, 0x2a0067f62e235b25L};
+
     /** Chunks fingerprinted per seed: origin, offset, and two negative ones. */
     private static final int[][] CHUNKS = {{0, 0}, {3, -2}, {-1, -1}, {-4, 5}};
 
@@ -82,6 +93,11 @@ class WorldGeneratorFingerprintTest {
         // both and stay green.
         assertTerrainPinned(World.GEN_LEGACY, LEGACY_TERRAIN_FINGERPRINTS);
         assertTerrainPinned(World.GEN_DEEP, DEEP_TERRAIN_FINGERPRINTS);
+    }
+
+    @Test
+    void theUrbanGeneratorMatchesItsRecordedFingerprint() {
+        assertTerrainPinned(World.GEN_URBAN, URBAN_TERRAIN_FINGERPRINTS);
     }
 
     private static void assertTerrainPinned(int generatorVersion, long[] recorded) {

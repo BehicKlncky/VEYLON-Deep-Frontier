@@ -2,6 +2,7 @@ package com.veylon;
 
 import com.veylon.combat.ProjectileLethality;
 import com.veylon.entity.Affliction;
+import com.veylon.entity.GameMode;
 import com.veylon.entity.Npc;
 import com.veylon.item.ItemStack;
 import com.veylon.item.ItemType;
@@ -10,6 +11,8 @@ import com.veylon.simulation.SimulationScheduler;
 import com.veylon.util.AppPaths;
 import com.veylon.util.Vec3i;
 import com.veylon.world.BlockType;
+import com.veylon.world.World;
+import com.veylon.world.urban.UrbanRevision;
 import org.junit.jupiter.api.Test;
 
 import java.nio.file.Path;
@@ -443,6 +446,45 @@ class GameLoopIntegrationTest {
         assertEquals(savedPieces, game.fragments.settledCount(),
                 "the pieces lying in the world are the save's, not the discarded world's as well");
         assertNoWoundOrBlastRecordSurvives(game, marked);
+    }
+
+    @Test
+    void urbanAndLegacyWorldsInheritNothingFromEachOther() {
+        // The legacy camp lives partly outside World (the faction's camp
+        // position) and the urban revision lives inside it; new worlds and loads
+        // over a live world, in both directions, must start clean of the other.
+        Game game = new Game();
+        game.newWorld(777L, true, World.GEN_CAVE_IDENTITIES);
+        assertNotNull(game.faction.campPos, "precondition: the legacy camp is raised");
+        assertFalse(game.entities.npcs.isEmpty(), "precondition: the camp has residents");
+        Path legacySave = AppPaths.dataDirectory().resolve("build/qa/game-loop-legacy.dat");
+        assertTrue(SaveSystem.save(game, legacySave));
+
+        game.newWorld(778L, true, World.GEN_URBAN, GameMode.SURVIVAL);
+        assertUrbanFoundationOnly(game);
+        Path urbanSave = AppPaths.dataDirectory().resolve("build/qa/game-loop-urban.dat");
+        assertTrue(SaveSystem.save(game, urbanSave));
+        game.newWorld(777L, true, World.GEN_CAVE_IDENTITIES);
+        assertNull(game.world.urban, "a legacy world carries no urban state");
+        assertNotNull(game.faction.campPos);
+
+        assertTrue(SaveSystem.load(game, urbanSave), "an urban load over a live legacy world");
+        assertUrbanFoundationOnly(game);
+
+        assertTrue(SaveSystem.load(game, legacySave), "a legacy load over a live urban world");
+        assertNull(game.world.urban);
+        assertEquals(World.GEN_CAVE_IDENTITIES, game.world.generatorVersion);
+        assertNotNull(game.faction.campPos, "the legacy load raises its own camp again");
+    }
+
+    private static void assertUrbanFoundationOnly(Game game) {
+        assertTrue(game.world.isUrban());
+        assertEquals(UrbanRevision.CURRENT_CONTENT, game.world.urban.contentRevision());
+        assertNull(game.world.campPos);
+        assertNull(game.faction.campPos, "the previous world's camp must not follow the player");
+        assertTrue(game.entities.npcs.isEmpty(), "no camp residents carried over");
+        assertTrue(game.world.crateContents.isEmpty(), "no camp crates carried over");
+        assertTrue(game.world.settlements.isEmpty());
     }
 
     /** Blows a person apart two blocks from the player, the way a blast death does. */
