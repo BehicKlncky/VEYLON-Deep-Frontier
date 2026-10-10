@@ -176,7 +176,7 @@ These are validated by production code *[05]* against real collider and movement
 | --- | --- |
 | A1 | Every generated building has ≥ 1 usable entrance from walkable street, alley or courtyard, or a discoverable alternate entry (ground-floor window, fire escape, basement hatch) usable with equipment obtainable before it is needed. |
 | A2 | Every generated playable room, container and quest reservation is reachable from an entrance by a route the player collider (0.6 × 1.8, auto-step 1.0) can walk. Where residents or hostiles must reach it, the route must also be followable by `Pathfinder` (B-21, B-65). |
-| A3 | Vertical access between all floors uses stairs of full-block steps with ≥ 3 clear cells above each step's departure cell, in switchback cores with landings. Ladders are secondary or alternate routes only (fire escapes, hatches). A ladder-only building is invalid. |
+| A3 | Vertical access between all floors uses switchback stairs with landings and ≥ 3 clear cells above each integer departure cell. Frozen templates 1/2 use full-block steps; template 3 uses two half-height treads per directional cell, with matching collision and reversible swept-clearance proof (owner's native-QA refinement, 2026-10-11; D-69–D-70). Ladders are secondary or alternate routes only (fire escapes, hatches). A ladder-only building is invalid. |
 | A4 | Every reachable room has a route back to an exit. No playable room may require a one-way drop deeper than 3 blocks (B-65 `MAX_DROP`). |
 | A5 | Locked routes need a key or tool obtainable outside the locked area, or an alternate entry. A key is never only behind its own lock. Abandoned property can always be forced with a basic tool, at a noise cost. |
 | A6 | Ruin variants may remove rooms or floors. Removed rooms carry no containers or quest reservations, and the remaining playable rooms stay connected. |
@@ -209,6 +209,9 @@ the validated proposal. Live room/floor, sky/cover, shelter and climate queries
 avoid roof-as-ground and apartment-as-cave classifications. Generated physical,
 state and day/night appearance evidence is recorded separately from the required
 human walk in [PROGRESS.md](PROGRESS.md) and [VALIDATION.md](VALIDATION.md).
+The 2026-10-11 native-QA continuation adds generator 8 / template 3 for shaped
+stairs, preserving generator 7 and every room/fixture identity. The owner
+explicitly confirmed the complete normal-input Survival exploration route passed.
 
 ## 6. Occupied sites and the player's refuge (D-21, D-22)
 
@@ -359,7 +362,7 @@ The table is in dependency order: an item may depend only on items above it. Sec
 | 1 | Generator version `GEN_URBAN` | Persistent | `World` | 02 | — | v3 base int; values above `MAX_SUPPORTED_GENERATOR` rejected | Fixed per `World` | — |
 | 2 | Urban content revision | Persistent | `UrbanRevision` | 02 | 1 | `urban.meta`; absent means 1 | New and load | — |
 | 3 | Region, district, street and parcel plans | Derived | `CityPlanner` | 03 | 1, 2 | Not saved | Cache per `World` | ≤ 16 regions |
-| 4 | Building, floor, room and fixture plans | Derived | `BuildingPlanner` / `BuildingPlan` | 05–06 | 3 | Template 1 / layout 3 selected by saved generator 6; furnished template 2 / layout 4 by generator 7; unchanged `urban.meta` v1 validates the layout; plans not serialized | Cache per `World`, discarded on new/load | ≤ 256 buildings; ≤ 73,984 cells/plan |
+| 4 | Building, floor, room and fixture plans | Derived | `BuildingPlanner` / `BuildingPlan` | 05–06 | 3 | Template 1 / layout 3 selected by saved generator 6; furnished template 2 / layout 4 by generator 7; shaped stairs template 3 / layout 5 by generator 8; unchanged `urban.meta` v1 validates the layout; plans not serialized | Cache per `World`, discarded on new/load | ≤ 256 buildings; ≤ 73,984 cells/plan |
 | 5 | Generated blocks plus edits | Derived plus deltas | Generator and `World` | 03, 06 | 3, 4 | `changedBlocks` (v3 base, last-write log, B-29) | — | 4,000,000 edits |
 | 6 | Fixture state: door or window open, keyed lock or one-sided bar (broken is a recorded block edit); barricade health later | Persistent, touched cells only | `FixtureStates` on `World` | 04, 06 | 4 | `world.fixtures` v1 (D-49); absent follows generated lock defaults, or unlocked for edited/player-placed fixtures; explicit saved unlock overrides the plan | Load replaces; reapplied after structure and recorded edits on chunk generation | ≤ 32,768 cells on write and read |
 | 7 | Container state: contents, emptied, destroyed, owner | Persistent, touched only | `UrbanContainers` | 07 | 2, 4 | `urban.containers`; absent means unrolled | Load replaces; never re-rolled | Capped, write ≤ read cap |

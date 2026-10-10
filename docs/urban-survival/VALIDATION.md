@@ -641,3 +641,169 @@ affected checks. Milestone 06 remains **PARTIAL**; do not begin 07 yet.
 No manual listening, wall-clock performance benchmark, native release package,
 merge, push, tag or publication was performed. Existing block-light wall leakage
 and CPU chunk retention remain the recorded package-22 and package-24 limits.
+
+## 06 native-QA continuation — 2026-10-11
+
+Started from clean `197f8da` on `feature/urban-survival`. Read the base in
+`build/urban-survival-roadmap-revision/00_BASE_KNOWLEDGE.md`, repository rules,
+relevant urban records and the save-compatibility skill. The owner instructed
+**“Complete 06’s gate first”** before 07. Native feedback identified the street
+entrance; the owner subsequently confirmed symmetric opening, supplied the cubic
+closed-door screenshot, confirmed the thin-panel repair, and requested shaped
+stairs. After the shaped-stair repair the owner explicitly confirmed **“Yes, the
+full route passed”**, completing the normal-input Survival street/kitchen/upper/
+B1/exit gate without clipping or getting stuck.
+
+All commands used JDK 25 via
+`$env:JAVA_HOME=(Resolve-Path 'build/tools/jdk25/jdk-25.0.4.1+1').Path`.
+Portable commands were run with `--console=plain`; logs below are ignored local
+artifacts, not committed fixtures. Git whitespace checks passed at each code
+staging boundary.
+
+### Door revisions
+
+`9e5c332` was tested with:
+
+```powershell
+.\gradlew.bat test --tests 'com.veylon.GeneratedEntranceGeometryTest' --tests 'com.veylon.UrbanFixtureGameplayTest' --tests 'com.veylon.UrbanApartmentQaSceneTest' --console=plain
+.\gradlew.bat build --console=plain
+```
+
+26 focused checks passed (`build/m06-entrance-focused-20261011.log`). Its portable
+build passed in 7 min 20 s: 1,706 tests, zero failures/errors, one skip
+(`build/m06-entrance-build-20261011.log`; XML totals preserved in
+`build/m06-hinge-build-summary-20261011.json`). Both paired door heights/frontages
+are exercised through production interactions and raycasts, including a removed
+or broken partner. `graphify update . --no-cluster` then completed with 7,384
+nodes / 28,165 edges (`build/m06-entrance-graph-20261011.log`). Later owner findings
+superseded that source snapshot, requiring the final graph refresh below.
+
+`f850626` was tested with:
+
+```powershell
+.\gradlew.bat test --tests 'com.veylon.GeneratedEntranceGeometryTest' --tests 'com.veylon.world.FixturesTest' --tests 'com.veylon.UrbanFixtureGameplayTest' --tests 'com.veylon.UrbanApartmentQaSceneTest' --tests 'com.veylon.world.RaycasterTest' --tests 'com.veylon.gfx.UrbanMaterialsTest' --tests 'com.veylon.qa.SerializedEnumOrderTest' --tests 'com.veylon.world.WorldGeneratorFingerprintTest' --tests 'com.veylon.save.GeneratedApartmentStateTest' --console=plain
+.\gradlew.bat build --console=plain
+```
+
+73 focused checks passed (`build/m06-door-panels-focused-20261011.log`). Portable
+build passed in 7 min 21 s: 1,707 tests, zero failures/errors, one skip
+(`build/m06-door-panels-build-20261011.log`; totals preserved in
+`build/m06-door-panels-build-summary-20261011.json`). This includes old generator
+fingerprints and serialized ordinals, not rewritten pins. Generated/isolated
+raycasts hit the panel while passing through its former perpendicular cube faces.
+
+Native door runs used seed `20260731`, generator 7 and Survival. The three
+scripted scenes used shots `3,7`, resolution `1280x720`, UI scale `1`, fullscreen
+`0`, vsync `0`, GL diagnostics `1`, and no frontend/smoke setting:
+
+| Scene | Data directory under `build/qa/` | Capture tag | Result |
+| --- | --- | --- | --- |
+| `urban_apartments` | `m06-door-panels-day-20261011` | `m06_closed_panels_scripted_day` | Clean exit, 14 s |
+| `urban_apartments_night` | `m06-door-panels-raw-night-20261011` | `m06_closed_panels_scripted_raw_night` | Clean exit, 9 s |
+| `urban_apartments_lit_night` | `m06-door-panels-lit-night-20261011` | `m06_closed_panels_scripted_portable_torches_night` | Clean exit, 9 s |
+
+Each used `.\gradlew.bat run -PveylonDataDir=build/qa/<directory> --console=plain`.
+Logs are `build/m06-door-panels-native-{day,raw-night,lit-night}-20261011.log`.
+All reported zero GL/KHR errors and zero native audio errors. Inspection covered
+day 3/7 s and portable-light night 7 s; scripted poses are appearance evidence.
+The owner confirmed the thin-door appearance in the subsequent normal-input
+`urban_apartments_manual` session, directory
+`build/qa/m06-door-panels-manual-20261011`. That session closed normally after
+10 min 31 s with zero GL/KHR/audio errors; it supplies no complete route report.
+
+### Stair mechanics and generated integration
+
+The reusable mechanics commit `1a58b53` was exported from its exact staged tree
+using `git checkout-index --all --prefix=build/m06-stair-mechanics-check/`, before
+including generator 8. This exported revision passed:
+
+```powershell
+.\build\m06-stair-mechanics-check\gradlew.bat -p build/m06-stair-mechanics-check test --tests 'com.veylon.world.StairGeometryTest' --tests 'com.veylon.StairPlacementSaveTest' --tests 'com.veylon.entity.ShapedStairBodyTest' --tests 'com.veylon.combat.ShapedStairProjectileTest' --tests 'com.veylon.UrbanFixtureGameplayTest' --tests 'com.veylon.entity.*Movement*' --tests 'com.veylon.entity.*Ragdoll*Test' --tests 'com.veylon.combat.ProjectileHitZoneTest' --tests 'com.veylon.qa.SerializedEnumOrderTest' --tests 'com.veylon.gfx.UrbanMaterialsTest' --console=plain
+```
+
+103 tests passed, zero failures/errors/skips, 30 s
+(`build/m06-stair-mechanics-check-final.log` and
+`build/m06-stair-mechanics-summary-20261011.json`). The first run failed because
+the new projectile test asserted guaranteed arrow recovery, which is actually
+probabilistic. The final assertion tests flight consumption on impact, preserving
+the production recovery policy. Tread raycasts test actual hit heights/normals
+and empty quarters in all orientations; fallen bodies settle on the low tread;
+placement/break/replacement and production save/load preserve direction and one
+shared item form. Existing cube-stair collision remains covered.
+
+Generated integration passed:
+
+```powershell
+.\gradlew.bat test --tests 'com.veylon.world.StairGeometryTest' --tests 'com.veylon.StairPlacementSaveTest' --tests 'com.veylon.entity.ShapedStairBodyTest' --tests 'com.veylon.combat.ShapedStairProjectileTest' --tests 'com.veylon.world.urban.ShapedStairGenerationTest' --tests 'com.veylon.save.GeneratedShapedStairStateTest' --tests 'com.veylon.entity.GeneratedApartmentTraversalTest' --tests 'com.veylon.entity.BuildingPlanTraversalTest' --tests 'com.veylon.world.UrbanGeneratorDispatchTest' --tests 'com.veylon.world.urban.UrbanRevisionTest' --tests 'com.veylon.UrbanDevelopmentSelectorTest' --tests 'com.veylon.UrbanApartmentQaSceneTest' --tests 'com.veylon.world.WorldGeneratorFingerprintTest' --tests 'com.veylon.qa.SerializedEnumOrderTest' --tests 'com.veylon.gfx.UrbanMaterialsTest' --console=plain
+.\gradlew.bat test --tests 'com.veylon.UrbanApartmentQaSceneTest' --console=plain
+```
+
+56 focused checks passed in 9 s (`build/m06-shaped-stairs-focused-final-20261011.log`
+and its `-summary-` JSON); after appending the stair camera pose, all five QA
+scene checks passed (`build/m06-shaped-stairs-qa-check-20261011.log`). The generated
+tests preserve every non-stair cell, room/fixture identity and occupation choice
+across three seeds and all origin-region parcels; compare both chunk load
+orders; climb/descend every frontage in both modes through production movement
+and pathfinding; and save/load a destroyed generated tread over a live old world
+without regeneration. Generator 1–7 fingerprint constants were not changed.
+
+The first integrated `.\gradlew.bat build --console=plain` failed one of 1,715
+tests: `AccessibilityValidatorTest` still expected literal template 3 to be
+unsupported. Production correctly supports that revision now. The rejection
+case was changed to `BUILDING_TEMPLATE_SHAPED_STAIRS + 1`, then verified with:
+
+```powershell
+.\gradlew.bat test --tests 'com.veylon.world.urban.AccessibilityValidatorTest' --console=plain
+.\gradlew.bat build --console=plain
+graphify update . --no-cluster
+```
+
+The focused validator check passed (`build/m06-shaped-stairs-revision-check-20261011.log`).
+Final portable build passed in 7 min 12 s: **1,715 tests, zero failures/errors,
+one skip**, including Javadoc/doclint (`build/m06-shaped-stairs-build-final-20261011.log`
+and `build/m06-shaped-stairs-build-final-summary-20261011.json`). The earlier
+failed totals remain in `build/m06-shaped-stairs-build-initial-summary-20261011.json`.
+The code graph update completed with 7,433 nodes / 28,400 edges
+(`build/m06-shaped-stairs-graph-20261011.log`), before the final test-only literal
+correction; no semantic extraction or clustering ran. Existing Gradle parser
+limitations remain. Documentation resolved 54 relative links/anchors across
+six changed records and passed whitespace checks. Code integration is `8388f93`.
+
+### Native stair appearance and completed human route
+
+Common settings: generator `urban-dev` (8), seed `20260731`, Survival,
+`VEYLON_SHOT=27`, resolution `1280x720`, UI scale `1`, fullscreen `0`, vsync `0`,
+GL diagnostics `1`, with frontend/smoke unset. Set scene/tag from each row and run
+`.\gradlew.bat run -PveylonDataDir=build/qa/<directory> --console=plain`.
+
+| Scene | Directory under `build/qa/` | Capture tag | Result |
+| --- | --- | --- | --- |
+| `urban_apartments` | `m06-shaped-stairs-day-20261011` | `m06_shaped_stairs_scripted_day` | Clean exit, 34 s |
+| `urban_apartments_night` | `m06-shaped-stairs-raw-night-20261011` | `m06_shaped_stairs_scripted_raw_night` | Clean exit, 29 s |
+| `urban_apartments_lit_night` | `m06-shaped-stairs-lit-night-20261011` | `m06_shaped_stairs_scripted_portable_torches_night` | Clean exit, 29 s |
+
+All three captures were inspected. Logs
+`build/m06-shaped-stairs-native-{day,raw-night,lit-night}-20261011.log` report zero
+GL/KHR errors and zero native audio errors. Day and portable-light night show
+the stepped tread/riser geometry. Raw night remains dimmer; the existing held
+torch model does not light terrain. Supplemental night still adds exactly four
+QA portable torches, without replacing a fixture or staging stairs. KHR shader
+recompile and screenshot pixel-transfer performance messages are not errors or
+frame benchmarks. Native boot uses the existing 104/160 texture layers and
+126/126 item icons; four directional materials reuse existing tiles.
+
+The new start-only manual session is
+`build/qa/m06-shaped-stairs-manual-20261011`, log
+`build/m06-shaped-stairs-native-manual-20261011.log`, with `VEYLON_SHOT` unset and
+vsync `1`. The owner was asked to walk the entire route and report appearance,
+clipping, stairs and exit. Building remains `urban:building:0,0:0:0`, INTACT,
+three storeys plus B1, bounds `(6,6)..(32,17)`, now template 3. The owner confirmed
+the stair appearance and explicitly reported **“Yes, the full route passed”**
+using normal WASD/mouse/F controls. The session closed normally after 3 min 25 s,
+with zero GL/KHR/native-audio errors. **Human route gate PASSED.** Day and night
+scripted captures supply separate appearance evidence. No listening pass,
+calibrated benchmark or older-binary
+execution is claimed. Existing saves stay on their frozen generator; older
+builds cannot read generator 8, and downgrading old-generator worlds edited with
+new stair ids is unsupported. Save base/section layouts and content revision
+are unchanged.

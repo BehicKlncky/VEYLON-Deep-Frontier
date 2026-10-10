@@ -256,14 +256,16 @@ regenerating under a newer generator.
 Generator versions form an explicit set (`World.isSupportedGenerator`): 1 legacy,
 2 deep, 3 cave identities, 4 the urban street datum, 5 the urban street network,
 6 the same street geometry plus frozen building plans (layout 3, template 1),
-and 7 generated furnished apartments and shops (layout 4, template 2), which the
+7 generated furnished apartments and shops (layout 4, template 2), and
+8 the same buildings with shaped stairs (layout 5, template 3), which the
 development selector creates. New worlds use
 `World.DEFAULT_NEW_WORLD_GENERATOR` (3, until the urban rollout); a load accepts any
 supported version and rejects the rest, including anything above
 `MAX_SUPPORTED_GENERATOR`, before it replaces the live world. Feature gates name
 their versions (`hasDeepFrontier`, `hasCaveIdentities`, `isUrbanGenerator`) instead
 of comparing with `>=`, so a new generator inherits nothing by accident, and
-`WorldGeneratorFingerprintTest` pins the output of every version.
+`WorldGeneratorFingerprintTest` pins versions 1–7. `ShapedStairGenerationTest`
+checks version 8 against frozen version 7 outside stair cells and across chunk orders.
 
 An urban world's layout revision follows from its generator, so it is known
 before bootstrap generates a chunk; a geometry change means a new generator
@@ -384,6 +386,14 @@ real rooms. The same production validator checks all playable room cells,
 interaction targets and reversible stairs after furnishings; budgets remain six
 fixtures/three containers per room and three to six containers per flat.
 
+`BuildingStairShapes` overlays template 2 to produce template 3 under generator
+8. It changes only the old stair cells: four two-wide directional cells per
+flight, with full concrete landings. Variant/basement selection deliberately
+uses revision two's inputs, preserving all room, fixture and building identities.
+Generators 6/7 keep their original plans and block bytes; saves are never
+automatically upgraded. The saved generator selects the layout before bootstrap;
+`urban.meta` remains version 1 and validates that matching layout.
+
 `UrbanBuildingStamper` intersects whole plans with each chunk and parcel. It
 writes only owned footprint cells, including AIR to carve B1, never the proposal's
 paving halo or a neighbour's chunk. Generator 7 also maps streets to the real
@@ -425,8 +435,14 @@ player and residents do). They apply in every world, legacy included, though onl
 Creative or salvage can bring one into a legacy world.
 
 - **Families.** A door or window kind has a closed, an open and a broken id. Closed
-  is a solid full cell (glass is solid but not opaque), open is a non-solid leaf
-  along the low jamb, broken is a non-solid frame in the wall plane. Collision,
+  retains a solid full-cell collider (glass is solid but not opaque), open is a non-solid leaf
+  against a jamb, broken is a non-solid frame in the wall plane. Open paired doors
+  use opposite outer jambs: a structural neighbour on the high side, with none on
+  the low side, puts that leaf on the high jamb. This also preserves its side when
+  its partner is broken or removed. Doors supported on both sides and casements
+  retain the low-side leaf. A closed door renders as a 0.125-block panel centred
+  in the wall plane, with visible jamb faces and matching targeting. Its existing
+  collision and world-light blocking remain unchanged. Collision,
   pathing and meshing read the ids, so they agree; the targeting raycast and the
   mesher share `FixtureGeometry`, so the crosshair passes an open doorway and hits
   only the drawn leaf. An opening is a vertical stack of one kind, at most three
@@ -459,7 +475,23 @@ Creative or salvage can bring one into a legacy world.
   `FixtureActions.tickResidentDoors` (settlement fast tick) shuts them behind,
   never on a body. Those timers are transient and bounded (`MAX_TRANSIT`); the save
   writes such a door shut. In urban worlds `Npc` steps up one full block, so
-  residents climb full-block stairs by walking.
+  residents climb full-block stairs by walking. `VoxelPhysics` first tries a
+  half-height rise when it fits, retaining the full-block allowance.
+
+- **Shaped stairs** (`StairGeometry`): four appended ids 78–81 encode the high
+  end, with two half-height treads. Meshing, targeting, ordinary body collision,
+  ragdoll contacts and projectile samples use the same bounds. The integer
+  pathfinder conservatively routes above their high end; reversible generated
+  flights are tested with both pathfinding and actual player movement in both
+  modes and every frontage. Placement chooses direction from camera yaw. All
+  directions share the existing stair item, icon, textures and one-item drop;
+  direction persists through ordinary changed-block bytes. The catalogue uses
+  82 of 128 non-negative byte ids. Historical `STAIRS` remains a full cube.
+  Voxel lighting treats shaped stairs as non-opaque to retain adjacent faces;
+  it does not resolve light through individual tread subvolumes. Older binaries
+  were not executed: those supporting at most generator 7 reject generator 8;
+  downgrading an older-generator world containing newly placed stair ids is not
+  supported. The v3 base and extension layouts are unchanged.
 - **Containers and salvage.** Shelving, cabinets and lockers use the crate storage
   (until package 07). A break of an urban block whose contents or salvage would not
   fit is refused rather than losing items; salvage is at most the one item that

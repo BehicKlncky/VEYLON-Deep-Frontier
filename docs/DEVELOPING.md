@@ -93,8 +93,8 @@ the spawn column.
 | `urban_seam_walk` | Real player movement east along a local street from x −40 to x 40, across the region seam at x 0; at 24 s it prints `[urban-qa] seam-walk ... pass=true` when the walk crossed the seam and at least four chunk borders without a collision, an unloaded column or a change of ground height |
 | `urban_fixtures` | Package 04's `FixtureShowcase` house beside the spawn: the facade (0–4 s); at 4 s the front door and a window are opened and the other window shattered through the production commands (facade again to 7 s); the door closed and seen from inside with its HUD prompt (7–10 s); the windows from inside (10–13 s); the stairs from their foot (13–16 s) and from the roof (16–19 s); at 19 s a real walk in through the front door and up the stairs, reporting `[urban-qa] fixtures-walk ... pass=true` at 32 s |
 | `urban_fixtures_night` | The same house at 23:00 with lanterns lit inside: facade, windows from inside, stairs, the door from inside (shots at 3, 6, 9 and 12 s) |
-| `urban_apartments`, `urban_apartments_night` | Actual generated boundary-spanning multi-storey apartment with B1. Six scripted camera holds: street, entrance, kitchen, upper floor, basement, exit. Capture at `3,7,11,15,19,23`. Logs and default filenames explicitly label scripted-camera appearance evidence; these views do not prove navigation. No staged structure, world lights or loot. |
-| `urban_apartments_lit_night` | Supplemental 23:00 appearance sequence with the same six scripted views. Adds exactly four QA portable torches through ordinary recorded block edits in previously empty cells, preserving structure and fixtures. Logs and default filenames identify the portable-light instrumentation; this is readability evidence, not generated utilities or human navigation. |
+| `urban_apartments`, `urban_apartments_night` | Actual generated boundary-spanning multi-storey apartment with B1. Seven scripted camera holds: street, entrance, kitchen, upper floor, basement, exit, stair foot. Capture at `3,7,11,15,19,23,27`. Logs and default filenames explicitly label scripted-camera appearance evidence; these views do not prove navigation. No staged structure, world lights or loot. |
+| `urban_apartments_lit_night` | Supplemental 23:00 appearance sequence with the same seven scripted views. Adds exactly four QA portable torches through ordinary recorded block edits in previously empty cells, preserving structure and fixtures. Logs and default filenames identify the portable-light instrumentation; this is readability evidence, not generated utilities or human navigation. |
 | `urban_apartments_manual`, `urban_apartments_manual_night` | Start-only positioning outside the same generated apartment, forced Survival, normal mouse look/movement/F interactions afterward. Without `VEYLON_SHOT`, stays open for a human walk. Record the seed, building id, mode, actual route, clipping/stair findings and exit. The scene itself never records a manual success. |
 
 ```powershell
@@ -105,7 +105,8 @@ $env:VEYLON_SCENE='urban_seam_walk'; $env:VEYLON_SHOT='3,9,14,25'
 
 Keep a shot at or after 25 s for the walk, because the run closes after its last
 shot (33 s for `urban_fixtures`). Generators 4–6 keep their unbuilt parcels;
-generator 7 builds furnished interiors. The HUD still shows the legacy camp line and climate biome
+generator 7 builds furnished interiors with cube stairs, and generator 8
+(`urban-dev`) uses directional half-height treads. The HUD still shows the legacy camp line and climate biome
 (packages 08, 13 and 21).
 
 For the generated apartment appearance sequence use an isolated directory and a
