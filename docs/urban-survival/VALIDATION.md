@@ -325,3 +325,24 @@ Document verification of these four records:
 | Five-lens read-only review workflow (two fact-checkers, feasibility, completeness, consistency) | **Failed.** All agents stopped on the account session limit before returning anything. It was replaced by the checks above; no independent semantic review of the design text was obtained. |
 
 Not run: no Gradle build, test, benchmark, native session or capture. Milestone 01 changes documentation only and makes no claim of fresh build or runtime evidence.
+
+### Milestone 02 (2026-10-07)
+
+Host: Windows 11 Pro, NVIDIA GeForce RTX 3060 Ti (driver 610.88, OpenGL 3.3). JDK: Temurin `25.0.4.1+1`, fetched again into the session scratchpad with its SHA-256 checked against Adoptium's published value. Commands ran from the repository root. Logs are in `build/m02-*.log` (ignored by git, never cleaned).
+
+| Check | Result |
+| --- | --- |
+| Safety net on the **unchanged** generator: the C-2 retargets, then `WorldGeneratorFingerprintTest`, `CaveIdentityGenerationTest`, `SaveMigrationTest`, `CorruptSaveResilienceTest`, `RuntimeBoundsTest` and `HistoricalV020SaveCompatibilityTest` | Pass: 5 + 3 + 5 + 13 + 5 + 1 tests. The absolute gen-1 and gen-2 terrain fingerprints were read from this unchanged code, then recorded as constants |
+| `grep` for `CURRENT_GENERATOR` in `src/` and `docs/`, apart from these records | No references left |
+| First focused run of the new tests | The gen-4 fingerprint placeholder failed, as intended, and was recorded. `UrbanIdsTest` found a real bug: `parse` expected 7 fields for a resident instead of 6. Fixed |
+| The 02 validation set from §5, the always set and `com.veylon.save.*`, after the fix | 146 tests, 0 failures |
+| Read-only review workflow: 3 reviewers (save and load; legacy gates and runtime; bootstrap, selector and ids) and 1 adversarial verifier | 3 low-severity findings, 2 of them the same issue. (1) Confirmed: `VEYLON_FRONTEND` staging ignored the selector; fixed. (2) Plausible: the isolation guard compared path text, so an alias got through; it now compares file identity. A remark from the first pass was also applied: new tests that mean "legacy world" now name generator 3. The reviewers' truth tables for every converted gate on versions 1–3 matched |
+| `.\gradlew.bat build` on the tree before the review fixes | BUILD SUCCESSFUL in 6 min 27 s. 150 test classes, 1,562 tests, 0 failures, 0 skipped; javadoc included |
+| Focused tests on the review fixes: `AppPathsTest`, `UrbanDevelopmentSelectorTest`, `UrbanMetaSectionTest`, `GameLoopIntegrationTest`, `WorldSeedDeterminismTest`, `ModeSelectionRoutingTest`, `SaveSlotIsolationTest` | Pass. On this host a symbolic link needs a privilege, so the link case skips through an assumption |
+| Manual alias check: a junction (`mklink /J`) from the scratchpad to the checkout, passed as `-Dveylon.dataDir` to `jshell` calling `AppPaths.isolatedFromPlayerData()`; the junction was removed afterwards | Junction: `false` (not isolated). The scratchpad itself and `build/qa/m02-check`: `true` |
+| **Final** `.\gradlew.bat build --console=plain` on the finished tree | BUILD SUCCESSFUL in 6 min 24 s. 150 test classes, **1,565 tests, 0 failures, 1 skipped** (the symlink case above); javadoc and doclint included |
+| Native negative check: `VEYLON_GENERATOR=urban-dev .\gradlew.bat run` without `-PveylonDataDir` | Refused at start with "VEYLON_GENERATOR=urban-dev needs an isolated data directory…". No `saves/` was created |
+| Native isolated urban smoke: `VEYLON_GENERATOR=urban-dev VEYLON_SEED=20260731 VEYLON_SMOKE=10 VEYLON_SHOT=4 VEYLON_CAPTURE_TAG=m02_urban_dev .\gradlew.bat run -PveylonDataDir=build/qa/m02-urban` | Smoke gate passed (exit 0). Save and load were both true at `build/qa/m02-urban/build/qa/smoke-save.dat`; `fortressPlan={available=false,generator=urban}`. Average 140.3 fps, 1280 × 720, VSync on; 0 GL and 0 KHR errors; runtime within hard limits; 3 wildlife creatures (the legacy spawner, D-28). The capture `build/qa/m02-urban/screenshots/m02_urban_dev_4s.png` shows the stone-brick street datum to the horizon and the development notice. Nothing was written outside `build/qa/m02-urban`; the checkout has no `saves/` |
+| `graphify update . --no-cluster`, run once after the code was final | Graph rebuilt: 6,471 nodes, 24,448 edges. The new classes are indexed |
+
+Not run: `performanceTest` (02 adds no per-frame work, and this host is not the calibrated reference) and `releaseArtifacts`. No older binary was executed: the rejection of an urban save by 0.8.1 is established by reading code (PROGRESS, milestone 02).

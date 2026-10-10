@@ -6,11 +6,11 @@ This is the running record for the 26-package urban-survival roadmap. The pack i
 
 | Item | Value |
 | --- | --- |
-| Last completed package | **01 - Design and repository audit**; this commit series reconstructs the accumulated 01-04 work in dependency order. |
+| Last completed package | **02 - Versioned urban foundation**; this commit series reconstructs the accumulated 01-04 work in dependency order. |
 | Branch | `feature/urban-survival`, based on `923345f`; `main` remains at that baseline until a separately authorized integration. |
 | Source revision | The source and configuration are reconstructed from `e452dc1`; final equality is checked after the split. Dated checks below belong to the original implementation sessions. |
 | Default new world | Legacy generator 3 until package 26. The explicit urban development selector requires an isolated data directory. |
-| Next package | **02 - Versioned urban foundation**; see the handoff below. |
+| Next package | **03 - City plans and street network**; see the handoff below. |
 | Commits | Local, scoped `feat`, `test`, `docs` and `chore` commits on the feature branch. No merge, push, tag or publication is part of this reconstruction. |
 
 ## Package ledger
@@ -20,7 +20,7 @@ The status vocabulary is NOT STARTED, IN PROGRESS, PARTIAL, BLOCKED or COMPLETE.
 | Id | Package | Depends on | Code owners | Observable gate | Status |
 | --- | --- | --- | --- | --- | --- |
 | 01 | Design and repository audit | — | `docs/urban-survival/` | The four records exist, are cross-linked and pass the link and path check; the entry point for 02 is recorded | **COMPLETE** |
-| 02 | Versioned urban foundation | 01 | `world/World` (`GEN_URBAN`, predicates, default and maximum constants), `world/WorldGenerator` (dispatch), `Game`, `WorldBootstrap`, `FrontendController` (explicit generator path), `save/SaveSystem`, `save/V3ExtensionSections` (`urban.meta`), `util/AppPaths`, `build.gradle` (QA data dir), new `world/urban/UrbanIds`, `UrbanRevision`, `UrbanBootstrap` skeleton | Production bootstrap creates an urban-dev world and its generator and revision round-trip. Legacy dispatch, fingerprints and the new gen-2 pin are unchanged. Old saves without urban state load safely. Unsupported or corrupt revisions fail per policy. Reset over a live world clears foundation state. A tested QA data-dir seam exists. | NOT STARTED |
+| 02 | Versioned urban foundation | 01 | `world/World` (`GEN_URBAN`, predicates, default and maximum constants), `world/WorldGenerator` (dispatch), `Game`, `WorldBootstrap`, `FrontendController` (explicit generator path), `save/SaveSystem`, `save/V3ExtensionSections` (`urban.meta`), `util/AppPaths`, `build.gradle` (QA data dir), new `world/urban/UrbanIds`, `UrbanRevision`, `UrbanBootstrap` skeleton | Production bootstrap creates an urban-dev world and its generator and revision round-trip. Legacy dispatch, fingerprints and the new gen-2 pin are unchanged. Old saves without urban state load safely. Unsupported or corrupt revisions fail per policy. Reset over a live world clears foundation state. A tested QA data-dir seam exists. | **COMPLETE** (2026-10-07) |
 | 03 | City plans and street network | 02 | New `world/urban/CityPlanner`, `DistrictPlan`, `StreetNetwork`, `ParcelPlan`, `UrbanChunkStamper`; `World` urban queries and the loaded-column query; `EntityManager` and `EventSystem` urban gating (D-28); `UrbanQaScenes` | Across the seed, region and order matrix: roads join at borders, parcels respect reservations, blocks and ids are identical in every chunk order, and no wilderness POI, ore, cave or legacy settlement appears. A walkable starter street network exists. Streetscape captures and a native seam walk. | NOT STARTED |
 | 04 | Urban materials and interactions | 03 | `world/BlockType` (appended, budgeted), `gfx/MaterialRegistry`, `gfx/ProceduralTextures`, `engine/AudioManager` footsteps, `WorldInteractions`, `InteractPromptBuilder`, `PlayerBlockActions`, `ai/Pathfinder` door passability, new `FixtureStates` and `world.fixtures` | A fixture shows a player and an NPC opening a door, using a window entry and climbing stairs; breaking a fixture; recognising a searchable object. Collision, raycast, rendering and navigation agree. Fixture state round-trips. Creative and Survival gates hold. Natives show both sides of doors and night readability. | NOT STARTED |
 | 05 | Building plans and accessibility | 03–04 | New `world/urban/BuildingPlanner`, `BuildingTemplates`, `FloorPlan`, `RoomPlan`, `FixtureSlot`, `AccessibilityValidator` (reusing `Pathfinder` semantics and `PlayerConstants`) | Across the template × rotation × seed matrix: no unreachable room, container or quest reservation; valid stairs; no overlap or overflow. Invalid fixtures are rejected. Plans match under shuffled access. Validator work is bounded. | NOT STARTED |
@@ -127,6 +127,83 @@ Milestone 02 starts here, in this order:
 6. Add `urban.meta` v1 (content revision) through the section envelope with an absent default (D-04, C-5). Add `UrbanIds` with the identity layout and validation (DESIGN §13), and its tests.
 7. Add the structural QA data-dir seam and its test (D-23), and document the native QA recipe (`-Dveylon.dataDir`).
 8. Validate with the 02 row of VALIDATION §5: focused tests, then `.\gradlew.bat build --console=plain`. Run `graphify update . --no-cluster` once at the end. Write the 02 handoff here and fill the D-02 to D-04 implementation details in DECISIONS. Do not claim playable urban content.
+
+## Milestone 02 — versioned urban foundation (2026-10-07)
+
+**Status: COMPLETE.** No user-visible selector was added, so the gate needs no native evidence (VALIDATION §5). An optional isolated native smoke and capture were run anyway (VALIDATION §7). Urban content is **not** playable: an urban world is the street datum and nothing else.
+
+### Start state
+
+- `main` at `923345f`. The only working-tree change was milestone 01's uncommitted `docs/urban-survival/`.
+- Temp cleanup had half-deleted the portable JDK from 2026-09. Temurin `jdk-25.0.4.1+1` was fetched again into this session's scratchpad, and its SHA-256 matched Adoptium's published checksum.
+
+### Implemented behaviour
+
+- **Generator split and explicit gates** (D-32):
+  - Added `World.GEN_URBAN = 4`, `DEFAULT_NEW_WORLD_GENERATOR = 3` and `MAX_SUPPORTED_GENERATOR = 4`. `CURRENT_GENERATOR` is gone.
+  - Every former `>=` / `<` gate is now an explicit predicate. A truth table per gate keeps generators 1–3 unchanged.
+  - Unsupported versions are refused by the loader, by `WorldBootstrap` before it resets anything, and by the `World` constructor.
+- **Exact dispatch** to `UrbanPlaceholderTerrain`: stone at y 0–39, a stone-brick street at y 40, air above, and soil moisture from the climate biome. Its output is frozen and fingerprint-pinned. Urban worlds get no caves, ores, decoration, POIs, cave mouths, settlements, fumaroles or stalker depth.
+- **Revisions** (D-33, D-34):
+  - The layout revision follows from the generator. The content revision is resolved before chunk generation for a fresh world. For a load it stays unreadable until `urban.meta` or its absent default (1) has been read.
+  - `urban.meta` v1 holds the version, layout and content. Only urban worlds write it. The rejection rules are recorded in D-34.
+- **Identities**: `UrbanIds` packs district, parcel, building, floor, room, fixture and resident ids into frozen 64-bit values, with a strict canonical text form, validation by range and kind, and parent navigation (DESIGN §13).
+- **Ownership** (D-38): `World.urban` (`UrbanWorldState`) exists only in urban worlds, so a new world or a load always starts clean. `BoundedPlanCache` is the LRU primitive for derived plans. Nothing was added to `Game` apart from the 4-argument `newWorld`.
+- **Bootstrap** (D-37): urban worlds skip the dry-land search and the crash camp, and spawn provisionally on the street at y 41.2. `FactionSystem.campPos` is now cleared for every new world and load. The camp hint becomes a development notice.
+- **Development selector and QA isolation** (D-36):
+  - `VEYLON_GENERATOR=urban-dev` applies to NEW FRONTIER, automated worlds and `VEYLON_FRONTEND` staging.
+  - It refuses to start unless `veylon.dataDir` differs from the player's directory, judged by file identity when both directories exist.
+  - Every Gradle `Test` task runs with `build/test-data/<task>`.
+  - `run` accepts `-PveylonDataDir`.
+- **Documentation**: `docs/ARCHITECTURE.md` (world creation, generator versions, `urban.meta`, compatibility directions, the id policy) and `docs/DEVELOPING.md` (`VEYLON_GENERATOR`, "Isolated QA data").
+
+### Changed paths
+
+- **Production**, under `src/main/java/com/veylon/`:
+  - New: `world/urban/{UrbanDatum,UrbanRevision,UrbanIds,UrbanWorldState,UrbanPlaceholderTerrain,BoundedPlanCache}.java`, `UrbanBootstrap.java`, `save/UrbanMetaSection.java`.
+  - Edited: `world/World.java`, `world/WorldGenerator.java`, `entity/EntityManager.java`, `QaHarness.java`, `save/SaveSystem.java`, `save/V3ExtensionSections.java`, `Game.java`, `WorldBootstrap.java`, `FrontendController.java`, `AutomatedRunDriver.java`, `util/AppPaths.java`.
+- **Build**: `build.gradle`.
+- **Tests**, under `src/test/java/com/veylon/`:
+  - New: `world/urban/{UrbanIdsTest,UrbanRevisionTest,BoundedPlanCacheTest}`, `world/UrbanGeneratorDispatchTest`, `save/UrbanMetaSectionTest`, `save/SaveSlotIsolationTest`, `UrbanDevelopmentSelectorTest`.
+  - Extended: `world/WorldGeneratorFingerprintTest`, `GameLoopIntegrationTest`, `WorldSeedDeterminismTest`, `util/AppPathsTest`.
+  - Retargeted (C-2): `world/CaveIdentityGenerationTest`, `save/SaveMigrationTest`, `qa/RuntimeBoundsTest`, `save/CorruptSaveResilienceTest`.
+- **Documents**: `docs/ARCHITECTURE.md`, `docs/DEVELOPING.md`, and these four records.
+
+### Stable ids, schema and compatibility
+
+- **New section**: `urban.meta` v1. Saves now carry 13 section ids at most, and legacy saves still carry 12.
+- **Enums**: none changed. The `UrbanIds.Kind` codes are explicit, never ordinals, and are pinned by `UrbanIdsTest`.
+- **Verified by tests on this build**:
+  - Legacy saves load with no urban state.
+  - Legacy saves written now contain no `urban.meta`.
+  - Urban saves round-trip their generator, layout and content.
+  - Loads over a live world work in both directions.
+  - Every rejection case listed in D-34, plus generators 0 and `MAX + 1`, fails while the live world survives.
+  - An absent `urban.meta` gives the content default.
+- **Established by reading code, not by running it**:
+  - Build 0.8.1 (`923345f`) rejects generator 4 before it replaces the live world: its check is `generatorVersion > CURRENT_GENERATOR (3)`.
+  - An older urban-capable build that meets a newer `urban.meta` version fails the whole load, through the existing known-section rule.
+  - No older binary was run.
+
+### Commands and results
+
+See [VALIDATION.md §7, milestone 02](VALIDATION.md#milestone-02-2026-10-07). Gradle ran with the scratchpad Temurin 25.0.4.1 on the Windows host.
+
+### Limitations and deferred items
+
+- The placeholder has no city, buildings or interiors (03, 05, 06). Package 03 must allocate a new generator version for its street network (D-35).
+- Legacy surface wildlife and surface events still run in urban worlds. They are harmless on the flat placeholder; the native smoke counted 3 creatures. Package 03 gates them (D-28).
+- The fresh kit and the Survival intro ("Gather wood…") are still legacy (08). The HUD operations panel still shows the legacy "Camp / Neutral" trust line although an urban world has no camp (08, 21). Respawn uses the provisional spawn (08).
+- No consumer reads the content revision or `BoundedPlanCache` yet; the first are 03 and 07. No urban id is persisted yet. The id-validation policy is documented in `docs/ARCHITECTURE.md` and DESIGN §13 for the sections that will store ids.
+- The isolation guard decides by file identity only when both directories exist. A not-yet-created alias of a not-yet-created player directory falls back to comparing normalised paths.
+- A milestone-02 review workflow (3 reviewers and 1 verifier) returned 3 low-severity findings, two of them the same issue. Both distinct issues were fixed: `VEYLON_FRONTEND` staging now honours the selector, and the guard now compares file identity. A further remark from the first pass was also applied: new tests that mean a legacy world now name generator 3. Every other point the reviewers checked held.
+
+### Next unmet prerequisite: entry point for 03
+
+1. Read `00_BASE_KNOWLEDGE.md`, prompt 03, DESIGN §4.2–4.4, §11 and §12, DECISIONS D-06, D-07, D-09, D-15, D-28, D-35 and D-38, and VALIDATION §4.1 (H-04, H-05, H-08, H-28, H-32) and §6.
+2. Allocate the next generator version for the street network (D-35), and decide whether to keep or retire generator 4. Repoint `UrbanRevision.DEVELOPMENT_GENERATOR` and `MAX_SUPPORTED_GENERATOR`, and add its fingerprint pin.
+3. Build `CityPlanner` plans on `BoundedPlanCache` (≤ 16 regions) owned by `UrbanWorldState`. Add the first salt class with its distinctness test (D-38). Add the loaded-column query (R-14). Gate surface wildlife and events in urban worlds (D-28).
+4. Freeze the urban design seed set in VALIDATION §6.
 
 ## Resume rules
 
