@@ -37,6 +37,12 @@ public final class UrbanRevision {
 
     /** Layout revision of {@link World#GEN_URBAN}: the street datum and nothing else. */
     public static final int LAYOUT_DATUM_PLACEHOLDER = 1;
+    /**
+     * Layout revision of {@link World#GEN_URBAN_STREETS}: the street network,
+     * districts and reserved parcels of {@link CityPlanner}, with no buildings.
+     */
+    public static final int LAYOUT_STREET_NETWORK = 2;
+
     /** Content revision every new urban world records. */
     public static final int CURRENT_CONTENT = 1;
     /** Oldest content revision this build still loads. */
@@ -49,7 +55,7 @@ public final class UrbanRevision {
     public static final int ABSENT_CONTENT = 1;
 
     /** The urban generator the development selector creates: the newest layout. */
-    public static final int DEVELOPMENT_GENERATOR = World.GEN_URBAN;
+    public static final int DEVELOPMENT_GENERATOR = World.GEN_URBAN_STREETS;
 
     private UrbanRevision() {
     }
@@ -62,6 +68,7 @@ public final class UrbanRevision {
     public static int layoutRevisionOf(int generatorVersion) {
         return switch (generatorVersion) {
             case World.GEN_URBAN -> LAYOUT_DATUM_PLACEHOLDER;
+            case World.GEN_URBAN_STREETS -> LAYOUT_STREET_NETWORK;
             default -> throw new IllegalArgumentException(
                     "generator " + generatorVersion + " is not an urban generator");
         };

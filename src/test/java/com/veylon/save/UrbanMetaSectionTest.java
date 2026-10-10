@@ -76,6 +76,44 @@ class UrbanMetaSectionTest {
     }
 
     @Test
+    void aStreetNetworkWorldRoundTripsItsLayoutGeometryAndSpawn() throws IOException {
+        Game original = new Game();
+        original.newWorld(SEED, true, World.GEN_URBAN_STREETS, GameMode.SURVIVAL);
+        assertEquals(UrbanRevision.LAYOUT_STREET_NETWORK, original.world.urban.layoutRevision());
+        int[] spawn = original.world.urban.spawnColumn();
+        Vec3i edit = new Vec3i(spawn[0], UrbanDatum.STREET_Y + 1, spawn[1] + 1);
+        original.world.setBlock(edit.x(), edit.y(), edit.z(), BlockType.PLANK, true);
+        Path save = save(original, "streets.sav");
+        assertEquals(List.of(1, UrbanRevision.LAYOUT_STREET_NETWORK, UrbanRevision.CURRENT_CONTENT),
+                ints(sections(Files.readAllBytes(save)).get(UrbanMetaSection.ID)));
+
+        Game loaded = new Game();
+        assertTrue(SaveSystem.load(loaded, save));
+        assertEquals(World.GEN_URBAN_STREETS, loaded.world.generatorVersion);
+        assertEquals(UrbanRevision.LAYOUT_STREET_NETWORK, loaded.world.urban.layoutRevision());
+        assertEquals(BlockType.PLANK, loaded.world.getBlock(edit.x(), edit.y(), edit.z()));
+        assertEquals(List.of(spawn[0], spawn[1]), List.of(loaded.world.urban.spawnColumn()[0],
+                loaded.world.urban.spawnColumn()[1]), "the spawn is re-derived from the plan");
+        int spawnChunkX = Math.floorDiv(spawn[0], Chunk.SX);
+        int spawnChunkZ = Math.floorDiv(spawn[1], Chunk.SZ);
+        assertChunksMatch(original.world, loaded.world, -1, -1);
+        assertChunksMatch(original.world, loaded.world, 0, 0);
+        assertChunksMatch(original.world, loaded.world, spawnChunkX + 3, spawnChunkZ - 2);
+        assertEquals(original.world.urban.parcelAt(spawn[0] - 2, spawn[1]),
+                loaded.world.urban.parcelAt(spawn[0] - 2, spawn[1]), "the refuge parcel keeps its identity");
+        assertTrue(loaded.entities.creatures.isEmpty(), "no surface wildlife after a load either");
+
+        // urban.meta that names the datum layout under the street generator is refused.
+        byte[] bytes = Files.readAllBytes(save);
+        Game live = new Game();
+        live.newWorld(SEED + 9, true, World.GEN_CAVE_IDENTITIES);
+        World liveWorld = live.world;
+        assertFalse(SaveSystem.load(live, write("mismatch.sav", withPayload(bytes,
+                meta(1, UrbanRevision.LAYOUT_DATUM_PLACEHOLDER, UrbanRevision.CURRENT_CONTENT)))));
+        assertSame(liveWorld, live.world);
+    }
+
+    @Test
     void loadingOverALiveWorldRehearsesTheUrbanStateAndReplacesTheWorld() throws IOException {
         Path save = save(urbanWorld(SEED), "urban.sav");
         Game live = new Game();

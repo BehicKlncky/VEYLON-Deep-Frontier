@@ -35,13 +35,22 @@ public class World {
     public static final int GEN_CAVE_IDENTITIES = 3;
     /**
      * Urban-survival development generator, layout revision 1: the street datum
-     * alone ({@link com.veylon.world.urban.UrbanPlaceholderTerrain}). Used only by explicit development and QA paths.
+     * alone ({@link com.veylon.world.urban.UrbanPlaceholderTerrain}). Kept so
+     * saved generator-4 worlds keep loading; new urban worlds use
+     * {@link #GEN_URBAN_STREETS}.
      */
     public static final int GEN_URBAN = 4;
+    /**
+     * Urban-survival development generator, layout revision 2: districts, the
+     * street network and reserved parcels, without buildings
+     * ({@link com.veylon.world.urban.CityPlanner}). Until the urban rollout only
+     * explicit development and QA paths create it.
+     */
+    public static final int GEN_URBAN_STREETS = 5;
     /** The generator of every ordinary new world; generator 3 until the urban rollout. */
     public static final int DEFAULT_NEW_WORLD_GENERATOR = GEN_CAVE_IDENTITIES;
     /** The highest generator version a save may name; a load rejects anything above it. */
-    public static final int MAX_SUPPORTED_GENERATOR = GEN_URBAN;
+    public static final int MAX_SUPPORTED_GENERATOR = GEN_URBAN_STREETS;
 
     public final long seed;
     /** Persisted in save v3; legacy (v2) saves always load as {@link #GEN_LEGACY}. */
@@ -131,9 +140,9 @@ public class World {
                 || version == GEN_CAVE_IDENTITIES || isUrbanGenerator(version);
     }
 
-    /** Generator 4: the urban street datum. */
+    /** Generators 4 and 5: the urban street datum and the urban street network. */
     public static boolean isUrbanGenerator(int version) {
-        return version == GEN_URBAN;
+        return version == GEN_URBAN || version == GEN_URBAN_STREETS;
     }
 
     /** Generators 2 and 3: deep caves, underground POIs, cave mouths and settlements. */

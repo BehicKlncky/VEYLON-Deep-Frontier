@@ -16,6 +16,7 @@ import com.veylon.settlement.CounterattackDirector;
 import com.veylon.settlement.SettlementManager;
 import com.veylon.simulation.FireSystem;
 import com.veylon.simulation.LiquidFireConstants;
+import com.veylon.world.urban.UrbanWorldState;
 
 /**
  * Read-only occupancy snapshot for the bounded runtime systems introduced by
@@ -45,7 +46,8 @@ public record RuntimeBudgetSnapshot(
         int liveFragments,
         int settledFragments,
         int liveRagdolls,
-        int panickingBodies) {
+        int panickingBodies,
+        int urbanRegionPlans) {
 
     public static RuntimeBudgetSnapshot capture(Game game) {
         int pathNodes = 0;
@@ -88,7 +90,8 @@ public record RuntimeBudgetSnapshot(
                 game.fragments.liveCount(),
                 game.fragments.settledCount(),
                 game.ragdolls.liveCount(),
-                panicking);
+                panicking,
+                game.world.urban == null ? 0 : game.world.urban.cachedRegionPlans());
     }
 
     /** True when every collection with a hard runtime ceiling is within it. */
@@ -119,6 +122,7 @@ public record RuntimeBudgetSnapshot(
                 && liveFragments <= BodyFragmentConstants.MAX_LIVE_FRAGMENTS
                 && settledFragments <= BodyFragmentConstants.MAX_SETTLED_FRAGMENTS
                 && liveRagdolls <= RagdollConstants.MAX_LIVE
+                && urbanRegionPlans <= UrbanWorldState.MAX_REGION_PLANS
                 // The player never panics.
                 && panickingBodies < livingBodies;
     }
@@ -149,7 +153,8 @@ public record RuntimeBudgetSnapshot(
                 + " burnResidues=" + burnResidues
                 + " fragments={live=" + liveFragments + ",settled=" + settledFragments + "}"
                 + " ragdolls=" + liveRagdolls
-                + " panicking=" + panickingBodies;
+                + " panicking=" + panickingBodies
+                + " urbanPlans=" + urbanRegionPlans;
     }
 
     public static String hardLimitSummary() {
@@ -174,6 +179,7 @@ public record RuntimeBudgetSnapshot(
                 + " burnResidues=" + CombustionConstants.MAX_BURN_RESIDUES
                 + " liveFragments=" + BodyFragmentConstants.MAX_LIVE_FRAGMENTS
                 + " settledFragments=" + BodyFragmentConstants.MAX_SETTLED_FRAGMENTS
-                + " ragdolls=" + RagdollConstants.MAX_LIVE;
+                + " ragdolls=" + RagdollConstants.MAX_LIVE
+                + " urbanPlans=" + UrbanWorldState.MAX_REGION_PLANS;
     }
 }

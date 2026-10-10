@@ -78,6 +78,15 @@ class WorldGeneratorFingerprintTest {
     private static final long[] URBAN_TERRAIN_FINGERPRINTS = {
             0x2a0067f62e235b25L, 0x4e5a3a9063303cfeL, 0x2a0067f62e235b25L};
 
+    /**
+     * Generator 5, urban layout revision 2: the street network, districts and
+     * reserved parcels, recorded 2026-10-08 when it was introduced. The four
+     * chunks straddle the region corner at the origin, so both sides of two
+     * avenue seams are pinned.
+     */
+    private static final long[] URBAN_STREETS_TERRAIN_FINGERPRINTS = {
+            0x2a9ec92f97a969a9L, 0xe22c4dabfb8606c5L, 0xd58d2e3a6d99b888L};
+
     /** Chunks fingerprinted per seed: origin, offset, and two negative ones. */
     private static final int[][] CHUNKS = {{0, 0}, {3, -2}, {-1, -1}, {-4, 5}};
 
@@ -98,6 +107,67 @@ class WorldGeneratorFingerprintTest {
     @Test
     void theUrbanGeneratorMatchesItsRecordedFingerprint() {
         assertTerrainPinned(World.GEN_URBAN, URBAN_TERRAIN_FINGERPRINTS);
+    }
+
+    @Test
+    void theUrbanStreetNetworkMatchesItsRecordedFingerprint() {
+        assertTerrainPinned(World.GEN_URBAN_STREETS, URBAN_STREETS_TERRAIN_FINGERPRINTS);
+    }
+
+    /**
+     * Generator 5's plans, recorded 2026-10-08 with its terrain. Parcel ids,
+     * bounds and reservations are part of what an urban save re-derives —
+     * later sections will store parcel ids — so a change that kept every block
+     * but moved a parcel boundary or renumbered a parcel must fail here too.
+     */
+    private static final long[] URBAN_STREETS_PLAN_FINGERPRINTS = {
+            0xb24a28dfedc8f80fL, 0xd09181b02503c697L, 0x3eb5bd37769c97d9L};
+
+    @Test
+    void theUrbanStreetPlansMatchTheirRecordedFingerprint() {
+        List<String> moved = new ArrayList<>();
+        for (int i = 0; i < SEEDS.length; i++) {
+            long actual = planFingerprint(SEEDS[i]);
+            if (actual != URBAN_STREETS_PLAN_FINGERPRINTS[i]) {
+                moved.add(String.format("seed %d: recorded 0x%016xL, generated 0x%016xL",
+                        SEEDS[i], URBAN_STREETS_PLAN_FINGERPRINTS[i], actual));
+            }
+        }
+        assertTrue(moved.isEmpty(), () -> "generator 5 plans changed; add a generator version "
+                + "instead of re-recording:\n  " + String.join("\n  ", moved));
+    }
+
+    private static long planFingerprint(long seed) {
+        World world = new World(seed, World.GEN_URBAN_STREETS);
+        long hash = 0xcbf29ce484222325L;
+        for (int[] region : new int[][]{{0, 0}, {-1, -1}, {1, -1}}) {
+            com.veylon.world.urban.DistrictPlan plan = world.urban.regionPlan(region[0], region[1]);
+            hash = mix(hash, plan.district.code);
+            hash = mix(hash, Long.hashCode(plan.districtId));
+            for (com.veylon.world.urban.SuperblockPlan block : plan.superblocks()) {
+                hash = mix(hash, block.kind().name().hashCode());
+                hash = mixRect(hash, block.bounds());
+            }
+            for (com.veylon.world.urban.ParcelPlan parcel : plan.parcels()) {
+                hash = mix(hash, Long.hashCode(parcel.id()));
+                hash = mix(hash, parcel.use().id.hashCode());
+                hash = mix(hash, parcel.x0() * 31 + parcel.z0());
+                hash = mix(hash, parcel.x1() * 31 + parcel.z1());
+                hash = mix(hash, parcel.frontage().name().hashCode());
+                for (com.veylon.world.urban.ParcelPlan.Entrance door : parcel.entrances()) {
+                    hash = mix(hash, door.x() * 31 + door.z());
+                    hash = mix(hash, door.facing().name().hashCode());
+                }
+                hash = mixRect(hash, parcel.core());
+                hash = mix(hash, parcel.maxStoreys());
+            }
+            for (com.veylon.world.urban.DistrictPlan.Tree tree : plan.trees()) {
+                hash = mix(hash, tree.x() * 31 + tree.z());
+                hash = mix(hash, tree.trunkHeight());
+            }
+        }
+        int[] spawn = world.urban.spawnColumn();
+        return mix(mix(hash, spawn[0]), spawn[1]);
     }
 
     private static void assertTerrainPinned(int generatorVersion, long[] recorded) {
@@ -232,6 +302,11 @@ class WorldGeneratorFingerprintTest {
     }
 
     /** FNV-1a style mixing: order-sensitive and cheap. */
+    /** Record hash codes are not specified across JDKs, so rectangles hash their corners. */
+    private static long mixRect(long hash, com.veylon.world.urban.ParcelPlan.Rect rect) {
+        return mix(mix(hash, rect.x0() * 31L + rect.z0()), rect.x1() * 31L + rect.z1());
+    }
+
     private static long mix(long hash, long value) {
         return (hash ^ value) * 0x100000001b3L;
     }
