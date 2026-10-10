@@ -405,6 +405,11 @@ final class PlayerBlockActions {
         if (place == null || !game.world.getBlock(px, py, pz).isReplaceable()) {
             return false;
         }
+        if (place == BlockType.STAIRS) {
+            double yaw = Math.toRadians(game.camera.yaw);
+            place = com.veylon.world.StairGeometry.ascending(
+                    Math.sin(yaw), -Math.cos(yaw));
+        }
         // Don't place inside the player or an entity, nor a flame into anyone who can burn.
         if (place.solid && wouldCollide(px, py, pz) || flameWouldTouch(place, px, py, pz)) {
             return false;

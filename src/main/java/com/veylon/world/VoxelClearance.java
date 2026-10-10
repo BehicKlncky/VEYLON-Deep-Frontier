@@ -1,6 +1,6 @@
 package com.veylon.world;
 
-/** The full-cell AABB collision used by moving bodies; open fixture leaves have no collider. */
+/** Body collision: solid cells, shaped stair treads, and passable open fixture leaves. */
 public final class VoxelClearance {
     /** Shared humanoid dimensions and navigation drop limit; changing them is gameplay. */
     public static final float BODY_WIDTH = 0.6f;
@@ -24,6 +24,11 @@ public final class VoxelClearance {
             for (int y = y0; y <= y1; y++) {
                 for (int z = z0; z <= z1; z++) {
                     BlockType t = voxels.getBlock(x, y, z);
+                    if (StairGeometry.isStair(t)) {
+                        if (StairGeometry.collides(t, x, y, z, px - hw, py, pz - hw,
+                                px + hw, py + height, pz + hw)) { return true; }
+                        continue;
+                    }
                     if (t.solid || flamesBlock && (t == BlockType.TORCH || t == BlockType.CAMPFIRE)) {
                         return true;
                     }

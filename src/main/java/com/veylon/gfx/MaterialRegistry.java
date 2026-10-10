@@ -206,6 +206,11 @@ public final class MaterialRegistry {
             register("locker", BlockType.LOCKER, "locker_top", "locker_front", "locker_top", 1, TintMode.NONE, false, 0f, 0.35f);
             register("table", BlockType.TABLE, "table_top", "plank", "table_top", 1, TintMode.NONE, false, 0f, 0.85f);
             register("debris", BlockType.DEBRIS, "debris", "debris", "debris", 1, TintMode.NONE, true, 0f, 0.95f);
+            // Direction changes shape only; all four share the existing stair tiles.
+            register("stairs_north", BlockType.STAIRS_NORTH, "stair_tread", "stair_riser", "concrete", 1, TintMode.NONE, false, 0f, 0.85f);
+            register("stairs_south", BlockType.STAIRS_SOUTH, "stair_tread", "stair_riser", "concrete", 1, TintMode.NONE, false, 0f, 0.85f);
+            register("stairs_west", BlockType.STAIRS_WEST, "stair_tread", "stair_riser", "concrete", 1, TintMode.NONE, false, 0f, 0.85f);
+            register("stairs_east", BlockType.STAIRS_EAST, "stair_tread", "stair_riser", "concrete", 1, TintMode.NONE, false, 0f, 0.85f);
 
             // Standalone prop tiles used by special shapes (torch flame, campfire, basin water...).
             propTile("torch_head", 1.0f, 0.9f);

@@ -3,6 +3,7 @@ package com.veylon.entity;
 import com.veylon.world.BlockType;
 import com.veylon.world.Chunk;
 import com.veylon.world.World;
+import com.veylon.world.StairGeometry;
 
 /**
  * Allocation-free axis-resolved movement for a ragdoll point mass.
@@ -88,8 +89,12 @@ final class RagdollCollision {
                     if (by < 0) {
                         return true;
                     }
-                    if (by < Chunk.SY && chunk.get(lx, by, lz).solid) {
-                        return true;
+                    if (by < Chunk.SY) {
+                        BlockType type = chunk.get(lx, by, lz);
+                        if (type.solid && (!StairGeometry.isStair(type)
+                                || StairGeometry.collides(type, bx, by, bz,
+                                px - halfWidth, py - halfHeight, pz - halfWidth,
+                                px + halfWidth, py + halfHeight, pz + halfWidth))) { return true; }
                     }
                 }
             }
@@ -124,13 +129,27 @@ final class RagdollCollision {
                     for (int by = (int) Math.floor(y - radius); by <= (int) Math.floor(y + radius); by++) {
                         if (by >= Chunk.SY || (by >= 0 && !chunk.get(Math.floorMod(bx, Chunk.SX), by,
                                 Math.floorMod(bz, Chunk.SZ)).solid)) continue;
-                        for (int a = 0; a < 3; a++) {
-                            float p = a == 0 ? x : a == 1 ? y : z;
-                            int block = a == 0 ? bx : a == 1 ? by : bz;
-                            float lo = block - radius - p - RagdollConstants.CONTACT_SKIN;
-                            float hi = block + 1 + radius - p + RagdollConstants.CONTACT_SKIN;
-                            float c = -lo < hi ? lo : hi;
-                            if (Math.abs(c) < best) { best = Math.abs(c); correction = c; axis = a; }
+                        BlockType type = by < 0 ? BlockType.STONE
+                                : chunk.get(Math.floorMod(bx, Chunk.SX), by, Math.floorMod(bz, Chunk.SZ));
+                        boolean stair = StairGeometry.isStair(type);
+                        for (int part = 0; part < (stair ? 2 : 1); part++) {
+                            float minX = bx + (stair ? StairGeometry.minX(type, part) : 0);
+                            float maxX = bx + (stair ? StairGeometry.maxX(type, part) : 1);
+                            float minZ = bz + (stair ? StairGeometry.minZ(type, part) : 0);
+                            float maxZ = bz + (stair ? StairGeometry.maxZ(type, part) : 1);
+                            float maxY = by + (stair ? StairGeometry.height(part) : 1);
+                            if (stair && (x + radius <= minX || x - radius >= maxX
+                                    || z + radius <= minZ || z - radius >= maxZ
+                                    || y + radius <= by || y - radius >= maxY)) { continue; }
+                            for (int a = 0; a < 3; a++) {
+                                float p = a == 0 ? x : a == 1 ? y : z;
+                                float min = a == 0 ? minX : a == 1 ? by : minZ;
+                                float max = a == 0 ? maxX : a == 1 ? maxY : maxZ;
+                                float lo = min - radius - p - RagdollConstants.CONTACT_SKIN;
+                                float hi = max + radius - p + RagdollConstants.CONTACT_SKIN;
+                                float c = -lo < hi ? lo : hi;
+                                if (Math.abs(c) < best) { best = Math.abs(c); correction = c; axis = a; }
+                            }
                         }
                     }
                 }

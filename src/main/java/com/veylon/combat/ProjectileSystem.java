@@ -308,7 +308,9 @@ public class ProjectileSystem {
             // Block hit.
             BlockType t = g.world.getBlock((int) Math.floor(px), (int) Math.floor(py),
                     (int) Math.floor(pz));
-            if (t.solid) {
+            if (t.solid && (!com.veylon.world.StairGeometry.isStair(t)
+                    || com.veylon.world.StairGeometry.contains(t, px - (float) Math.floor(px),
+                    py - (float) Math.floor(py), pz - (float) Math.floor(pz)))) {
                 onBlockHit(g, p, px, py, pz, t);
                 return p.kind != Kind.BOMB;
             }

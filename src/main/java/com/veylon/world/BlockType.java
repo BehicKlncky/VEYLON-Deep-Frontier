@@ -97,7 +97,13 @@ public enum BlockType {
     CABINET("Cabinet", Shape.CUBE, true, true, true, 2.0f, ToolKind.AXE, false, ItemType.CABINET, 1, 0, 0f, 0.62f, 0.52f, 0.38f),
     LOCKER("Metal Locker", Shape.CUBE, true, true, false, 4.0f, ToolKind.PICKAXE, false, ItemType.LOCKER, 1, 0, 0f, 0.40f, 0.48f, 0.46f),
     TABLE("Table", Shape.TABLE, true, false, true, 1.5f, ToolKind.AXE, false, ItemType.TABLE, 1, 0, 0f, 0.58f, 0.44f, 0.28f),
-    DEBRIS("Debris", Shape.PANEL, false, false, false, 0.15f, ToolKind.NONE, false, null, 0, 0, 0f, 0.48f, 0.46f, 0.42f);
+    DEBRIS("Debris", Shape.PANEL, false, false, false, 0.15f, ToolKind.NONE, false, null, 0, 0, 0f, 0.48f, 0.46f, 0.42f),
+
+    // Append-only byte ids: the direction names the ascending (high) end.
+    STAIRS_NORTH("Concrete Stairs", Shape.STAIRS, true, false, false, 6.0f, ToolKind.PICKAXE, false, ItemType.STAIRS, 1, 0, 0f, 0.60f, 0.60f, 0.58f),
+    STAIRS_SOUTH("Concrete Stairs", Shape.STAIRS, true, false, false, 6.0f, ToolKind.PICKAXE, false, ItemType.STAIRS, 1, 0, 0f, 0.60f, 0.60f, 0.58f),
+    STAIRS_WEST("Concrete Stairs", Shape.STAIRS, true, false, false, 6.0f, ToolKind.PICKAXE, false, ItemType.STAIRS, 1, 0, 0f, 0.60f, 0.60f, 0.58f),
+    STAIRS_EAST("Concrete Stairs", Shape.STAIRS, true, false, false, 6.0f, ToolKind.PICKAXE, false, ItemType.STAIRS, 1, 0, 0f, 0.60f, 0.60f, 0.58f);
 
     /**
      * How a block is meshed. Not persisted: only {@link BlockType} ordinals are
@@ -110,7 +116,9 @@ public enum BlockType {
         /** A thin panel in the wall plane: closed/broken doors and shattered windows. */
         PANE,
         /** A table top on four legs over a full-cell collider. */
-        TABLE
+        TABLE,
+        /** Two half-height treads, with matching collision and targeting. */
+        STAIRS
     }
 
     public final String displayName;

@@ -169,6 +169,7 @@ public class ChunkMesher {
                         case LIQUID -> emitWater(wx, y, wz);
                         case LEAF, PANE -> emitThin(t, wx, y, wz);
                         case TABLE -> emitTable(t, wx, y, wz);
+                        case STAIRS -> emitStairs(t, wx, y, wz);
                         case NONE -> {
                         }
                     }
@@ -394,6 +395,23 @@ public class ChunkMesher {
         box(x + 1 - b, y, z + a, x + 1 - a, y + 0.84f, z + b, leg, x, y, z, 0.9f, 0.9f, 0.9f);
         box(x + a, y, z + 1 - b, x + b, y + 0.84f, z + 1 - a, leg, x, y, z, 0.9f, 0.9f, 0.9f);
         box(x + 1 - b, y, z + 1 - b, x + 1 - a, y + 0.84f, z + 1 - a, leg, x, y, z, 0.9f, 0.9f, 0.9f);
+    }
+
+    /** Two real treads. Internal faces are omitted; the upper riser starts at half height. */
+    private void emitStairs(BlockType t, int x, int y, int z) {
+        BlockMaterial m = MaterialRegistry.of(t);
+        float sky = skyAt(x, y + 1, z), blk = blockAt(x, y + 1, z);
+        for (int part = 0; part < 2; part++) {
+            for (int d = 0; d < 6; d++) {
+                boolean internal = d == StairGeometry.internalFace(t, part);
+                if (internal && part == 0) { continue; }
+                int tile = d == 0 ? m.topLayer[0] : d == 1 ? m.bottomLayer[0] : m.sideLayer[0];
+                boxFace(d, x + StairGeometry.minX(t, part), internal ? y + .5f : y,
+                        z + StairGeometry.minZ(t, part), x + StairGeometry.maxX(t, part),
+                        y + StairGeometry.height(part), z + StairGeometry.maxZ(t, part),
+                        tile, sky, blk, 1f, 1f, 1f);
+            }
+        }
     }
 
     // ------------------------------------------------------------------

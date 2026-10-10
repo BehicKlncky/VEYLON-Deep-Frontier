@@ -176,6 +176,12 @@ public final class Raycaster {
         for (int i = 0; i < 512; i++) {
             BlockType type = world.getBlock(x, y, z);
             boolean hit = includeFluids ? type != BlockType.AIR : type.isTargetable();
+            if (hit && advanced && StairGeometry.isStair(type)) {
+                if (StairGeometry.raycast(type, x, y, z, ox, oy, oz, dx, dy, dz, maxDist, result)) {
+                    return true;
+                }
+                hit = false;
+            }
             if (hit && advanced && FixtureGeometry.isThin(type)
                     && !FixtureGeometry.rayHitsThin(world, x, y, z, type, ox, oy, oz, dx, dy, dz,
                     maxDist)) {
@@ -215,5 +221,37 @@ public final class Raycaster {
             }
         }
         return false;
+    }
+
+    /** Allocation-free shaped-block slab test, retaining the nearest actual face. */
+    static boolean intersectBox(int x, int y, int z, BlockType type,
+                                double ox, double oy, double oz, double dx, double dy, double dz,
+                                double x0, double y0, double z0, double x1, double y1, double z1,
+                                double maxDist, MutableHit result) {
+        double enter = 0, leave = maxDist;
+        int nx = 0, ny = 0, nz = 0;
+        for (int axis = 0; axis < 3; axis++) {
+            double o = axis == 0 ? ox : axis == 1 ? oy : oz;
+            double d = axis == 0 ? dx : axis == 1 ? dy : dz;
+            double lo = axis == 0 ? x0 : axis == 1 ? y0 : z0;
+            double hi = axis == 0 ? x1 : axis == 1 ? y1 : z1;
+            if (Math.abs(d) < 1e-12) {
+                if (o < lo || o > hi) { return false; }
+            } else {
+                double a = (lo - o) / d, b = (hi - o) / d;
+                double near = Math.min(a, b);
+                if (near > enter) {
+                    enter = near;
+                    int normal = d > 0 ? -1 : 1;
+                    nx = axis == 0 ? normal : 0;
+                    ny = axis == 1 ? normal : 0;
+                    nz = axis == 2 ? normal : 0;
+                }
+                leave = Math.min(leave, Math.max(a, b));
+                if (enter > leave) { return false; }
+            }
+        }
+        if (!result.hit() || enter < result.dist()) { result.set(x, y, z, nx, ny, nz, enter, type); }
+        return true;
     }
 }
