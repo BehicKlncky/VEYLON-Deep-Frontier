@@ -13,7 +13,9 @@ import java.util.Locale;
 
 /**
  * Urban QA scenes ({@code VEYLON_SCENE=urban_streets},
- * {@code urban_intersection} and {@code urban_seam_walk}), staged on a real
+ * {@code urban_intersection}, {@code urban_seam_walk}, and the package-04
+ * {@code urban_fixtures} and {@code urban_fixtures_night} of
+ * {@link UrbanFixtureQaScene}), staged on a real
  * street-network world from {@code VEYLON_GENERATOR=urban-dev}. They read the
  * plan through its production queries, never the column top, and never touch
  * an outcome random stream. Each prints the plan diagnostics of the four
@@ -31,6 +33,8 @@ final class UrbanQaScenes {
     private static final float FEET_TOLERANCE = 0.05f;
 
     private final Game game;
+    /** Package 04: doors, windows and stairs ({@code urban_fixtures}, {@code urban_fixtures_night}). */
+    private final UrbanFixtureQaScene fixtures;
     private final PlayerMovementSystem.Command walk = new PlayerMovementSystem.Command();
     private boolean holding;
     private float holdX;
@@ -55,6 +59,7 @@ final class UrbanQaScenes {
 
     UrbanQaScenes(Game game) {
         this.game = game;
+        this.fixtures = new UrbanFixtureQaScene(game);
     }
 
     /** Stages one of the urban scenes; inert, with a notice, outside a street-network world. */
@@ -83,6 +88,7 @@ final class UrbanQaScenes {
                 // Above the corner where regions (-1,-1), (0,-1), (-1,0) and (0,0) meet.
                 hold(world, -21.5f, -21.5f, 20, SOUTH_EAST_YAW, 34f);
             case "urban_seam_walk" -> stageSeamWalk(world, origin);
+            case "urban_fixtures", "urban_fixtures_night" -> fixtures.stage(scene);
             default -> System.out.println("[urban-qa] unknown urban scene '" + scene + "'");
         }
     }
@@ -142,6 +148,7 @@ final class UrbanQaScenes {
 
     /** Per-frame hook, before streaming and rendering; inert unless a scene is staged. */
     void update(double elapsed) {
+        fixtures.update(elapsed);
         if (holding) {
             apply();
         }

@@ -773,7 +773,8 @@ final class QaHarness {
                 updateUiCycle(0);
             }
             case "creative_flight" -> game.creativeQa.stageFlightScene();
-            case "urban_streets", "urban_intersection", "urban_seam_walk" -> urbanScene.stage(normalized);
+            case "urban_streets", "urban_intersection", "urban_seam_walk", "urban_fixtures",
+                 "urban_fixtures_night" -> urbanScene.stage(normalized);
             default -> System.out.println("[scene] unknown VEYLON_SCENE '" + scene + "'");
         }
         System.out.println("[scene] applied benchmark scene '" + scene + "'");
