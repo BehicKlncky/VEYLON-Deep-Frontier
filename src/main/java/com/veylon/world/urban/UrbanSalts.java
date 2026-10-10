@@ -50,6 +50,10 @@ public final class UrbanSalts {
     public static final long TREE = 0x5654_5245_455f_5f50L;
     /** Trunk height of a planted tree. */
     public static final long TREE_HEIGHT = 0x5654_5245_455f_4854L;
+    /** Revision-one abandonment/occupation variant of a building. */
+    public static final long BUILDING_VARIANT = 0x5642_5549_4c44_5641L;
+    /** Whether a revision-one walk-up has a first basement. */
+    public static final long BUILDING_BASEMENT = 0x5642_5549_4c44_4241L;
 
     private UrbanSalts() {
     }

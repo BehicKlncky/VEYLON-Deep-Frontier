@@ -114,6 +114,11 @@ class WorldGeneratorFingerprintTest {
         assertTerrainPinned(World.GEN_URBAN_STREETS, URBAN_STREETS_TERRAIN_FINGERPRINTS);
     }
 
+    @Test
+    void planningRevisionStampsExactlyTheFrozenStreetNetworkWithoutBuildings() {
+        assertTerrainPinned(World.GEN_URBAN_PLANS, URBAN_STREETS_TERRAIN_FINGERPRINTS);
+    }
+
     /**
      * Generator 5's plans, recorded 2026-10-08 with its terrain. Parcel ids,
      * bounds and reservations are part of what an urban save re-derives —

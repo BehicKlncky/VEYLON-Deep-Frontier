@@ -114,6 +114,39 @@ class UrbanMetaSectionTest {
     }
 
     @Test
+    void buildingTemplateRevisionIsSelectedBeforeLoadBootstrapAndRecomputesStableReservations() throws IOException {
+        Game original = new Game();
+        original.newWorld(SEED, true, World.GEN_URBAN_PLANS, GameMode.SURVIVAL);
+        var parcel = original.world.urban.regionPlan(0, 0).refuge();
+        var plan = original.world.urban.buildingAt(parcel.x0(), parcel.z0());
+        assertEquals(1, original.world.urban.buildingTemplateRevision());
+        Path file = save(original, "building-plans.sav");
+        byte[] bytes = Files.readAllBytes(file);
+        assertEquals(List.of(1, UrbanRevision.LAYOUT_BUILDING_PLANS, UrbanRevision.CURRENT_CONTENT),
+                ints(sections(bytes).get(UrbanMetaSection.ID)), "existing meta layout, no new codec bytes");
+        Game loaded = new Game();
+        assertTrue(SaveSystem.load(loaded, file));
+        assertEquals(1, loaded.world.urban.buildingTemplateRevision());
+        assertEquals(0, loaded.world.urban.cachedBuildingPlans(), "load never needs to stamp or restore a plan cache");
+        assertEquals(plan, loaded.world.urban.buildingAt(parcel.x1(), parcel.z1()));
+        assertChunksMatch(original.world, loaded.world, Math.floorDiv(parcel.x0(), 16), Math.floorDiv(parcel.z0(), 16));
+
+        World preserved = loaded.world;
+        assertFalse(SaveSystem.load(loaded, write("wrong-plan-layout.sav", withPayload(bytes,
+                meta(1, UrbanRevision.LAYOUT_STREET_NETWORK, UrbanRevision.CURRENT_CONTENT)))));
+        assertSame(preserved, loaded.world);
+        assertTrue(SaveSystem.load(loaded, write("plans-absent-meta.sav", withoutSection(bytes, UrbanMetaSection.ID))));
+        assertEquals(1, loaded.world.urban.buildingTemplateRevision(), "generator pins template even without optional meta");
+        assertEquals(plan, loaded.world.urban.buildingAt(parcel.x0(), parcel.z0()));
+
+        loaded.newWorld(SEED + 1, true, World.GEN_URBAN_PLANS, GameMode.CREATIVE);
+        assertEquals(0, loaded.world.urban.cachedBuildingPlans(), "a new world owns a fresh derived cache");
+        loaded.newWorld(SEED, true, World.GEN_URBAN_STREETS, GameMode.SURVIVAL);
+        assertEquals(0, loaded.world.urban.buildingTemplateRevision());
+        assertNull(loaded.world.urban.buildingAt(parcel.x0(), parcel.z0()), "generator 5 is never silently upgraded");
+    }
+
+    @Test
     void loadingOverALiveWorldRehearsesTheUrbanStateAndReplacesTheWorld() throws IOException {
         Path save = save(urbanWorld(SEED), "urban.sav");
         Game live = new Game();

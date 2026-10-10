@@ -42,6 +42,8 @@ public final class UrbanWorldState {
 
     /** Region plans kept at once (DESIGN §10, package 03). */
     public static final int MAX_REGION_PLANS = 16;
+    /** Pure building plans only; no fixture or container state lives in this cache. */
+    public static final int MAX_BUILDING_PLANS = 256;
 
     /** Spawn column of the street-datum placeholder (layout revision 1). */
     static final int PLACEHOLDER_SPAWN_X = 8;
@@ -52,6 +54,8 @@ public final class UrbanWorldState {
     private final long seed;
     private final int layoutRevision;
     private final BoundedPlanCache<Long, DistrictPlan> regionPlans;
+    private final int buildingTemplateRevision;
+    private final BoundedPlanCache<Long, BuildingPlan> buildingPlans;
     private int contentRevision = UNRESOLVED;
 
     /**
@@ -60,7 +64,9 @@ public final class UrbanWorldState {
     public UrbanWorldState(long seed, int generatorVersion) {
         this.seed = seed;
         this.layoutRevision = UrbanRevision.layoutRevisionOf(generatorVersion);
+        this.buildingTemplateRevision = UrbanRevision.buildingTemplateRevisionOf(generatorVersion);
         this.regionPlans = hasCityPlan() ? new BoundedPlanCache<>(MAX_REGION_PLANS) : null;
+        this.buildingPlans = buildingTemplateRevision == 0 ? null : new BoundedPlanCache<>(MAX_BUILDING_PLANS);
     }
 
     public int layoutRevision() {
@@ -69,7 +75,7 @@ public final class UrbanWorldState {
 
     /** True for a layout with streets, parcels and districts; false for the bare datum. */
     public boolean hasCityPlan() {
-        return layoutRevision == UrbanRevision.LAYOUT_STREET_NETWORK;
+        return layoutRevision == UrbanRevision.LAYOUT_STREET_NETWORK || layoutRevision == UrbanRevision.LAYOUT_BUILDING_PLANS;
     }
 
     public boolean contentRevisionResolved() {
@@ -131,7 +137,21 @@ public final class UrbanWorldState {
             throw new IllegalStateException("layout revision " + layoutRevision + " has no city plan");
         }
         long key = UrbanIds.district(rx, rz);
-        return regionPlans.get(key, ignored -> CityPlanner.plan(seed, layoutRevision, rx, rz));
+        // Generator 6 explicitly inherits the frozen layout-2 city fabric, not new hash inputs.
+        return regionPlans.get(key, ignored -> CityPlanner.plan(seed, UrbanRevision.LAYOUT_STREET_NETWORK, rx, rz));
+    }
+
+    public int buildingTemplateRevision() { return buildingTemplateRevision; }
+
+    public int cachedBuildingPlans() { return buildingPlans == null ? 0 : buildingPlans.size(); }
+
+    /** A validated whole-building proposal; generators 4 and 5 continue to have none. */
+    public BuildingPlan buildingAt(int x, int z) {
+        if (buildingPlans == null) { return null; }
+        ParcelPlan parcel = parcelAt(x, z);
+        if (parcel == null) { return null; }
+        return buildingPlans.get(UrbanIds.building(parcel.id(), 0),
+                ignored -> BuildingPlanner.plan(seed, buildingTemplateRevision, parcel).plan());
     }
 
     /** Region plans currently cached; never above {@value #MAX_REGION_PLANS}. */

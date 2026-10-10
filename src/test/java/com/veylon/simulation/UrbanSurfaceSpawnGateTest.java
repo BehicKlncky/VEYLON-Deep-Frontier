@@ -27,7 +27,7 @@ class UrbanSurfaceSpawnGateTest {
 
     @Test
     void urbanWorldsSpawnNoWildlifeAndRollNoSurfacePlacedEvent() {
-        for (int generator : new int[]{World.GEN_URBAN, World.GEN_URBAN_STREETS}) {
+        for (int generator : new int[]{World.GEN_URBAN, World.GEN_URBAN_STREETS, World.GEN_URBAN_PLANS}) {
             Game g = new Game();
             g.newWorld(4_242L, true, generator, GameMode.SURVIVAL);
             assertTrue(g.entities.creatures.isEmpty(), "bootstrap populated a city with wildlife");

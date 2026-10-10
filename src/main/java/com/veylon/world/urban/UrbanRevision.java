@@ -42,6 +42,10 @@ public final class UrbanRevision {
      * districts and reserved parcels of {@link CityPlanner}, with no buildings.
      */
     public static final int LAYOUT_STREET_NETWORK = 2;
+    /** Frozen building template revision one, without building stamping (milestone 05). */
+    public static final int LAYOUT_BUILDING_PLANS = 3;
+    /** Frozen catalogue used by generator 6; later catalogues append another constant. */
+    public static final int BUILDING_TEMPLATE_WALKUPS = 1;
 
     /** Content revision every new urban world records. */
     public static final int CURRENT_CONTENT = 1;
@@ -55,7 +59,7 @@ public final class UrbanRevision {
     public static final int ABSENT_CONTENT = 1;
 
     /** The urban generator the development selector creates: the newest layout. */
-    public static final int DEVELOPMENT_GENERATOR = World.GEN_URBAN_STREETS;
+    public static final int DEVELOPMENT_GENERATOR = World.GEN_URBAN_PLANS;
 
     private UrbanRevision() {
     }
@@ -69,8 +73,18 @@ public final class UrbanRevision {
         return switch (generatorVersion) {
             case World.GEN_URBAN -> LAYOUT_DATUM_PLACEHOLDER;
             case World.GEN_URBAN_STREETS -> LAYOUT_STREET_NETWORK;
+            case World.GEN_URBAN_PLANS -> LAYOUT_BUILDING_PLANS;
             default -> throw new IllegalArgumentException(
                     "generator " + generatorVersion + " is not an urban generator");
+        };
+    }
+
+    /** Resolved from the saved generator before bootstrap; zero means no building catalogue. */
+    public static int buildingTemplateRevisionOf(int generatorVersion) {
+        return switch (generatorVersion) {
+            case World.GEN_URBAN, World.GEN_URBAN_STREETS -> 0;
+            case World.GEN_URBAN_PLANS -> BUILDING_TEMPLATE_WALKUPS;
+            default -> throw new IllegalArgumentException("not an urban generator " + generatorVersion);
         };
     }
 

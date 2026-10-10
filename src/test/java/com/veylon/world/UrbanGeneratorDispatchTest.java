@@ -35,11 +35,12 @@ class UrbanGeneratorDispatchTest {
                 "ordinary new worlds stay on generator 3 until the urban rollout (package 26)");
         assertEquals(4, World.GEN_URBAN, "the first unused version after 1-3");
         assertEquals(5, World.GEN_URBAN_STREETS, "the street network got its own version (D-35)");
-        assertEquals(World.GEN_URBAN_STREETS, World.MAX_SUPPORTED_GENERATOR);
+        assertEquals(6, World.GEN_URBAN_PLANS);
+        assertEquals(World.GEN_URBAN_PLANS, World.MAX_SUPPORTED_GENERATOR);
         for (int version = -1; version <= World.MAX_SUPPORTED_GENERATOR + 2; version++) {
             boolean known = version >= World.GEN_LEGACY && version <= World.MAX_SUPPORTED_GENERATOR;
             assertEquals(known, World.isSupportedGenerator(version), "supported " + version);
-            assertEquals(version == World.GEN_URBAN || version == World.GEN_URBAN_STREETS,
+            assertEquals(version == World.GEN_URBAN || version == World.GEN_URBAN_STREETS || version == World.GEN_URBAN_PLANS,
                     World.isUrbanGenerator(version), "urban " + version);
             assertEquals(version == World.GEN_DEEP || version == World.GEN_CAVE_IDENTITIES,
                     World.hasDeepFrontier(version), "deep frontier " + version);

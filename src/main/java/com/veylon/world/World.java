@@ -47,10 +47,12 @@ public class World implements VoxelAccess {
      * explicit development and QA paths create it.
      */
     public static final int GEN_URBAN_STREETS = 5;
+    /** Layout 3: frozen building plans, with the layout-2 streets still stamped alone. */
+    public static final int GEN_URBAN_PLANS = 6;
     /** The generator of every ordinary new world; generator 3 until the urban rollout. */
     public static final int DEFAULT_NEW_WORLD_GENERATOR = GEN_CAVE_IDENTITIES;
     /** The highest generator version a save may name; a load rejects anything above it. */
-    public static final int MAX_SUPPORTED_GENERATOR = GEN_URBAN_STREETS;
+    public static final int MAX_SUPPORTED_GENERATOR = GEN_URBAN_PLANS;
 
     public final long seed;
     /** Persisted in save v3; legacy (v2) saves always load as {@link #GEN_LEGACY}. */
@@ -144,7 +146,7 @@ public class World implements VoxelAccess {
 
     /** Generators 4 and 5: the urban street datum and the urban street network. */
     public static boolean isUrbanGenerator(int version) {
-        return version == GEN_URBAN || version == GEN_URBAN_STREETS;
+        return version == GEN_URBAN || version == GEN_URBAN_STREETS || version == GEN_URBAN_PLANS;
     }
 
     /** Generators 2 and 3: deep caves, underground POIs, cave mouths and settlements. */

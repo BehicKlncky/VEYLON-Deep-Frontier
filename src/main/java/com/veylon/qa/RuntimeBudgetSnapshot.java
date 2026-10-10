@@ -49,6 +49,7 @@ public record RuntimeBudgetSnapshot(
         int liveRagdolls,
         int panickingBodies,
         int urbanRegionPlans,
+        int urbanBuildingPlans,
         int fixtureStates,
         int residentDoors) {
 
@@ -95,6 +96,7 @@ public record RuntimeBudgetSnapshot(
                 game.ragdolls.liveCount(),
                 panicking,
                 game.world.urban == null ? 0 : game.world.urban.cachedRegionPlans(),
+                game.world.urban == null ? 0 : game.world.urban.cachedBuildingPlans(),
                 game.world.fixtures.size(),
                 game.world.fixtures.transitTimers().size());
     }
@@ -128,6 +130,7 @@ public record RuntimeBudgetSnapshot(
                 && settledFragments <= BodyFragmentConstants.MAX_SETTLED_FRAGMENTS
                 && liveRagdolls <= RagdollConstants.MAX_LIVE
                 && urbanRegionPlans <= UrbanWorldState.MAX_REGION_PLANS
+                && urbanBuildingPlans <= UrbanWorldState.MAX_BUILDING_PLANS
                 && fixtureStates <= FixtureStates.MAX_ENTRIES
                 && residentDoors <= FixtureStates.MAX_TRANSIT
                 // The player never panics.
@@ -162,6 +165,7 @@ public record RuntimeBudgetSnapshot(
                 + " ragdolls=" + liveRagdolls
                 + " panicking=" + panickingBodies
                 + " urbanPlans=" + urbanRegionPlans
+                + " buildingPlans=" + urbanBuildingPlans
                 + " fixtures={states=" + fixtureStates + ",residentDoors=" + residentDoors + "}";
     }
 
@@ -189,6 +193,7 @@ public record RuntimeBudgetSnapshot(
                 + " settledFragments=" + BodyFragmentConstants.MAX_SETTLED_FRAGMENTS
                 + " ragdolls=" + RagdollConstants.MAX_LIVE
                 + " urbanPlans=" + UrbanWorldState.MAX_REGION_PLANS
+                + " buildingPlans=" + UrbanWorldState.MAX_BUILDING_PLANS
                 + " fixtureStates=" + FixtureStates.MAX_ENTRIES
                 + " residentDoors=" + FixtureStates.MAX_TRANSIT;
     }
