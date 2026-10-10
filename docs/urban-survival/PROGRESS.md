@@ -6,11 +6,11 @@ This is the running record for the 26-package urban-survival roadmap. The pack i
 
 | Item | Value |
 | --- | --- |
-| Last completed package | **02 - Versioned urban foundation**; this commit series reconstructs the accumulated 01-04 work in dependency order. |
+| Last completed package | **03 - City plans and street network**; this commit series reconstructs the accumulated 01-04 work in dependency order. |
 | Branch | `feature/urban-survival`, based on `923345f`; `main` remains at that baseline until a separately authorized integration. |
 | Source revision | The source and configuration are reconstructed from `e452dc1`; final equality is checked after the split. Dated checks below belong to the original implementation sessions. |
 | Default new world | Legacy generator 3 until package 26. The explicit urban development selector requires an isolated data directory. |
-| Next package | **03 - City plans and street network**; see the handoff below. |
+| Next package | **04 - Urban materials and interactions**; see the handoff below. |
 | Commits | Local, scoped `feat`, `test`, `docs` and `chore` commits on the feature branch. No merge, push, tag or publication is part of this reconstruction. |
 
 ## Package ledger
@@ -21,7 +21,7 @@ The status vocabulary is NOT STARTED, IN PROGRESS, PARTIAL, BLOCKED or COMPLETE.
 | --- | --- | --- | --- | --- | --- |
 | 01 | Design and repository audit | — | `docs/urban-survival/` | The four records exist, are cross-linked and pass the link and path check; the entry point for 02 is recorded | **COMPLETE** |
 | 02 | Versioned urban foundation | 01 | `world/World` (`GEN_URBAN`, predicates, default and maximum constants), `world/WorldGenerator` (dispatch), `Game`, `WorldBootstrap`, `FrontendController` (explicit generator path), `save/SaveSystem`, `save/V3ExtensionSections` (`urban.meta`), `util/AppPaths`, `build.gradle` (QA data dir), new `world/urban/UrbanIds`, `UrbanRevision`, `UrbanBootstrap` skeleton | Production bootstrap creates an urban-dev world and its generator and revision round-trip. Legacy dispatch, fingerprints and the new gen-2 pin are unchanged. Old saves without urban state load safely. Unsupported or corrupt revisions fail per policy. Reset over a live world clears foundation state. A tested QA data-dir seam exists. | **COMPLETE** (2026-10-07) |
-| 03 | City plans and street network | 02 | New `world/urban/CityPlanner`, `DistrictPlan`, `StreetNetwork`, `ParcelPlan`, `UrbanChunkStamper`; `World` urban queries and the loaded-column query; `EntityManager` and `EventSystem` urban gating (D-28); `UrbanQaScenes` | Across the seed, region and order matrix: roads join at borders, parcels respect reservations, blocks and ids are identical in every chunk order, and no wilderness POI, ore, cave or legacy settlement appears. A walkable starter street network exists. Streetscape captures and a native seam walk. | NOT STARTED |
+| 03 | City plans and street network | 02 | New `world/urban/CityPlanner`, `DistrictPlan`, `StreetNetwork`, `ParcelPlan`, `UrbanChunkStamper`; `World` urban queries and the loaded-column query; `EntityManager` and `EventSystem` urban gating (D-28); `UrbanQaScenes` | Across the seed, region and order matrix: roads join at borders, parcels respect reservations, blocks and ids are identical in every chunk order, and no wilderness POI, ore, cave or legacy settlement appears. A walkable starter street network exists. Streetscape captures and a native seam walk. | **COMPLETE** (2026-10-08) |
 | 04 | Urban materials and interactions | 03 | `world/BlockType` (appended, budgeted), `gfx/MaterialRegistry`, `gfx/ProceduralTextures`, `engine/AudioManager` footsteps, `WorldInteractions`, `InteractPromptBuilder`, `PlayerBlockActions`, `ai/Pathfinder` door passability, new `FixtureStates` and `world.fixtures` | A fixture shows a player and an NPC opening a door, using a window entry and climbing stairs; breaking a fixture; recognising a searchable object. Collision, raycast, rendering and navigation agree. Fixture state round-trips. Creative and Survival gates hold. Natives show both sides of doors and night readability. | NOT STARTED |
 | 05 | Building plans and accessibility | 03–04 | New `world/urban/BuildingPlanner`, `BuildingTemplates`, `FloorPlan`, `RoomPlan`, `FixtureSlot`, `AccessibilityValidator` (reusing `Pathfinder` semantics and `PlayerConstants`) | Across the template × rotation × seed matrix: no unreachable room, container or quest reservation; valid stairs; no overlap or overflow. Invalid fixtures are rejected. Plans match under shuffled access. Validator work is bounded. | NOT STARTED |
 | 06 | Generated apartments and interiors | 04–05 | `UrbanChunkStamper`; `World` height and light hooks; `simulation/TemperatureSystem`, `AmbienceSystem`, `AudioSceneState` urban indoor state (D-19); `UrbanBootstrap` | Generated apartments and a shop have recognisable rooms, usable stairs, matching windows and exits. Blocks and ids are identical in every order. Persisted breaks survive. Native street-to-basement walks in day and night. | NOT STARTED |
@@ -204,6 +204,73 @@ See [VALIDATION.md §7, milestone 02](VALIDATION.md#milestone-02-2026-10-07). Gr
 2. Allocate the next generator version for the street network (D-35), and decide whether to keep or retire generator 4. Repoint `UrbanRevision.DEVELOPMENT_GENERATOR` and `MAX_SUPPORTED_GENERATOR`, and add its fingerprint pin.
 3. Build `CityPlanner` plans on `BoundedPlanCache` (≤ 16 regions) owned by `UrbanWorldState`. Add the first salt class with its distinctness test (D-38). Add the loaded-column query (R-14). Gate surface wildlife and events in urban worlds (D-28).
 4. Freeze the urban design seed set in VALIDATION §6.
+
+## Milestone 03 — city plans and street network (2026-10-08)
+
+**Status: COMPLETE.** Urban development worlds (generator 5) are a connected city of districts, streets, courtyards, parks, plazas and reserved parcels. **Buildings do not exist yet:** every parcel is a flat reserved lot (a stone outline around dirt, with plank entrance markers and a ruin-stone stair-core pad) until packages 05 and 06 build on it.
+
+### Start state
+
+- `main` at `923345f`, with milestones 01 and 02 uncommitted. `git status` showed only that work; nothing unrelated was present.
+- The scratchpad Temurin `25.0.4.1+1` from 2026-10-07 still ran.
+
+### Implemented behaviour
+
+- **Generator 5** (D-39): `World.GEN_URBAN_STREETS = 5`, layout revision 2, `MAX_SUPPORTED_GENERATOR = 5`; the development selector now builds it. Generator 4 is kept, unchanged and pinned.
+- **Pure regional planning** (D-40, D-46): `CityPlanner.plan(seed, layoutRevision, rx, rz)` reads no world state and no other region. Every decision hashes (seed, layout revision, salt, stable coordinates) through `UrbanHash`, with the salts in `UrbanSalts`.
+  - Avenues, 12 wide, run on every region edge; each region stamps its half, and the plain or boulevard profile of a segment is a function of the edge and segment, so both neighbours agree.
+  - Local streets, 8 wide, keep their position across a whole region column or row, so every street continues through the avenues and the lattice is connected.
+  - Sixteen superblocks per region: courtyard housing, shop rows with a through alley, at most one park or plaza.
+  - Six district ids with stable codes (`UrbanDistrict`); residential and commercial are planned, region (0, 0) is residential, and the other four wait for package 13.
+- **Reservations** (D-41): each parcel (12–32 blocks a side, index `superblock * 8 + slot`, a packed parcel id) has a primary street entrance, a rear entrance onto its courtyard walkway or alley, a 4 × 6 stair-core footprint and a storey envelope. One service parcel per region. Region (0, 0) reserves the starter refuge, a corner shop and the spawn anchor. A fixed claim order resolves overlaps, and every collision is counted.
+- **Chunk-local stamping** (D-42): a chunk writes only its own blocks from one region plan; `pendingGen` stays empty. Everything is flush at y 40 over stone fill, with planned trees whose crowns start at y 44. The blocks are a temporary mapping to existing ids; no block id was added.
+- **Queries** (D-43): `UrbanWorldState.groundY`, `plannedRoofY`, `surfaceAt`, `parcelAt`, `districtAt`, `spawnColumn`, `regionPlan`; `UrbanDatum.floorContaining`; `World.isColumnLoaded`. None generates a chunk. `surfaceHeight` is unchanged for every world.
+- **Spawn** (D-44): the walkway cell outside the reserved refuge's courtyard door, recomputed from the plan on new world and load.
+- **D-28 gates** (D-45): no surface wildlife and no migration, trader or meteor events in urban worlds. Legacy odds are unchanged.
+- **Bounds and diagnostics** (D-47): at most 16 region plans cached, reported by `RuntimeBudgetSnapshot` (`urbanPlans`). `CityPlanDiagnostics` checks overlaps, parcel rules, routes and seams against the four neighbours, keeping at most 16 messages.
+- **QA** (`UrbanQaScenes`): `VEYLON_SCENE=urban_streets`, `urban_intersection` and `urban_seam_walk` (real player movement across the region seam at x 0, with a pass or fail report); see `docs/DEVELOPING.md` "Urban planning QA".
+
+### Changed paths
+
+- **Production**, under `src/main/java/com/veylon/`:
+  - New: `world/urban/{UrbanSalts,UrbanHash,UrbanDistrict,UrbanSurface,UrbanSurfaceMaterials,StreetNetwork,ParcelPlan,SuperblockPlan,DistrictPlan,CityPlanner,UrbanChunkStamper,CityPlanDiagnostics}.java`, `UrbanQaScenes.java`.
+  - Edited: `world/urban/{UrbanWorldState,UrbanRevision,UrbanDatum}.java`, `UrbanBootstrap.java`, `world/World.java`, `world/WorldGenerator.java`, `entity/EntityManager.java`, `simulation/EventSystem.java`, `qa/RuntimeBudgetSnapshot.java`, `QaHarness.java` (4 lines; 1,492 of 1,500), `AutomatedRunDriver.java`, `WorldBootstrap.java`. `Game.java` is untouched (994).
+- **Tests**, under `src/test/java/com/veylon/`:
+  - New: `world/urban/{CityPlannerTest,UrbanSaltsTest}`, `world/UrbanStreetNetworkGenerationTest`, `simulation/UrbanSurfaceSpawnGateTest`.
+  - Extended: `world/WorldGeneratorFingerprintTest` (generator-5 terrain and plan pins), `world/urban/UrbanRevisionTest`, `world/UrbanGeneratorDispatchTest`, `save/UrbanMetaSectionTest`, `UrbanDevelopmentSelectorTest`, `WorldSeedDeterminismTest`, `qa/RuntimeBoundsTest`.
+- **Documents**: `docs/ARCHITECTURE.md` (generator list, world creation step 7, "Urban city plans"), `docs/DEVELOPING.md` (`VEYLON_GENERATOR`, the urban scenes, "Urban planning QA"), and these four records.
+
+### Stable ids, schema and compatibility
+
+- No save section, section version, enum or block id changed. `urban.meta` v1 carries layout 2 for generator 5; a layout that does not match the generator still fails the load.
+- Parcel ids are `UrbanIds.parcel(district(rx, rz), superblock * 8 + slot)`, pinned with the rest of the plan by the generator-5 plan fingerprint. No section stores one yet.
+- **Verified by tests on this build**: generators 1–4 fingerprints unchanged; a generator-5 world round-trips its generator, layout, content revision, edits, geometry, parcel identity and spawn; a generator-5 save whose `urban.meta` names layout 1 fails without touching the live world; legacy event odds unchanged.
+- **Established by reading code, not by running it**: the package-02 build (maximum generator 4) and 0.8.1 (maximum 3) both refuse a generator-5 save as an unsupported generator before replacing the live world. No older binary was run.
+
+### Commands and results
+
+See [VALIDATION.md §7, milestone 03](VALIDATION.md#milestone-03-2026-10-08). In short:
+- focused tests, three mutation checks (all caught), native streetscape, intersection and seam-walk runs (`pass=true`) and an urban smoke;
+- the portable build before and after the review;
+- a 12-agent read-only review. It confirmed one low-severity code defect, a meteor shower restored from an old development save still dropping shards in a city, which is now fixed and tested. Three test-hardening suggestions were applied.
+
+### Limitations and deferred items
+
+- **No buildings.** Parcels, entrances, stair cores and storey envelopes are reservations; package 05 plans buildings on them and package 06 generates them, under a later generator version.
+- **Temporary materials.** Streets use existing blocks; footsteps on stone brick, basalt, clay and gravel still sound like grass (B-74). Real urban materials are package 04, and changing street blocks then needs a new generator (D-42).
+- **Climate under the city is the legacy biome noise** (D-08). For seed `20260731` the starter region reads Rocky Highlands, −3.5 °C at noon. Package 13 owns the district-to-climate mapping; package 08 must check that the starter area is survivable, or bring the mapping forward with a recorded decision.
+- **Planned greenery is still under legacy `PlantSystem` regrowth** (H-24): tall grass and, near planted trees, saplings can appear on lawns and medians over time. Walkways, passages, alleys, streets and lots are not grass, so routes stay clear. Package 13 owns greenery behaviour.
+- **The legacy HUD** still shows the camp line and the crash-landing intro (packages 08, 21).
+- **Canals and level changes** do not exist yet (no flooded district). The avenue profile is where package 13 adds them so both sides of a seam agree.
+- **The seam walk is scripted**: real player movement through the production movement path in a native window, not a manual keyboard walk.
+- Memory per explored area is not measured (package 11). A plan costs about 1 ms to build; the urban smoke saw one 115 ms first-frame spike while the spawn area generated.
+
+### Next unmet prerequisite: entry point for 04
+
+1. Read `00_BASE_KNOWLEDGE.md`, prompt 04, DESIGN §5.1 (A1–A12) and §12, DECISIONS D-18, D-31, D-42 and §3 (block budget ≤ 24 ids), and VALIDATION §4.2 (B-11, B-23, B-39, B-73, B-74). Check `git status` and preserve the uncommitted 01–03 work.
+2. Decide whether 04 changes any stamped street or parcel block. If it does, allocate generator 6 with layout revision 3 and keep generator 5 pinned (D-04, D-39). If 04 only adds fixture blocks for later buildings, generator 5 stays as it is.
+3. Build doors, windows, stairs and fixtures as appended `BlockType` ids within budget, with materials and textures; measure the texture-layer count at boot. Add the `FixtureState` side map and the `urban.fixtures` section with its codec, absence default, reset and corruption tests (D-17, D-18). Prove D-31 (AI stair climbing) on a stair fixture.
+4. Use the plan queries (D-43) for any placement, never `surfaceHeight`; use `World.isColumnLoaded` before trusting `getBlock`.
 
 ## Resume rules
 
