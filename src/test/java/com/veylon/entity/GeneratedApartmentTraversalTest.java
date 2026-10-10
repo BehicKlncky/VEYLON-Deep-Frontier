@@ -18,7 +18,16 @@ import static org.junit.jupiter.api.Assertions.*;
 class GeneratedApartmentTraversalTest {
     @Test
     void generatedFurnishedStairsAreWalkableBothWaysInEveryFrontageAndGameMode() {
-        World world = new World(20260731, World.GEN_URBAN_APARTMENTS);
+        walkGenerated(World.GEN_URBAN_APARTMENTS);
+    }
+
+    @Test
+    void generatedShapedStairsAreWalkableBothWaysInEveryFrontageAndGameMode() {
+        walkGenerated(World.GEN_URBAN_SHAPED_STAIRS);
+    }
+
+    private static void walkGenerated(int generator) {
+        World world = new World(20260731, generator);
         world.urban.resolveContentRevision(UrbanRevision.CURRENT_CONTENT);
         for (ParcelPlan.Side side : ParcelPlan.Side.values()) {
             BuildingPlan plan = world.urban.regionPlan(0, 0).parcels().stream()
@@ -37,6 +46,9 @@ class GeneratedApartmentTraversalTest {
                     for (int direction = 0; direction < 2; direction++) {
                         if (direction == 1) { Collections.reverse(route); }
                         Vec3i start = route.getFirst();
+                        Vec3i end = route.getLast();
+                        assertNotNull(com.veylon.ai.Pathfinder.find(world, start.x(), start.y(), start.z(),
+                                end.x(), end.y(), end.z(), 2000), "ordinary pathfinder accepts the generated flight");
                         player.pos.set(start.x() + .5f, start.y(), start.z() + .5f);
                         player.vel.zero(); player.onGround = true;
                         walk(player, world, movement, command, result, route,

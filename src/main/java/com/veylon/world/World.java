@@ -53,10 +53,12 @@ public class World implements VoxelAccess {
     public static final int GEN_URBAN_PLANS = 6;
     /** Layout 4: furnished walk-ups and shops, stamped from frozen template revision two. */
     public static final int GEN_URBAN_APARTMENTS = 7;
+    /** Layout 5: the same furnished buildings with directional, half-height stair treads. */
+    public static final int GEN_URBAN_SHAPED_STAIRS = 8;
     /** The generator of every ordinary new world; generator 3 until the urban rollout. */
     public static final int DEFAULT_NEW_WORLD_GENERATOR = GEN_CAVE_IDENTITIES;
     /** The highest generator version a save may name; a load rejects anything above it. */
-    public static final int MAX_SUPPORTED_GENERATOR = GEN_URBAN_APARTMENTS;
+    public static final int MAX_SUPPORTED_GENERATOR = GEN_URBAN_SHAPED_STAIRS;
 
     public final long seed;
     /** Persisted in save v3; legacy (v2) saves always load as {@link #GEN_LEGACY}. */
@@ -152,7 +154,8 @@ public class World implements VoxelAccess {
     /** Explicit urban layouts, including the frozen datum, street and plan-only versions. */
     public static boolean isUrbanGenerator(int version) {
         return version == GEN_URBAN || version == GEN_URBAN_STREETS
-                || version == GEN_URBAN_PLANS || version == GEN_URBAN_APARTMENTS;
+                || version == GEN_URBAN_PLANS || version == GEN_URBAN_APARTMENTS
+                || version == GEN_URBAN_SHAPED_STAIRS;
     }
 
     /** Generators 2 and 3: deep caves, underground POIs, cave mouths and settlements. */

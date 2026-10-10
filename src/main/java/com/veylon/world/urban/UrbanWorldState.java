@@ -81,7 +81,8 @@ public final class UrbanWorldState {
 
     /** Earlier urban generators keep their unbuilt parcel geometry. */
     public boolean hasGeneratedBuildings() {
-        return layoutRevision == UrbanRevision.LAYOUT_GENERATED_APARTMENTS;
+        return layoutRevision == UrbanRevision.LAYOUT_GENERATED_APARTMENTS
+                || layoutRevision == UrbanRevision.LAYOUT_SHAPED_STAIRS;
     }
 
     public boolean contentRevisionResolved() {

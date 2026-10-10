@@ -37,13 +37,16 @@ public final class BuildingPlanDiagnostics {
                     case WOOD_DOOR, METAL_DOOR -> 'D';
                     case SHELF, CABINET, LOCKER -> 'C';
                     case TABLE -> 'T';
-                    case STAIRS -> '1';
+                    case STAIRS, STAIRS_NORTH, STAIRS_SOUTH, STAIRS_WEST, STAIRS_EAST -> '1';
                     default -> '.';
                 };
                 if (t == BlockType.BRICK && (high == BlockType.WINDOW || high == BlockType.BROKEN_WINDOW)) { cell = 'W'; }
                 if (cell == '.') {
                     for (int h = 2; h <= 4; h++) {
-                        if (p.voxels().getBlock(x, slab + h, z) == BlockType.STAIRS) { cell = (char) ('0' + h); }
+                        BlockType step = p.voxels().getBlock(x, slab + h, z);
+                        if (step == BlockType.STAIRS || com.veylon.world.StairGeometry.isStair(step)) {
+                            cell = (char) ('0' + h);
+                        }
                     }
                 }
                 out.append(cell);

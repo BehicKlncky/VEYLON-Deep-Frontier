@@ -43,7 +43,7 @@ class UrbanDevelopmentSelectorTest {
 
     @Test
     void urbanDevSelectsTheUrbanGeneratorOnlyWithAnIsolatedDataDirectory() {
-        assertEquals(World.GEN_URBAN_APARTMENTS, AutomatedRunDriver.configuredGenerator("urban-dev", true),
+        assertEquals(World.GEN_URBAN_SHAPED_STAIRS, AutomatedRunDriver.configuredGenerator("urban-dev", true),
                 "the selector builds the newest urban layout");
         assertEquals(UrbanRevision.DEVELOPMENT_GENERATOR,
                 AutomatedRunDriver.configuredGenerator(" Urban-Dev ", true));
@@ -66,7 +66,7 @@ class UrbanDevelopmentSelectorTest {
 
         startNewFrontier(game);
 
-        assertEquals(World.GEN_URBAN_APARTMENTS, game.world.generatorVersion);
+        assertEquals(World.GEN_URBAN_SHAPED_STAIRS, game.world.generatorVersion);
         assertEquals(GameMode.SURVIVAL, game.gameMode());
         assertEquals(UrbanRevision.CURRENT_CONTENT, game.world.urban.contentRevision());
         assertEquals(UrbanDatum.STREET_Y + 1.2f, game.player.pos.y, 1e-4f,

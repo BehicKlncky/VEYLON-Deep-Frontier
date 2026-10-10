@@ -263,7 +263,8 @@ public final class AccessibilityValidator {
                     }
                 }
             }
-            if (violations == 0 && plan.templateRevision() == UrbanRevision.BUILDING_TEMPLATE_FURNISHED) {
+            if (violations == 0 && (plan.templateRevision() == UrbanRevision.BUILDING_TEMPLATE_FURNISHED
+                    || plan.templateRevision() == UrbanRevision.BUILDING_TEMPLATE_SHAPED_STAIRS)) {
                 furnishingBounds();
             }
             // No structure is allowed to spill into the approach halo, even if its route still works.

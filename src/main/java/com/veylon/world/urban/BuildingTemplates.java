@@ -26,7 +26,8 @@ public final class BuildingTemplates {
 
     /** The original proposal and its furnished successor remain independently reproducible. */
     public static boolean supportsRevision(int revision) {
-        return revision == REVISION || revision == UrbanRevision.BUILDING_TEMPLATE_FURNISHED;
+        return revision == REVISION || revision == UrbanRevision.BUILDING_TEMPLATE_FURNISHED
+                || revision == UrbanRevision.BUILDING_TEMPLATE_SHAPED_STAIRS;
     }
 
     /** Low-level proposal; callers must validate it, or use {@link BuildingPlanner#plan}. */
@@ -41,7 +42,9 @@ public final class BuildingTemplates {
             throw new IllegalArgumentException("building does not fit parcel/storey envelope");
         }
         BuildingPlan original = new Builder(parcel, family, variant, storeys, basement, minimal).build();
-        return revision == REVISION ? original : BuildingFurnishing.apply(original);
+        if (revision == REVISION) { return original; }
+        BuildingPlan furnished = BuildingFurnishing.apply(original);
+        return revision == UrbanRevision.BUILDING_TEMPLATE_FURNISHED ? furnished : BuildingStairShapes.apply(furnished);
     }
 
     private static final class Builder {

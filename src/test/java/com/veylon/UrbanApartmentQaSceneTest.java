@@ -44,7 +44,7 @@ class UrbanApartmentQaSceneTest {
             assertTrue(UrbanApartmentQaScene.crossesChunkBoundary(building.parcel()));
             assertTrue(building.basement());
             assertTrue(building.storeys() >= 2);
-            for (int view = 0; view < 6; view++) {
+            for (int view = 0; view < 7; view++) {
                 scene.update(view * 4 + 1);
                 assertFalse(VoxelClearance.collides(game.world, game.player.pos.x, game.player.pos.y,
                         game.player.pos.z, .6f, 1.8f, true), "camera body is clear, view=" + view);

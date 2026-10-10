@@ -51,7 +51,7 @@ final class UrbanApartmentQaScene {
 
     void stage(String scene) {
         World world = game.world;
-        if (world.generatorVersion != World.GEN_URBAN_APARTMENTS) {
+        if (world.urban == null || !world.urban.hasGeneratedBuildings()) {
             System.out.println("[urban-qa] apartments require the generated-apartment urban-dev revision; inactive");
             return;
         }
@@ -139,8 +139,11 @@ final class UrbanApartmentQaScene {
         Vec3i rearDoor = new Vec3i(rear.x(), 41, rear.z());
         Vec3i rearOutside = new Vec3i(rear.outsideX() + 2 * rear.facing().dx, 41,
                 rear.outsideZ() + 2 * rear.facing().dz);
+        List<Vec3i> stair = plan.stairs().stream().filter(s -> s.fromFloor() == 0)
+                .findFirst().orElseThrow().route();
         return List.of(new View("street", street, door, 0f), new View("entrance", inside, door, 8f),
-                kitchen, upstairs, downstairs, new View("exit", rearOutside, rearDoor, 4f));
+                kitchen, upstairs, downstairs, new View("exit", rearOutside, rearDoor, 4f),
+                new View("stairs", stair.getFirst(), stair.get(1), 18f));
     }
 
     private static BuildingPlan.Floor floor(BuildingPlan plan, int index) {

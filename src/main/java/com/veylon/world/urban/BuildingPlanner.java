@@ -20,9 +20,12 @@ public final class BuildingPlanner {
     public static Result plan(long seed, int revision, ParcelPlan parcel) {
         Family family = parcel.use() == ParcelPlan.Use.COMMERCIAL ? Family.SHOP : Family.APARTMENT;
         int storeys = family == Family.SHOP ? Math.min(2, parcel.maxStoreys()) : Math.min(5, parcel.maxStoreys());
-        Variant variant = Variant.values()[UrbanHash.range(0, 3, seed, revision,
+        // Revision three refines only treads; preserve revision-two occupation and basements.
+        int selectionRevision = revision == UrbanRevision.BUILDING_TEMPLATE_SHAPED_STAIRS
+                ? UrbanRevision.BUILDING_TEMPLATE_FURNISHED : revision;
+        Variant variant = Variant.values()[UrbanHash.range(0, 3, seed, selectionRevision,
                 UrbanSalts.BUILDING_VARIANT, parcel.id(), 0, 0)];
-        boolean basement = family == Family.APARTMENT && UrbanHash.range(0, 1, seed, revision,
+        boolean basement = family == Family.APARTMENT && UrbanHash.range(0, 1, seed, selectionRevision,
                 UrbanSalts.BUILDING_BASEMENT, parcel.id(), 0, 0) == 1;
         BuildingPlan candidate = BuildingTemplates.propose(parcel, revision, family, variant, storeys, basement, false);
         return repair(candidate);
