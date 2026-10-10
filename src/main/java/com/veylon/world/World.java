@@ -5,6 +5,8 @@ import com.veylon.settlement.Settlement;
 import com.veylon.settlement.SettlementBuilder;
 import com.veylon.settlement.SettlementPlanner;
 import com.veylon.util.Vec3i;
+import com.veylon.world.urban.BuildingPlan;
+import com.veylon.world.urban.UrbanIndoorQueries;
 import com.veylon.world.urban.UrbanWorldState;
 
 import java.util.ArrayList;
@@ -49,10 +51,12 @@ public class World implements VoxelAccess {
     public static final int GEN_URBAN_STREETS = 5;
     /** Layout 3: frozen building plans, with the layout-2 streets still stamped alone. */
     public static final int GEN_URBAN_PLANS = 6;
+    /** Layout 4: furnished walk-ups and shops, stamped from frozen template revision two. */
+    public static final int GEN_URBAN_APARTMENTS = 7;
     /** The generator of every ordinary new world; generator 3 until the urban rollout. */
     public static final int DEFAULT_NEW_WORLD_GENERATOR = GEN_CAVE_IDENTITIES;
     /** The highest generator version a save may name; a load rejects anything above it. */
-    public static final int MAX_SUPPORTED_GENERATOR = GEN_URBAN_PLANS;
+    public static final int MAX_SUPPORTED_GENERATOR = GEN_URBAN_APARTMENTS;
 
     public final long seed;
     /** Persisted in save v3; legacy (v2) saves always load as {@link #GEN_LEGACY}. */
@@ -61,8 +65,9 @@ public class World implements VoxelAccess {
     /** Urban foundation state; present exactly when the generator is urban. */
     public final UrbanWorldState urban;
     private final Map<Long, Chunk> chunks = new HashMap<>();
+    private final ChunkBlockEdits blockEdits = new ChunkBlockEdits();
     /** Blocks set during gameplay, persisted in saves (value = BlockType ordinal). */
-    public final Map<Vec3i, Byte> changedBlocks = new HashMap<>();
+    public final Map<Vec3i, Byte> changedBlocks = blockEdits;
     /** Decoration blocks that target not-yet-generated chunks. */
     final Map<Long, List<int[]>> pendingGen = new HashMap<>();
     public final Map<Vec3i, Inventory> crateContents = new HashMap<>();
@@ -144,9 +149,10 @@ public class World implements VoxelAccess {
                 || version == GEN_CAVE_IDENTITIES || isUrbanGenerator(version);
     }
 
-    /** Generators 4 and 5: the urban street datum and the urban street network. */
+    /** Explicit urban layouts, including the frozen datum, street and plan-only versions. */
     public static boolean isUrbanGenerator(int version) {
-        return version == GEN_URBAN || version == GEN_URBAN_STREETS || version == GEN_URBAN_PLANS;
+        return version == GEN_URBAN || version == GEN_URBAN_STREETS
+                || version == GEN_URBAN_PLANS || version == GEN_URBAN_APARTMENTS;
     }
 
     /** Generators 2 and 3: deep caves, underground POIs, cave mouths and settlements. */
@@ -165,7 +171,15 @@ public class World implements VoxelAccess {
 
     @Override
     public int fixtureLockAt(int x, int y, int z) {
-        return fixtures.lockAt(x, y, z);
+        int saved = fixtures.stateAt(x, y, z);
+        if (saved >= 0) { return FixtureStates.lock(saved); }
+        if (urban != null && urban.hasGeneratedBuildings() && isColumnLoaded(x, z)
+                && Fixtures.isClosedDoor(getBlock(x, y, z))
+                && !changedBlocks.containsKey(new Vec3i(x, y, z))) {
+            BuildingPlan plan = urban.buildingAt(x, z);
+            if (plan != null) { return FixtureStates.lock(plan.fixtureStateAt(fixtures, x, y, z)); }
+        }
+        return FixtureStates.LOCK_NONE;
     }
 
     /**
@@ -271,6 +285,10 @@ public class World implements VoxelAccess {
                     }
                 }
             }
+            if (urban != null && urban.hasGeneratedBuildings()) {
+                // Structure first, irreversible deltas second, reversible state last.
+                blockEdits.applyTo(c);
+            }
             if (!fixtures.isEmpty()) {
                 // Saved door and window state outlives the generated structure.
                 fixtures.applyToNewChunk(c);
@@ -283,6 +301,7 @@ public class World implements VoxelAccess {
             markDirty(cx + 1, cz);
             markDirty(cx, cz - 1);
             markDirty(cx, cz + 1);
+            markUrbanCornersDirty(cx, cz);
         }
         return c;
     }
@@ -361,6 +380,7 @@ public class World implements VoxelAccess {
             markDirty(c.cx + 1, c.cz);
             markDirty(c.cx, c.cz - 1);
             markDirty(c.cx, c.cz + 1);
+            markUrbanCornersDirty(c.cx, c.cz);
         }
         batchChunks.clear();
     }
@@ -418,7 +438,9 @@ public class World implements VoxelAccess {
         }
         c.recomputeHeight(lx, lz);
         c.dirty = true;
-        boolean lightChanged = old.light > 0 || t.light > 0;
+        boolean lightChanged = old.light > 0 || t.light > 0
+                || urban != null && urban.hasGeneratedBuildings()
+                && (old.opaque != t.opaque || old == BlockType.WINDOW || t == BlockType.WINDOW);
         if (lightChanged) {
             c.updateLightAt(this, x, y, z);
             // Light spills into neighbor meshes; rebuild them too.
@@ -426,6 +448,7 @@ public class World implements VoxelAccess {
             markDirty(cx + 1, cz);
             markDirty(cx, cz - 1);
             markDirty(cx, cz + 1);
+            markUrbanCornersDirty(cx, cz);
         } else {
             if (lx == 0) markDirty(cx - 1, cz);
             if (lx == 15) markDirty(cx + 1, cz);
@@ -445,6 +468,15 @@ public class World implements VoxelAccess {
         if (c != null) {
             c.dirty = true;
         }
+    }
+
+    private void markUrbanCornersDirty(int cx, int cz) {
+        if (urban == null || !urban.hasGeneratedBuildings()) { return; }
+        // Mesh vertex smoothing samples the diagonally adjacent column too.
+        markDirty(cx - 1, cz - 1);
+        markDirty(cx - 1, cz + 1);
+        markDirty(cx + 1, cz - 1);
+        markDirty(cx + 1, cz + 1);
     }
 
     /** Mutable value object persisted in the versioned v3 extension. */
@@ -589,6 +621,7 @@ public class World implements VoxelAccess {
         markDirty(cx + 1, cz);
         markDirty(cx, cz - 1);
         markDirty(cx, cz + 1);
+        markUrbanCornersDirty(cx, cz);
     }
 
     /** One bounded pass after loading all position state. */
@@ -654,8 +687,33 @@ public class World implements VoxelAccess {
         return c.height(Math.floorMod(x, 16), Math.floorMod(z, 16));
     }
 
-    /** Sky light 0..1 at a cell using the column heightmap. */
+    /** Urban depth is below the street datum, rather than below a roof. */
+    public float environmentDepth(int x, float y, int z) {
+        if (urban != null && urban.hasGeneratedBuildings()) {
+            return isColumnLoaded(x, z) ? urban.groundY(x, z) - y : 0f;
+        }
+        return surfaceHeight(x, z) - y;
+    }
+
+    /** Weather exposure; generated urban windows also stop overhead rain. */
+    public boolean isSkyExposed(int x, int y, int z) {
+        if (urban != null && urban.hasGeneratedBuildings()) {
+            return UrbanIndoorQueries.isSkyExposed(this, x, y, z);
+        }
+        Chunk chunk = getChunk(Math.floorDiv(x, Chunk.SX), Math.floorDiv(z, Chunk.SZ));
+        return y >= (chunk == null ? 0 : chunk.height(Math.floorMod(x, Chunk.SX), Math.floorMod(z, Chunk.SZ)));
+    }
+
+    /** Infrequent room/floor observation; never generates a missing column. */
+    public UrbanIndoorQueries.Location urbanLocation(int x, int y, int z) {
+        return UrbanIndoorQueries.location(this, x, y, z);
+    }
+
+    /** Sky light 0..1; urban openings admit bounded daylight below roofs. */
     public float skyLight(int x, int y, int z) {
+        if (urban != null && urban.hasGeneratedBuildings()) {
+            return UrbanIndoorQueries.skyLight(this, x, y, z);
+        }
         Chunk c = getChunk(Math.floorDiv(x, 16), Math.floorDiv(z, 16));
         if (c == null) {
             return 1f;

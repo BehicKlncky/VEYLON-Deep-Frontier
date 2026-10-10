@@ -96,7 +96,7 @@ public final class FixtureActions {
             return bodyInOpening(g, x, bottom, z, height) ? Action.BLOCKED
                     : room ? Action.CLOSE : Action.FULL;
         }
-        int lock = w.fixtures.lockAt(x, bottom, z);
+        int lock = w.fixtureLockAt(x, bottom, z);
         if (g.player.abilities.instantBuild() && g.player.crouching) {
             return lock != FixtureStates.LOCK_NONE ? Action.UNLOCK : room ? Action.LOCK : Action.FULL;
         }
@@ -318,7 +318,7 @@ public final class FixtureActions {
         Fixtures.Kind kind = Fixtures.kindOf(t);
         int bottom = Fixtures.stackBottom(w, x, y, z, kind);
         int height = Fixtures.stackHeight(w, x, bottom, z, kind);
-        if (w.fixtures.lockAt(x, bottom, z) != FixtureStates.LOCK_NONE
+        if (w.fixtureLockAt(x, bottom, z) != FixtureStates.LOCK_NONE
                 || !roomFor(w, x, bottom, z, height)) {
             return false;
         }

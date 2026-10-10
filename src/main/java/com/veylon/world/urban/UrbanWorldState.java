@@ -75,7 +75,13 @@ public final class UrbanWorldState {
 
     /** True for a layout with streets, parcels and districts; false for the bare datum. */
     public boolean hasCityPlan() {
-        return layoutRevision == UrbanRevision.LAYOUT_STREET_NETWORK || layoutRevision == UrbanRevision.LAYOUT_BUILDING_PLANS;
+        return layoutRevision == UrbanRevision.LAYOUT_STREET_NETWORK
+                || layoutRevision == UrbanRevision.LAYOUT_BUILDING_PLANS || hasGeneratedBuildings();
+    }
+
+    /** Earlier urban generators keep their unbuilt parcel geometry. */
+    public boolean hasGeneratedBuildings() {
+        return layoutRevision == UrbanRevision.LAYOUT_GENERATED_APARTMENTS;
     }
 
     public boolean contentRevisionResolved() {
@@ -121,7 +127,11 @@ public final class UrbanWorldState {
             UrbanChunkStamper.stampDatum(chunk, soilMoisture);
             return;
         }
-        UrbanChunkStamper.stamp(chunk, regionPlan(rx, rz), soilMoisture);
+        DistrictPlan district = regionPlan(rx, rz);
+        UrbanChunkStamper.stamp(chunk, district, soilMoisture);
+        if (hasGeneratedBuildings()) {
+            UrbanBuildingStamper.stamp(chunk, district, this);
+        }
     }
 
     // ---- plan queries ------------------------------------------------------
@@ -137,7 +147,7 @@ public final class UrbanWorldState {
             throw new IllegalStateException("layout revision " + layoutRevision + " has no city plan");
         }
         long key = UrbanIds.district(rx, rz);
-        // Generator 6 explicitly inherits the frozen layout-2 city fabric, not new hash inputs.
+        // Generators 6 and 7 explicitly inherit layout-2 city fabric, not new hash inputs.
         return regionPlans.get(key, ignored -> CityPlanner.plan(seed, UrbanRevision.LAYOUT_STREET_NETWORK, rx, rz));
     }
 

@@ -151,7 +151,7 @@ class AccessibilityValidatorTest {
         IllegalStateException failed = assertThrows(IllegalStateException.class, () -> BuildingPlanner.repair(proposal));
         assertTrue(failed.getMessage().contains("attempt=3"));
         assertTrue(failed.getMessage().contains("reserved core"));
-        assertThrows(IllegalArgumentException.class, () -> BuildingTemplates.propose(good, 2,
+        assertThrows(IllegalArgumentException.class, () -> BuildingTemplates.propose(good, 3,
                 BuildingPlan.Family.APARTMENT, BuildingPlan.Variant.INTACT, 2, false, false));
     }
 

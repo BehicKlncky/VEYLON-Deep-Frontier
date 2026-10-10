@@ -1,8 +1,11 @@
 package com.veylon.world;
 
 import org.junit.jupiter.api.Test;
+import com.veylon.world.urban.DistrictPlan;
+import com.veylon.world.urban.ParcelPlan;
 
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -87,6 +90,14 @@ class WorldGeneratorFingerprintTest {
     private static final long[] URBAN_STREETS_TERRAIN_FINGERPRINTS = {
             0x2a9ec92f97a969a9L, 0xe22c4dabfb8606c5L, 0xd58d2e3a6d99b888L};
 
+    /** Generator 7, layout 4 / template 2, first recorded 2026-10-10. */
+    private static final long[] URBAN_APARTMENT_TERRAIN_FINGERPRINTS = {
+            0x6e45f241c7882998L, 0xfce647ce212623a4L, 0x345fb9e4d83a73a8L};
+
+    /** Every chunk intersecting the generated refuge and first shop, including their interiors. */
+    private static final long[] URBAN_FURNISHED_BUILDING_FINGERPRINTS = {
+            0xa508a4ab6554fd94L, 0x1a6aa1a4c08df7f3L, 0xd3544779f9af6166L};
+
     /** Chunks fingerprinted per seed: origin, offset, and two negative ones. */
     private static final int[][] CHUNKS = {{0, 0}, {3, -2}, {-1, -1}, {-4, 5}};
 
@@ -117,6 +128,19 @@ class WorldGeneratorFingerprintTest {
     @Test
     void planningRevisionStampsExactlyTheFrozenStreetNetworkWithoutBuildings() {
         assertTerrainPinned(World.GEN_URBAN_PLANS, URBAN_STREETS_TERRAIN_FINGERPRINTS);
+    }
+
+    @Test
+    void generatedApartmentsMatchTheRecordedTerrainFingerprint() {
+        assertTerrainPinned(World.GEN_URBAN_APARTMENTS, URBAN_APARTMENT_TERRAIN_FINGERPRINTS);
+    }
+
+    @Test
+    void completeGeneratedRefugeAndShopMatchTheirRecordedBlocksAndHeightmaps() {
+        for (int i = 0; i < SEEDS.length; i++) {
+            assertEquals(URBAN_FURNISHED_BUILDING_FINGERPRINTS[i], furnishedBuildingFingerprint(SEEDS[i]),
+                    "generator 7 furnished building cells and heights are a saved-world contract; seed=" + SEEDS[i]);
+        }
     }
 
     /**
@@ -266,6 +290,27 @@ class WorldGeneratorFingerprintTest {
         for (String poi : pois) {
             hash = mix(hash, poi.hashCode());
         }
+        return hash;
+    }
+
+    private static long furnishedBuildingFingerprint(long seed) {
+        World world = new World(seed, World.GEN_URBAN_APARTMENTS);
+        DistrictPlan district = world.urban.regionPlan(0, 0);
+        LinkedHashSet<Long> chunks = new LinkedHashSet<>();
+        for (ParcelPlan.Use use : new ParcelPlan.Use[]{ParcelPlan.Use.REFUGE, ParcelPlan.Use.COMMERCIAL}) {
+            ParcelPlan parcel = district.parcels().stream().filter(p -> p.use() == use).findFirst().orElseThrow();
+            for (int cx = Math.floorDiv(parcel.x0(), Chunk.SX); cx <= Math.floorDiv(parcel.x1(), Chunk.SX); cx++) {
+                for (int cz = Math.floorDiv(parcel.z0(), Chunk.SZ); cz <= Math.floorDiv(parcel.z1(), Chunk.SZ); cz++) {
+                    chunks.add(((long) cx << 32) | (cz & 0xffffffffL));
+                }
+            }
+        }
+        assertTrue(chunks.size() >= 10, "the frozen refuge/shop sample covers both complete crossing buildings");
+        long hash = 0xcbf29ce484222325L;
+        for (long chunk : chunks) {
+            hash = mix(hash, hashChunk(world.getOrCreateChunk((int) (chunk >> 32), (int) chunk)));
+        }
+        assertTrue(world.pois.isEmpty());
         return hash;
     }
 

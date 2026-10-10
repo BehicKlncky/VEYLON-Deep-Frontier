@@ -14,7 +14,7 @@ import com.veylon.world.urban.BuildingPlan.Variant;
 import java.util.ArrayList;
 import java.util.List;
 
-/** Revision-one walk-ups and small shops. Never change these rules for an existing generator. */
+/** Frozen walk-ups and small shops, with separately versioned furnishing overlays. */
 public final class BuildingTemplates {
     public static final int REVISION = UrbanRevision.BUILDING_TEMPLATE_WALKUPS;
     public static final int MAX_STOREYS = 5;
@@ -24,10 +24,15 @@ public final class BuildingTemplates {
 
     private BuildingTemplates() { }
 
+    /** The original proposal and its furnished successor remain independently reproducible. */
+    public static boolean supportsRevision(int revision) {
+        return revision == REVISION || revision == UrbanRevision.BUILDING_TEMPLATE_FURNISHED;
+    }
+
     /** Low-level proposal; callers must validate it, or use {@link BuildingPlanner#plan}. */
     public static BuildingPlan propose(ParcelPlan parcel, int revision, Family family, Variant variant,
                                        int storeys, boolean basement, boolean minimal) {
-        if (revision != REVISION) {
+        if (!supportsRevision(revision)) {
             throw new IllegalArgumentException("unsupported building template revision " + revision);
         }
         if (parcel.width() < 12 || parcel.width() > 32 || parcel.depth() < 12 || parcel.depth() > 32
@@ -35,7 +40,8 @@ public final class BuildingTemplates {
                 || family == Family.SHOP && storeys > 2) {
             throw new IllegalArgumentException("building does not fit parcel/storey envelope");
         }
-        return new Builder(parcel, family, variant, storeys, basement, minimal).build();
+        BuildingPlan original = new Builder(parcel, family, variant, storeys, basement, minimal).build();
+        return revision == REVISION ? original : BuildingFurnishing.apply(original);
     }
 
     private static final class Builder {

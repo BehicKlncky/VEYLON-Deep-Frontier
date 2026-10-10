@@ -46,6 +46,10 @@ public final class UrbanRevision {
     public static final int LAYOUT_BUILDING_PLANS = 3;
     /** Frozen catalogue used by generator 6; later catalogues append another constant. */
     public static final int BUILDING_TEMPLATE_WALKUPS = 1;
+    /** Generated, furnished apartments and shops (milestone 06). */
+    public static final int LAYOUT_GENERATED_APARTMENTS = 4;
+    /** Frozen furnishings and abandonment overlays, preserving catalogue one. */
+    public static final int BUILDING_TEMPLATE_FURNISHED = 2;
 
     /** Content revision every new urban world records. */
     public static final int CURRENT_CONTENT = 1;
@@ -59,7 +63,7 @@ public final class UrbanRevision {
     public static final int ABSENT_CONTENT = 1;
 
     /** The urban generator the development selector creates: the newest layout. */
-    public static final int DEVELOPMENT_GENERATOR = World.GEN_URBAN_PLANS;
+    public static final int DEVELOPMENT_GENERATOR = World.GEN_URBAN_APARTMENTS;
 
     private UrbanRevision() {
     }
@@ -74,6 +78,7 @@ public final class UrbanRevision {
             case World.GEN_URBAN -> LAYOUT_DATUM_PLACEHOLDER;
             case World.GEN_URBAN_STREETS -> LAYOUT_STREET_NETWORK;
             case World.GEN_URBAN_PLANS -> LAYOUT_BUILDING_PLANS;
+            case World.GEN_URBAN_APARTMENTS -> LAYOUT_GENERATED_APARTMENTS;
             default -> throw new IllegalArgumentException(
                     "generator " + generatorVersion + " is not an urban generator");
         };
@@ -84,6 +89,7 @@ public final class UrbanRevision {
         return switch (generatorVersion) {
             case World.GEN_URBAN, World.GEN_URBAN_STREETS -> 0;
             case World.GEN_URBAN_PLANS -> BUILDING_TEMPLATE_WALKUPS;
+            case World.GEN_URBAN_APARTMENTS -> BUILDING_TEMPLATE_FURNISHED;
             default -> throw new IllegalArgumentException("not an urban generator " + generatorVersion);
         };
     }

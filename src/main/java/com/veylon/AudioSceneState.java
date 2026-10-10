@@ -20,6 +20,10 @@ final class AudioSceneState {
 
     static MusicMood music(Game game, float depth) {
         var player = game.player;
+        if (game.world.urban != null && game.world.urban.hasGeneratedBuildings()) {
+            depth = game.world.environmentDepth((int) Math.floor(player.pos.x), player.pos.y,
+                    (int) Math.floor(player.pos.z));
+        }
         for (int i = 0, count = Math.min(THREAT_SCAN_LIMIT, game.entities.creatures.size()); i < count; i++) {
             var creature = game.entities.creatures.get(i);
             float radius = creature.targetEntity == player ? COMBAT_RADIUS : THREAT_RADIUS;
@@ -42,6 +46,14 @@ final class AudioSceneState {
 
     static AudioEnvironment.Zone environment(Game game, float depth) {
         int x = (int) Math.floor(game.player.pos.x), z = (int) Math.floor(game.player.pos.z);
+        if (game.world.urban != null && game.world.urban.hasGeneratedBuildings()) {
+            depth = game.world.environmentDepth(x, game.player.pos.y, z);
+            // The room-aware shelter observation is refreshed before this
+            // medium-tick mix. Stone apartments use structure reverb, while
+            // the same pavement outdoors remains an open acoustic space.
+            return AudioEnvironment.classify(depth, game.player.exposedToSky, false,
+                    game.player.shelter.indoor());
+        }
         Settlement settlement = game.world.settlements.get(Settlement.packId(
                 SettlementPlanner.regionOfBlock(x), SettlementPlanner.regionOfBlock(z)));
         boolean stone = settlement != null && settlement.containsBlock(x, z)

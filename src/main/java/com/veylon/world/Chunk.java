@@ -15,6 +15,8 @@ public class Chunk {
     private final byte[] blocks = new byte[SX * SY * SZ];
     /** Highest opaque block per column, for cheap sky light. */
     public final int[] heightMap = new int[SX * SZ];
+    /** Highest rain-blocking cell, including closed glass; derived, never serialized. */
+    private final int[] precipitationHeightMap = new int[SX * SZ];
     /** Light-emitting blocks in this chunk: {worldX, worldY, worldZ, level}. */
     public final List<int[]> lights = new ArrayList<>();
     /** Deterministic diagnostics for full versus point light-list maintenance. */
@@ -53,13 +55,20 @@ public class Chunk {
     }
 
     public void recomputeHeight(int lx, int lz) {
+        int cover = -1;
         for (int y = SY - 1; y >= 0; y--) {
-            if (BlockType.byId(blocks[idx(lx, y, lz)]).opaque) {
+            BlockType block = BlockType.byId(blocks[idx(lx, y, lz)]);
+            if (cover < 0 && (block.opaque || block == BlockType.WINDOW)) {
+                cover = y;
+            }
+            if (block.opaque) {
                 heightMap[lz * SX + lx] = y;
+                precipitationHeightMap[lz * SX + lx] = cover;
                 return;
             }
         }
         heightMap[lz * SX + lx] = 0;
+        precipitationHeightMap[lz * SX + lx] = cover;
     }
 
     public void recomputeAllHeights() {
@@ -72,6 +81,11 @@ public class Chunk {
 
     public int height(int lx, int lz) {
         return heightMap[lz * SX + lx];
+    }
+
+    /** Roof/closed-glass bound for precipitation, or -1 for a wholly empty column. */
+    public int precipitationHeight(int lx, int lz) {
+        return precipitationHeightMap[lz * SX + lx];
     }
 
     /** Rescans the chunk for light-emitting blocks. */

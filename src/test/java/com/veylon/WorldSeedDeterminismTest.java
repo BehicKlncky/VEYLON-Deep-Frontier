@@ -115,7 +115,8 @@ class WorldSeedDeterminismTest {
         // The urban branch takes the same reset and reseed as every world and
         // adds no random stream of its own that could carry state across: its
         // plans are pure derivations, not streams (decision D-38).
-        for (int generator : new int[]{World.GEN_URBAN, World.GEN_URBAN_STREETS, World.GEN_URBAN_PLANS}) {
+        for (int generator : new int[]{World.GEN_URBAN, World.GEN_URBAN_STREETS,
+                World.GEN_URBAN_PLANS, World.GEN_URBAN_APARTMENTS}) {
             String first = simulate(20260716L, null, generator);
             String afterLegacyWorld = simulate(20260716L, 20260716L, generator);
             assertEquals(first, afterLegacyWorld,

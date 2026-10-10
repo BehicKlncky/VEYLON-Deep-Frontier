@@ -16,6 +16,10 @@ import static com.veylon.simulation.TemperatureConstants.*;
  * underground stabilization + nearby fire heat.
  */
 public class TemperatureSystem implements MediumTickSystem {
+    /** Unheated covered rooms buffer short-term weather while retaining seasons. */
+    private static final float INDOOR_WEATHER_FACTOR = 0.35f;
+    private static final float INDOOR_DAY_NIGHT_FACTOR = 0.65f;
+    private static final float INDOOR_ALTITUDE_FACTOR = 0.35f;
 
     /** Cached heat sources near the player (campfires, torches, burning blocks). */
     private final List<float[]> heatSources = new ArrayList<>();
@@ -79,22 +83,27 @@ public class TemperatureSystem implements MediumTickSystem {
         int y = (int) Math.floor(fy);
         int z = (int) Math.floor(fz);
         Biome biome = g.world.biomeAt(x, z);
+        boolean generatedUrban = g.world.urban != null && g.world.urban.hasGeneratedBuildings();
+        boolean covered = generatedUrban && g.world.isColumnLoaded(x, z)
+                && !g.world.isSkyExposed(x, y + 1, z);
         float t = biome.baseTemp;
-        t += g.time.tempOffset();
-        t += g.weather.tempOffset();
+        t += g.time.tempOffset() * (covered ? INDOOR_DAY_NIGHT_FACTOR : 1f);
+        t += g.weather.tempOffset() * (covered ? INDOOR_WEATHER_FACTOR : 1f);
         t += g.events.tempOffset();
         t += g.seasons.current(g.time).tempOffset;
 
         // Altitude cooling above the base terrain level.
         if (y > ALTITUDE_COOLING_START_Y) {
-            t -= (y - ALTITUDE_COOLING_START_Y) * ALTITUDE_COOLING_PER_BLOCK;
+            t -= (y - ALTITUDE_COOLING_START_Y) * ALTITUDE_COOLING_PER_BLOCK
+                    * (covered ? INDOOR_ALTITUDE_FACTOR : 1f);
         }
 
         // Underground: temperature stabilizes toward the deep-rock value with depth.
         var chunk = g.world.getChunk(Math.floorDiv(x, 16), Math.floorDiv(z, 16));
         if (chunk != null) {
-            int surface = chunk.height(Math.floorMod(x, 16), Math.floorMod(z, 16));
-            int depth = surface - y;
+            // A roof is not deep rock. Urban depth uses the street datum,
+            // so B1 gets a modest blend and upper rooms retain the climate.
+            float depth = g.world.environmentDepth(x, y, z);
             if (depth > UNDERGROUND_DEPTH_START) {
                 float blend = Math.min(1f,
                         (depth - UNDERGROUND_DEPTH_START) / UNDERGROUND_BLEND_DEPTH);

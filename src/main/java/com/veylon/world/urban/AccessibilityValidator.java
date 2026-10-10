@@ -44,7 +44,44 @@ public final class AccessibilityValidator {
 
     /** Checks city approach reservations and adjacent footprints as well as the building itself. */
     public static Report inspect(BuildingPlan plan, DistrictPlan district) {
-        Check c = new Check(plan);
+        return inspectDistrict(plan, district, false);
+    }
+
+    /**
+     * Validate the actual generated cells through the same physical entry/return proof. Every
+     * column of the bounded footprint and approach halo must already be loaded. Neighbouring
+     * structures may occupy that halo; the proposal ownership restriction still applies to
+     * {@link #inspect(BuildingPlan)} and is checked before stamping, rather than to their cells.
+     * This read never requests a chunk and does not edit blocks or fixture state.
+     */
+    public static Report inspectGenerated(BuildingPlan plan, DistrictPlan district, VoxelAccess generated) {
+        Check bounds = new Check(plan);
+        if (!bounds.boundedMetadata()) {
+            bounds.fail("BOUNDS: plan metadata exceeds validation limits");
+            return bounds.report(0);
+        }
+        PlanVolume volume = plan.voxels();
+        for (int x = volume.x0; x < volume.x0 + volume.width; x++) {
+            for (int z = volume.z0; z < volume.z0 + volume.depth; z++) {
+                if (!generated.isColumnLoaded(x, z)) {
+                    bounds.fail("LOADED: generated building/approach column is unavailable " + x + "," + z);
+                }
+            }
+        }
+        if (bounds.violations != 0) { return bounds.report(0); }
+        PlanVolume.Builder actual = volume.edit();
+        for (int x = volume.x0; x < volume.x0 + volume.width; x++) {
+            for (int z = volume.z0; z < volume.z0 + volume.depth; z++) {
+                for (int y = volume.minY; y <= volume.maxY; y++) {
+                    actual.set(x, y, z, generated.getBlock(x, y, z));
+                }
+            }
+        }
+        return inspectDistrict(plan.withVoxels(actual.build()), district, true);
+    }
+
+    private static Report inspectDistrict(BuildingPlan plan, DistrictPlan district, boolean worldContext) {
+        Check c = new Check(plan, worldContext);
         if (!c.boundedMetadata() || district.parcels().size() > UrbanIds.MAX_PARCEL + 1) {
             c.fail("BOUNDS: district/plan metadata exceeds validation limits");
             return c.report(0);
@@ -110,13 +147,17 @@ public final class AccessibilityValidator {
     private static final class Check {
         final BuildingPlan plan;
         final PlanVolume volume;
+        final boolean worldContext;
         final List<String> messages = new ArrayList<>();
         int violations, transitions, forwardVisits, reverseVisits;
         PlanVolume opened;
         boolean[] walk, reached, escaped;
         int[] edges, reverseHead, reverseNext, reverseFrom;
 
-        Check(BuildingPlan p) { plan = p; volume = p.voxels(); }
+        Check(BuildingPlan p) { this(p, false); }
+        Check(BuildingPlan p, boolean worldContext) {
+            plan = p; volume = p.voxels(); this.worldContext = worldContext;
+        }
 
         Report run() {
             if (!boundedMetadata()) {
@@ -143,7 +184,7 @@ public final class AccessibilityValidator {
 
         void metadata() {
             if (!UrbanIds.isValid(plan.id()) || plan.id() != UrbanIds.building(plan.parcel().id(), 0)
-                    || plan.templateRevision() != BuildingTemplates.REVISION) {
+                    || !BuildingTemplates.supportsRevision(plan.templateRevision())) {
                 fail("IDENTITY: unsupported building/template identity");
             }
             if (plan.storeys() < 1 || plan.storeys() > Math.min(5, plan.parcel().maxStoreys())
@@ -222,14 +263,45 @@ public final class AccessibilityValidator {
                     }
                 }
             }
+            if (violations == 0 && plan.templateRevision() == UrbanRevision.BUILDING_TEMPLATE_FURNISHED) {
+                furnishingBounds();
+            }
             // No structure is allowed to spill into the approach halo, even if its route still works.
-            for (int x = volume.x0; x < volume.x0 + volume.width; x++) {
-                for (int z = volume.z0; z < volume.z0 + volume.depth; z++) {
-                    if (!plan.parcel().contains(x, z)) {
-                        for (int y = 41; y <= volume.maxY; y++) {
-                            if (volume.getBlock(x, y, z) != BlockType.AIR) { fail("OVERLAP: geometry outside parcel"); }
+            if (!worldContext) {
+                for (int x = volume.x0; x < volume.x0 + volume.width; x++) {
+                    for (int z = volume.z0; z < volume.z0 + volume.depth; z++) {
+                        if (!plan.parcel().contains(x, z)) {
+                            for (int y = 41; y <= volume.maxY; y++) {
+                                if (volume.getBlock(x, y, z) != BlockType.AIR) { fail("OVERLAP: geometry outside parcel"); }
+                            }
                         }
                     }
+                }
+            }
+        }
+
+        void furnishingBounds() {
+            for (BuildingPlan.Floor floor : plan.floors()) {
+                int flatContainers = 0;
+                for (BuildingPlan.Room room : floor.rooms()) {
+                    int fixtures = 0, containers = 0;
+                    for (BuildingPlan.Fixture fixture : plan.fixtures()) {
+                        if (UrbanIds.parent(fixture.id()) == room.id()) {
+                            fixtures++;
+                            if (fixture.kind() == FixtureKind.CONTAINER) { containers++; }
+                        }
+                    }
+                    if (fixtures > BuildingFurnishing.MAX_ROOM_FIXTURES
+                            || containers > BuildingFurnishing.MAX_ROOM_CONTAINERS) {
+                        fail("FURNISHING: room fixture/container budget exceeded");
+                    }
+                    flatContainers += containers;
+                }
+                boolean domestic = floor.index() >= 0 && floor.index() < plan.storeys()
+                        && (plan.family() == BuildingPlan.Family.APARTMENT || floor.index() > 0);
+                if (domestic && (flatContainers < BuildingFurnishing.MIN_FLAT_CONTAINERS
+                        || flatContainers > BuildingFurnishing.MAX_FLAT_CONTAINERS)) {
+                    fail("FURNISHING: apartment searchable reservation budget exceeded");
                 }
             }
         }

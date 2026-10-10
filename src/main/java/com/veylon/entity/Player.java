@@ -288,12 +288,7 @@ public class Player extends Entity {
         int bx = (int) Math.floor(pos.x), bz = (int) Math.floor(pos.z);
         biome = world.biomeAt(bx, bz);
         envTemp = g.temperature.envTempAt(g, pos.x, pos.y, pos.z);
-        int surface = 0;
-        var chunk = world.getChunk(Math.floorDiv(bx, 16), Math.floorDiv(bz, 16));
-        if (chunk != null) {
-            surface = chunk.height(Math.floorMod(bx, 16), Math.floorMod(bz, 16));
-        }
-        exposedToSky = pos.y + SKY_EXPOSURE_EYE_OFFSET >= surface;
+        exposedToSky = world.isSkyExposed(bx, (int) Math.floor(pos.y + SKY_EXPOSURE_EYE_OFFSET), bz);
 
         damageFlash = Math.max(0, damageFlash - DAMAGE_FLASH_DECAY_PER_SECOND * dt);
         noise = Math.max(0, noise - NOISE_DECAY_PER_SECOND * dt);

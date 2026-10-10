@@ -22,6 +22,9 @@ final class UrbanBootstrap {
     /** Shown instead of the camp hint on the street network (generator 5). */
     static final String STREETS_NOTICE =
             "Urban development world: streets and reserved lots only; no buildings yet.";
+    /** Furnished geometry is explorable; contextual loot and the refuge loop follow later. */
+    static final String APARTMENTS_NOTICE =
+            "Urban development world: explorable apartments and shops; contextual supplies follow later.";
 
     /** Chunks generated around the spawn before the first frame. */
     private static final int SPAWN_RADIUS_CHUNKS = 5;
@@ -45,6 +48,7 @@ final class UrbanBootstrap {
     }
 
     static String developmentNotice(World world) {
+        if (world.urban.hasGeneratedBuildings()) { return APARTMENTS_NOTICE; }
         return world.urban.hasCityPlan() ? STREETS_NOTICE : DATUM_NOTICE;
     }
 }
