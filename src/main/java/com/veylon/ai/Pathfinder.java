@@ -2,6 +2,8 @@ package com.veylon.ai;
 
 import com.veylon.util.Vec3i;
 import com.veylon.world.BlockType;
+import com.veylon.world.FixtureStates;
+import com.veylon.world.Fixtures;
 import com.veylon.world.World;
 
 import java.util.ArrayList;
@@ -62,6 +64,11 @@ public final class Pathfinder {
         if (t == BlockType.GATE) {
             return true; // NPCs shoulder gates open; cost handled below
         }
+        if (Fixtures.isClosedDoor(t)) {
+            // An unlocked door is opened on the way (cost below); a locked or
+            // barred one is a wall until someone forces or unbars it.
+            return w.fixtures.lockAt(x, y, z) == FixtureStates.LOCK_NONE;
+        }
         if (t == BlockType.TORCH || t == BlockType.CAMPFIRE) {
             return false;
         }
@@ -90,7 +97,9 @@ public final class Pathfinder {
         if (feet == BlockType.WATER) {
             return 4f;
         }
-        if (feet == BlockType.GATE || w.getBlock(x, y + 1, z) == BlockType.GATE) {
+        BlockType head = w.getBlock(x, y + 1, z);
+        if (feet == BlockType.GATE || head == BlockType.GATE
+                || Fixtures.isClosedDoor(feet) || Fixtures.isClosedDoor(head)) {
             return 2.5f;
         }
         return 1f;

@@ -133,7 +133,15 @@ public abstract class Entity {
 
     /** Integrates velocity with gravity and voxel collision. */
     public void applyPhysics(float dt, boolean gravity) {
-        VoxelPhysics.integrate(this, dt, gravity, 0f);
+        VoxelPhysics.integrate(this, dt, gravity, stepHeight());
+    }
+
+    /**
+     * How high this body walks up without jumping. Bodies have none by
+     * default and jump at a ledge ({@code Steering}); see {@link Npc}.
+     */
+    protected float stepHeight() {
+        return 0f;
     }
 
     protected void onLanded(float fall) {

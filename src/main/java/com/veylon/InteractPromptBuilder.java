@@ -14,6 +14,8 @@ import com.veylon.world.RackBatch;
 import com.veylon.world.Raycaster;
 import com.veylon.world.World;
 
+import java.util.Locale;
+
 /**
  * Builds the one-line "[F] ..." hint the HUD shows for whatever the player is
  * currently looking at or standing next to.
@@ -54,12 +56,22 @@ final class InteractPromptBuilder {
      */
     void update() {
         game.interactPrompt = null;
-        if (npcPrompt() || stuckArrowPrompt() || carcassPrompt() || fallingBodyPrompt()
+        if (fixturePrompt() || npcPrompt() || stuckArrowPrompt() || carcassPrompt() || fallingBodyPrompt()
                 || targetBlockPrompt()
                 || trackPrompt()) {
             return;
         }
         waterPrompt();
+    }
+
+    /** An aimed door or window outranks nearby people, as it does for the F key. */
+    private boolean fixturePrompt() {
+        if (game.targetHit == null) {
+            return false;
+        }
+        game.interactPrompt = FixtureActions.prompt(game,
+                game.targetHit.x(), game.targetHit.y(), game.targetHit.z());
+        return game.interactPrompt != null;
     }
 
     private boolean npcPrompt() {
@@ -144,13 +156,17 @@ final class InteractPromptBuilder {
                         + (int) (float) world.campfireFuel.getOrDefault(position, 0f)
                         + "s fuel)";
             }
-            case CRATE -> {
+            case CRATE, SHELF, CABINET, LOCKER -> {
                 var stores = world.settlementAt(targetX, targetZ);
+                boolean crate = game.targetHit.type() == BlockType.CRATE;
                 game.interactPrompt = stores != null && !stores.cleared && !stores.occupied
                         ? "[F] Open " + (stores.hostile() ? "enemy" : "restricted")
                         + " stores (taking supplies has consequences)"
-                        : "[F] Open crate";
+                        : crate ? "[F] Open crate"
+                        : "[F] Search " + game.targetHit.type().displayName.toLowerCase(Locale.ROOT);
             }
+            case BROKEN_DOOR -> game.interactPrompt = "Broken doorway";
+            case BROKEN_WINDOW -> game.interactPrompt = "Shattered window: climb through";
             case WORKBENCH -> game.interactPrompt = "[F] Use workbench";
             case FURNACE -> game.interactPrompt = "[F] Use furnace (crafting)";
             case ANVIL -> game.interactPrompt = "[F] Use anvil (crafting)";

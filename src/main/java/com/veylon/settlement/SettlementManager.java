@@ -576,10 +576,11 @@ public class SettlementManager
     // Ticks
     // ------------------------------------------------------------------
 
-    /** Fast tick (20 Hz): gates plus bounded active/abstract counterattacks. */
+    /** Fast tick (20 Hz): gates, residents' doors and bounded active/abstract counterattacks. */
     @Override
     public void fastTick(Game g, float dt) {
         tickGates(g, dt);
+        com.veylon.FixtureActions.tickResidentDoors(g, dt);
         counterattacks.tick(g, dt);
         tickRestrictedAreas(g, dt);
     }

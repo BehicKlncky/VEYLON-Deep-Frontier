@@ -7,6 +7,7 @@ import com.veylon.item.ItemType;
 import com.veylon.settlement.SettlementManager;
 import com.veylon.util.Vec3i;
 import com.veylon.world.BlockType;
+import com.veylon.world.Fixtures;
 
 /**
  * Opening crates and moving items in and out of them, including the crime
@@ -44,6 +45,14 @@ final class CrateTransactionSystem {
     private final long[] activeTheftTransferIds =
             new long[SettlementManager.MAX_THEFT_TRANSFERS_PER_EVENT];
     private int activeTheftTransferCount;
+    /**
+     * The urban container whose storage screen is open, or null. Its contents
+     * have one owner (D-51): if the furniture burns, is blown apart or broken
+     * while the screen is open, the screen must not keep handing them out or
+     * swallow deposits into an inventory the world no longer holds. Legacy
+     * crates keep their rules (D-12).
+     */
+    private Vec3i openUrbanContainer;
 
     CrateTransactionSystem(Game game) {
         this.game = game;
@@ -55,11 +64,12 @@ final class CrateTransactionSystem {
         activeTheftEventId = Long.MIN_VALUE;
         activeTheftEventCrate = null;
         activeTheftTransferCount = 0;
+        openUrbanContainer = null;
     }
 
-    /** Opens a real world crate; both RMB/F interaction paths use this command. */
+    /** Opens a real world crate or urban container; both RMB/F interaction paths use this command. */
     boolean openCrateAt(Vec3i pos) {
-        if (pos == null || game.world.getBlock(pos.x(), pos.y(), pos.z()) != BlockType.CRATE) {
+        if (pos == null || !Fixtures.isContainer(game.world.getBlock(pos.x(), pos.y(), pos.z()))) {
             return false;
         }
         game.settlementManager.onRestrictedStorageOpened(game, pos);
@@ -67,6 +77,27 @@ final class CrateTransactionSystem {
                 pos, k -> new Inventory(CRATE_SLOTS));
         game.openCratePos = pos;
         game.uiMode = Game.UiMode.CRATE;
+        openUrbanContainer = Fixtures.isUrbanContainer(game.world.getBlock(pos.x(), pos.y(), pos.z()))
+                ? pos : null;
+        return true;
+    }
+
+    /**
+     * True, closing the screen, when the open storage was an urban container
+     * that is gone: no longer that furniture, or no longer holding this inventory.
+     */
+    private boolean openUrbanContainerGone() {
+        Vec3i p = openUrbanContainer;
+        if (p == null || !p.equals(game.openCratePos)) {
+            return false;
+        }
+        if (Fixtures.isUrbanContainer(game.world.getBlock(p.x(), p.y(), p.z()))
+                && game.world.crateContents.get(p) == game.openCrate) {
+            return false;
+        }
+        openUrbanContainer = null;
+        game.closeScreens();
+        game.log("There is nothing left to search.");
         return true;
     }
 
@@ -147,6 +178,9 @@ final class CrateTransactionSystem {
 
     /** Real crate-UI transfer command used by mouse input and integration tests. */
     int transferCrateItemToPlayer(int slot) {
+        if (openUrbanContainerGone()) {
+            return 0;
+        }
         Inventory crate = game.openCrate;
         if (crate == null || slot < 0 || slot >= crate.size()) {
             return 0;
@@ -170,6 +204,9 @@ final class CrateTransactionSystem {
 
     /** Real crate-UI deposit command; returned supplies are attributed by crate position. */
     int transferPlayerItemToCrate(int slot) {
+        if (openUrbanContainerGone()) {
+            return 0;
+        }
         Inventory crate = game.openCrate;
         if (crate == null || slot < 0 || slot >= game.player.inventory.size()) {
             return 0;

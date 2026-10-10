@@ -16,6 +16,7 @@ import com.veylon.settlement.CounterattackDirector;
 import com.veylon.settlement.SettlementManager;
 import com.veylon.simulation.FireSystem;
 import com.veylon.simulation.LiquidFireConstants;
+import com.veylon.world.FixtureStates;
 import com.veylon.world.urban.UrbanWorldState;
 
 /**
@@ -47,7 +48,9 @@ public record RuntimeBudgetSnapshot(
         int settledFragments,
         int liveRagdolls,
         int panickingBodies,
-        int urbanRegionPlans) {
+        int urbanRegionPlans,
+        int fixtureStates,
+        int residentDoors) {
 
     public static RuntimeBudgetSnapshot capture(Game game) {
         int pathNodes = 0;
@@ -91,7 +94,9 @@ public record RuntimeBudgetSnapshot(
                 game.fragments.settledCount(),
                 game.ragdolls.liveCount(),
                 panicking,
-                game.world.urban == null ? 0 : game.world.urban.cachedRegionPlans());
+                game.world.urban == null ? 0 : game.world.urban.cachedRegionPlans(),
+                game.world.fixtures.size(),
+                game.world.fixtures.transitTimers().size());
     }
 
     /** True when every collection with a hard runtime ceiling is within it. */
@@ -123,6 +128,8 @@ public record RuntimeBudgetSnapshot(
                 && settledFragments <= BodyFragmentConstants.MAX_SETTLED_FRAGMENTS
                 && liveRagdolls <= RagdollConstants.MAX_LIVE
                 && urbanRegionPlans <= UrbanWorldState.MAX_REGION_PLANS
+                && fixtureStates <= FixtureStates.MAX_ENTRIES
+                && residentDoors <= FixtureStates.MAX_TRANSIT
                 // The player never panics.
                 && panickingBodies < livingBodies;
     }
@@ -154,7 +161,8 @@ public record RuntimeBudgetSnapshot(
                 + " fragments={live=" + liveFragments + ",settled=" + settledFragments + "}"
                 + " ragdolls=" + liveRagdolls
                 + " panicking=" + panickingBodies
-                + " urbanPlans=" + urbanRegionPlans;
+                + " urbanPlans=" + urbanRegionPlans
+                + " fixtures={states=" + fixtureStates + ",residentDoors=" + residentDoors + "}";
     }
 
     public static String hardLimitSummary() {
@@ -180,6 +188,8 @@ public record RuntimeBudgetSnapshot(
                 + " liveFragments=" + BodyFragmentConstants.MAX_LIVE_FRAGMENTS
                 + " settledFragments=" + BodyFragmentConstants.MAX_SETTLED_FRAGMENTS
                 + " ragdolls=" + RagdollConstants.MAX_LIVE
-                + " urbanPlans=" + UrbanWorldState.MAX_REGION_PLANS;
+                + " urbanPlans=" + UrbanWorldState.MAX_REGION_PLANS
+                + " fixtureStates=" + FixtureStates.MAX_ENTRIES
+                + " residentDoors=" + FixtureStates.MAX_TRANSIT;
     }
 }

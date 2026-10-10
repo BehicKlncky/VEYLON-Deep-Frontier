@@ -1,5 +1,6 @@
 package com.veylon.ai;
 
+import com.veylon.FixtureActions;
 import com.veylon.Game;
 import com.veylon.combat.WeaponDefinition;
 import com.veylon.combat.WeaponRegistry;
@@ -12,6 +13,7 @@ import com.veylon.settlement.CounterattackMission;
 import com.veylon.settlement.Settlement;
 import com.veylon.util.Vec3i;
 import com.veylon.world.BlockType;
+import com.veylon.world.Fixtures;
 
 import java.util.List;
 
@@ -867,8 +869,9 @@ public final class SettledNpcAI {
     /**
      * Moves toward a target using the cached path; returns false when arrived.
      * Falls back to direct steering when pathing fails or the target is close.
+     * Package-private so navigation tests drive the production path follower.
      */
-    private static boolean moveTo(Game g, Npc n, Vec3i target, float speed, float arrive) {
+    static boolean moveTo(Game g, Npc n, Vec3i target, float speed, float arrive) {
         double flat = Math.sqrt((n.pos.x - target.x() - 0.5) * (n.pos.x - target.x() - 0.5)
                 + (n.pos.z - target.z() - 0.5) * (n.pos.z - target.z() - 0.5));
         if (flat < arrive && Math.abs(n.pos.y - target.y()) < 3) {
@@ -908,6 +911,12 @@ public final class SettledNpcAI {
             }
             if (headCell == BlockType.GATE) {
                 g.settlementManager.openGate(g, new Vec3i(cell.x(), cell.y() + 1, cell.z()));
+            }
+            // Doors too: opened as one, and they swing shut behind (D-52).
+            if (Fixtures.isClosedDoor(inCell)) {
+                FixtureActions.residentOpens(g, cell.x(), cell.y(), cell.z());
+            } else if (Fixtures.isClosedDoor(headCell)) {
+                FixtureActions.residentOpens(g, cell.x(), cell.y() + 1, cell.z());
             }
             double cd = n.distSqTo(cell.x() + 0.5f, n.pos.y, cell.z() + 0.5f);
             if (cd < 0.55 * 0.55 && Math.abs(n.pos.y - cell.y()) < 1.6f) {

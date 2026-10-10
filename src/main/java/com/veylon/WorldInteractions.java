@@ -107,7 +107,7 @@ final class WorldInteractions {
                     game.uiMode = Game.UiMode.CRAFTING;
                     return;
                 }
-                case CRATE -> {
+                case CRATE, SHELF, CABINET, LOCKER -> {
                     game.openCrateAt(targetPos());
                     return;
                 }
@@ -293,6 +293,8 @@ final class WorldInteractions {
                 game.log("The beacon thrums steadily, its signal cutting through the sky.");
                 yield true;
             }
+            case WOOD_DOOR, WOOD_DOOR_OPEN, METAL_DOOR, METAL_DOOR_OPEN, WINDOW, WINDOW_OPEN ->
+                    FixtureActions.interact(game, pos.x(), pos.y(), pos.z());
             default -> false;
         };
     }
@@ -327,6 +329,12 @@ final class WorldInteractions {
      * talked to, not harvested past.
      */
     void interact() {
+        // An aimed door or window comes first: doorways are where people stand,
+        // and F on the door must not open a conversation instead (D-50).
+        if (game.targetHit != null && FixtureActions.interact(game,
+                game.targetHit.x(), game.targetHit.y(), game.targetHit.z())) {
+            return;
+        }
         if (interactWithNearbyNpc() || recoverNearbyArrow() || interactWithNearbyCarcass()) {
             return;
         }
@@ -354,7 +362,7 @@ final class WorldInteractions {
             }
             case CAMPFIRE, LANTERN, POWDER_KEG, GATE, ALARM_BELL, BEACON, BEACON_LIT ->
                     interactWithBlockAt(pos);
-            case CRATE -> game.openCrateAt(pos);
+            case CRATE, SHELF, CABINET, LOCKER -> game.openCrateAt(pos);
             case WORKBENCH, FURNACE, ANVIL, TANNERY, HERB_STATION, MAP_TABLE ->
                     game.uiMode = Game.UiMode.CRAFTING;
             case DRYING_RACK -> rackInteract(pos);

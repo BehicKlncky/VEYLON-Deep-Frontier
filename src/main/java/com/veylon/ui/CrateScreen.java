@@ -4,6 +4,10 @@ import com.veylon.Game;
 import com.veylon.engine.UiRenderer;
 import com.veylon.item.Inventory;
 import com.veylon.item.ItemStack;
+import com.veylon.world.BlockType;
+import com.veylon.world.Fixtures;
+
+import java.util.Locale;
 
 import static org.lwjgl.glfw.GLFW.GLFW_MOUSE_BUTTON_LEFT;
 
@@ -23,7 +27,7 @@ public class CrateScreen {
         float pw = 620, ph = 470;
         float x0 = w / 2f - pw / 2f, y0 = h / 2f - ph / 2f;
         ui.panel(x0, y0, pw, ph);
-        ui.textCentered(w / 2f, y0 + 10, 2f, "STORAGE CRATE", 1f, 1f, 1f, 1f);
+        ui.textCentered(w / 2f, y0 + 10, 2f, title(g), 1f, 1f, 1f, 1f);
         ui.textCentered(w / 2f, y0 + ph - 22, 1.2f, "Click an item to transfer it. [F or Esc] close",
                 0.7f, 0.7f, 0.7f, 1f);
 
@@ -83,5 +87,13 @@ public class CrateScreen {
             ui.itemIcon(s.type, x + 7, y + 5, size - 14);
             ui.textShadow(x + 6, y + size - 15, 1.1f, String.valueOf(s.count), 1f, 1f, 1f, 1f);
         }
+    }
+
+    /** The open container's name: "STORAGE CRATE", or the cabinet, shelving or locker being searched. */
+    private static String title(Game g) {
+        BlockType t = g.openCratePos == null ? BlockType.CRATE
+                : g.world.getBlock(g.openCratePos.x(), g.openCratePos.y(), g.openCratePos.z());
+        return t == BlockType.CRATE || !Fixtures.isUrbanContainer(t)
+                ? "STORAGE CRATE" : t.displayName.toUpperCase(Locale.ROOT);
     }
 }

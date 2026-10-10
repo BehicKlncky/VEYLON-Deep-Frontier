@@ -132,6 +132,20 @@ public class Npc extends Entity {
         return true;
     }
 
+    /**
+     * In a city people climb stairs of full-block steps by walking, as the
+     * player does (D-31): the jump that gets them up a ledge clears a step by
+     * only about 0.05 of a block. The path finder already demands the headroom
+     * a step-up needs. Legacy worlds keep the jump, unchanged.
+     */
+    @Override
+    protected float stepHeight() {
+        return world.isUrban() ? URBAN_STEP_HEIGHT : 0f;
+    }
+
+    /** Step-up of a person in an urban world: one full stair step. */
+    public static final float URBAN_STEP_HEIGHT = 1f;
+
     public boolean hostileToPlayer() {
         // Captives are protected prisoners, not members of the faction that
         // happens to hold them.  Keep this before settlement ownership so a
