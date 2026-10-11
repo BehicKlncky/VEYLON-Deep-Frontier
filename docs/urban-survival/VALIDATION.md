@@ -924,3 +924,114 @@ remains for 08/13/21. Specialist building families (12), full district gameplay
 eviction (24) retain their separate gates. **All required 07 gates passed.**
 The next concrete step is 08's starter refuge/guaranteed supplies and first
 urban upgrade; final scarcity tuning stays in 23.
+
+## Milestone 08 — starter refuge and survival progression (2026-10-11)
+
+Baseline: clean `feature/urban-survival` at `0d76b66`; 07 was complete. The pack's
+full base knowledge was read from the sibling roadmap directory because the
+linked root `00_BASE_KNOWLEDGE.md` is absent. AGENTS, current urban records and the
+save-compatibility skill governed this work. D-75–D-79 record the new contracts.
+
+### Production route and compatibility
+
+`UrbanStarterProgressionTest` exercises seeds `20260731`, `-4242`, `7`, `0`,
+`987654321` and `-9000000000000000000`. Each creates a normal Survival world,
+spends the starter food/water, follows continuous production movement and door
+commands through an apartment and shop, searches/takes finite generated supplies,
+returns, treats bleeding/infection, crafts a reinforced spear at the existing
+workbench, sleeps, saves/loads and respawns with the upgrade retained. No pose,
+structure or resource injection occurs in that route after bootstrap. Live
+ecology may grow plants; the route mines no ore and harvests no tree. It checks
+≥ 6 food servings / ≥ 3 containers / 2 buildings, ≥ 3 clean-water units, treatment,
+an unlocked pry tool and walking paths ≤ 96 blocks from the refuge courtyard door.
+
+Separate isolated fixtures cover full-inventory cooking/refill/drinking failure,
+rain renewal, wood-fuel cooking/boiling/lanterns, damaged-anchor fallback,
+room rain/smoke and Survival/Creative twins. The original recipes are still
+selected for legacy and generator-8 worlds. New/load does not restock consumed
+fire/water. `UrbanRefugesSectionTest` checks identity/coordinate/version/strict
+presence/length corruption and missing-required-section failure without replacing
+the live world. `UrbanStarterGenerationTest` checks actual starter voxels and
+accessibility over six seeds in opposite chunk orders, plus unchanged street and
+parcel plans outside the origin starter region. Older binaries were not run;
+they reject generator 9, and no downgrade support is claimed. No enum was added.
+
+### Commands and iteration results
+
+All Gradle commands used the bundled JDK 25.0.4.1 and Windows wrapper. Logs are
+local ignored artifacts under `build/`.
+
+- `test --tests com.veylon.item.CraftingTransactionTest --tests com.veylon.RelicProgressionGameplayTest --console=plain`
+  passed on the independent transactional-crafting revision committed as `89a0edd`;
+  `m08-crafting-tests.log` records that exact intermediate check.
+- `test --tests com.veylon.UrbanStarterProgressionTest --tests com.veylon.world.urban.UrbanStarterGenerationTest --tests com.veylon.save.UrbanRefugesSectionTest --tests com.veylon.save.UrbanContainersSectionTest --tests com.veylon.UrbanDevelopmentSelectorTest --tests com.veylon.GameLoopIntegrationTest --tests com.veylon.world.WorldGeneratorFingerprintTest --console=plain`
+  passed in 16 seconds (`m08-starter-final-focused.log`).
+- The broader iteration run had 231 checks and one stale content-revision
+  expectation. The first portable build had 1,751 checks and one stale
+  unsupported-template assertion (`m08-build.log`). Both assertions were updated
+  for the explicitly added revisions; production budgets/rules were not relaxed.
+  `test --tests com.veylon.world.urban.AccessibilityValidatorTest --console=plain`
+  then passed (`m08-accessibility-final.log`).
+- The next `.\gradlew.bat build --console=plain` passed in 7 min 53 s:
+  1,751 tests, zero failures/errors, one existing Windows symlink-privilege skip,
+  with Javadoc/doclint (`m08-build-final.log`).
+- Final review corrected the lantern log to name recovered wood. The subsequent
+  focused run executed all seven starter progression tests, including actual
+  450-second lantern refuel/lighting, with zero failures/errors/skips in nine
+  seconds (`m08-fuel-final-focused.log`). Its additional filter
+  `com.veylon.LanternGameplayTest` matched no class; the actual legacy class is
+  `com.veylon.world.LanternGameplayTest`, covered by the portable build.
+- Final `.\gradlew.bat build --console=plain` passed in **7 min 28 s** on
+  `bc0a363`: **1,751 tests, zero failures/errors, one existing Windows privilege
+  skip**, including Javadoc/doclint (`m08-build-verified.log`, counts retained in
+  `m08-build-verified-counts.json`). Source did not change after this run started.
+- `test --tests com.veylon.UrbanStarterProgressionTest --tests com.veylon.world.LanternGameplayTest --console=plain`
+  resolved the earlier unmatched filter and passed **10 tests**, zero
+  failures/errors/skips in five seconds (`m08-starter-lantern-verified.log`).
+- `graphify update . --no-cluster` ran once on the final code: **7,635 nodes /
+  29,324 edges**, exit 0 (`m08-graph-final-20261011.log`). Existing Gradle syntax/
+  symbol-extraction warnings remain. No clustering or document/image semantic
+  extraction ran. The six-document path/anchor checker resolved **56** relative
+  links; staged/unstaged `git diff --check` passed. Code commits are `89a0edd`
+  and `bc0a363`; documentation is the following independent handoff commit.
+
+### Fresh native evidence
+
+The final route command was `.\gradlew.bat run -PveylonDataDir=build/qa/m08-starter-final-20261011 --console=plain`,
+with `VEYLON_GENERATOR=urban-dev`, `VEYLON_SEED=20260731`,
+`VEYLON_GAME_MODE=survival`, `VEYLON_SCENE=urban_starter_manual`,
+`VEYLON_SHOT=5,1200`, and `VEYLON_CAPTURE_TAG=m08-starter-final`.
+The scene only observes: it grants no items and changes no position, time or
+weather. OS keyboard/mouse events were restricted to the foreground game window.
+This is a scripted walk through normal controls, not a human playtest.
+
+The spawn was `(65.5,41,83.5)` in the refuge bedroom. Movement keys, mouse and F crossed
+the courtyard, opened generated apartment doors and searched the kitchen cabinet
+at `(65,41,75)`. Normal UI clicks emptied it into the player's inventory:
+four food servings, two clean-water containers, two planks and two scrap including
+the initial kit. Search state remained depleted. The route returned to
+`(65.58,41,83.67)` by t=495 and saved with F5. Health/needs/weather continued normally;
+ashfall, a cold snap and toxic fog occurred during pauses for tool inspection.
+The refuge read Indoors on return; sickness already acquired outside persisted.
+No invulnerability, time reset, teleport or tree/ore action was used.
+
+Artifacts in that directory's `screenshots/`:
+`m08-starter-final_5s.png` (spawn), `m08-first-search.png` (hidden live search),
+`m08-first-supplies.png` (depleted cupboard and transferred supplies),
+`m08-first-scavenging-return-verified.png` and `m08-return-torch.png` (bedroom return).
+The return is a dark night/toxic-fog view; the position log independently confirms
+the bedroom. Earlier `m08-first-scavenging-return.png` / `m08-refuge-return.png`
+were premature doorway-alignment attempts, not successful return evidence.
+The route exited cleanly in 8 min 44 s (`m08-starter-final-native.log`), with zero
+GL/KHR and native-audio errors. The screenshot pixel-transfer warning is not an error.
+
+After the lantern text correction, the same environment with shots `5,10`, tag
+`m08-starter-source-final` and data directory
+`build/qa/m08-starter-source-final-20261011` launched the final source and exited
+cleanly in 16 seconds (`m08-starter-source-final-native.log`), again with zero
+GL/KHR/native-audio errors. This confirms final-source spawn/rendering; the longer
+normal-controls route above preceded only that wording correction. Two earlier
+fresh sessions were startup/input-calibration attempts, not completed routes.
+Native treatment, sleep, upgrade, a shop visit and human comfort/balance testing
+were not performed; the required mechanics are covered by the production route
+tests. Infected encounters remain 09, claims 18, utilities 19 and economy tuning 23.

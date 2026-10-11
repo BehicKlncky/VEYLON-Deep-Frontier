@@ -6,10 +6,10 @@ This is the running record for the 26-package urban-survival roadmap. The pack i
 
 | Item | Value |
 | --- | --- |
-| Last completed package | **07 — Contextual loot and persistence** (2026-10-11). Production save/transaction checks, native generated searches and final portable verification passed. 06's full human route is confirmed. |
-| Source revision | 07: `5adfcbb` bounded identity/save foundation → `602c12c` live searches/transfers/destruction → `73ee6a3` generated source/order regressions → `df7e2b7` native production-search QA → `dddb812` orchestration-budget extraction → `0ebb6a9` readable panel corners/text. Records follow separately. |
-| Default new world | Legacy (`World.DEFAULT_NEW_WORLD_GENERATOR = GEN_CAVE_IDENTITIES`), unchanged until 26 passes. Isolated `VEYLON_GENERATOR=urban-dev` creates generator 8 (`GEN_URBAN_SHAPED_STAIRS`, layout 5 / template 3 on frozen layout-2 city plans). Generators 1–7 stay loadable with their original geometry. |
-| Next package | **08 — Urban spawn and survival progression.** Implement the starter refuge/source guarantees and a first urban upgrade without tree/ore progression. No required 07 gate is pending. |
+| Last completed package | **08 — Urban spawn and survival progression** (2026-10-11). Six seeded production routes, save/capacity/Creative regressions, normal-controls native scavenging return and final portable build passed. |
+| Source revision | 08: `89a0edd` independent crafting-capacity fix → `bc0a363` starter generator/refuge, finite supplies, repair/reuse progression and coupled regression/native QA coverage. Records follow separately. |
+| Default new world | Legacy (`World.DEFAULT_NEW_WORLD_GENERATOR = GEN_CAVE_IDENTITIES`), unchanged until 26 passes. Isolated `VEYLON_GENERATOR=urban-dev` creates generator 9 (`GEN_URBAN_STARTER`, layout 6 / template 4 / content 3). Generators 1–8 stay loadable with their original geometry. |
+| Next package | **09 — Infected threats and encounters.** Implement the first bounded, persistent infected encounter outside the starter sanctuary. No required 08 gate is pending. |
 | Commits | Separate `feat`, `test`, `docs` and `chore` commits on `feature/urban-survival`; see the reconstruction ledger below. `main` stays at `923345f`. Original combined commit retained at `backup/urban-m01-m04-before-split`. No merge, push, tag or publication. |
 
 ## Package ledger
@@ -25,7 +25,7 @@ The status vocabulary is NOT STARTED, IN PROGRESS, PARTIAL, BLOCKED or COMPLETE.
 | 05 | Building plans and accessibility | 03–04 | `world/urban/{BuildingPlanner,BuildingTemplates,BuildingPlan,PlanVolume,AccessibilityValidator,BuildingPlanDiagnostics}`; shared `VoxelAccess`/`VoxelClearance`; generator 6 / layout 3 / template 1 | No unreachable room/container/quest reservation, invalid stairs, overlap or overflow; invalid fixtures rejected; stable shuffled access/eviction; bounded work. Native plan debug optional, furnished exploration is 06. | **COMPLETE** (2026-10-10; focused checks, portable build, graph and scoped local handoff) |
 | 06 | Generated apartments and interiors | 04–05 | `UrbanBuildingStamper`, `BuildingFurnishing`, `UrbanIndoorQueries`; `World`/`Chunk` height/light/state hooks; shelter, temperature, ambience/audio; generated QA scenes | Generated apartments and a shop have recognisable rooms, usable stairs, matching windows and exits. Blocks and ids are identical in every order. Persisted breaks survive. Native street-to-basement walks in day and night. | **COMPLETE** (2026-10-11; final build, day/night appearance and full human Survival route passed) |
 | 07 | Contextual loot and persistence | 06, 02 | `UrbanContainers`, `LootTables`, `urban.containers`; `CrateTransactionSystem`, `ui/CrateScreen`, `simulation/ItemConditionSystem`, one removal path for hand, blast, fire and salvage | Open, partially loot, leave, reload, revisit, break and replace: no refill or duplication. Abandoned property is not theft; owned property has a consequence. Interrupted search, full-inventory and corruption tests. Native searching while the world runs. | **COMPLETE** (2026-10-11; focused checks, final build and generated native searches passed) |
-| 08 | Urban spawn and survival progression | 07 | `UrbanBootstrap` (spawn, refuge, provisional camp), `item/CraftingSystem` urban recipe set, `item/ItemType` (appended), `WorldInteractions` fuel, water and cooking, `SleepSystem`, onboarding text | Fixed starter seeds reach shelter, food, water, treatment, sleep and a first upgrade from urban sources only, on a production route with no tree and no ore. Creative bootstrap is intact. A fresh native session. | NOT STARTED |
+| 08 | Urban spawn and survival progression | 07 | `UrbanBootstrap`, `UrbanStarterSite`, generator 9 / template 4 / content 3, `urban.refuges`, `item/UrbanCrafting`, atomic transfers, indoor safety/prompts, read-only native QA and production route tests; no enum additions | Six starter seeds reach shelter, food, water, treatment, sleep and a first upgrade from urban sources only. Legacy/Creative/save/build pass. Fresh normal-controls native search/take/return with captures. | **COMPLETE** (2026-10-11) |
 | 09 | Infected threats and encounters | 08 | Entity kind (D-20, appended enums), a new AI brain, `gfx/model`, `engine/AudioManager`, new `UrbanEncounterDirector` and `urban.population`, caps in `qa/RuntimeBudgetSnapshot` | Infected notice the player fairly, pursue in a fixture, attack through the damage gates, react to fire and die cleanly. Defeated state survives save, load and reactivation. Caps and sanctuary hold. Creative twin. Natives in a street and a ground-floor apartment. | NOT STARTED |
 | 10 | Indoor navigation and perception | 09, 04–06 | `ai/Pathfinder` plus new `PortalGraph` and `PathBudget`; `ai/Steering` guards; `combat/WorldNoise` attenuation; AI loaded-column guard | Multi-floor pursuit through doors and stairs, losing sight, searching and giving up. Door edits change routes. A shared measured budget. No roof or ground confusion and no void pathing. A native pursuit and escape. | NOT STARTED |
 | 11 | Playable vertical slice gate | 02–10 | Integration: `UrbanQaScenes`, `AutomatedRunDriver` urban route, integration tests | The DESIGN §14 slice holds headless and native with normal controls; save, revisit, no refill and no resurrection; Creative twins. Regression seeds frozen. Memory per explored area recorded (§4.3). | NOT STARTED |
@@ -792,6 +792,93 @@ progression. Current initial tables are not final economy tuning (23). Actual
 specialist building families (12), full district rules (13), resident/guard
 responses (16/17), onboarding (08/21) and CPU chunk eviction (24) retain their
 own gates. No release, merge, push, tag or publication was performed.
+
+## Milestone 08 — urban spawn and survival progression (2026-10-11)
+
+**Status: COMPLETE.** No 09 implementation has started.
+Baseline was clean `feature/urban-survival` at `0d76b66`; 07 had no pending gate.
+The independently validated capacity fix is committed as `89a0edd`
+(`fix(crafting): preserve supplies when craft output cannot fit`). Starter
+behavior/regressions are `bc0a363` (`feat(urban): start survival in a scavenging refuge`);
+documentation follows separately. Both code revisions were validated against
+their actual contents before committing; no history was rewritten.
+
+Implemented behavior and source ownership:
+
+- `world/urban/{CityPlanner,BuildingPlanner,BuildingTemplates,UrbanStarterSite,UrbanWorldState,UrbanRevision}`
+  and `World` introduce opt-in generator 9 / layout 6 / template 4 / content 3.
+  The original street lattice contains one refuge, a shop and four three-storey
+  apartments with B1 in the starter superblock. Validated room lanes provide
+  workbench/light and unlocked finite supplies in ordinary ground-floor storage.
+  No city reroll or debug giveaway is involved. Default stays generator 3;
+  generations 1–8 and content 1/2 remain supported/frozen. No enums were appended.
+- `UrbanBootstrap`, `WorldBootstrap`, `PlayerLifeCycle` and
+  `save/{UrbanRefugesSection,V3ExtensionSections,SaveSystem}` own the loaded,
+  supported bedroom spawn and persisted starter anchor. Respawn checks at most
+  4,225 actual ground-floor cells, avoiding roofs, basements and unloaded air.
+  `urban.refuges` v1 is mandatory for generator 9, 5/25 bytes, with strict
+  identity/coordinate/version/presence/length checks and atomic load isolation.
+  Load never grants the kit or replenishes fire/water; inventory retention on
+  death follows the existing policy.
+- `item/{UrbanCrafting,CraftingSystem}`, `ui/CraftingScreen`, `SurvivalTransfers`,
+  `WorldInteractions` and `PlayerConsumables` supply fifteen repair/reuse recipes,
+  recovered-wood fuel and atomic capacity handling. Food, reusable containers,
+  water/boiling, cooking, bandages/splints, light, bedroll, tool/weapon repair and
+  the first reinforced spear have urban paths. Antiseptic is scavenged. Earlier
+  worlds retain the original recipe set and ingredient requirements.
+- `SleepSystem`, `PlayerEnvironmentSystem`, `InteractPromptBuilder`, `ui/Hud`
+  and fresh-session logs adapt room safety, smoke, refill/fuel and shelter hints.
+  Rain/cold reuse the existing room shelter query. A courtyard fire does not add
+  indoor smoke; a covered fire does. Creative bootstrap/catalog/world controls,
+  free consumption, flight and damage gates remain covered.
+- `UrbanQaScenes`, `QaHarness` and `UrbanApartmentQaScene` provide the read-only
+  `urban_starter_manual` scene. New starter/progression, refuge-codec and generated
+  order/accessibility tests exercise production mechanics; selector/revision and
+  unsupported-version expectations track the newly supported versions.
+
+**Exact provisional camp:** zero NPCs, no legacy camp stamping, camp faction
+track, settlement or trade/quest grant. This is an unattended flat with ordinary
+destructible doors/walls, beds, storage, workbench/light and courtyard fire plus
+rain collector. It has no invulnerability radius. The current prompt makes
+friendly roles optional; populations and camp encounters remain 16 (D-76).
+
+Validation and evidence are in [VALIDATION.md](VALIDATION.md#milestone-08--starter-refuge-and-survival-progression-2026-10-11).
+Six fixed seeds complete continuous apartment/shop scavenging, treatment, sleep,
+upgrade, save/load and death return without trees/ore, after spending the kit.
+Full-inventory failures preserve inputs and water. Legacy/bootstrap, Creative,
+save, geometry/accessibility and bounded-runtime checks run in the portable build.
+The normal-controls native route uses OS keyboard/mouse, not injected poses or
+items; its captures show the spawn, searched cupboard and saved bedroom return.
+The optional human playtest was not performed. Native treatment/sleep/upgrade
+remain unclaimed; their production routes passed headless.
+
+Initial balance assumptions: the kit has five units; food/water/treatment and
+salvage are distributed across the six starter buildings, with no replenishing
+container rolls. The collector starts with 3 litres and renews only through
+existing rain. Fire starts at 240 seconds; a plank adds 60, or 450 to a lantern.
+The guarantees are deliberately generous before scarcity tuning in 23. Prolonged
+native input-calibration pauses reached ordinary cold/toxic events; interiors
+protected the returned player, while an outside-acquired sickness persisted.
+No new safe-zone exemption was added. Claims/fortification are 18; utilities 19;
+full climate differentiation 13; infected encounter and sanctuary behavior 09–10.
+
+Final `.\gradlew.bat build --console=plain` passed in 7 min 28 s on the committed
+source: **1,751 tests, zero failures/errors, one existing Windows privilege skip**,
+plus Javadoc/doclint (`build/m08-build-verified.log`). The corrected final focused
+starter/legacy-lantern invocation passed ten checks in five seconds. Native route
+and final-source startup both exited cleanly with zero GL/KHR/native-audio errors.
+The single completion graph refresh (`graphify update . --no-cluster`) produced
+**7,635 nodes / 29,324 edges** (`build/m08-graph-final-20261011.log`); existing
+Gradle extractor limitations remain. No clustering or semantic extraction ran.
+All 56 relative documentation links/anchors and whitespace checks pass. No
+required 08 gate remains pending; the optional human balance walk is unclaimed.
+Task-owned changes are committed in the scoped code series followed by this
+handoff. No push, merge, tag, release or publication was performed.
+
+Next concrete step: **09**, append the first
+infected kind and bounded encounter state, prove damage/Creative gates and a
+persisted encounter at least 24 walking blocks from the refuge door without
+spawn visibility. Do not switch the ordinary generator default.
 
 ## Resume rules
 

@@ -258,8 +258,8 @@ Generator versions form an explicit set (`World.isSupportedGenerator`): 1 legacy
 2 deep, 3 cave identities, 4 the urban street datum, 5 the urban street network,
 6 the same street geometry plus frozen building plans (layout 3, template 1),
 7 generated furnished apartments and shops (layout 4, template 2), and
-8 the same buildings with shaped stairs (layout 5, template 3), which the
-development selector creates. New worlds use
+8 the same buildings with shaped stairs (layout 5, template 3), and 9 the starter
+neighbourhood (layout 6, template 4). The development selector creates 9. New worlds use
 `World.DEFAULT_NEW_WORLD_GENERATOR` (3, until the urban rollout); a load accepts any
 supported version and rejects the rest, including anything above
 `MAX_SUPPORTED_GENERATOR`, before it replaces the live world. Feature gates name
@@ -271,16 +271,17 @@ checks version 8 against frozen version 7 outside stair cells and across chunk o
 An urban world's layout revision follows from its generator, so it is known
 before bootstrap generates a chunk; a geometry change means a new generator
 version, never a change under an old one (`UrbanRevision`). Its content revision
-(the rolled loot, encounter and trade tables) is saved in the optional
-`urban.meta` section, which only urban worlds write. Until that section, or its
+(the rolled loot, encounter and trade tables) is saved in `urban.meta`, which
+only urban worlds write. It is optional for older layouts and required for
+generator 9. Until that section, or its
 absent default, has been read, a loading world's content revision cannot be read
-at all. Fresh worlds use content revision 2; revision 1 remains supported and
-is the absent-metadata default. The tables and their hash inputs are frozen
-under both revisions. Compatibility directions:
+at all. Fresh worlds use content revision 3; revisions 1 and 2 remain supported.
+Revision 1 is the absent-metadata default. The tables and their hash inputs are frozen
+under each revision. Generator 9 requires content 3. Compatibility directions:
 
 - this build, a legacy save: unchanged, and no urban state is created;
 - this build, an urban save: the same geometry through its generator, the content
-  revision from `urban.meta` (absent means revision 1);
+  revision from `urban.meta` (absence means revision 1 only for older layouts);
 - an older build, a newer urban save: refused when its generator or content
   revision is unsupported, before the live world is touched; optional unknown
   sections alone do not make downgrading safe;
@@ -566,6 +567,33 @@ does not. Save preparation binds/compacts the core map before the existing
 sibling-temp, flush, force and atomic replacement path. Invalid loads preserve
 the live session; failed writes preserve the previous save. Older binaries were
 not executed, and no downgrade guarantee is made for new content-2 saves.
+
+### Urban starter progression
+
+Generator 9 reserves the origin courtyard neighbourhood through pure
+`CityPlanner.planStarter` constraints. `UrbanStarterSite` supplies the workbench,
+light and courtyard fixtures, and content-3 ground-floor container reservations.
+Ordinary search, ownership and depletion remain authoritative; the kit and
+initial 3-litre collector / 240-second fire are granted only by fresh bootstrap.
+There is no wilderness camp, NPC population or protected radius. Shelter uses
+the existing room/portal queries; a courtyard fire does not count as indoor smoke.
+Sleep checks loaded support and nearby hostile survivors as well as the existing
+conditions and predator gate.
+
+`CraftingSystem.recipesFor` selects fifteen repair/reuse recipes only for the
+starter generator, retaining the original list for older worlds. Recovered wood,
+metal and textiles cover the first reinforced spear, stations, treatment,
+containers, light, bedroll and tool/weapon repair. Crafting, cooking, boiling,
+refilling and Survival drinking check the complete output transaction before
+consuming ingredients or water. Failed capacity leaves the source intact.
+
+`urban.refuges` v1 is required for generator 9: version + strict presence byte,
+then optional generated refuge id and integer anchor (5 or 25 bytes). It validates
+the pure ground-floor plan; no claim catalogue is introduced. Load replaces it
+without restocking, and missing/corrupt sections reject before publication.
+Respawn checks actual loaded colliders/support at y=41 in at most 4,225 cells
+within 32 blocks of the saved anchor, refusing if none is safe. It retains the
+existing carried-inventory death policy. Claims and utilities remain 18–19.
 
 Transient state is deliberately **not** serialized: an in-flight reload is
 cancelled on load, and bow draw resets. Combat and fire add more of it. An

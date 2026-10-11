@@ -62,7 +62,7 @@ Route: **city refuge → apartment → supplies → street threat → refuge**. 
 
 | Time | Beat | What the player does | Systems |
 | --- | --- | --- | --- |
-| 0:00–1:00 | Wakes in the starter refuge: a secured ground-floor flat off a courtyard, with one or two friendly survivors (the provisional camp) | Reads one contextual hint ("Water is low. The block across the street hasn't been searched."); checks the kit | Urban spawn and refuge *[08]*; existing NPC archetypes (**Existing**, B-37); hint text *[08]* |
+| 0:00–1:00 | Wakes in the starter refuge: a secured ground-floor flat off a courtyard; unattended provisional shelter in 08, residents in 16 | Reads contextual room/supply hints; checks the modest kit | Urban spawn, refuge and hints **Implemented [08]**; survivor populations *[16]* |
 | 1:00–2:00 | Crosses the street to the apartment block (≤ 40 blocks away) | Sees or hears a distant infected that has not noticed them | Street plan *[03]*; encounter placed outside the sanctuary radius *[09]* |
 | 2:00–7:00 | Enters through the front door or a broken side door; uses the stair core; searches the kitchen, bathroom and utility closet on two floors | Each search takes time and makes noise; chooses what to carry | Doors *[04]*; stairs and rooms *[05–06]*; contextual containers *[07]*; WorldNoise (**Existing**, B-66) |
 | 7:00–9:00 | Finds a locked flat with a useful item upstairs | Forces the door with the tool found downstairs (loud), or skips it | Lock and forced-entry state *[04]*; noise and perception *[09–10]* |
@@ -164,7 +164,26 @@ The spawn planning region `(0, 0)` is always reclaimed residential. Its eight ne
 - treatment ≥ 2 bandage-class plus ≥ 1 antiseptic-class item;
 - ≥ 1 pry-class tool reachable without forced entry;
 - materials for ≥ 1 first-upgrade recipe;
-- 1 infected encounter of 1–2 bodies, ≥ 24 blocks from the refuge door and not visible from the spawn point.
+- 1 infected encounter of 1–2 bodies, ≥ 24 blocks from the refuge door and not visible from the spawn point *[09]*.
+
+**Implemented in 08 (D-75–D-79):** generator 9 / layout 6 / template 4 reserves
+the origin starter superblock on the frozen street lattice: one refuge, one shop
+and four three-storey apartments with B1 access. Existing validated furnishing
+lanes provide unlocked ground-floor supplies; the building repair limit remains
+three, with no whole-city retry. Content 3 adds finite starter reservations to
+ordinary searched containers, without altering content 1/2 rolls. Six fixed
+seeds prove the apartment/shop route within 96 walking blocks of the courtyard
+refuge door, food distribution, treatment, water, sleep and a reinforced spear.
+The five-item kit can be spent before this route. The refuge has no NPCs or
+invulnerability area; doors, walls, beds, storage and stations remain editable
+and destructible. The first infected encounter is the next package's gate.
+
+The courtyard collector begins with 3 litres and refills through existing rain
+simulation; its fire begins with 240 seconds of fuel. Recovered planks fuel fire
+and lanterns. Fifteen urban repair/reuse recipes cover containers, cloth
+treatment, light, sleep, stations and tool/weapon repair without ore or logs.
+Antiseptic is scavenged, not crafted from mandatory wilderness herbs. Residential
+starter climate uses MEADOW only in generator 9; full district climates remain 13.
 
 ## 5. Building contract
 
@@ -217,8 +236,8 @@ explicitly confirmed the complete normal-input Survival exploration route passed
 
 | Site | Role in the loop | Spatial basis | Population (*initial*) | Interaction and consequence | Packages |
 | --- | --- | --- | --- | --- | --- |
-| Player refuge | Home: storage, bed, crafting, utilities, respawn anchor | Claimed apartment, ground floor or rooftop unit, by building and room identity | Player (+ provisional camp at 08) | Claim, store, fortify, repair; threats arrive through genuine noise and exposure, not scheduled raids | 08, 18, 19 |
-| Survivor camp | Trade, aid, rumours, missions | Courtyard, rooftop or reclaimed ground floor | 3–6 | Trade, aid delivery, missions; trust against theft and violence | 08 (provisional), 16 |
+| Player refuge | Home: storage, bed, crafting, utilities, respawn anchor | Starter ground-floor flat in 08; broader claims in 18 | Player; unattended provisional shelter in 08 | Store, rest and repair in 08; claims/fortification/utilities later; threats arrive through genuine noise and exposure, not scheduled raids | 08, 18, 19 |
+| Survivor camp | Trade, aid, rumours, missions | Courtyard, rooftop or reclaimed ground floor | 3–6 | Trade, aid delivery, missions; trust against theft and violence | 16 |
 | Hidden basement civilians | Discovery and aid; source of intel and codes | Planned secret basement rooms with a discoverable entrance and clues | 2–5 | Found through clues and real interaction; deliver aid or escort to a known camp; deaths are permanent | 14 (reservations), 16 |
 | Guarded stronghold | Protected access, trade hub, holder of a relay component | School courtyard or municipal block with barricades, gates, posts, barracks and clinic | 8–16, ≥ 4 guards | Trusted admission, trade, restricted access or intrusion; theft attributed to the stored owner; guards perceive through real senses | 17 |
 | Hostile survivor site | Risk and reward; bounded raids | Fortified warehouse or yard | 4–8 | Avoid, infiltrate or fight; finite supplies; an attainable alternative route | 17 |
@@ -383,14 +402,14 @@ The table is in dependency order: an item may depend only on items above it. Sec
 | # | State | Kind | Owner | Package | Depends on | Persistence; absence default | Reset (new / load / dormancy) | Bound |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | 1 | Generator version `GEN_URBAN` | Persistent | `World` | 02 | — | v3 base int; values above `MAX_SUPPORTED_GENERATOR` rejected | Fixed per `World` | — |
-| 2 | Urban content revision | Persistent | `UrbanRevision` | 02 | 1 | `urban.meta`; absent means 1 | New and load | — |
+| 2 | Urban content revision | Persistent | `UrbanRevision` | 02, 07–08 | 1 | `urban.meta`; absent means 1 for older layouts; generator 9 requires content 3 | New and load | — |
 | 3 | Region, district, street and parcel plans | Derived | `CityPlanner` | 03 | 1, 2 | Not saved | Cache per `World` | ≤ 16 regions |
-| 4 | Building, floor, room and fixture plans | Derived | `BuildingPlanner` / `BuildingPlan` | 05–06 | 3 | Template 1 / layout 3 selected by saved generator 6; furnished template 2 / layout 4 by generator 7; shaped stairs template 3 / layout 5 by generator 8; unchanged `urban.meta` v1 validates the layout; plans not serialized | Cache per `World`, discarded on new/load | ≤ 256 buildings; ≤ 73,984 cells/plan |
+| 4 | Building, floor, room and fixture plans | Derived | `BuildingPlanner` / `BuildingPlan` | 05–06, 08 | 3 | Generator 6 selects template 1 / layout 3; 7 furnished template 2 / layout 4; 8 shaped template 3 / layout 5; 9 starter template 4 / layout 6. Unchanged `urban.meta` v1 validates the layout; plans not serialized | Cache per `World`, discarded on new/load | ≤ 256 buildings; ≤ 73,984 cells/plan |
 | 5 | Generated blocks plus edits | Derived plus deltas | Generator and `World` | 03, 06 | 3, 4 | `changedBlocks` (v3 base, last-write log, B-29) | — | 4,000,000 edits |
 | 6 | Fixture state: door or window open, keyed lock or one-sided bar (broken is a recorded block edit); barricade health later | Persistent, touched cells only | `FixtureStates` on `World` | 04, 06 | 4 | `world.fixtures` v1 (D-49); absent follows generated lock defaults, or unlocked for edited/player-placed fixtures; explicit saved unlock overrides the plan | Load replaces; reapplied after structure and recorded edits on chunk generation | ≤ 32,768 cells on write and read |
-| 7 | Container identity, state and owner; authoritative contents | Persistent, touched only | `UrbanContainers` metadata; `World.crateContents` inventory | 07 | 2, 4 | `urban.containers` v1; required for content 2; content-1 absence adopts core contents/empties and edited reservations | Load replaces; never re-rolled | ≤ 32,768 rows/core inventories; 12 slots; 20-byte header + 36 bytes/row metadata |
+| 7 | Container identity, state and owner; authoritative contents | Persistent, touched only | `UrbanContainers` metadata; `World.crateContents` inventory | 07–08 | 2, 4 | `urban.containers` v1; required for content ≥ 2; content-1 absence adopts core contents/empties and edited reservations | Load replaces; never re-rolled | ≤ 32,768 rows/core inventories; 12 slots; 20-byte header + 36 bytes/row metadata |
 | 8 | Search progress; open target and rummage timer | Progress persistent; target/timer transient | Ledger; `CrateTransactionSystem` | 07 | 7 | Progress in `urban.containers`; load closes UI but retains elapsed work (D-72 revises the initial transient proposal) | Load replaces progress; resets target/timer | One active search |
-| 9 | Refuge claims, respawn anchor, starter refuge | Persistent | `RefugeSystem` | 08, 18 | 4 | `urban.refuges`; absent means the starter refuge for a fresh world, nothing on load | New sets the starter; load replaces | ≤ 3 claims |
+| 9 | Starter refuge identity and ground-floor respawn anchor; claims later | Persistent | `UrbanWorldState` / `UrbanBootstrap`; `RefugeSystem` later | 08, 18 | 4 | `urban.refuges` v1, required for generator 9; absent on older worlds means no claim | New sets starter once; load replaces without replenishing | One starter anchor; ≤ 3 claims in 18 |
 | 10 | Encounter outcomes: deaths, depletion, migration counters | Persistent | `UrbanEncounterDirector` | 09, 15 | 4 | `urban.population`; absent means all present | Dormancy uses a coarse model; never respawns a defeated id | Capped |
 | 11 | Live hostile AI state | Transient | entity | 09 | 10 | Not saved; re-derived on activation | — | Active cap |
 | 12 | Portals, route caches, path budget | Derived and transient | `PortalGraph`, `PathBudget` | 10 | 4, 6 | Not saved | Invalidated by edits and doors | ≤ 64 routes |
