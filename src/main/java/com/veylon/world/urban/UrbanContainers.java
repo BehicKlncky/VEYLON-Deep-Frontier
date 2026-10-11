@@ -109,8 +109,12 @@ public final class UrbanContainers {
         Entry entry = generated(plan,legacy ? State.SEARCHED : State.UNSEARCHED);
         put(entry);
         if (!legacy) {
-            Inventory rolled = LootTables.roll(world.seed,world.urban.contentRevision(),entry.id,plan.table,
-                    world.urban.districtAt(position.x(),position.z()),plan.building.variant());
+            Inventory rolled = world.urban.hasStarter() && world.urban.contentRevision() == 3
+                    ? UrbanStarterSite.supplies(plan.building, plan.fixture) : null;
+            if (rolled == null) {
+                rolled = LootTables.roll(world.seed,world.urban.contentRevision(),entry.id,plan.table,
+                        world.urban.districtAt(position.x(),position.z()),plan.building.variant());
+            }
             if (rolled != null) { world.crateContents.put(position,rolled); }
         }
         compact(world,entry);

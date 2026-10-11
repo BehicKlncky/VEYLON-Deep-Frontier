@@ -86,6 +86,9 @@ final class V3ExtensionSections {
         if (g.world.isUrban()) {
             // Legacy saves stay byte-identical: the section exists only for urban worlds.
             sections.add(new V3Section(UrbanMetaSection.ID, UrbanMetaSection.write(g)));
+            if (g.world.urban.hasStarter()) {
+                sections.add(new V3Section(UrbanRefugesSection.ID, UrbanRefugesSection.write(g)));
+            }
             if (com.veylon.world.urban.UrbanContainers.manages(g.world)) {
                 sections.add(new V3Section(UrbanContainersSection.ID, UrbanContainersSection.write(g)));
             }
@@ -332,6 +335,8 @@ final class V3ExtensionSections {
                 UrbanMetaSection.read(payload, g);
             } else if (UrbanContainersSection.ID.equals(id)) {
                 containers = payload;
+            } else if (UrbanRefugesSection.ID.equals(id)) {
+                UrbanRefugesSection.read(payload, g);
             }
             // Unknown stable IDs are intentionally skipped using their bounded length.
         }

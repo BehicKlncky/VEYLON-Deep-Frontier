@@ -55,10 +55,12 @@ public class World implements VoxelAccess {
     public static final int GEN_URBAN_APARTMENTS = 7;
     /** Layout 5: the same furnished buildings with directional, half-height stair treads. */
     public static final int GEN_URBAN_SHAPED_STAIRS = 8;
+    /** Layout 6: a starter refuge, constrained courtyard neighbours and salvage progression. */
+    public static final int GEN_URBAN_STARTER = 9;
     /** The generator of every ordinary new world; generator 3 until the urban rollout. */
     public static final int DEFAULT_NEW_WORLD_GENERATOR = GEN_CAVE_IDENTITIES;
     /** The highest generator version a save may name; a load rejects anything above it. */
-    public static final int MAX_SUPPORTED_GENERATOR = GEN_URBAN_SHAPED_STAIRS;
+    public static final int MAX_SUPPORTED_GENERATOR = GEN_URBAN_STARTER;
 
     public final long seed;
     /** Persisted in save v3; legacy (v2) saves always load as {@link #GEN_LEGACY}. */
@@ -155,7 +157,7 @@ public class World implements VoxelAccess {
     public static boolean isUrbanGenerator(int version) {
         return version == GEN_URBAN || version == GEN_URBAN_STREETS
                 || version == GEN_URBAN_PLANS || version == GEN_URBAN_APARTMENTS
-                || version == GEN_URBAN_SHAPED_STAIRS;
+                || version == GEN_URBAN_SHAPED_STAIRS || version == GEN_URBAN_STARTER;
     }
 
     /** Generators 2 and 3: deep caves, underground POIs, cave mouths and settlements. */
@@ -758,6 +760,9 @@ public class World implements VoxelAccess {
     }
 
     public Biome biomeAt(int x, int z) {
+        // Starter climate brought forward from 13; historical cities keep their noise climate.
+        if (urban != null && urban.hasStarter() && urban.districtAt(x, z)
+                == com.veylon.world.urban.UrbanDistrict.RESIDENTIAL) { return Biome.MEADOW; }
         return generator.biomeAt(x, z);
     }
 

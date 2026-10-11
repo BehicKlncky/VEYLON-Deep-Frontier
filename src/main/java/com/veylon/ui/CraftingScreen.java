@@ -41,14 +41,14 @@ public class CraftingScreen {
         }
 
         List<Recipe> recipes = new ArrayList<>();
-        for (Recipe r : CraftingSystem.RECIPES) {
+        for (Recipe r : CraftingSystem.recipesFor(g.world)) {
             if (tab == 0 || r.station == stations[tab - 1]) {
                 recipes.add(r);
             }
         }
         if (recipes.isEmpty()) {
             tab = 0;
-            recipes.addAll(CraftingSystem.RECIPES);
+            recipes.addAll(CraftingSystem.recipesFor(g.world));
         }
 
         float pw = 700, ph = 500;

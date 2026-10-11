@@ -152,7 +152,7 @@ class AccessibilityValidatorTest {
         assertTrue(failed.getMessage().contains("attempt=3"));
         assertTrue(failed.getMessage().contains("reserved core"));
         assertThrows(IllegalArgumentException.class, () -> BuildingTemplates.propose(good,
-                UrbanRevision.BUILDING_TEMPLATE_SHAPED_STAIRS + 1,
+                UrbanRevision.BUILDING_TEMPLATE_STARTER + 1,
                 BuildingPlan.Family.APARTMENT, BuildingPlan.Variant.INTACT, 2, false, false));
     }
 

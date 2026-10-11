@@ -160,6 +160,10 @@ public final class CraftingSystem {
     private CraftingSystem() {
     }
 
+    public static List<Recipe> recipesFor(com.veylon.world.World world) {
+        return world.urban != null && world.urban.hasStarter() ? UrbanCrafting.RECIPES : RECIPES;
+    }
+
     public static boolean hasIngredients(Inventory inv, Recipe recipe) {
         for (var e : recipe.ingredients.entrySet()) {
             if (!inv.has(e.getKey(), e.getValue())) {

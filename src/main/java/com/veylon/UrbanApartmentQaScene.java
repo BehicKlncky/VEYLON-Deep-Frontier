@@ -46,6 +46,7 @@ final class UrbanApartmentQaScene {
         if (scene == null) { return false; }
         String normalized = scene.trim().toLowerCase(java.util.Locale.ROOT);
         return normalized.equals("urban_apartments_manual")
+                || normalized.equals("urban_starter_manual")
                 || normalized.equals("urban_apartments_manual_night");
     }
 

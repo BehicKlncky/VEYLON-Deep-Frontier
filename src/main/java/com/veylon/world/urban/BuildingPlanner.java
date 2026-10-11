@@ -22,11 +22,16 @@ public final class BuildingPlanner {
         int storeys = family == Family.SHOP ? Math.min(2, parcel.maxStoreys()) : Math.min(5, parcel.maxStoreys());
         // Revision three refines only treads; preserve revision-two occupation and basements.
         int selectionRevision = revision == UrbanRevision.BUILDING_TEMPLATE_SHAPED_STAIRS
+                || revision == UrbanRevision.BUILDING_TEMPLATE_STARTER
                 ? UrbanRevision.BUILDING_TEMPLATE_FURNISHED : revision;
         Variant variant = Variant.values()[UrbanHash.range(0, 3, seed, selectionRevision,
                 UrbanSalts.BUILDING_VARIANT, parcel.id(), 0, 0)];
         boolean basement = family == Family.APARTMENT && UrbanHash.range(0, 1, seed, selectionRevision,
                 UrbanSalts.BUILDING_BASEMENT, parcel.id(), 0, 0) == 1;
+        if (revision == UrbanRevision.BUILDING_TEMPLATE_STARTER && UrbanStarterSite.isNeighbour(parcel)) {
+            variant = Variant.INTACT;
+            basement = family == Family.APARTMENT;
+        }
         BuildingPlan candidate = BuildingTemplates.propose(parcel, revision, family, variant, storeys, basement, false);
         return repair(candidate);
     }

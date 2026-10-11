@@ -27,7 +27,8 @@ public final class BuildingTemplates {
     /** The original proposal and its furnished successor remain independently reproducible. */
     public static boolean supportsRevision(int revision) {
         return revision == REVISION || revision == UrbanRevision.BUILDING_TEMPLATE_FURNISHED
-                || revision == UrbanRevision.BUILDING_TEMPLATE_SHAPED_STAIRS;
+                || revision == UrbanRevision.BUILDING_TEMPLATE_SHAPED_STAIRS
+                || revision == UrbanRevision.BUILDING_TEMPLATE_STARTER;
     }
 
     /** Low-level proposal; callers must validate it, or use {@link BuildingPlanner#plan}. */
@@ -44,7 +45,9 @@ public final class BuildingTemplates {
         BuildingPlan original = new Builder(parcel, family, variant, storeys, basement, minimal).build();
         if (revision == REVISION) { return original; }
         BuildingPlan furnished = BuildingFurnishing.apply(original);
-        return revision == UrbanRevision.BUILDING_TEMPLATE_FURNISHED ? furnished : BuildingStairShapes.apply(furnished);
+        if (revision == UrbanRevision.BUILDING_TEMPLATE_FURNISHED) { return furnished; }
+        BuildingPlan shaped = BuildingStairShapes.apply(furnished);
+        return revision == UrbanRevision.BUILDING_TEMPLATE_STARTER ? UrbanStarterSite.furnish(shaped) : shaped;
     }
 
     private static final class Builder {

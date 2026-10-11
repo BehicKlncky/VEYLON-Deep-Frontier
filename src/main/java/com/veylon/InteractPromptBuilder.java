@@ -194,7 +194,8 @@ final class InteractPromptBuilder {
                             ? "Hostile bed — clear the area before sleeping"
                             : "Residents' bed — earn local friendship first";
                 } else {
-                    game.interactPrompt = "[F] Sleep (camp bed"
+                    game.interactPrompt = world.isUrban() ? "[F] Rest in this room (check doors and nearby threats)"
+                            : "[F] Sleep (camp bed"
                             + (game.faction.campPrivileges() ? ")" : " - needs Friendly trust)");
                 }
             }
@@ -296,13 +297,14 @@ final class InteractPromptBuilder {
         }
         int fuel = (int) Math.ceil(state.fuelSeconds());
         ItemStack held = game.player.selected();
-        if (held != null && held.type == ItemType.CHARCOAL
+        if (held != null && (held.type == ItemType.CHARCOAL || game.world.isUrban() && held.type == ItemType.PLANK)
                 && state.fuelSeconds() < World.LANTERN_MAX_FUEL) {
-            return "[F] Refuel lantern with charcoal (" + fuel + "/"
+            return "[F] Refuel lantern with " + (held.type == ItemType.PLANK ? "recovered wood" : "charcoal") + " (" + fuel + "/"
                     + (int) World.LANTERN_MAX_FUEL + "s)";
         }
         if (fuel <= 0) {
-            return "[F] Lantern UNLIT — hold charcoal to refuel";
+            return game.world.isUrban() ? "[F] Lantern UNLIT - hold recovered planks to refuel"
+                    : "[F] Lantern UNLIT — hold charcoal to refuel";
         }
         return state.lit()
                 ? "[F] Extinguish lantern — LIT, " + fuel + "s fuel"

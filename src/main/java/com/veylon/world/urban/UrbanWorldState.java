@@ -59,6 +59,10 @@ public final class UrbanWorldState {
     private int contentRevision = UNRESOLVED;
     /** Persistent sparse state, separate from evictable pure plan caches. */
     public final UrbanContainers containers = new UrbanContainers();
+    /** Starter anchor only; claims and upgrades are introduced in milestone 18. */
+    public long refugeBuilding;
+    public com.veylon.util.Vec3i refugeAnchor;
+    public boolean refugeSectionRestored;
 
     /**
      * @throws IllegalArgumentException for a generator that is not urban
@@ -84,8 +88,10 @@ public final class UrbanWorldState {
     /** Earlier urban generators keep their unbuilt parcel geometry. */
     public boolean hasGeneratedBuildings() {
         return layoutRevision == UrbanRevision.LAYOUT_GENERATED_APARTMENTS
-                || layoutRevision == UrbanRevision.LAYOUT_SHAPED_STAIRS;
+                || layoutRevision == UrbanRevision.LAYOUT_SHAPED_STAIRS || hasStarter();
     }
+
+    public boolean hasStarter() { return layoutRevision == UrbanRevision.LAYOUT_STARTER; }
 
     public boolean contentRevisionResolved() {
         return contentRevision != UNRESOLVED;
@@ -109,6 +115,9 @@ public final class UrbanWorldState {
      */
     public void resolveContentRevision(int revision) {
         UrbanRevision.requireSupportedContent(revision);
+        if (hasStarter() && revision < 3) {
+            throw new IllegalArgumentException("starter layout requires urban content revision 3 or later");
+        }
         if (contentRevision != UNRESOLVED) {
             throw new IllegalStateException("urban content revision is already resolved ("
                     + contentRevision + ")");
@@ -134,6 +143,7 @@ public final class UrbanWorldState {
         UrbanChunkStamper.stamp(chunk, district, soilMoisture);
         if (hasGeneratedBuildings()) {
             UrbanBuildingStamper.stamp(chunk, district, this);
+            if (hasStarter() && rx == 0 && rz == 0) { UrbanStarterSite.of(this).stamp(chunk); }
         }
     }
 
@@ -151,7 +161,8 @@ public final class UrbanWorldState {
         }
         long key = UrbanIds.district(rx, rz);
         // Generators 6 and 7 explicitly inherit layout-2 city fabric, not new hash inputs.
-        return regionPlans.get(key, ignored -> CityPlanner.plan(seed, UrbanRevision.LAYOUT_STREET_NETWORK, rx, rz));
+        return regionPlans.get(key, ignored -> hasStarter() ? CityPlanner.planStarter(seed, rx, rz)
+                : CityPlanner.plan(seed, UrbanRevision.LAYOUT_STREET_NETWORK, rx, rz));
     }
 
     public int buildingTemplateRevision() { return buildingTemplateRevision; }

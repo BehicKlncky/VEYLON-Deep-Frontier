@@ -58,6 +58,8 @@ final class UrbanQaScenes {
     private int blockedFrames;
     private float minFeet = Float.MAX_VALUE;
     private float maxFeet = -Float.MAX_VALUE;
+    private boolean starterManual;
+    private int lastStarterReport = -1;
 
     UrbanQaScenes(Game game) {
         this.game = game;
@@ -69,6 +71,15 @@ final class UrbanQaScenes {
     /** Stages one of the urban scenes; inert, with a notice, outside a street-network world. */
     void stage(String scene) {
         World world = game.world;
+        if (scene.equals("urban_starter_manual")) {
+            if (world.urban == null || !world.urban.hasStarter()) {
+                throw new IllegalStateException("starter QA requires the urban starter generator");
+            }
+            starterManual = true;
+            System.out.println("[urban-starter] evidence=normal-controls-only seed=" + world.seed
+                    + " refuge=" + world.urban.refugeBuilding + " spawn=" + game.player.pos);
+            return;
+        }
         if (!world.isUrban() || !world.urban.hasCityPlan()) {
             System.out.println("[urban-qa] " + scene
                     + " needs VEYLON_GENERATOR=urban-dev (the street network); scene inactive");
@@ -156,6 +167,16 @@ final class UrbanQaScenes {
 
     /** Per-frame hook, before streaming and rendering; inert unless a scene is staged. */
     void update(double elapsed) {
+        if (starterManual && (int) (elapsed / 5) != lastStarterReport) {
+            lastStarterReport = (int) (elapsed / 5);
+            System.out.println("[urban-starter] t=" + (int) elapsed + " pos=" + game.player.pos
+                    + " yaw=" + game.camera.yaw + " pitch=" + game.camera.pitch + " screen=" + game.uiMode
+                    + " searched=" + game.world.urban.containers.size()
+                    + " food=" + (game.player.inventory.count(com.veylon.item.ItemType.DRIED_BERRY)
+                    + game.player.inventory.count(com.veylon.item.ItemType.DRIED_MEAT))
+                    + " water=" + game.player.inventory.count(com.veylon.item.ItemType.WATERSKIN_CLEAN)
+                    + " upgrade=" + game.player.inventory.count(com.veylon.item.ItemType.IRON_SPEAR));
+        }
         fixtures.update(elapsed);
         apartments.update(elapsed);
         loot.update(elapsed);

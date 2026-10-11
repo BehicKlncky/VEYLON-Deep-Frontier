@@ -82,6 +82,21 @@ final class SleepSystem {
 
     /** Attempts to begin sleeping; logs the reason and does nothing when refused. */
     void startSleep(boolean campBed) {
+        if (game.world.isUrban()) {
+            int x = (int) Math.floor(game.player.pos.x), y = (int) Math.floor(game.player.pos.y);
+            int z = (int) Math.floor(game.player.pos.z);
+            if (!game.world.isColumnLoaded(x, z) || !game.world.getBlock(x, y - 1, z).solid) {
+                game.log("Find a loaded, supported floor before resting.");
+                return;
+            }
+            for (var npc : game.entities.npcs) {
+                if (!npc.dead && npc.hostileToPlayer()
+                        && npc.distSqTo(game.player.pos.x, game.player.pos.y, game.player.pos.z) < 144) {
+                    game.log("A hostile survivor is too close to sleep safely.");
+                    return;
+                }
+            }
+        }
         if (game.combustion.isBurning(game.player)) {
             // Sleep fast-forwards the night but not a fire, which would burn on unseen.
             game.log("You can't sleep while you're on fire!");

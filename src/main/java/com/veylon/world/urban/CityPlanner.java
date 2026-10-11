@@ -84,6 +84,14 @@ public final class CityPlanner {
     private CityPlanner() {
     }
 
+    /** Frozen layout-six constraints; all street/subdivision hash inputs remain layout two. */
+    public static DistrictPlan planStarter(long seed, int rx, int rz) {
+        if (!isPlannable(rx, rz)) { throw new IllegalArgumentException("unplannable starter region"); }
+        Builder builder = new Builder(seed, UrbanRevision.LAYOUT_STREET_NETWORK, rx, rz);
+        builder.starterRules = true;
+        return builder.build();
+    }
+
     /**
      * True when urban ids can name every parcel of the region. Beyond about
      * 33.5 million blocks from the origin the city is the flat street datum,
@@ -227,6 +235,7 @@ public final class CityPlanner {
         final int oz;
         final UrbanDistrict district;
         final boolean starter;
+        boolean starterRules;
         final int[] northSouth = new int[3];
         final int[] eastWest = new int[3];
         final byte[] surface = new byte[StreetNetwork.REGION_SIZE * StreetNetwork.REGION_SIZE];
@@ -572,6 +581,8 @@ public final class CityPlanner {
                         draft.use = Use.REFUGE;
                     } else if (draft.slot == SLOT_NORTH_EAST) {
                         draft.use = Use.COMMERCIAL;
+                    } else if (starterRules) {
+                        draft.use = Use.RESIDENTIAL;
                     }
                     continue;
                 }
@@ -629,6 +640,8 @@ public final class CityPlanner {
         }
 
         int storeys(Draft draft) {
+            if (starterRules && starter && draft.superblock == STARTER_BLOCK
+                    && draft.use == Use.RESIDENTIAL) { return 3; }
             long key = draft.index();
             boolean downtown = district == UrbanDistrict.COMMERCIAL;
             return switch (draft.use) {

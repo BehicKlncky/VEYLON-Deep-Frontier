@@ -23,7 +23,12 @@ final class PlayerLifeCycle {
             player.restoreCreativeBody();
             return;
         }
-        game.log("You died. The frontier reclaims you... (respawned at the crash site)");
+        if (game.world.urban != null && game.world.urban.hasStarter()) {
+            if (!UrbanBootstrap.restoreRespawn(game)) { return; }
+            game.log("You return to the city refuge. Your carried supplies remain with you.");
+        } else {
+            game.log("You died. The frontier reclaims you... (respawned at the crash site)");
+        }
         player.dead = false;
         player.clearBlastDeath();
         game.combustion.clear(player);

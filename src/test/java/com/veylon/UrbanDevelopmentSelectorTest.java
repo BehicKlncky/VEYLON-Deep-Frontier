@@ -43,7 +43,7 @@ class UrbanDevelopmentSelectorTest {
 
     @Test
     void urbanDevSelectsTheUrbanGeneratorOnlyWithAnIsolatedDataDirectory() {
-        assertEquals(World.GEN_URBAN_SHAPED_STAIRS, AutomatedRunDriver.configuredGenerator("urban-dev", true),
+        assertEquals(World.GEN_URBAN_STARTER, AutomatedRunDriver.configuredGenerator("urban-dev", true),
                 "the selector builds the newest urban layout");
         assertEquals(UrbanRevision.DEVELOPMENT_GENERATOR,
                 AutomatedRunDriver.configuredGenerator(" Urban-Dev ", true));
@@ -66,19 +66,17 @@ class UrbanDevelopmentSelectorTest {
 
         startNewFrontier(game);
 
-        assertEquals(World.GEN_URBAN_SHAPED_STAIRS, game.world.generatorVersion);
+        assertEquals(World.GEN_URBAN_STARTER, game.world.generatorVersion);
         assertEquals(GameMode.SURVIVAL, game.gameMode());
         assertEquals(UrbanRevision.CURRENT_CONTENT, game.world.urban.contentRevision());
-        assertEquals(UrbanDatum.STREET_Y + 1.2f, game.player.pos.y, 1e-4f,
+        assertEquals(UrbanDatum.STREET_Y + 1.05f, game.player.pos.y, 1e-4f,
                 "the spawn stands on the planned ground, not a roof, a crown or the fill");
         int x = (int) Math.floor(game.player.pos.x);
         int z = (int) Math.floor(game.player.pos.z);
-        assertEquals(x, game.world.urban.spawnColumn()[0]);
-        assertEquals(z, game.world.urban.spawnColumn()[1]);
-        assertEquals(UrbanSurface.COURTYARD_PATH, game.world.urban.surfaceAt(x, z),
-                "in front of the reserved refuge door, never on a parcel");
-        assertEquals(UrbanSurfaceMaterials.blockFor(UrbanSurface.COURTYARD_PATH),
-                game.world.getBlock(x, UrbanDatum.STREET_Y, z));
+        assertEquals(x, game.world.urban.refugeAnchor.x());
+        assertEquals(z, game.world.urban.refugeAnchor.z());
+        assertEquals(com.veylon.world.urban.ParcelPlan.Use.REFUGE, game.world.urban.parcelAt(x, z).use());
+        assertTrue(game.world.getBlock(x, UrbanDatum.STREET_Y, z).solid);
         assertEquals(BlockType.AIR, game.world.getBlock(x, UrbanDatum.STREET_Y + 1, z));
         assertEquals(BlockType.AIR, game.world.getBlock(x, UrbanDatum.STREET_Y + 2, z));
         assertTrue(game.entities.creatures.isEmpty(),
@@ -90,7 +88,7 @@ class UrbanDevelopmentSelectorTest {
         assertTrue(game.player.inventory.count(com.veylon.item.ItemType.BANDAGE) > 0,
                 "the fresh-world kit is still granted");
         assertTrue(game.eventLog.all().stream()
-                .anyMatch(line -> line.endsWith(UrbanBootstrap.APARTMENTS_NOTICE)),
+                .anyMatch(line -> line.contains("City refuge")),
                 "the log says what this world is instead of promising a camp");
     }
 

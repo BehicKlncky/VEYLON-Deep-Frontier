@@ -270,6 +270,9 @@ final class WorldInteractions {
                 yield true;
             }
             case LANTERN -> interactLantern(pos);
+            case RAIN_COLLECTOR -> { collectorInteract(pos); yield true; }
+            case CAMP_BED -> { sleepInBed(pos); yield true; }
+            case BEDROLL -> { game.startSleep(false); yield true; }
             case POWDER_KEG -> {
                 lightKegFuse(pos);
                 yield true;
@@ -403,8 +406,7 @@ final class WorldInteractions {
             return;
         }
         if (game.player.inventory.count(ItemType.WATERSKIN_EMPTY) > 0) {
-            game.player.inventory.remove(ItemType.WATERSKIN_EMPTY, 1);
-            game.player.inventory.add(ItemType.WATERSKIN_DIRTY, 1);
+            if (!SurvivalTransfers.exchange(game, ItemType.WATERSKIN_EMPTY, ItemType.WATERSKIN_DIRTY)) { return; }
             game.audio.playDrink();
             game.log("Filled a waterskin with untreated water. Boil it at a campfire.");
             return;
@@ -519,23 +521,26 @@ final class WorldInteractions {
         }
         boolean lit = game.world.campfireFuel.getOrDefault(pos, 0f) > 0;
         if (lit && game.player.inventory.has(ItemType.RAW_MEAT, 1)) {
-            game.player.inventory.remove(ItemType.RAW_MEAT, 1);
-            game.player.inventory.add(ItemType.COOKED_MEAT, 1);
+            if (!SurvivalTransfers.exchange(game, ItemType.RAW_MEAT, ItemType.COOKED_MEAT)) { return; }
             game.audio.playClick();
             game.particles.smoke(pos.x() + 0.5f, pos.y() + 0.8f, pos.z() + 0.5f, 1f);
             game.log("Cooked meat over the campfire.");
         } else if (lit && game.player.inventory.has(ItemType.WATERSKIN_DIRTY, 1)) {
-            game.player.inventory.remove(ItemType.WATERSKIN_DIRTY, 1);
-            game.player.inventory.add(ItemType.WATERSKIN_CLEAN, 1);
+            if (!SurvivalTransfers.exchange(game, ItemType.WATERSKIN_DIRTY, ItemType.WATERSKIN_CLEAN)) { return; }
             game.audio.playBoil();
             game.log("Boiled the waterskin - the water is safe to drink now.");
+        } else if (game.world.isUrban() && game.player.inventory.has(ItemType.PLANK, 1)) {
+            game.player.inventory.remove(ItemType.PLANK, 1);
+            game.world.campfireFuel.merge(pos, 60f, Float::sum);
+            game.log("Added recovered wood (+60s fuel). Cook outside; roofed fires build smoke.");
         } else if (game.player.inventory.has(ItemType.LOG, 1)) {
             game.player.inventory.remove(ItemType.LOG, 1);
             game.world.campfireFuel.merge(pos, LOG_FUEL_SECONDS, Float::sum);
             game.audio.playClick();
             game.log("Added a log to the fire (+" + (int) LOG_FUEL_SECONDS + "s fuel).");
         } else {
-            game.log(lit ? "Bring raw meat to cook, dirty water to boil, or a log for fuel."
+            game.log(game.world.isUrban() ? "Bring recovered planks for fuel, dirty water to boil or raw food to cook."
+                    : lit ? "Bring raw meat to cook, dirty water to boil, or a log for fuel."
                     : "The fire is out. Add a log to relight it.");
         }
     }
@@ -547,19 +552,22 @@ final class WorldInteractions {
             return false;
         }
         ItemStack held = game.player.selected();
-        if (held != null && held.type == ItemType.CHARCOAL
+        boolean recoveredFuel = held != null && game.world.isUrban() && held.type == ItemType.PLANK;
+        if (held != null && (held.type == ItemType.CHARCOAL || recoveredFuel)
                 && state.fuelSeconds() < World.LANTERN_MAX_FUEL) {
             game.player.inventory.shrink(game.player.hotbarSel, 1);
-            float fuel = game.world.addLanternFuel(pos, World.LANTERN_FUEL_PER_CHARCOAL);
+            float fuel = game.world.addLanternFuel(pos, recoveredFuel ? 450f : World.LANTERN_FUEL_PER_CHARCOAL);
             game.audio.playClick();
+            String fuelName = recoveredFuel ? "recovered wood" : "charcoal";
             game.log(state.lit()
-                    ? "Added charcoal to the lit lantern (" + (int) fuel + "s fuel)."
-                    : "Added charcoal to the lantern (" + (int) fuel
+                    ? "Added " + fuelName + " to the lit lantern (" + (int) fuel + "s fuel)."
+                    : "Added " + fuelName + " to the lantern (" + (int) fuel
                     + "s fuel). Press [F] again to light it.");
             return true;
         }
         if (state.fuelSeconds() <= 0) {
-            game.log("The lantern is empty. Hold charcoal and press [F] to refuel it.");
+            game.log(game.world.isUrban() ? "Hold recovered planks and press [F] to fuel the lantern."
+                    : "The lantern is empty. Hold charcoal and press [F] to refuel it.");
             return true;
         }
         boolean light = !state.lit();
@@ -608,8 +616,7 @@ final class WorldInteractions {
         float liters = game.world.collectorWater.getOrDefault(pos, 0f);
         if (liters >= COLLECTOR_LITRES_PER_USE
                 && game.player.inventory.count(ItemType.WATERSKIN_EMPTY) > 0) {
-            game.player.inventory.remove(ItemType.WATERSKIN_EMPTY, 1);
-            game.player.inventory.add(ItemType.WATERSKIN_CLEAN, 1);
+            if (!SurvivalTransfers.exchange(game, ItemType.WATERSKIN_EMPTY, ItemType.WATERSKIN_CLEAN)) { return; }
             game.world.collectorWater.put(pos, liters - COLLECTOR_LITRES_PER_USE);
             game.audio.playDrink();
             game.log("Filled a waterskin with clean rainwater.");

@@ -81,7 +81,7 @@ final class WorldBootstrap {
 
         if (game.world.isUrban()) {
             // No crash camp or camp faction track in a city (decision D-22).
-            UrbanBootstrap.placePlayerOnStreet(game);
+            UrbanBootstrap.placePlayerOnStreet(game, fresh);
         } else {
             placePlayerOnDryLand();
             setupCamp(fresh);
@@ -333,6 +333,10 @@ final class WorldBootstrap {
     }
 
     private void grantStartingKit() {
+        if (game.world.urban != null && game.world.urban.hasStarter()) {
+            grantUrbanKit();
+            return;
+        }
         game.player.inventory.add(ItemType.BERRY, 4);
         game.player.inventory.add(ItemType.LOG, 2);
         game.player.inventory.add(ItemType.STICK, 2);
@@ -357,6 +361,24 @@ final class WorldBootstrap {
         // Populate the world with wildlife before the player sees the first frame.
         for (int i = 0; i < INITIAL_WILDLIFE_TICKS; i++) {
             game.entities.slowTick(game);
+        }
+    }
+
+    private void grantUrbanKit() {
+        game.player.inventory.add(ItemType.DRIED_BERRY, 1);
+        game.player.inventory.add(ItemType.WATERSKIN_CLEAN, 1);
+        game.player.inventory.add(ItemType.WATERSKIN_EMPTY, 1);
+        game.player.inventory.add(ItemType.BANDAGE, 1);
+        game.player.inventory.add(ItemType.TORCH, 1);
+        if (game.gameMode() == GameMode.CREATIVE) {
+            game.log("City refuge - Creative mode. Press [E] for the catalog; Esc then [T] for world controls.");
+            game.log("Double-tap Space to fly; Space rises and Ctrl descends. Nothing here can hurt you.");
+        } else {
+            game.log("City refuge. Close the doors; the bedroom is a sheltered place to rest.");
+            game.log("Search [F] kitchen cabinets and the bathroom for food, water and treatment.");
+            game.log("Cross the courtyard to the apartments and corner shop; return here with salvage.");
+            game.log("The courtyard collector refills in rain. Burn recovered planks there to cook or boil.");
+            game.log("Use [C] by the kitchen workbench: scrap, planks and textiles make a reinforced spear.");
         }
     }
 }
