@@ -117,6 +117,13 @@ public class Npc extends Entity {
     /** Flight from the fire on this body; written only by the AI. Transient. */
     public final PanicIntent panic = new PanicIntent();
 
+    /** Stable generated encounter slot; zero for an unmanaged fixture body. */
+    public long encounterId;
+    /** Infected combat intent is transient; health and torso wounds are durable in the encounter ledger. */
+    public float strikeWindup = -1f, painTimer;
+    public boolean painSound;
+    public com.veylon.combat.WorldNoise.NoiseEvent lastHeard;
+
     public Npc(World world, String name) {
         super(world);
         this.name = name;
@@ -147,6 +154,7 @@ public class Npc extends Entity {
     public static final float URBAN_STEP_HEIGHT = 1f;
 
     public boolean hostileToPlayer() {
+        if (infected()) { return true; }
         // Captives are protected prisoners, not members of the faction that
         // happens to hold them.  Keep this before settlement ownership so a
         // captive inside a hostile fort remains interactable and never becomes
@@ -168,6 +176,7 @@ public class Npc extends Entity {
 
     /** Runtime side used by targeting and friendly-fire checks. */
     public String sideId() {
+        if (infected()) { return "urban.infected"; }
         if (archetype == NpcArchetype.CAPTIVE) {
             return "protected-captive";
         }
@@ -214,7 +223,21 @@ public class Npc extends Entity {
     public boolean settled() {
         // Region (0,0) legitimately packs to id 0, so id 0 cannot be a sentinel.
         // Resident index distinguishes real residents from traveling parties.
-        return archetype != null && residentIndex >= 0;
+        return !infected() && archetype != null && residentIndex >= 0;
+    }
+
+    /** Species profile uses the shared humanoid appearance codec, not settlement ownership. */
+    public boolean infected() { return archetype == NpcArchetype.VEILBOUND; }
+
+    @Override
+    public void hurt(float damage, boolean byPlayer) {
+        boolean living = !dead;
+        super.hurt(damage, byPlayer);
+        if (living && !dead && damage > 0 && infected()) {
+            painTimer = Math.max(painTimer, 0.35f);
+            painSound = true;
+            strikeWindup = -1f;
+        }
     }
 
     public String jobName() {

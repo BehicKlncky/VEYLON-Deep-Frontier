@@ -102,7 +102,7 @@ class AllLivingEndToEndTest {
     // ------------------------------------------------------------------
 
     /** How the game dispatches a body's decisions and its death. */
-    enum Route { ANIMAL, CAMP_MEMBER, WANDERING_TRADER, RAIDER, RESIDENT, WAR_PARTY, PLAYER }
+    enum Route { ANIMAL, CAMP_MEMBER, WANDERING_TRADER, RAIDER, RESIDENT, WAR_PARTY, INFECTED, PLAYER }
 
     /** One kind of living body and how it is staged. */
     record Body(String label, Route route, CreatureType species, NpcArchetype archetype,
@@ -145,6 +145,10 @@ class AllLivingEndToEndTest {
             }
             Npc n = g.entities.spawnNpc(g.world, label, x, y, z);
             switch (route) {
+                case INFECTED -> {
+                    n.archetype = NpcArchetype.VEILBOUND;
+                    n.maxHealth = n.health = n.archetype.maxHealth;
+                }
                 case CAMP_MEMBER -> {
                     g.world.campPos = new Vec3i(300, 40, 300);
                     n.faction = g.faction;
@@ -230,6 +234,10 @@ class AllLivingEndToEndTest {
         bodies.add(new Body("wandering trader", Route.WANDERING_TRADER, null, null, null, null));
         bodies.add(new Body("raider", Route.RAIDER, null, null, null, null));
         for (NpcArchetype a : NpcArchetype.values()) {
+            if (a == NpcArchetype.VEILBOUND) {
+                bodies.add(new Body("Veilbound", Route.INFECTED, null, a, null, null));
+                continue;
+            }
             Settlement.Alignment side = sideOf(a);
             bodies.add(new Body(a.name() + " resident (" + side.name().toLowerCase(java.util.Locale.ROOT) + ")",
                     Route.RESIDENT, null, a, side, null));
@@ -262,16 +270,16 @@ class AllLivingEndToEndTest {
             if (b.species() != null) {
                 species.add(b.species());
             }
-            if (b.route() == Route.RESIDENT) {
+            if (b.route() == Route.RESIDENT || b.route() == Route.INFECTED) {
                 archetypes.add(b.archetype());
-                sides.add(b.side());
+                if (b.side() != null) { sides.add(b.side()); }
             }
             if (b.party() != null) {
                 parties.add(b.party());
             }
         }
         assertEquals(EnumSet.allOf(CreatureType.class), species);
-        assertEquals(EnumSet.allOf(NpcArchetype.class), archetypes, "every archetype lives in a settlement");
+        assertEquals(EnumSet.allOf(NpcArchetype.class), archetypes, "every humanoid profile has a dispatch route");
         assertEquals(EnumSet.allOf(Settlement.Alignment.class), sides, "friendly, neutral and hostile residents");
         assertEquals(EnumSet.allOf(Npc.PartyKind.class), parties);
         assertEquals(EnumSet.allOf(Route.class), routes);
@@ -290,6 +298,8 @@ class AllLivingEndToEndTest {
                 case CAMP_MEMBER -> assertTrue(((Npc) e).faction != null && !((Npc) e).settled());
                 case WANDERING_TRADER -> assertTrue(((Npc) e).isTrader && !((Npc) e).settled());
                 case RAIDER -> assertTrue(((Npc) e).raider && ((Npc) e).hostileToPlayer());
+                case INFECTED -> assertTrue(((Npc) e).infected() && !((Npc) e).settled()
+                        && ((Npc) e).hostileToPlayer() && ((Npc) e).faction == null);
                 case RESIDENT -> {
                     Npc n = (Npc) e;
                     assertTrue(n.settled(), b + " is a resident");
@@ -794,7 +804,8 @@ class AllLivingEndToEndTest {
 
         List<Entity> crowd = new ArrayList<>();
         Settlement village = settlement(g, Settlement.Alignment.FRIENDLY);
-        NpcArchetype[] archetypes = NpcArchetype.values();
+        NpcArchetype[] archetypes = Arrays.stream(NpcArchetype.values())
+                .filter(a -> a != NpcArchetype.VEILBOUND).toArray(NpcArchetype[]::new);
         for (int i = 0; i < com.veylon.settlement.SettlementManager.MAX_ACTIVE_NPCS; i++) {
             float x = 300.5f + (i % 10) * 4f, z = 305.5f + (i / 10) * 4f;
             Npc n = g.entities.spawnNpc(g.world, "Crowd " + i, x, FEET, z);
@@ -890,6 +901,7 @@ class AllLivingEndToEndTest {
             case RESIDENT -> List.of("You killed " + n.name + "!", "You killed a protected captive",
                     "You search the fallen ", n.name + " has died.", "leader has fallen");
             case WAR_PARTY -> List.of("You search the fallen ");
+            case INFECTED -> List.of("The Veilbound collapses.");
             case PLAYER -> throw new AssertionError("the player's death is the death screen");
         };
         int total = 0;

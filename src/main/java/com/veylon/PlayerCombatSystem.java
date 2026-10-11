@@ -179,7 +179,7 @@ final class PlayerCombatSystem {
         if (victim instanceof Npc n) {
             if (n.settled()) {
                 game.settlementManager.onNpcAttackedByPlayer(game, n);
-            } else if (!n.isTrader && !n.raider && !n.warParty) {
+            } else if (!n.infected() && !n.isTrader && !n.raider && !n.warParty) {
                 game.faction.addTrust(game, NPC_ATTACK_TRUST_PENALTY,
                         "You attacked " + n.name + "!");
             }

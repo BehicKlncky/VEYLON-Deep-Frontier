@@ -265,6 +265,25 @@ public final class Animator {
         torso.poseY = Math.abs((float) Math.sin(phase)) * 0.04f * run;
         torso.rotX = 0.05f * run;
 
+        if (n.infected()) {
+            torso.rotX = n.painTimer > 0 ? -0.18f : 0.22f;
+            m.part("head").rotZ = -0.13f;
+            m.part("arm_l").rotX = swing * 0.3f;
+            m.part("arm_r").rotX = -0.4f;
+            m.part("arm_r").rotZ = -0.16f;
+            if (n.strikeWindup >= 0) {
+                float progress = 1 - n.strikeWindup / com.veylon.ai.InfectedAI.WINDUP;
+                m.part("arm_r").rotX = -0.4f - 1.8f * progress;
+                m.part("arm_l").rotX = -0.3f - 0.7f * progress;
+                torso.rotX = 0.10f + 0.25f * progress;
+            }
+            if (n.panic.active()) {
+                m.part("arm_l").rotX = -1.4f;
+                m.part("arm_r").rotX = -1.2f;
+            }
+            return;
+        }
+
         // Idle sway + breathing.
         if (run < 0.1f) {
             torso.rotZ = (float) Math.sin(t * 1.3 + n.bobPhase) * 0.02f;
@@ -403,5 +422,17 @@ public final class Animator {
         m.part("warPaint").visible = headhunter;
         m.part("medicSash").visible = a == com.veylon.settlement.NpcArchetype.MEDIC;
         m.part("guardPlate").visible = a == com.veylon.settlement.NpcArchetype.GUARD;
+        boolean infected = a == com.veylon.settlement.NpcArchetype.VEILBOUND;
+        m.part("veilShoulder").visible = infected;
+        m.part("veilRibs").visible = infected;
+        m.part("friendlyBadge").visible &= !infected;
+        m.part("head").color(infected ? 0xa1aa8e : 0xd8ad8a);
+        m.part("torso").color(infected ? 0x666954 : 0x33566e);
+        m.part("vest").color(infected ? 0x777965 : vest);
+        int arms = infected ? 0x929a7d : 0x3d5468, legs = infected ? 0x494e46 : 0x2e3a44;
+        m.part("arm_l").color(arms); m.part("arm_r").color(arms);
+        m.part("forearm_l").color(arms); m.part("forearm_r").color(arms);
+        m.part("leg_l").color(legs); m.part("leg_r").color(legs);
+        m.part("shin_l").color(legs); m.part("shin_r").color(legs);
     }
 }

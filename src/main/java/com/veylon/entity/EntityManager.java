@@ -40,7 +40,17 @@ public class EntityManager {
     /** Goals of people and animals fleeing the fire on their bodies ({@code ai.FirePanic}). */
     private final Random panicRng = new Random();
 
+    /** At most two 400-expansion infected searches per fast tick, shared by all twelve bodies. */
+    private int infectedPathQueries;
+
+    public boolean takeInfectedPathQuery() {
+        if (infectedPathQueries >= 2) { return false; }
+        infectedPathQueries++;
+        return true;
+    }
+
     public void fastTick(Game g, float dt) {
+        infectedPathQueries = 0;
         for (Iterator<Creature> it = creatures.iterator(); it.hasNext(); ) {
             Creature c = it.next();
             CreatureAI.update(g, c, dt);
@@ -63,6 +73,11 @@ public class EntityManager {
                 n.applyPhysics(dt, true);
             }
             if (n.dead) {
+                if (n.infected() && reallyDied(n)) {
+                    g.log("The Veilbound collapses.");
+                    g.audio.playInfected(com.veylon.engine.InfectedSounds.Cue.DEATH,
+                            n.pos.x, n.pos.y, n.pos.z);
+                }
                 if (n.isTrader && n.partyMissionId != null && !n.partyMissionId.isBlank()) {
                     g.faction.failMission(n.partyMissionId, "the escorted trader was lost");
                 }

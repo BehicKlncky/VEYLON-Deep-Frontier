@@ -21,6 +21,10 @@ public final class NpcAI {
         if (n.dead) {
             return;
         }
+        if (n.infected()) {
+            InfectedAI.update(g, n, dt);
+            return;
+        }
         n.decideTimer -= dt;
         n.attackCooldown -= dt;
         n.hunger = Math.min(100, n.hunger + 0.03f * dt);

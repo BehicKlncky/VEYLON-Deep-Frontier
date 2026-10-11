@@ -629,6 +629,7 @@ public final class SaveSystem {
                 if (version >= 3) {
                     String archetypeId = in.readUTF();
                     n.archetype = archetypeId.isEmpty() ? null : requireArchetype(archetypeId);
+                    if (n.infected()) { n.maxHealth = n.archetype.maxHealth; }
                     n.settlementId = in.readLong();
                     n.residentIndex = in.readInt();
                     n.loadedAmmo = in.readInt();

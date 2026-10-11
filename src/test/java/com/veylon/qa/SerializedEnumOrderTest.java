@@ -83,7 +83,7 @@ class SerializedEnumOrderTest {
     private static final List<String> NPC_ARCHETYPE_ORDER = List.of(
             "VILLAGER", "GUARD", "MEDIC", "TRADER", "FARMER", "SMITH", "ARCHER",
             "SCAVENGER", "TRACKER", "SCOUT", "HUNTER", "BRUTE", "POWDERMAN", "LEADER",
-            "CAPTIVE");
+            "CAPTIVE", "VEILBOUND");
 
     /** {@code world.fragments} stores the piece id as its ordinal. */
     private static final List<String> BODY_FRAGMENT_PIECE_ORDER = List.of(

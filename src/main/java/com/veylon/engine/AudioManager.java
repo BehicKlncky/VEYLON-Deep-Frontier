@@ -47,6 +47,12 @@ public class AudioManager {
     private int bDoorOpen, bDoorClose, bMetalDoor, bDoorRattle, bDoorForced, bGlassBreak, bWindowSlide;
     // Burning bodies (BodyFireSounds).
     private int bBodyCrackle, bBodyFlare, bBodySizzle;
+    private final int[] infectedBuffers = new int[InfectedSounds.Cue.values().length];
+
+    /** Positioned gameplay cues; presentation never emits AI noise or changes simulation. */
+    public void playInfected(InfectedSounds.Cue cue, float x, float y, float z) {
+        if (enabled) { playAt(infectedBuffers[cue.ordinal()], x, y, z, 0.65f, pitchVar(0.08f)); }
+    }
 
     // Ambience loops.
     private final int[] detailBuffers = new int[4];
@@ -651,6 +657,10 @@ public class AudioManager {
 
     private VoicePool.Priority priority(int buffer, boolean ambience) {
         if (buffer == bExplosion || buffer == bHurt || buffer == bAlarmBell) return VoicePool.Priority.CRITICAL;
+        if (buffer == infectedBuffers[InfectedSounds.Cue.STRIKE.ordinal()]
+                || buffer == infectedBuffers[InfectedSounds.Cue.NOTICE.ordinal()]) {
+            return VoicePool.Priority.IMPORTANT;
+        }
         if (buffer == bMusket || buffer == bPistol || buffer == bHowl || buffer == bGrowl
                 || buffer == bClick || buffer == bDiscover || buffer == bQuest || buffer == bToolBreak
                 || buffer == bGlassBreak || buffer == bDoorForced)
@@ -735,6 +745,9 @@ public class AudioManager {
         bDoorForced = bank.get(UrbanFixtureSounds.DOOR_FORCED);
         bGlassBreak = bank.get(UrbanFixtureSounds.GLASS_BREAK);
         bWindowSlide = bank.get(UrbanFixtureSounds.WINDOW_SLIDE);
+        for (InfectedSounds.Cue cue : InfectedSounds.Cue.values()) {
+            infectedBuffers[cue.ordinal()] = bank.get(InfectedSounds.key(cue));
+        }
         bBodyCrackle = bank.get(BodyFireSounds.CRACKLE);
         bBodyFlare = bank.get(BodyFireSounds.FLARE);
         bBodySizzle = bank.get(BodyFireSounds.SIZZLE);

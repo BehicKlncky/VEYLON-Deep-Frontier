@@ -3,8 +3,8 @@ package com.veylon.settlement;
 import com.veylon.item.ItemType;
 
 /**
- * Settlement NPC archetypes: role + combat profile + loadout in one record.
- * Persisted by stable string {@link #id}, never by ordinal.
+ * Humanoid body/combat profiles, primarily settlement roles; VEILBOUND has a separate brain.
+ * Live NPCs persist by stable string {@link #id}; remains also pin the append-only ordinal.
  */
 public enum NpcArchetype {
     //        id            display        hp   speed melee view  hear  weapon                 leader
@@ -25,7 +25,10 @@ public enum NpcArchetype {
     POWDERMAN("powderman", "Headhunter Powderman", 40, 3.3f, 5, 22, 16, ItemType.MUSKET, false),
     LEADER("leader", "Headhunter Leader", 90, 3.6f, 12, 24, 18, ItemType.IRON_SPEAR, true),
 
-    CAPTIVE("captive", "Captive", 24, 3.2f, 2, 10, 10, null, false);
+    CAPTIVE("captive", "Captive", 24, 3.2f, 2, 10, 10, null, false),
+
+    /** Biological humanoid profile, never a settlement role or human faction member. */
+    VEILBOUND("veilbound", "Veilbound", 28, 1.65f, 6, 18, 0, null, false);
 
     public final String id;
     public final String displayName;

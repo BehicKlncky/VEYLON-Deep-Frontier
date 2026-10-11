@@ -120,6 +120,11 @@ public final class NpcModels {
         // Guard shoulder plate.
         torso.child(new ModelPart("guardPlate").pivot(-0.30f, 0.56f, 0)
                 .box(0, 0, 0, 0.17f, 0.10f, 0.30f).color(0x6e747c));
+        // Thickened alien membrane braces one shoulder, preserving the humanoid joints.
+        torso.child(new ModelPart("veilShoulder").pivot(0.24f, 0.51f, 0)
+                .box(0, 0, 0, 0.28f, 0.20f, 0.33f).color(0x8a9172));
+        torso.child(new ModelPart("veilRibs").pivot(0.12f, 0.27f, -0.16f)
+                .box(0, 0, 0, 0.17f, 0.30f, 0.045f).color(0xa1a584));
         return new EntityModel(root);
     }
 }

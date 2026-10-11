@@ -77,6 +77,7 @@ final class ProceduralAudio {
         // From their own generators: everything above keeps its exact samples.
         UrbanFixtureSounds.synthesize(new Random(UrbanFixtureSounds.SEED), sink);
         BodyFireSounds.synthesize(new Random(BodyFireSounds.SEED), sink);
+        InfectedSounds.synthesize(sink);
     }
 
     // ---- 0.3.0 combat & settlement synthesis ----

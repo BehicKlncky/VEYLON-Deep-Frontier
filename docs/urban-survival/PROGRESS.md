@@ -9,7 +9,7 @@ This is the running record for the 26-package urban-survival roadmap. The pack i
 | Last completed package | **08 — Urban spawn and survival progression** (2026-10-11). Six seeded production routes, save/capacity/Creative regressions, normal-controls native scavenging return and final portable build passed. |
 | Source revision | 08: `89a0edd` independent crafting-capacity fix → `bc0a363` starter generator/refuge, finite supplies, repair/reuse progression and coupled regression/native QA coverage. Records follow separately. |
 | Default new world | Legacy (`World.DEFAULT_NEW_WORLD_GENERATOR = GEN_CAVE_IDENTITIES`), unchanged until 26 passes. Isolated `VEYLON_GENERATOR=urban-dev` creates generator 9 (`GEN_URBAN_STARTER`, layout 6 / template 4 / content 3). Generators 1–8 stay loadable with their original geometry. |
-| Next package | **09 — Infected threats and encounters.** Implement the first bounded, persistent infected encounter outside the starter sanctuary. No required 08 gate is pending. |
+| Next package | **09 — Infected threats and encounters, IN PROGRESS.** Veilbound humanoid body/brain slice implemented; generated encounter director, persistence and native QA remain. No required 08 gate is pending. |
 | Human testing schedule | Owner instruction (2026-10-11, D-80): consolidated human playtesting/listening after milestone 22. Through 22, run automated and scripted native validation and record human-only checks as deferred; do not request interim human walks. |
 | Commits | Separate `feat`, `test`, `docs` and `chore` commits on `feature/urban-survival`; see the reconstruction ledger below. `main` stays at `923345f`. Original combined commit retained at `backup/urban-m01-m04-before-split`. No merge, push, tag or publication. |
 
