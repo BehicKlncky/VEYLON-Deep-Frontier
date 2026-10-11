@@ -10,6 +10,7 @@ This is the running record for the 26-package urban-survival roadmap. The pack i
 | Source revision | 08: `89a0edd` independent crafting-capacity fix → `bc0a363` starter generator/refuge, finite supplies, repair/reuse progression and coupled regression/native QA coverage. Records follow separately. |
 | Default new world | Legacy (`World.DEFAULT_NEW_WORLD_GENERATOR = GEN_CAVE_IDENTITIES`), unchanged until 26 passes. Isolated `VEYLON_GENERATOR=urban-dev` creates generator 9 (`GEN_URBAN_STARTER`, layout 6 / template 4 / content 3). Generators 1–8 stay loadable with their original geometry. |
 | Next package | **09 — Infected threats and encounters.** Implement the first bounded, persistent infected encounter outside the starter sanctuary. No required 08 gate is pending. |
+| Human testing schedule | Owner instruction (2026-10-11, D-80): consolidated human playtesting/listening after milestone 22. Through 22, run automated and scripted native validation and record human-only checks as deferred; do not request interim human walks. |
 | Commits | Separate `feat`, `test`, `docs` and `chore` commits on `feature/urban-survival`; see the reconstruction ledger below. `main` stays at `923345f`. Original combined commit retained at `backup/urban-m01-m04-before-split`. No merge, push, tag or publication. |
 
 ## Package ledger
@@ -882,6 +883,7 @@ spawn visibility. Do not switch the ordinary generator default.
 
 ## Resume rules
 
+- D-80 governs human validation timing: defer human-only gates until after 22 and carry them explicitly in handoffs. These owner-authorized deferrals permit implementation to advance through 22; other unmet gates retain the blocking rules below. Do not count scripted native evidence as a human pass.
 - On resume, read `00_BASE_KNOWLEDGE.md`, the current package prompt, the sections of these four records that the prompt names, and current source. Do not reload every plan.
 - Continue a PARTIAL package before starting the next. Record the exact resume step whenever a package spans sessions.
 - Each package handoff appends a section here containing: id; status; implemented behaviour; changed paths; stable-id and schema decisions; exact commands and results; native evidence; limitations; next concrete step. The package also updates its ledger row.

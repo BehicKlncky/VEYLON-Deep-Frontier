@@ -1035,3 +1035,13 @@ fresh sessions were startup/input-calibration attempts, not completed routes.
 Native treatment, sleep, upgrade, a shop visit and human comfort/balance testing
 were not performed; the required mechanics are covered by the production route
 tests. Infected encounters remain 09, claims 18, utilities 19 and economy tuning 23.
+
+### Owner scheduling update after the 08 handoff
+
+On 2026-10-11, the owner deferred human testing until after milestone 22 (D-80).
+The optional 08 human walk remains unperformed and joins that consolidated pass.
+Upcoming human-only playtest/listening checks must be recorded as deferred rather
+than passed; implementation may advance through 22 under this instruction.
+Automated checks, builds and scripted native evidence remain required during
+development. This scheduling update adds no validation result and does not alter
+the actual human evidence previously recorded for 06.
