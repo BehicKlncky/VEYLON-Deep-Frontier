@@ -807,3 +807,120 @@ execution is claimed. Existing saves stay on their frozen generator; older
 builds cannot read generator 8, and downgrading old-generator worlds edited with
 new stair ids is unsupported. Save base/section layouts and content revision
 are unchanged.
+
+## Milestone 07 — Contextual loot and persistence (2026-10-11)
+
+Prerequisite 06's human route is passed as recorded above. These are fresh 07
+checks, not reused 06 counts. Windows PowerShell used Temurin `25.0.4.1+1` at
+`build/tools/jdk25/jdk-25.0.4.1+1` through `JAVA_HOME`. Approved execution supplied
+JDK/cache access; all native saves/settings/captures stayed under isolated
+`build/qa/` directories. Source/codec policies are D-71–D-74.
+
+### Production checks and revision boundaries
+
+Each code revision was checked against its actual contents before its local
+commit; independent generated regression coverage used an exported index tree.
+Logs and JSON totals remain under ignored `build/`:
+
+| Revision/check | Actual command | Result |
+| --- | --- | --- |
+| Foundation `5adfcbb` | `.\gradlew.bat test --tests 'com.veylon.save.UrbanContainersSectionTest' --tests 'com.veylon.save.GeneratedApartmentStateTest' --tests 'com.veylon.save.UrbanMetaSectionTest' --tests 'com.veylon.world.urban.UrbanRevisionTest' --tests 'com.veylon.world.urban.UrbanSaltsTest' --tests 'com.veylon.world.WorldGeneratorFingerprintTest' --console=plain` | 34 tests, zero failures/errors/skips, 10 s; `m07-state-revision-focused-20261011.log`, matching `-summary-` JSON |
+| Transaction revision `602c12c` | `.\gradlew.bat test --tests 'com.veylon.UrbanLootGameplayTest' --tests 'com.veylon.UrbanFixtureGameplayTest' --tests 'com.veylon.save.*' --tests 'com.veylon.settlement.SettlementTheftTransactionTest' --tests 'com.veylon.CombustionLifecycleTest' --tests 'com.veylon.GameLoopIntegrationTest' --tests 'com.veylon.qa.RuntimeBoundsTest' --console=plain` | 162 tests, zero failures/errors/skips, 1 min 30 s; `m07-transactions-final-focused-20261011.log`, matching `-summary-` JSON |
+| Independent regression `73ee6a3` | `.\build\m07-source-regression-check\gradlew.bat -p build/m07-source-regression-check test --tests 'com.veylon.world.urban.ContextualLootGenerationTest' --console=plain` | Exact staged-tree export: 3 tests, zero failures/errors/skips, 6 s; `m07-source-regression-check-20261011.log` |
+| QA revision `df7e2b7` | `.\gradlew.bat test --tests 'com.veylon.UrbanLootQaSceneTest' --tests 'com.veylon.world.urban.ContextualLootGenerationTest' --tests 'com.veylon.UrbanLootGameplayTest' --console=plain` | 14 tests, zero failures/errors/skips, 7 s; `m07-qa-generation-focused-20261011.log`, matching `-summary-` JSON. First native run below validated the same QA source before presentation polish. |
+| Extraction `dddb812` | `.\build\m07-orchestrator-check\gradlew.bat -p build/m07-orchestrator-check test --tests 'com.veylon.qa.OrchestratorSizeTest' --tests 'com.veylon.AllLivingBlastDeathTest' --tests 'com.veylon.CreativeBodyTest' --tests 'com.veylon.GameLoopIntegrationTest' --tests 'com.veylon.UrbanLootGameplayTest' --console=plain` | Exact staged-tree export: 108 tests, zero failures/errors/skips, 44 s; `m07-orchestrator-focused-20261011.log`, matching `-summary-` JSON |
+| Final tree through `0ebb6a9` | `.\gradlew.bat build --console=plain` | Exit 0, 7 min 21 s; 1,737 tests, zero failures/errors, one Windows symlink-privilege skip, Javadoc/doclint passed. `build/m07-build-final-20261011.log` and `build/m07-build-final-summary-20261011.json`. Code frozen before the run. |
+| Code graph | `graphify update . --no-cluster` | Exit 0, 7,574 nodes / 29,010 edges; `build/m07-graph-final-20261011.log`. Supersedes the premature pre-budget-fix 7,568 / 29,004 update in `m07-graph-update-20261011.log`. Existing `build.gradle` syntax/no-symbol and `settings.gradle` no-symbol limitations; no clustering or semantic extraction. |
+| Documentation/fixture integrity | `powershell -NoProfile -ExecutionPolicy Bypass -File build/check-m06-record-links.ps1`; `git diff --check`; `Get-FileHash -LiteralPath src/test/resources/saves/urban-preloot-m06.sav -Algorithm SHA256` | 55 relative links/anchors resolved across six changed documents; whitespace check passed; authentic SHA-256 unchanged. The existing checker filename is historical; it checks the six current records. |
+
+Production behavior coverage includes open/partial/leave/load/revisit/break/place
+cycles without refill or duplicate contents; hidden/interrupted searches with
+durable progress; normal scheduler clock, hunger and actual noise; full inventory
+and full storage; one-item transfers both ways; condition/charge/freshness;
+spoilage-to-empty; hand refusal/salvage; blast/fire destruction and closed ghost
+screens in Creative/Survival; player versus natural-fire attribution; abandoned
+versus survivor property; deduplicated theft and saved reputation. Three seeds
+(`20260731`, `7`, `-4242`) prove several generated room sources for necessities,
+clothing availability and secured-only firearm/ammunition tables. A boundary-
+spanning building retains ids and every stack field under reversed chunk/search
+order. Pure planning and picked-clean content-2 shelves retain no Inventories.
+
+Persistence checks use real `SaveSystem.save/load`, including load over a live
+world and failed save preserving its prior file. Corruption cases reject unknown
+known-section versions, bad length/count/id/owner/progress/flags/references,
+duplicate ids/cells, missing required content-2 sections, oversized core slots,
+invalid item ordinals/count/metadata and duplicate core inventory rows. Failed
+loads preserve the live session. Section order is irrelevant. The 32,768-entry
+ledger refuses mutation before changing blocks/contents at capacity.
+
+Authentic fixture `src/test/resources/saves/urban-preloot-m06.sav` was generated
+by unchanged production `SaveSystem` exported from `cfcd591`: seed `20260731`,
+generator 7, Survival, content 1, no new container section. It contains one empty
+core inventory, one with three bandages and one destroyed generated reservation.
+SHA-256: `361199bd25a754161713475958697c241c4535cb832fd8c0b97427b7e61302a3`.
+It is retained unchanged, with provenance in that directory's README. Current
+reader migration preserves empties/depletion, then round-trips them; content-1
+core empty markers also prevent refills if the optional section is removed.
+Fresh content 2 requires even an empty ledger. Older binaries were not run;
+new-save downgrade is unsupported, independently of unknown-section skipping.
+
+Iteration corrections before the successful checks: new tests initially called
+a nonexistent mode setter and used integer camp-trust expectations; they now use
+the actual mode API/float field. The headless generated fixture initially stayed
+on TITLE, preventing normal simulation, and now explicitly enters PLAYING. The
+shared `interactWithBlockAt` path initially omitted container opening; timed
+search now uses that production command as well as normal F/RMB routing. The
+successful results above follow these corrections; failed drafts are not passes.
+
+The first portable build (`build/m07-build-initial-20261011.log`, 7 min 19 s)
+ran 1,737 tests, with one failure, zero errors and one Windows privilege skip.
+Its sole failure was `OrchestratorSizeTest`: Game had 1,014 lines against the
+unchanged 1,000-line ceiling. Existing death/respawn rules were extracted to
+`PlayerLifeCycle`, and storage destruction attribution moved into its transaction
+owner. Game keeps its public commands/tick order and now has 991 lines. No limit,
+save layout or gameplay policy changed. The focused exported-revision check and
+final build reported above supersede this failed result.
+
+### Native generated kitchen and survivor cupboard
+
+Common environment: `VEYLON_GENERATOR=urban-dev` (8), `VEYLON_SEED=20260731`,
+`VEYLON_GAME_MODE=survival`, `VEYLON_SCENE=urban_loot`,
+`VEYLON_SHOT=1,4,6,10,14`, resolution `1280x720`, UI scale `1`, fullscreen `0`,
+vsync `0`, GL diagnostics `1`, frontend/smoke unset. For each row set the capture
+tag and run `.\gradlew.bat run -PveylonDataDir=build/qa/<directory> --console=plain`.
+
+| Run | Directory under `build/qa/` | Capture tag | Result |
+| --- | --- | --- | --- |
+| First | `m07-contextual-loot-20261011` | `m07_contextual_loot_survival_720` | Exit 0, 16 s, five captures; `build/m07-contextual-loot-native-20261011.log` |
+| Presentation correction | `m07-contextual-loot-final-20261011` | `m07_contextual_loot_final_survival_720` | Exit 0, 17 s, five captures; `build/m07-contextual-loot-native-final-20261011.log` |
+| Final source after extraction | `m07-contextual-loot-verified-20261011` | `m07_contextual_loot_verified_survival_720` | Exit 0, 24 s including compilation, five captures; `build/m07-contextual-loot-native-verified-20261011.log` |
+
+The driver selects actual INTACT/abandoned kitchen
+`urban:fixture:0,0:0:0:0:6:2` and OCCUPIED/survivor cupboard
+`urban:fixture:0,0:1:0:0:6:2`, owner `urban:building:0,0:1:0`, without injecting
+structure, lights or loot. It positions once per interaction, opens through the
+production command, waits for ordinary simulation to search, and takes one item.
+Wall-clock camera updates alone fail the headless driver test; the deadline at
+13 s also fails an interrupted native search. This is scripted production
+interaction evidence, not a manual walk or a hostile encounter.
+
+Final source log: kitchen searched/taken 1, `noise=true`, clock delta
+6.399755840001831 minutes; owned searched/taken 1 with faction reputation
+`-4.0`; `loot pass=true`, clock delta **15.999404799996682 game minutes**,
+`hungerUsed=0.4478836`, `inventories=2`. Abandoned taking did not change reputation.
+The 1 s/6 s captures show hidden contents and live progress for each ownership;
+10 s shows searched storage with remaining food/water/treatment. These final
+views were inspected at 1280 × 720. The first run exposed oversized cyan panel
+corners and small instructions; final explicit eight-pixel corners and larger
+status/instruction text are readable and unclipped. Search/transfer behavior did
+not change with that polish.
+
+All three runs reported zero GL, KHR error and native audio errors on NVIDIA GeForce
+RTX 3060 Ti, OpenGL 3.3 / driver 610.88. Screenshot pixel-transfer performance
+messages are not errors or benchmark evidence. No calibrated benchmark/listening
+pass or cross-platform native run is claimed. Legacy camp/biome/startup HUD text
+remains for 08/13/21. Specialist building families (12), full district gameplay
+(13), resident/guard responses (16/17), final scarcity (23) and CPU streaming
+eviction (24) retain their separate gates. **All required 07 gates passed.**
+The next concrete step is 08's starter refuge/guaranteed supplies and first
+urban upgrade; final scarcity tuning stays in 23.

@@ -6,10 +6,10 @@ This is the running record for the 26-package urban-survival roadmap. The pack i
 
 | Item | Value |
 | --- | --- |
-| Last completed package | **06 — Generated apartments and interiors** (2026-10-11). Door/stair repairs, native appearance checks, the owner's full Survival route and final portable verification passed. |
-| Source revision | Original 06 handoff at `197f8da`. Native-QA continuation: `9e5c332` outer-jamb door leaves → `f850626` thin closed panels → `1a58b53` shaped stair mechanics → `8388f93` frozen generated stair integration. Records follow separately. |
+| Last completed package | **07 — Contextual loot and persistence** (2026-10-11). Production save/transaction checks, native generated searches and final portable verification passed. 06's full human route is confirmed. |
+| Source revision | 07: `5adfcbb` bounded identity/save foundation → `602c12c` live searches/transfers/destruction → `73ee6a3` generated source/order regressions → `df7e2b7` native production-search QA → `dddb812` orchestration-budget extraction → `0ebb6a9` readable panel corners/text. Records follow separately. |
 | Default new world | Legacy (`World.DEFAULT_NEW_WORLD_GENERATOR = GEN_CAVE_IDENTITIES`), unchanged until 26 passes. Isolated `VEYLON_GENERATOR=urban-dev` creates generator 8 (`GEN_URBAN_SHAPED_STAIRS`, layout 5 / template 3 on frozen layout-2 city plans). Generators 1–7 stay loadable with their original geometry. |
-| Next package | **07 — Contextual loot and persistence.** The owner explicitly confirmed the entire Survival street/kitchen/upper/B1/exit route passed. |
+| Next package | **08 — Urban spawn and survival progression.** Implement the starter refuge/source guarantees and a first urban upgrade without tree/ore progression. No required 07 gate is pending. |
 | Commits | Separate `feat`, `test`, `docs` and `chore` commits on `feature/urban-survival`; see the reconstruction ledger below. `main` stays at `923345f`. Original combined commit retained at `backup/urban-m01-m04-before-split`. No merge, push, tag or publication. |
 
 ## Package ledger
@@ -24,7 +24,7 @@ The status vocabulary is NOT STARTED, IN PROGRESS, PARTIAL, BLOCKED or COMPLETE.
 | 04 | Urban materials and interactions | 03 | `world/BlockType` (appended, budgeted), `gfx/MaterialRegistry`, `gfx/ProceduralTextures`, `engine/AudioManager` footsteps, `WorldInteractions`, `InteractPromptBuilder`, `PlayerBlockActions`, `ai/Pathfinder` door passability, new `FixtureStates` and `world.fixtures` | A fixture shows a player and an NPC opening a door, using a window entry and climbing stairs; breaking a fixture; recognising a searchable object. Collision, raycast, rendering and navigation agree. Fixture state round-trips. Creative and Survival gates hold. Natives show both sides of doors and night readability. | **COMPLETE** (final verification 2026-10-10) |
 | 05 | Building plans and accessibility | 03–04 | `world/urban/{BuildingPlanner,BuildingTemplates,BuildingPlan,PlanVolume,AccessibilityValidator,BuildingPlanDiagnostics}`; shared `VoxelAccess`/`VoxelClearance`; generator 6 / layout 3 / template 1 | No unreachable room/container/quest reservation, invalid stairs, overlap or overflow; invalid fixtures rejected; stable shuffled access/eviction; bounded work. Native plan debug optional, furnished exploration is 06. | **COMPLETE** (2026-10-10; focused checks, portable build, graph and scoped local handoff) |
 | 06 | Generated apartments and interiors | 04–05 | `UrbanBuildingStamper`, `BuildingFurnishing`, `UrbanIndoorQueries`; `World`/`Chunk` height/light/state hooks; shelter, temperature, ambience/audio; generated QA scenes | Generated apartments and a shop have recognisable rooms, usable stairs, matching windows and exits. Blocks and ids are identical in every order. Persisted breaks survive. Native street-to-basement walks in day and night. | **COMPLETE** (2026-10-11; final build, day/night appearance and full human Survival route passed) |
-| 07 | Contextual loot and persistence | 06, 02 | New `UrbanContainers`, `LootTables`, `urban.containers`; `CrateTransactionSystem`, `ui/CrateScreen`, `simulation/ItemConditionSystem`, one removal path for hand, blast, fire and salvage | Open, partially loot, leave, reload, revisit, break and replace: no refill or duplication. Abandoned property is not theft; owned property has a consequence. Interrupted search, full-inventory and corruption tests. Native searching while the world runs. | NOT STARTED |
+| 07 | Contextual loot and persistence | 06, 02 | `UrbanContainers`, `LootTables`, `urban.containers`; `CrateTransactionSystem`, `ui/CrateScreen`, `simulation/ItemConditionSystem`, one removal path for hand, blast, fire and salvage | Open, partially loot, leave, reload, revisit, break and replace: no refill or duplication. Abandoned property is not theft; owned property has a consequence. Interrupted search, full-inventory and corruption tests. Native searching while the world runs. | **COMPLETE** (2026-10-11; focused checks, final build and generated native searches passed) |
 | 08 | Urban spawn and survival progression | 07 | `UrbanBootstrap` (spawn, refuge, provisional camp), `item/CraftingSystem` urban recipe set, `item/ItemType` (appended), `WorldInteractions` fuel, water and cooking, `SleepSystem`, onboarding text | Fixed starter seeds reach shelter, food, water, treatment, sleep and a first upgrade from urban sources only, on a production route with no tree and no ore. Creative bootstrap is intact. A fresh native session. | NOT STARTED |
 | 09 | Infected threats and encounters | 08 | Entity kind (D-20, appended enums), a new AI brain, `gfx/model`, `engine/AudioManager`, new `UrbanEncounterDirector` and `urban.population`, caps in `qa/RuntimeBudgetSnapshot` | Infected notice the player fairly, pursue in a fixture, attack through the damage gates, react to fire and die cleanly. Defeated state survives save, load and reactivation. Caps and sanctuary hold. Creative twin. Natives in a street and a ground-floor apartment. | NOT STARTED |
 | 10 | Indoor navigation and perception | 09, 04–06 | `ai/Pathfinder` plus new `PortalGraph` and `PathBudget`; `ai/Steering` guards; `combat/WorldNoise` attenuation; AI loaded-column guard | Multi-floor pursuit through doors and stairs, losing sight, searching and giving up. Door edits change routes. A shared measured budget. No roof or ground confusion and no void pathing. A native pursuit and escape. | NOT STARTED |
@@ -704,6 +704,94 @@ tables, non-pausing search/transfer commands and extension codec, with durable
 depletion, replacement and owner attribution through production save paths.
 No release, merge, push, tag or
 publication is authorized by this continuation.
+
+## 07 — Contextual loot and persistence (2026-10-11)
+
+**Status: COMPLETE.** Prerequisite 06 is complete: the owner
+explicitly confirmed the full normal-input Survival route. 07 now uses actual
+generated room furniture, with durable depletion from its first implementation.
+
+Implemented behavior and source ownership:
+
+- `world/urban/{UrbanContainers,LootTables,UrbanRevision,UrbanSalts}` supplies the
+  bounded lazy ledger and twelve room/building/district tables. Stable generated
+  fixture ids, negative player ids, explicit states and three owner classes are
+  separate from item storage. Picked-clean shelves remain empty. No Inventory is
+  allocated for untouched furniture or content-2 empty records. The 32,768-row
+  cap includes permanent tombstones; cap refusal precedes block/item mutation.
+- `CrateTransactionSystem`, `Game`, `WorldInteractions` and `ui/CrateScreen`
+  search/take/deposit through production commands while normal simulation keeps
+  ticking. Search emits real noise, hides contents, resumes durable progress and
+  interrupts on closing, damage/death, distance, unloaded/replaced targets.
+  Left click moves a stack; right click one item. Full and partial destinations
+  preserve undelivered supplies and stack metadata.
+- `World`, `PlayerBlockActions`, `combat/ExplosionSystem`, `simulation/FireSystem`
+  and `simulation/ItemConditionSystem` share authoritative storage/removal.
+  Hand salvage refuses losses, moves contents once and retires the identity;
+  blast/fire destroy contents and persist tombstones. Replacement starts empty
+  as player property. Spoilage empties and compacts only materialized storage.
+  `Inventory` retains charge/durability and weighted freshness during merging.
+- `save/{UrbanContainersSection,V3ExtensionSections,SaveSystem}` retains frozen
+  core bytes and atomic publication. The version-1 section stores only bounded
+  metadata (20-byte header / 36-byte rows), cross-checking the core inventory.
+  Content 2 requires the section; old content-1 absence adopts inventories,
+  including empties, and edited reservations. Content-1 touched empties retain
+  core markers. Invalid loads preserve live state and failed saves preserve the
+  previous file. New/load replaces the world-owned ledger and resets UI targets.
+- Survivor taking affects Free Settlers faction reputation, once per logical
+  event; stable building ownership survives reload. Abandoned/player property
+  bypasses legacy proximity theft. Player destruction has a consequence;
+  natural fire does not. Legacy camp trust remains separate (D-74).
+- Final verification found `Game` at 1,014 lines against its unchanged 1,000-line
+  budget. Existing death/respawn rules now live in `PlayerLifeCycle`; storage
+  destruction attribution lives in `CrateTransactionSystem`. Game retains the
+  same delegates and tick order at 991 lines. This extraction changes no saved
+  state or player policy; the existing production death/Creative checks validate it.
+
+Compatibility and policy are D-71–D-74. New content revision 2 does not change
+geometry, generator dispatch, existing ordinals, or legacy-world crate rules.
+Older binaries were not executed and downgrading new content-2 saves is not
+supported. The authentic pre-loot fixture is retained unchanged with provenance
+and SHA-256 in `src/test/resources/saves/README.md`.
+
+Validation: exact foundation revision, 34 focused checks;
+production gameplay/save/ownership/runtime checks, 162; independent generated
+regression revision, 3; QA/generation/gameplay checks, 14; exact extracted
+death/respawn/Creative/scavenging revision, 108. All passed with zero
+failures/errors/skips. Exact commands, iteration corrections and artifacts are
+in [VALIDATION.md](VALIDATION.md). The first portable build failed only the
+orchestration budget; after extraction, final `.\gradlew.bat build --console=plain`
+passed in 7 min 21 s: **1,737 tests, zero failures/errors, one Windows symlink-
+privilege skip**, plus Javadoc/doclint. Code was frozen before that run. The
+authentic fixture hash still matches; all 55 relative documentation links and
+anchors resolve and the diff passes whitespace checks.
+
+Native `urban_loot` used seed `20260731`, generator 8 and Survival in isolated
+`build/qa/` directories. It searches a generated abandoned kitchen and survivor
+cupboard through normal transaction commands, with scripted positioning only.
+Both emitted noise; the clock advanced about 16 game minutes and hunger fell
+0.4478836 while the screens stayed open. Abandoned taking incurred no theft;
+one owned item cost four faction reputation. Five final captures show hidden
+search contents, progress, ownership and remaining supplies; panel corners and
+text were corrected after the first run. The source after extraction was checked
+again in `build/qa/m07-contextual-loot-verified-20261011`; its five captures and
+live-search gate also passed. All three sessions exited cleanly with zero
+GL/KHR/native-audio errors. No human 07 walk or threat encounter is claimed.
+
+The completion code graph update (`graphify update . --no-cluster`) has 7,574
+nodes / 29,010 edges (`build/m07-graph-final-20261011.log`). It supersedes the
+premature pre-budget-fix update (7,568 / 29,004); no further code changed.
+Existing Gradle parser limitations remain; no clustering or semantic
+document/image extraction ran.
+
+No required 07 gate remains pending. Code is committed in the scoped series
+listed above, followed by this record update; no task-owned changes remain.
+Next is **08**: implement the
+starter refuge/source guarantees and a first urban upgrade without tree/ore
+progression. Current initial tables are not final economy tuning (23). Actual
+specialist building families (12), full district rules (13), resident/guard
+responses (16/17), onboarding (08/21) and CPU chunk eviction (24) retain their
+own gates. No release, merge, push, tag or publication was performed.
 
 ## Resume rules
 

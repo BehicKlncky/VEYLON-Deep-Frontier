@@ -43,7 +43,8 @@ Main.main
               PlayerBlockActions     hold-to-mine, break outcomes, placement
               WorldInteractions      F/RMB routing, NPCs, stations, beacon endgame
               PlayerConsumables      eat, drink, treat, equip
-              CrateTransactionSystem crate transfers and theft attribution
+              PlayerLifeCycle        death transition, remains and respawn
+              CrateTransactionSystem timed searches, crate transfers and theft attribution
               InteractPromptBuilder  read-only HUD interaction hint
               AmbienceSystem         ambient particles and audio mix, and (BodyFireEffects)
                                      what burning bodies give off and how they sound
@@ -273,21 +274,24 @@ version, never a change under an old one (`UrbanRevision`). Its content revision
 (the rolled loot, encounter and trade tables) is saved in the optional
 `urban.meta` section, which only urban worlds write. Until that section, or its
 absent default, has been read, a loading world's content revision cannot be read
-at all. Compatibility directions:
+at all. Fresh worlds use content revision 2; revision 1 remains supported and
+is the absent-metadata default. The tables and their hash inputs are frozen
+under both revisions. Compatibility directions:
 
 - this build, a legacy save: unchanged, and no urban state is created;
 - this build, an urban save: the same geometry through its generator, the content
   revision from `urban.meta` (absent means revision 1);
-- an older build, an urban save: refused as an unsupported generator before the
-  live world is touched;
+- an older build, a newer urban save: refused when its generator or content
+  revision is unsupported, before the live world is touched; optional unknown
+  sections alone do not make downgrading safe;
 - an `urban.meta` in a non-urban world, a newer section version, a layout
   revision that does not match the generator, an unsupported content revision or
   trailing bytes: the whole load fails.
 
 Urban ids (`world.urban.UrbanIds`) are packed from plan coordinates, never from
-visit or list order. No section stores one yet; the policy for those that will is
-to check each with `UrbanIds.requireKind` and fail the whole load on an invalid or
-wrong-kind id, never to resolve it to some other object.
+visit or list order. `urban.containers` validates generated fixture ids against
+their immutable reservation and survivor owner building. An invalid, wrong-kind
+or mismatched id fails the whole load, never resolves to another object.
 
 ### Urban city plans
 
@@ -492,14 +496,76 @@ Creative or salvage can bring one into a legacy world.
   were not executed: those supporting at most generator 7 reject generator 8;
   downgrading an older-generator world containing newly placed stair ids is not
   supported. The v3 base and extension layouts are unchanged.
-- **Containers and salvage.** Shelving, cabinets and lockers use the crate storage
-  (until package 07). A break of an urban block whose contents or salvage would not
-  fit is refused rather than losing items; salvage is at most the one item that
-  places the block, so breaking and placing never multiplies material. A blast or
-  fire takes an urban container's contents with it (`World.setBlock`); the legacy
-  crate keeps its old behaviour. Transfers from an open urban storage screen
-  revalidate its furniture and inventory identity, closing the screen when either
-  is gone so destroyed contents cannot be taken and deposits cannot disappear.
+- **Containers and salvage.** Generated buildings (generators 7/8) use the sparse
+  per-world `UrbanContainers` ledger described below. A hand break first commits
+  any unrolled contents, refuses if contents plus salvage would not fit, then
+  transfers them once and retires the identity as MOVED. Salvage is at most the
+  one item that places the block. Blast/fire retire it as DESTROYED and destroy
+  its contents. `World.setBlock` reserves ledger capacity before mutation and
+  creates an empty player identity for replacement furniture. Legacy worlds
+  retain their crate rules. Open screens revalidate the live fixture, ledger
+  entry and authoritative inventory before transfers; destruction closes them.
+
+### Contextual storage and searches
+
+`world.urban.LootTables` maps nine furniture functions to twelve contextual
+tables, with six district biases. Pure rolls use seed, saved content revision,
+stable fixture id and distinct presence/count/condition salts. Kitchens and
+pantries supply food/water; bathrooms and civic treatment cabinets supply
+treatment; wardrobes supply clothing; utility/stockroom storage supplies tools
+and repair materials. Scarce firearms/ammunition occur only in occupied secured
+utility/stockroom tables. Picked-clean sites roll empty. Initial quantities are
+not the package-23 economy tuning or package-08 starter guarantees.
+
+Lazy generation commits a record on first search or consequential mutation.
+`UrbanContainers` holds at most 32,768 entries including permanent tombstones;
+there is no eviction that could refill a fixture. Generated ids are packed
+fixture ids; player storage uses a disjoint negative monotonic sequence. States
+are UNSEARCHED, SEARCHING, SEARCHED, EMPTY, MOVED and DESTROYED with explicit
+stable codes. Ownership is ABANDONED, SURVIVOR (stable building id) or PLAYER.
+Only `World.crateContents` owns inventories: the ledger stores metadata, never
+another item copy. Untouched furniture allocates neither record nor inventory;
+content-2 empty records allocate no inventory. At capacity, new touches and
+mutations needing a record fail without changing blocks or moving supplies.
+
+`CrateTransactionSystem` advances 1.5/2.5/3.5-second searches on normal fast ticks
+after needs, entities and settlements. Rummaging emits actual bounded
+`WorldNoise` events and audio. Closing, damage, death, range over five blocks,
+unloaded columns or fixture replacement interrupt the screen; elapsed search
+progress remains durable. Opening a screen never pauses simulation. Left click
+transfers a stack, right click one item. Full destinations preserve the source;
+partial transfers remove only delivered quantities. Stack merging preserves
+durability/charge and weighted food freshness. Existing spoilage visits only
+materialized core inventories; emptied content-2 inventories are removed.
+
+Taking from abandoned/player storage bypasses legacy proximity theft. Taking
+survivor storage applies the existing Free Settlers faction reputation penalty
+(3 + count, capped at 12) once per logical theft event, with callback deduplication.
+Player hand/blast/fire destruction costs 15 reputation; natural fire does not.
+Legacy camp trust is separate. Guard responses and urban residents remain 16/17.
+
+`urban.containers` v1 has a 20-byte header (version, content revision, next player
+id, count), then 36-byte rows (id, cell, block, owner code/building, state code,
+search progress, authoritative-inventory presence). Its maximum payload is
+1,179,668 bytes, below the 16 MiB section limit; at most 32,768 core inventories
+fit below the frozen core's 100,000-entry reader cap. Inventory bytes occur only
+in that existing core map. The generated-urban core reader additionally requires
+12 slots, unique cells and valid item counts, ordinals, condition, freshness and
+charge. The section checks exact length, identities, owners, progress, active
+cells and inventory references. Known unsupported versions fail; unknown ids
+retain the existing skip policy.
+
+Load applies this section after `urban.meta`, regardless of section order.
+Content 2 requires it, including a zero-entry ledger: absence cannot refill loot.
+For authentic pre-loot content-1 saves, absence adopts core inventories (including
+empties) and tombstones edited generated reservations. Touched content-1 empties
+retain a core empty marker so dropping the optional section cannot refill them;
+untouched decorative furniture still allocates nothing. New/load replaces the
+world-owned ledger; open targets and noise timers reset, saved search progress
+does not. Save preparation binds/compacts the core map before the existing
+sibling-temp, flush, force and atomic replacement path. Invalid loads preserve
+the live session; failed writes preserve the previous save. Older binaries were
+not executed, and no downgrade guarantee is made for new content-2 saves.
 
 Transient state is deliberately **not** serialized: an in-flight reload is
 cancelled on load, and bow draw resets. Combat and fire add more of it. An
@@ -591,7 +657,8 @@ in a named collaborator:
 | `PlayerBlockActions` | hold-to-mine, break drops/spill/vandalism, placement |
 | `WorldInteractions` | F and RMB routing, NPC talk/rescue, stations, beacon endgame |
 | `PlayerConsumables` | eat, drink, treat wounds, equip gear |
-| `CrateTransactionSystem` | crate transfers and theft attribution |
+| `PlayerLifeCycle` | death transition and respawn; Game keeps its existing command delegates |
+| `CrateTransactionSystem` | simulation-timed searches, crate transfers and theft attribution |
 | `InteractPromptBuilder` | the `[F] …` hint (pure read — cannot change what F does) |
 | `AmbienceSystem` | ambient particles and the audio mix; `BodyFireEffects`, what burning bodies give off and their sound |
 | `SleepSystem` | sleep eligibility, quality scoring, night effects |

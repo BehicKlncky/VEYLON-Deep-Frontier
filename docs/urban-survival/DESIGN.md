@@ -252,7 +252,7 @@ New hostiles must not copy the current creature pattern. Creature perception is 
 
 | Id | Rule |
 | --- | --- |
-| S1 | A container's contents are rolled at most once, from (seed, content revision, container id, loot salt), on first search. Search results, emptying and destruction persist from that moment. Absence of a record means "never searched", and nothing else. |
+| S1 | A container's contents are rolled at most once, from (seed, content revision, container id, loot salt), on first search or consequential hand salvage. Search results, emptying and destruction persist from that moment. An absent row in a valid ledger means untouched; a missing required content-2 section rejects the save. Old content-1 core inventories/edits are adopted without refilling. |
 | S2 | The room function selects the table, the district multiplies the bias, and site ownership decides theft. Abandoned property is never theft. |
 | S3 | Necessities (food, water, treatment, light, a pry tool) have ≥ 2 independent source types in the starter area and in every district. Specialist goods concentrate in specialist destinations and cost access or encounter risk, never an unobtainable key. |
 | S4 | Searching costs time (1.5–4 s per container, *initial*) and emits rummage noise. Forced entry is louder. The world keeps simulating during search and while the container screen is open (**Existing**: the crate screen does not pause, B-45). |
@@ -261,6 +261,29 @@ New hostiles must not copy the current creature pattern. Creature perception is 
 | S7 | Found food spoils under the existing model (B-47); packaged food spoils slowly. Spoilage cost must not scale with every container in the explored city. |
 | S8 | Carrying uses the existing 36-slot inventory and 28 kg capacity plus gear (B-46). Urban containers hold ≤ 12 slots so the existing transfer UI applies (B-45). |
 | S9 | Contents always have exactly one owner. Destroying a container by any route (hand, blast, fire, salvage) goes through one removal path. Nothing is silently lost: legacy crates currently orphan contents on blast or fire, and a full inventory destroys drops (B-43, B-44). |
+
+**Implemented in 07 (D-71–D-74).** Nine room/furniture functions select twelve
+tables and six district biases, with existing food, water, treatment, clothing,
+tools and repair items. Basic supplies have multiple generated room sources;
+scarce firearms/ammunition are confined to occupied secured utility/stockroom
+storage. Picked-clean sites stay empty. Specialist clinic/warehouse roles work
+through current room/district mappings; the actual building catalogue and full
+district gameplay remain 12/13. The initial tables do not establish starter
+guarantees (08) or final scarcity (23).
+
+Lazy records are bounded to 32,768 including MOVED/DESTROYED tombstones. There is
+no tombstone eviction or reroll on replacement. Only `World.crateContents` owns
+inventory bytes; content-2 empty records and untouched furniture allocate no
+Inventory. Player replacements start empty under fresh negative ids. Search
+progress persists across close/load; the open UI target and rummage timer reset.
+Normal simulation advances searches, needs and threats. Actual partial transfers,
+full destinations, hand salvage, spoilage, blast/fire, owner consequences and
+save corruption are exercised through production paths. Survivor taking changes
+Free Settlers reputation using stable building ownership, with logical-event
+deduplication; abandoned/player storage bypasses legacy camp-proximity theft.
+Urban policing remains 16/17. Hand salvage refuses insufficient capacity; blast
+and fire intentionally destroy contents. All three retire the original identity
+before replacement can create empty player storage.
 
 ## 9. Legacy mechanics disposition (D-26)
 
@@ -283,7 +306,7 @@ These are bounded starting scope, not a wish list. Packages may change a number 
 | 04 | ≤ 24 new block ids (budget in DECISIONS §3); ≤ 6 container visual forms; doors, windows and stairs from standard blocks plus a few dedicated ids |
 | 05 | Implemented revision 1: compact/standard/court apartment layouts adapting about 12 × 16, 16 × 20, 20 × 24 to reserved parcels, up to 5 storeys, optional B1, one flat per floor (D-59). Shop: 1 storey plus optional flat, sales floor, stockroom/utility, back door. 12 room functions; shallow parcels combine functions. |
 | 06 | ≤ 6 fixtures per room, of which ≤ 3 containers; 3–6 containers per apartment unit; decorative props are blocks, not entities |
-| 07 | 9 container kinds (kitchen cabinet, fridge, pantry shelf, bathroom cabinet, wardrobe, dresser or desk, utility locker, shop shelf, stockroom crate); about 14 room-and-kind loot tables; 6 district bias rows; ≤ 12 slots per container |
+| 07 | Implemented: 9 container functions (kitchen cabinet, fridge, pantry shelf, bathroom cabinet, wardrobe, dresser or desk, utility locker, shop shelf, stockroom crate); 12 contextual tables (D-71 replaces the approximate 14); 6 district bias rows; ≤ 12 slots and ≤ 4 initial occupied slots per container; ≤ 32,768 touched/retired identities |
 | 08 | Starter guarantees in §4.4; ≤ 20 new items; ≤ 15 urban recipes |
 | 09 | 1 infected type; active hostile cap ≤ 12 globally and ≤ 4 per encounter; sanctuary radius 24 around the refuge; no spawn within 16 blocks or in view; activation and deactivation at 96 and 130 blocks, following the settlement precedent (B-37) |
 | 10 | Shared path allowance ≤ 2,000 expansions per fast tick; route cache ≤ 64; portals derived from plans |
@@ -333,7 +356,7 @@ Paths are relative to `src/main/java/com/veylon/`. Proposed objects are modest d
 | Accessibility | `AccessibilityValidator` *[05]* | `ai/Pathfinder.standable` and `passable`; `entity/PlayerConstants` colliders (B-21, B-65) | Diagnostics only |
 | Generation slices | `UrbanChunkStamper`: chunk-bucketed layout, `Chunk.set` inside the chunk only, bounded per chunk *[03, 06]* | `WorldGenerator.applySettlementSlice` pattern; `World.getOrCreateChunk` finalisation (B-15, B-16) | Derived |
 | Doors, windows, locks, barricades | Appended `BlockType` ids (`world.Fixtures` families) plus the `World.fixtures` side map (`FixtureStates`), keyed by block position (D-48) *[04]* | GATE/GATE_OPEN swap and `World.gateTimers`; `Pathfinder.passable`; `WorldInteractions`; `InteractPromptBuilder` (B-39) | `world.fixtures` (D-49; proposed as `urban.fixtures`) |
-| Containers | `UrbanContainers` (state: rolled contents, emptied, destroyed, owner) plus `LootTables` *[07]* | `World.crateContents` as runtime index; `CrateTransactionSystem`; `ui/CrateScreen`; `SettlementManager.onCrateTheft` (B-42, B-45, B-38) | `urban.containers` |
+| Containers | `UrbanContainers` identity/state/owner ledger plus pure `LootTables` (implemented 07) | `World.crateContents` owns inventory bytes; `CrateTransactionSystem`; `ui/CrateScreen`; `SettlementManager.addReputation` for managed survivor property, legacy theft paths retained | `urban.containers` v1 plus existing core crate map |
 | Container removal | One removal path for hand, blast, fire and salvage *[07]* | `PlayerBlockActions.spillContainerContents`; `combat/ExplosionSystem`; `simulation/FireSystem` (B-43) | Tombstones |
 | Spawn, refuge and respawn | `UrbanBootstrap`, called from `WorldBootstrap` (skeleton 02, full 08) | `WorldBootstrap.placePlayerOnDryLand`, `setupCamp`; `Game.respawn` (B-03, B-08, B-41) | `urban.refuges` |
 | Urban progression | `CraftingSystem.recipesFor(world)` plus appended `ItemType`s *[08]* | `item/CraftingSystem.RECIPES` unchanged (B-49 to B-51) | Existing stack codec |
@@ -365,8 +388,8 @@ The table is in dependency order: an item may depend only on items above it. Sec
 | 4 | Building, floor, room and fixture plans | Derived | `BuildingPlanner` / `BuildingPlan` | 05–06 | 3 | Template 1 / layout 3 selected by saved generator 6; furnished template 2 / layout 4 by generator 7; shaped stairs template 3 / layout 5 by generator 8; unchanged `urban.meta` v1 validates the layout; plans not serialized | Cache per `World`, discarded on new/load | ≤ 256 buildings; ≤ 73,984 cells/plan |
 | 5 | Generated blocks plus edits | Derived plus deltas | Generator and `World` | 03, 06 | 3, 4 | `changedBlocks` (v3 base, last-write log, B-29) | — | 4,000,000 edits |
 | 6 | Fixture state: door or window open, keyed lock or one-sided bar (broken is a recorded block edit); barricade health later | Persistent, touched cells only | `FixtureStates` on `World` | 04, 06 | 4 | `world.fixtures` v1 (D-49); absent follows generated lock defaults, or unlocked for edited/player-placed fixtures; explicit saved unlock overrides the plan | Load replaces; reapplied after structure and recorded edits on chunk generation | ≤ 32,768 cells on write and read |
-| 7 | Container state: contents, emptied, destroyed, owner | Persistent, touched only | `UrbanContainers` | 07 | 2, 4 | `urban.containers`; absent means unrolled | Load replaces; never re-rolled | Capped, write ≤ read cap |
-| 8 | Search and rummage progress | Transient | Transaction system | 07 | 7 | Not saved; cancelled on load | Reset | — |
+| 7 | Container identity, state and owner; authoritative contents | Persistent, touched only | `UrbanContainers` metadata; `World.crateContents` inventory | 07 | 2, 4 | `urban.containers` v1; required for content 2; content-1 absence adopts core contents/empties and edited reservations | Load replaces; never re-rolled | ≤ 32,768 rows/core inventories; 12 slots; 20-byte header + 36 bytes/row metadata |
+| 8 | Search progress; open target and rummage timer | Progress persistent; target/timer transient | Ledger; `CrateTransactionSystem` | 07 | 7 | Progress in `urban.containers`; load closes UI but retains elapsed work (D-72 revises the initial transient proposal) | Load replaces progress; resets target/timer | One active search |
 | 9 | Refuge claims, respawn anchor, starter refuge | Persistent | `RefugeSystem` | 08, 18 | 4 | `urban.refuges`; absent means the starter refuge for a fresh world, nothing on load | New sets the starter; load replaces | ≤ 3 claims |
 | 10 | Encounter outcomes: deaths, depletion, migration counters | Persistent | `UrbanEncounterDirector` | 09, 15 | 4 | `urban.population`; absent means all present | Dormancy uses a coarse model; never respawns a defeated id | Capped |
 | 11 | Live hostile AI state | Transient | entity | 09 | 10 | Not saved; re-derived on activation | — | Active cap |
@@ -387,6 +410,7 @@ Identity scheme (implemented by package 02 in `world/urban/UrbanIds`; the packed
 - **Resident ids**: the building that the site occupies, plus a resident slot (5 bits, 0–31) and a generation counter for replacements (8 bits, 0–255), stored in the floor, room and slot bits. Never a list index.
 - **Canonical text form**, for mission targets and logs, following the existing `storage:<sid>:x:y:z` precedent: `urban:<kind>:<rx>,<rz>` followed by one `:`-separated index per level, for example `urban:fixture:-3,12:7:2:-2:31:15`. A resident ends `:<slot>:<generation>`. The parser accepts only the canonical form, up to 64 characters.
 - **Encounter ids** (anchor plus slot) take a reserved kind code in package 09.
+- **Player container ids** (07): negative monotonic ids in the separate container ledger, disjoint from packed generated ids. They are not accepted by `UrbanIds`; generated ownership still uses canonical building ids.
 - The proposal of milestone 01 used 21-bit regions, a 1-bit building slot and a signed 4-bit floor. A signed 4-bit field cannot hold storey 11, so the floor became a biased field, and a kind tag replaced the spare bits.
 
 Ids never derive from visit, activation or list order. They are validated by range and kind (`UrbanIds.isValid`, `requireKind`). A section that stores an id fails the whole load on an invalid or wrong-kind id.
