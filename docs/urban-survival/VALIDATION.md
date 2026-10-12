@@ -1204,3 +1204,155 @@ destruction remains **18**. No healing, migration or repopulation is supported.
 The next concrete step is milestone 10 with budgeted portal/navigation fixtures
 and a native pursuit/escape, preserving the existing encounter identities and
 permanent depletion state.
+
+## Milestone 10 — indoor navigation and perception (2026-10-12)
+
+### Scope and regression coverage
+
+Baseline: `feature/urban-survival` at `9651f6b`, clean before editing. Navigation
+is committed as `edf3d45`, perception/lifecycle/native QA as `ae80b14`; records
+follow independently. The pack's
+`00_BASE_KNOWLEDGE.md` was absent from the repository root; the full sibling
+roadmap copy was read, followed by current AGENTS and the urban records. D-80
+continues to defer human-only testing until after 22. The performance skill was
+used for bounded-work accounting; no calibrated wall-clock benchmark is claimed.
+
+New production fixtures cover two-floor generated pursuit and Creative twins;
+all four building frontages and both stair directions, including roof/basement
+bands; ladder travel and rejection of a four-block drop; exact floor goals;
+loaded-column refusal without generation; support edits; barred/unbarred doors
+and preservation of unrelated cached routes; long local legs and connected
+prefixes from exhausted searches. Perception fixtures cover occluded floors,
+quiet rummage versus gunfire, consistent locked/unlocked closed-door attenuation,
+consumed evidence, hearing work ceilings and departed pursuit references.
+Existing daily-life, patrol, counterattack, fire-panic, Creative and save tests
+remain required by the portable build. Save formats, enum order, generation and
+encounter identities are unchanged.
+
+`PathBudget` is reset once by `EntityManager.fastTick` and enforced by Pathfinder:
+four queries / 2,800 expansions in total, 700 per local query. Cache hits consume
+a query but no expansions. There are 64 cached routes, each at most 512 cells.
+The mixed 24-body contention fixture measured **4 queries, 2,800 expansions,
+4 incomplete searches and 20 deferred requests**, all with safe stopped bodies
+on that initial tick. Partial searches return only connected swept-safe prefixes,
+cached to their real endpoints. They do not claim the final goal is reachable.
+The generated headless pursuit measured a peak of 1 query / 33 expansions after
+the repeated-noise route-retention fix. Hearing caps are 16 queries / 4,096 shared
+samples; unloaded or exhausted rays are inaudible. These deterministic work counts
+do not substitute for frame-time or allocation benchmarks in 24.
+
+### Commands and iteration results
+
+Host: Windows NT 10.0.26200.0, AMD Ryzen 5 5600X 6-Core Processor, bundled JDK
+25.0.4.1+1 at `build/tools/jdk25/jdk-25.0.4.1+1`. `JAVA_HOME` was set for each
+Gradle shell. The sandbox denied the JDK security file on the first attempt;
+authorized Gradle execution then worked. No budget was raised to pass tests.
+
+The final expanded focused command was:
+
+```powershell
+.\gradlew.bat test --tests '*IndoorNavigationTest' --tests '*IndoorPerceptionTest' --tests '*VillageDailyLifeGameplayTest' --tests '*CounterattackLifecycleTest' --tests '*SettlementRuntimeTest' --tests '*FirearmGameplayWorkflowTest' --tests '*UrbanResidentFixtureTest' --tests '*InfectedBehaviorTest' --tests '*CreativePerceptionTest' --tests '*PerformanceInvariantTest' --tests '*HumanPerceptionGameplayTest' --tests '*UrbanEncounterPopulationTest' --tests '*UrbanPopulationSaveTest' --console=plain
+```
+
+It passed **76 tests, zero failures/errors/skips**, in 27 seconds
+(`m10-focused-verified.log`, `m10-focused-verified-counts.json`). Removing an
+unnecessary route reset for repeated identical sound evidence was followed by
+`IndoorNavigationTest`, `IndoorPerceptionTest`, `InfectedBehaviorTest`,
+`CreativePerceptionTest` and `HumanPerceptionGameplayTest`: **36 tests, zero
+failures/errors/skips**, 12 seconds (`m10-evidence-final.log` and counts).
+The departure-reference test was then added for the final portable build.
+
+The exact navigation-only staged tree was reproduced in detached
+`build/m10-nav-validation`, keeping the perception changes out. Its focused
+command used `IndoorNavigationTest`, `UrbanResidentFixtureTest`,
+`InfectedBehaviorTest`, `RuntimeBoundsTest`, `PerformanceInvariantTest`,
+`UrbanEncounterPopulationTest`, `UrbanPopulationSaveTest`,
+`VillageDailyLifeGameplayTest`, `CounterattackLifecycleTest` and
+`SettlementRuntimeTest`: **58 tests, zero failures/errors/skips**, 29 seconds
+(`m10-navigation-intermediate-final.log` and counts). This validates the actual
+intermediate revision, rather than inferring it from the final tree.
+
+The first portable build failed: **1,785 tests, four failures, one existing
+Windows symlink-privilege skip** (`m10-build.log`). Two perception fixtures had
+used unloaded AIR as a clear gunshot/patrol lane; they now load and prepare their
+actual lane. Two movement regressions were fixed in production: distant legacy
+missions can advance through loaded local anchors before their final goal loads,
+and a villager whose home search exceeded 700 expansions can follow a safe
+connected prefix before replanning. No direct steering fallback was restored.
+An earlier event-reset regression was also fixed by keeping noise sequence ids
+monotonic when live listeners survive queue clearing. All affected focused
+checks were rerun successfully. The initial multi-floor noise fixture used a
+radius too small after slab attenuation; its explicit gunshot now uses radius
+128. This changes supplied test evidence, not production gunshot radius.
+
+Final `.\gradlew.bat build --console=plain` passed in **7 min 26 s**:
+**1,787 tests, zero failures/errors, one existing Windows symlink-privilege skip
+in AppPathsTest**, including Javadoc/doclint (`m10-build-final.log`,
+`m10-build-final-counts.json`). The always-required compatibility, fingerprint,
+determinism, runtime and orchestration checks ran as part of that build.
+Production source stayed unchanged from the final native run through the build;
+the additional departure regression is included. No opt-in `performanceTest`
+or calibrated FPS benchmark was run or claimed.
+
+The exact intermediate validation tree was
+`4e095fd2f8711675cd0a833e810975d720cff901`; it matched `edf3d45` before the
+disposable checkout was removed. Logs and XML counts were retained locally.
+`graphify update . --no-cluster` ran once at completion and exited 0 with
+**7,814 nodes / 30,097 edges** (`m10-graph-update.log`). Existing `build.gradle`
+syntax and `settings.gradle` no-symbol warnings remain. No clustering,
+document/image or LLM semantic extraction ran. The six-document relative
+Markdown path/anchor check resolved **58 links** (`m10-record-links.log`);
+staged/unstaged `git diff --check` passed. `main` remains `923345f`. No push,
+merge, tag or publication occurred.
+
+### Final native generated pursuit and escape
+
+```powershell
+.\gradlew.bat run -PveylonDataDir=build/qa/m10-navigation-verified --console=plain
+```
+
+Settings: `VEYLON_GENERATOR=urban-dev`, `VEYLON_SEED=20260731`,
+`VEYLON_GAME_MODE=survival`, `VEYLON_RESOLUTION=1280x720`,
+`VEYLON_SCENE=urban_navigation`, `VEYLON_CAPTURE_TAG=m10-navigation-verified`,
+`VEYLON_SHOT=2,12,20,21,24,54,84`. The final run passed in **1 min 26 s**
+(`m10-native-verified.log`), with **zero GL, KHR and native-audio errors**.
+The KHR pixel-transfer/shader messages are driver performance warnings.
+
+The generated building is `3458764513820540928`; the fixture Veilbound starts
+at `(18,41,5)` and investigates positioned gunshot evidence at the floor-2
+bedroom `(11,49,7)`. No blocks or paths are injected. Normal AI/physics reaches
+that floor in **17.0628138 seconds**. The scripted target then moves to an
+occluded basement pose and stops emitting evidence. The observer checks unchanged
+last-known position, expired timer, cleared path and stopped horizontal velocity
+after 20 seconds. The run logged `reachedTwoFloors=true` and
+`pass=true lostSight=true expired=true`, with peaks **1 query / 33 expansions /
+25 hearing samples** in a tick. Earlier native runs passed before the final
+route-retention change; they are iteration evidence only.
+
+Seven captures are under the isolated data directory's `screenshots/`. The
+12-second upstairs door/partition capture was inspected; other captures mostly
+show the occluded basement observer pose. The captures alone do not prove the
+actor's route: the normal-scheduler position/collision/evidence assertions and
+log supply that mechanics evidence. Scripted player poses and emitted events
+are explicit; no human escape walk, ammunition economy or listening pass is
+claimed. The real save slot was not used.
+
+### Supported traversal, tuning and next gate
+
+Supported: loaded walking, one-block steps, at most the existing three-block
+safe drop, generated stair/landing clearance, unlocked doors/gates and supported
+ladders. Intact windows and barred/keyed doors block body traversal; an opening
+must have actual support and body clearance. Block/damage and lock changes
+invalidate intersecting route envelopes; ordinary unlocked door swings preserve
+equivalent routes. Unsupported entries and blocked routes wait/retry safely.
+New/load and activation rebuild transient routes; departures clear live pursuit
+references. Teleports/flight add no observation, and hidden/unreachable evidence
+expires rather than becoming a ground/roof target.
+
+The hierarchy is modest: no arbitrary citywide detour guarantee, automatic
+forced-door/barricade destruction or whole-building sound propagation. Destruction
+is 18. Attenuation and crowded replan/hearing latency remain tuning for 11/24;
+calibrated dense-city timing is 24. Human pursuit/escape, comfort and listening
+are deferred after 22 under D-80. The next concrete step is **11**: the integrated
+generated scavenging/refuge/save/revisit route, permanent depletion, Creative
+twin, frozen regression seeds and explored-area memory accounting.

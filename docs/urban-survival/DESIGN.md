@@ -287,10 +287,28 @@ and room anchors. Admission checks actual loaded support/clearance, sanctuary,
 player breathing room, occupied property, overlap and view. Global cap 12;
 two spawns, 16 parcels and 16 stored snapshots per slow tick. Dormant bodies
 pause without healing; health-zero rows never reactivate. At 32,768 visited
-records new encounters stop, with no death eviction or migration. Same-floor
-pursuit has two bounded 400-expansion A* searches per fast tick; doors and unsafe
-strides stop it. **Portal routing, multi-floor pursuit and sound attenuation
-remain 10.** These guards do not protect an exposed refuge from an existing body.
+records new encounters stop, with no death eviction or migration. In 09,
+same-floor pursuit used two bounded 400-expansion A* searches per fast tick;
+doors and unsafe strides stopped it. These guards do not protect an exposed
+refuge from an existing body.
+
+**Implemented in 10 — indoor pursuit (D-86–D-90).** Residents and infected now
+share four path queries / 2,800 expansions per fast tick, at most 700 per query.
+Derived entries, stair landings and room anchors divide longer routes; loaded
+exterior legs advance through modest supported local anchors. Every actual
+segment uses live voxel A* and swept collider clearance. Missing, edited,
+barred or unloaded routes wait safely instead of direct steering. There is no
+guarantee of a citywide detour, forced entry by AI or gap jumping.
+
+The 64-route transient world cache invalidates only intersecting edit envelopes.
+Unlocked door swings preserve walking connectivity; lock/support/headroom edits
+invalidate it. Searches and cache entries rebuild on load/activation without a
+new save format or generator revision. Noise is attenuated through partitions,
+slabs, glass and closed doors under shared query/sample bounds. Each event is
+consumed once, and hidden movement never changes its position. Veilbound now
+search fresh sound for fourteen seconds and last sight for eighteen; they turn
+at the remembered place and stop on expiry. Creative clears player-derived
+intent. Work/failure/unsupported-entry diagnostics appear in the runtime snapshot.
 
 ## 8. Scavenging economy: scarcity and depletion (D-12, D-13)
 

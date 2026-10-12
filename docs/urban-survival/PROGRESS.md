@@ -6,10 +6,10 @@ This is the running record for the 26-package urban-survival roadmap. The pack i
 
 | Item | Value |
 | --- | --- |
-| Last completed package | **09 — Infected threats and encounters** (2026-10-12). Veilbound combat/senses, bounded seeded street/ground-floor encounters, durable depletion, Creative/reset/save/population checks, generated native scenes and final portable build passed. |
-| Source revision | 09: `e3211a7` independently validated humanoid threat → `7827f3c` coupled encounter director, population codec, safety/regression coverage and native QA. Records follow separately. |
+| Last completed package | **10 — Indoor navigation and perception** (2026-10-12). Shared bounded routes, selective invalidation, multi-floor pursuit, occluded evidence/expiry, retained settlement travel, scripted native QA and final portable build passed. |
+| Source revision | 10: `edf3d45` independently validated navigation → `ae80b14` indoor perception, lifecycle, regression fixtures and native QA. Records follow separately. |
 | Default new world | Legacy (`World.DEFAULT_NEW_WORLD_GENERATOR = GEN_CAVE_IDENTITIES`), unchanged until 26 passes. Isolated `VEYLON_GENERATOR=urban-dev` creates generator 10 (`GEN_URBAN_ENCOUNTERS`, layout 7 / template 4 / content 3, encounter catalogue 1). Generators 1–9 stay loadable with their original geometry and no new encounters. |
-| Next package | **10 — Indoor navigation and perception, NOT STARTED.** Add budgeted portal routes through edited doors/stairs, vertical pursuit, sound attenuation and native pursuit/escape. No required automated/native 09 gate remains pending; human-only checks are deferred by D-80. |
+| Next package | **11 — Playable vertical slice gate, NOT STARTED.** Integrate scavenging, refuge return, infected evidence, save/revisit and explored-area memory accounting. No required automated/native 10 gate remains pending; human-only checks remain deferred by D-80. |
 | Human testing schedule | Owner instruction (2026-10-11, D-80): consolidated human playtesting/listening after milestone 22. Through 22, run automated and scripted native validation and record human-only checks as deferred; do not request interim human walks. |
 | Commits | Separate `feat`, `test`, `docs` and `chore` commits on `feature/urban-survival`; see the reconstruction ledger below. `main` stays at `923345f`. Original combined commit retained at `backup/urban-m01-m04-before-split`. No merge, push, tag or publication. |
 
@@ -28,7 +28,7 @@ The status vocabulary is NOT STARTED, IN PROGRESS, PARTIAL, BLOCKED or COMPLETE.
 | 07 | Contextual loot and persistence | 06, 02 | `UrbanContainers`, `LootTables`, `urban.containers`; `CrateTransactionSystem`, `ui/CrateScreen`, `simulation/ItemConditionSystem`, one removal path for hand, blast, fire and salvage | Open, partially loot, leave, reload, revisit, break and replace: no refill or duplication. Abandoned property is not theft; owned property has a consequence. Interrupted search, full-inventory and corruption tests. Native searching while the world runs. | **COMPLETE** (2026-10-11; focused checks, final build and generated native searches passed) |
 | 08 | Urban spawn and survival progression | 07 | `UrbanBootstrap`, `UrbanStarterSite`, generator 9 / template 4 / content 3, `urban.refuges`, `item/UrbanCrafting`, atomic transfers, indoor safety/prompts, read-only native QA and production route tests; no enum additions | Six starter seeds reach shelter, food, water, treatment, sleep and a first upgrade from urban sources only. Legacy/Creative/save/build pass. Fresh normal-controls native search/take/return with captures. | **COMPLETE** (2026-10-11) |
 | 09 | Infected threats and encounters | 08 | Appended `NpcArchetype.VEILBOUND`, `ai/InfectedAI`, humanoid models/anatomy, `engine/InfectedSounds`, `UrbanEncounterDirector`, `EncounterAnchors`, `urban.population`, `RuntimeBudgetSnapshot` | Infected notice the player fairly, pursue in a fixture, attack through the damage gates, react to fire and die cleanly. Defeated state survives save, load and reactivation. Caps and sanctuary hold. Creative twin. Natives in a street and a ground-floor apartment. | **COMPLETE** (2026-10-12; human-only validation deferred by D-80) |
-| 10 | Indoor navigation and perception | 09, 04–06 | `ai/Pathfinder` plus new `PortalGraph` and `PathBudget`; `ai/Steering` guards; `combat/WorldNoise` attenuation; AI loaded-column guard | Multi-floor pursuit through doors and stairs, losing sight, searching and giving up. Door edits change routes. A shared measured budget. No roof or ground confusion and no void pathing. A native pursuit and escape. | NOT STARTED |
+| 10 | Indoor navigation and perception | 09, 04–06 | `ai/Pathfinder`, `PortalGraph`, `PathBudget`, `NavigationCache`, `IndoorNavigation`; `combat/WorldNoise`; AI and lifecycle guards | Multi-floor pursuit through doors and stairs, losing sight, searching and giving up. Door edits change routes. A shared measured budget. No roof or ground confusion and no void pathing. A native pursuit and escape. | **COMPLETE** (2026-10-12; human-only validation deferred by D-80) |
 | 11 | Playable vertical slice gate | 02–10 | Integration: `UrbanQaScenes`, `AutomatedRunDriver` urban route, integration tests | The DESIGN §14 slice holds headless and native with normal controls; save, revisit, no refill and no resurrection; Creative twins. Regression seeds frozen. Memory per explored area recorded (§4.3). | NOT STARTED |
 | 12 | Commercial and civic buildings | 11 | `BuildingTemplates` catalog (6 archetypes), `LootTables` | Every family has connected interiors with reachable containers and exits across the family matrix. Earlier urban layouts and legacy fingerprints are unchanged. | NOT STARTED |
 | 13 | Urban biome differentiation | 12, 03 | New `DistrictRules`, overlays, district-to-climate mapping (D-08) | Six distinct districts change player choices. Seams connect. Basics never depend on rare districts. Overlays keep accessibility. Legacy biome consumers are unchanged. | NOT STARTED |
@@ -953,6 +953,82 @@ Next concrete step: **10**, introduce
 budgeted indoor portal routing and perception through edited doors and stairs,
 with multi-floor pursuit/escape fixtures and native evidence. Preserve catalogue-1
 identities, tombstones and generator-9/10 geometry. Do not switch the default.
+
+## Milestone 10 — indoor navigation and perception (2026-10-12)
+
+**Status: COMPLETE** — focused checks, final portable build, scripted native
+validation and completion graph refresh passed. Human-only validation remains
+deferred by D-80.
+
+`Pathfinder` remains bounded voxel A*. Derived `PortalGraph` waypoints connect
+building approaches, rooms and adjacent stair landings; long exterior missions
+advance through loaded supported local anchors. `IndoorNavigation` is the common
+resident/infected follower. It validates swept bodies and actual support, opens
+supported unlocked doors/gates through production actions, and waits safely on
+blocked, unloaded or deferred routes. A bounded search may return a connected
+prefix to make progress through complicated legacy settlements. It never caches
+that prefix as a complete route to the original goal. Stair height is explicit;
+no roof-height substitution or direct steering fallback remains in this follower.
+
+Every entity fast tick shares **four queries / 2,800 expansions**, with **700 per
+query** and staggered replans. At most **64 transient routes of 512 cells** are
+cached. Block/damage edits and lock/bar changes invalidate intersecting route
+envelopes, preserving unrelated routes and equivalent unlocked door swings.
+Fresh worlds/load rebuild derived plans and caches; departures clear live routes,
+combat targets and hearing/search references. No save layout, serialized enum,
+generator revision, seeded geometry or encounter identity changed.
+
+Indoor `WorldNoise` hearing consumes positioned evidence once, with **16 queries /
+4,096 ray samples per tick**, closed-door/glass/solid losses of 6/4/8 distance
+units per cell, and no sound through unloaded columns. Existing rummage, footstep,
+forced-entry and gunshot producers use this queue. Sight checks loaded partitions
+and floors. Veilbound investigate sound for 14 seconds or sight for 18, search
+the last-known place, and stop after expiry. Teleports supply no new observation;
+Creative invisibility clears intent. Residents use occluded last-known evidence
+instead of following an unseen live player coordinate. D-86–D-90 record the policy.
+
+The exact navigation-only intermediate tree passed **58 tests**, including
+generated stair traversal in all frontages/both directions, roof/basement bands,
+ladder/drop and loaded-boundary safety, edited barred doors, connected search
+prefixes, daily routines and counterattack travel. Expanded final focused checks
+passed **76 tests**, followed by **36 perception/navigation checks** after the
+repeated-noise route-retention change. The final build includes an additional
+departure-reference regression. Logs/counts are retained under ignored `build/`.
+
+Deterministic contention with 24 mixed resident/infected bodies used exactly
+**4 queries / 2,800 expansions**, deferring **20** safely. Final generated native
+QA reached floor 2 in **17.0628 seconds**, then lost sight after an explicitly
+scripted basement relocation, searched the unchanged evidence and stopped.
+Peaks were **1 query / 33 expansions / 25 hearing samples** in a tick. The run
+passed in **1 min 26 s** with zero GL/KHR/native-audio errors. These are workload
+counts and scripted mechanics evidence, not calibrated frame-time or human
+escape/listening evidence. Commands, host and artifacts are in
+[VALIDATION.md](VALIDATION.md#milestone-10--indoor-navigation-and-perception-2026-10-12).
+
+Final `.\gradlew.bat build --console=plain` passed in **7 min 26 s**:
+**1,787 tests, zero failures/errors, one existing Windows symlink-privilege skip**,
+including Javadoc/doclint. Production source stayed unchanged from the final
+native run through this build. Local code commits are `edf3d45` and `ae80b14`;
+the exact navigation-only checkout matched its committed tree before removal,
+with its log/counts retained locally. The single completion graph update,
+`graphify update . --no-cluster`, exited 0 with **7,814 nodes / 30,097 edges**.
+Existing Gradle extraction warnings remain; no clustering or semantic extraction
+ran. All **58 relative links/anchors** in the six changed documents and staged/
+unstaged whitespace checks pass. Records follow in their own commit. No push,
+merge, tag or publication occurred.
+
+Supported traversal is loaded walking, one-block steps, existing safe drops,
+generated switchback stairs/landings, unlocked doors/gates and supported ladders.
+Intact windows, locks/bars and impassable edits block routes; destruction remains
+18. Broken entries need actual body clearance and support. The modest hierarchy
+does not promise arbitrary citywide detours or whole-building acoustics. Crowded
+replan/hearing latency and attenuation need tuning in the integrated slice.
+Human pursuit/escape, comfort and listening remain deferred until after 22 under
+D-80. No required automated/native 10 gate remains pending.
+
+Next concrete step after the local handoff: **11**, build the generated
+scavenge/return/save/revisit integration route with a real infected encounter,
+preserved depletion, Creative twin and explored-area memory measurements.
 
 ## Resume rules
 

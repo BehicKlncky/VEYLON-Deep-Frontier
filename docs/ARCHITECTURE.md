@@ -650,6 +650,37 @@ bomb still in the air, which is saved with the other explosives and shatters
 where it lands. If you add state, decide explicitly which side of that line it
 sits on.
 
+### Indoor navigation and evidence
+
+`World.navigation` owns a transient `NavigationCache` and `PathBudget`.
+`EntityManager.fastTick` resets the shared allowance once before any population
+runs: four A* queries and 2,800 expansions, at most 700 per query. `Pathfinder`
+enforces the allowance even for direct callers during a tick; cached hits use a
+query and no expansions. Standalone diagnostics have the same local ceiling.
+`PortalGraph` derives entry/floor/room waypoints from immutable building plans;
+long loaded exterior legs advance through supported local anchors. Local A*
+still validates every transition through the shared swept-body clearance proof.
+Exhausted local searches may return a safe connected prefix, cached only to its
+actual endpoint. This preserves progress through complicated legacy settlements
+without expanding the allowance or pretending that the final goal was reached.
+
+`IndoorNavigation` is the common resident/infected follower. It opens unlocked
+doors/gates through existing actions, sweeps the live body, checks column/support
+limits and waits when blocked or deferred. Replans are staggered by 0.8–1.5 s.
+Up to 64 routes of 512 cells are retained. `World.setBlock` and fixture lock
+notifications invalidate intersecting route envelopes; ordinary unlocked door
+swings preserve equivalent routes. No path or search state is serialized.
+New/load creates a fresh world/cache, and departures clear live pursuit references.
+
+WorldNoise indoor listeners consume event identities once and use the actual
+event position. Sixteen hearing queries / 4,096 ray samples are shared each fast
+tick; closed doors, glass and other solids add distance losses of 6, 4 and 8 per
+cell. Unloaded/exhausted rays fail closed. Perception decisions are staggered.
+Veilbound retain sound for fourteen seconds and sight for eighteen, search the
+remembered place and clear paths on expiry or Creative invisibility. Resident
+melee rechecks loaded occlusion/elevation instead of tracking an unseen live
+player coordinate. `RuntimeBudgetSnapshot` exposes cache/work/failure occupancy.
+
 ### Entity updates
 
 `EntityManager` owns the creature/NPC/carcass/track lists and ticks them. It

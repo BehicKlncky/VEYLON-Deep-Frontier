@@ -124,8 +124,21 @@ progression evidence. At 12 s a real save/load must preserve the defeated id
 and non-harvestable humanoid remains; `[urban-infected] pass=true` is required
 before 16 s. Wall-clock updates without simulation must fail. Inspect the tilted
 head/braced shoulder, readable windup/pain/fire poses and settled body, plus
-GL/KHR/native-audio diagnostics. Multi-floor routing and sound attenuation remain
-milestone 10; human playtesting/listening is deferred until after 22 (D-80).
+GL/KHR/native-audio diagnostics. Human playtesting/listening is deferred until after 22 (D-80).
+
+For indoor navigation QA, run `VEYLON_SCENE=urban_navigation` with generator
+`urban-dev`, seed `20260731`, Survival, resolution `1280x720`, shots
+`2,12,20,21,24,54,84` and an isolated directory such as
+`-PveylonDataDir=build/qa/m10-navigation-verified`. A fixture Veilbound starts at a
+generated apartment entrance; scripted player poses and positioned gunshot
+events supply evidence upstairs. The ordinary scheduler must move it through
+doors and two floors. The target then relocates to an occluded basement pose;
+the infected must retain its old evidence and give up. Require
+`[urban-navigation] pass=true` before 85 s and zero GL/KHR/native-audio errors.
+This is scripted pursuit/occlusion/expiry evidence, not a human escape walk.
+No structure edits, path injection, supplied loot or save publication are used.
+The runtime snapshot reports path queries/expansions/deferred/failures and
+unsupported entries; the hard per-tick allowance is four queries / 2,800 nodes.
 
 For contextual scavenging QA, use seed `20260731`, generator `urban-dev` and
 `VEYLON_GAME_MODE=survival`. Set `VEYLON_SCENE=urban_loot`,
