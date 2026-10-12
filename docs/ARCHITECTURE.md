@@ -259,7 +259,8 @@ Generator versions form an explicit set (`World.isSupportedGenerator`): 1 legacy
 6 the same street geometry plus frozen building plans (layout 3, template 1),
 7 generated furnished apartments and shops (layout 4, template 2), and
 8 the same buildings with shaped stairs (layout 5, template 3), and 9 the starter
-neighbourhood (layout 6, template 4). The development selector creates 9. New worlds use
+neighbourhood (layout 6, template 4), and 10 adds encounter catalogue 1 on that
+same geometry (layout 7, template 4). The development selector creates 10. New worlds use
 `World.DEFAULT_NEW_WORLD_GENERATOR` (3, until the urban rollout); a load accepts any
 supported version and rejects the rest, including anything above
 `MAX_SUPPORTED_GENERATOR`, before it replaces the live world. Feature gates name
@@ -273,11 +274,13 @@ before bootstrap generates a chunk; a geometry change means a new generator
 version, never a change under an old one (`UrbanRevision`). Its content revision
 (the rolled loot, encounter and trade tables) is saved in `urban.meta`, which
 only urban worlds write. It is optional for older layouts and required for
-generator 9. Until that section, or its
+generators 9–10. Until that section, or its
 absent default, has been read, a loading world's content revision cannot be read
 at all. Fresh worlds use content revision 3; revisions 1 and 2 remain supported.
 Revision 1 is the absent-metadata default. The tables and their hash inputs are frozen
-under each revision. Generator 9 requires content 3. Compatibility directions:
+under each revision. Generators 9–10 require content 3. The first encounter
+catalogue is additive and versioned separately in `urban.population`; it does
+not reroll content-3 loot or add encounters to older generators. Compatibility directions:
 
 - this build, a legacy save: unchanged, and no urban state is created;
 - this build, an urban save: the same geometry through its generator, the content
@@ -581,13 +584,13 @@ Sleep checks loaded support and nearby hostile survivors as well as the existing
 conditions and predator gate.
 
 `CraftingSystem.recipesFor` selects fifteen repair/reuse recipes only for the
-starter generator, retaining the original list for older worlds. Recovered wood,
+starter generators 9–10, retaining the original list for older worlds. Recovered wood,
 metal and textiles cover the first reinforced spear, stations, treatment,
 containers, light, bedroll and tool/weapon repair. Crafting, cooking, boiling,
 refilling and Survival drinking check the complete output transaction before
 consuming ingredients or water. Failed capacity leaves the source intact.
 
-`urban.refuges` v1 is required for generator 9: version + strict presence byte,
+`urban.refuges` v1 is required for generators 9–10: version + strict presence byte,
 then optional generated refuge id and integer anchor (5 or 25 bytes). It validates
 the pure ground-floor plan; no claim catalogue is introduced. Load replaces it
 without restocking, and missing/corrupt sections reject before publication.
@@ -595,14 +598,46 @@ Respawn checks actual loaded colliders/support at y=41 in at most 4,225 cells
 within 32 blocks of the saved anchor, refusing if none is safe. It retains the
 existing carried-inventory death policy. Claims and utilities remain 18–19.
 
+### Urban infected encounters
+
+`EntityManager.encounters` owns `UrbanEncounterDirector`, reset by bootstrap.
+Generator 10 enables frozen `EncounterAnchors`: a selected residential building
+reserves street and ground-floor room slots, excluding occupied buildings.
+Packed kind 8 identifies the room/slot; it is unrelated to settlement residency.
+`NpcArchetype.VEILBOUND` is an append-only humanoid appearance/combat profile
+with its own `InfectedAI`, no faction/jobs/feeding/harvest, and shared weapon,
+hit-zone, combustion, ragdoll and fragment handling. `Player.hurtPhysical` and
+perception controls remain authoritative. Audio uses independent procedural cues.
+
+Admission requires loaded whole footprints, supported clear bodies, breathing
+room 16, refuge sanctuary 24 and no direct camera view or occupied property.
+Caps: 12 active, two slots/building, two admissions/slow tick, 16 parcel checks
+and 16 dormant snapshot checks/tick, 32,768 durable records. Shared NPC caps and
+counterattack reservation apply. Activation/deactivation distances are 96/130.
+An unloaded footprint freezes physics until dormancy, preserving its floor.
+Same-floor A* admits two 400-expansion queries/fast tick and refuses unsafe
+strides or closed doors. Multi-floor portals and sound attenuation remain 10.
+
+`urban.population` v1/catalogue 1 is required even when empty for generator 10.
+Its 12-byte header and 47-byte rows preserve stable species/id, health, position,
+yaw, torso wounds and an active frozen-core NPC index (−1 otherwise). Health zero
+is a permanent death; dormancy pauses without healing, migration or replacement.
+Saturation stops new encounters without evicting tombstones. A save commits
+pending infected deaths before settling remains. Read waits until `urban.meta`,
+validates planned anchors, duplicates, bounds and one-to-one core bindings, and
+rejects missing/unknown/corrupt required state before publishing. Earlier worlds
+remain encounter-free. Older builds reject generator 10 or the unknown body id.
+
 Transient state is deliberately **not** serialized: an in-flight reload is
 cancelled on load, and bow draw resets. Combat and fire add more of it. An
-NPC's torso wound count and the shot id that last wounded it, the blast
+ordinary human NPC's torso wound count and the shot id that last wounded it, the blast
 record a lethal explosion leaves on the body it killed, a living body's
 fire (`Entity.combustion`) and a burning person's or animal's panic
 (`Npc.panic`, `Creature.panic`) live on the entity and die with it — a person who
 leaves the world, through a save, a load or a settlement going dormant, comes
-back unwounded, not burning and calm at their stored health. Saving leaves a body
+back unwounded, not burning and calm at their stored health. Infected retain
+their torso wounds through the population ledger; the last shot id remains transient.
+Saving leaves a body
 that is burning in the live world burning. The flames and scorch a body dies with,
 carried by its ragdoll, corpse, carcass or pieces (`BurnResidue`), are not saved
 either: loaded remains show neither. Pools

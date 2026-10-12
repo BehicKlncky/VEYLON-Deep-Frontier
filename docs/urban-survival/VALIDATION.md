@@ -1045,3 +1045,162 @@ than passed; implementation may advance through 22 under this instruction.
 Automated checks, builds and scripted native evidence remain required during
 development. This scheduling update adds no validation result and does not alter
 the actual human evidence previously recorded for 06.
+
+## Milestone 09 — infected threats and encounters (2026-10-12)
+
+### Scope and compatibility
+
+The implementation uses an appended, ordinal-pinned `NpcArchetype.VEILBOUND`
+and stable species id `veilbound`. The existing humanoid body/combat/anatomy
+and remains paths apply, with explicit infected allegiance/AI/death dispatch.
+There is no new disease, animal carcass, harvest resource or kill drop. Four
+procedural positioned cues have independent presentation randomness. D-81–D-85
+record the initial biology, combat values, encounter and persistence policies.
+
+Generator 10 / layout 7 enables encounter catalogue 1. Template 4 and content 3
+remain unchanged; six seeds compare actual starter block bytes against generator
+9 in opposite chunk orders. The packed encounter kind appends code 8; existing
+kind codes, body enum ordinals and frozen core bytes stay unchanged. Default new
+world creation remains generator 3. Earlier generators load without population
+state and gain no encounters. Older binaries were not run; no downgrade support
+is claimed for generator 10 or the new body profile.
+
+`urban.population` v1 is required even when empty for generator 10. It stores
+codec/catalogue/count and fixed 47-byte resident rows. The live-NPC core binding
+is one-to-one; dormant injuries/positions and permanent death tombstones remain
+authoritative. Saturation refuses new encounters instead of discarding deaths.
+Actual save-envelope corruption tests cover missing/truncated state, negative,
+oversized and maximum-int counts, unknown codec/catalogue/species, invalid or
+duplicate anchors, nonfinite scalars, invalid wounds, bad/duplicate core indices,
+unbound bodies and mismatched health. Failed loads preserve the original live
+world/player. Active, dormant and defeated residents survive repeated saves;
+save immediately after a lethal hit preserves exactly one humanoid corpse.
+
+### Behavior and population evidence
+
+- `InfectedBehaviorTest` exercises production senses, supported pursuit, actual
+  player melee, interrupted windup, dodging, wall occlusion and noise-position
+  investigation. Creative hides the player and blocks physical damage; Survival
+  receives the strike through the normal damage/bleeding path. Trust stays
+  unchanged. The all-living combat/fire/projectile/anatomy matrix includes the
+  infected profile without staging it as a human crowd member.
+- `UrbanEncounterPopulationTest` covers supported street and actual ground-floor
+  room anchors over six seeds; visible/breathing-room/occupied/refuge guards;
+  missing floor, blocked headroom and unloaded footprints; caps and shared NPC
+  counterattack reservation; paused Creative spawning; injured dormancy,
+  death/depletion and new-world reset. A moved pursuer reactivates at its durable
+  position away from its home parcel. An unloaded body cannot fall before
+  dormancy. Fresh production starter ticks create encounters on all six seeds
+  while preserving sanctuary, spacing and bounded scan/admission work.
+- Runtime snapshots include the 12-active and 32,768-record limits. Admissions
+  are capped at two per slow tick, with 16 parcel and 16 saved-position checks.
+  Same-floor route searches share two queries per fast tick, 400 expansions each.
+  No runtime, allocation or orchestrator line budget was raised.
+- `GameLoopIntegrationTest` checks reset; `UrbanInfectedQaSceneTest` prevents
+  elapsed wall time without simulation from reporting a native success. Enum,
+  generator and development-selector expectations pin the appended revisions.
+
+### Commands and iteration results
+
+All Gradle commands used the Windows wrapper and local JDK 25.0.4.1+1. Logs and
+captures below are ignored local `build/` artifacts, not historical evidence
+substituted for current checks.
+
+- The independent humanoid slice passed focused body/combat/enum/audio checks
+  (263 tests) and an exact staged-revision worktree build before commit
+  `e3211a7`: `.\gradlew.bat build --console=plain`, **8 min 13 s, 1,762 tests,
+  zero failures/errors, one existing Windows symlink-privilege skip**, including
+  Javadoc/doclint (`m09-body-build.log`, `m09-body-build-counts.json`).
+- Encounter/save/generated geometry/NPC-budget checks passed in 15 seconds
+  (`m09-encounter-focused.log`); state/runtime/revision checks passed in 11 seconds
+  (`m09-state-tests.log`). An earlier population fixture incorrectly filled the
+  shared nonresident budget with legacy bodies; it was corrected to 24 residents
+  plus eight legacy bodies without changing production limits. An early audio
+  expectation also assumed the final three cues were the fire cues; the added
+  independent cue catalogue is now checked explicitly.
+- The first complete encounter build failed in 9 min 24 s with **1,771 tests,
+  three failures** (`m09-build-final.log`). The failures were stale expectations
+  in `UrbanDevelopmentSelectorTest` (two) and `UrbanGeneratorDispatchTest` (one)
+  after adding generator 10; those checks were updated to pin the actual new
+  supported revision. Two further streaming/starter safety tests were added.
+- `.\gradlew.bat test --tests '*UrbanEncounterPopulationTest' --tests '*UrbanPopulationSaveTest' --tests '*UrbanDevelopmentSelectorTest' --tests '*UrbanGeneratorDispatchTest' --tests '*InfectedBehaviorTest' --tests '*GameLoopIntegrationTest' --console=plain`
+  passed **38 tests, zero failures/errors/skips, 26 seconds**
+  (`m09-safety-focused.log`, `m09-safety-focused-counts.json`).
+- Final `.\gradlew.bat build --console=plain` passed in **7 min 50 s** on the
+  source committed as `7827f3c`: **1,773 tests, zero failures/errors, one existing
+  Windows symlink-privilege skip** (`AppPathsTest.aLinkToThePlayersDirectoryIsNotIsolated`),
+  including Javadoc/doclint (`m09-build-verified.log`,
+  `m09-build-verified-counts.json`). Source did not change during or after this
+  run; the final native captures use that same source.
+- `graphify update . --no-cluster` ran once on the final code, exit 0: **7,748
+  nodes / 29,822 edges** (`m09-graph-final-20261012.log`). Existing `build.gradle`
+  syntax and `settings.gradle` no-symbol extraction warnings remain. No
+  clustering, document/image or LLM semantic extraction ran. Code commits are
+  `e3211a7` and `7827f3c`; the records follow independently.
+- The seven-document Markdown path/anchor checker resolved **57 relative links**
+  (`m09-record-links.log`). Staged and unstaged `git diff --check` passed. The
+  exact intermediate validation worktree matched the committed body tree before
+  removal; its build log and XML counts were retained locally. `main` remains
+  `923345f`; no push, merge, tag or publication occurred.
+
+### Fresh native evidence
+
+The final scene commands were:
+
+```powershell
+.\gradlew.bat run -PveylonDataDir=build/qa/m09-street-final --console=plain
+.\gradlew.bat run -PveylonDataDir=build/qa/m09-apartment-final --console=plain
+```
+
+Each used `VEYLON_GENERATOR=urban-dev`, `VEYLON_SEED=20260731`,
+`VEYLON_GAME_MODE=survival`, `VEYLON_RESOLUTION=1280x720` and
+`VEYLON_SHOT=0.7,3,4.1,8,14,17`. Scene/tag pairs were
+`urban_infected_street` / `m09-street-final` and
+`urban_infected_apartment` / `m09-apartment-final`.
+
+Both use production anchor admission and unchanged generated blocks. Observer
+poses expose normal-scheduler attack windup and Survival damage, an actual
+unarmed player pain hit, direct instrumented ignition with panic/damage, then a
+head-height projectile death. Real save/load at 12 seconds preserves the dead
+id and exactly one humanoid remains record; reactivation refuses that slot.
+Both logged `[urban-infected] pass=true`, `savedDead=true`, `respawned=false`
+and `humanoidRemains=1`. Another slot may remain active; that is a distinct
+resident. The street run exited in **24 seconds**, apartment in **19 seconds**,
+with **zero GL, KHR and native-audio errors** (`m09-native-street-final.log`,
+`m09-native-apartment-final.log`). Driver shader/pixel-transfer performance
+messages are warnings, not errors or calibrated benchmark results.
+
+Each data directory has six captures under `screenshots/`, suffixed
+`_0s.png`, `_3s.png`, `_4s.png`, `_8s.png`, `_14s.png`, `_17s.png` (fractional
+shot times are truncated in filenames). Final street windup/pain/fire captures
+and apartment initial pose/settled corpse were visually inspected. The head
+tilt and braced shoulder, attack/pain/fire poses and humanoid corpse are visible.
+Earlier 2026-10-11 scene runs also passed; the first apartment attempt failed
+because the QA observer unnecessarily demanded the original room after panic
+movement. The observer restriction was limited to initial setup, then both
+final scenes were rerun. This changed QA observation, not world geometry or
+production navigation.
+
+Creative World Controls captures ran separately with scene unset,
+`VEYLON_FRONTEND=worldcontrols`, `VEYLON_GAME_MODE=creative`, the same generator
+and seed, and `VEYLON_SHOT=2`. Commands used isolated directories
+`build/qa/m09-controls-720` and `build/qa/m09-controls-1080`, resolutions
+1280×720 and 1920×1080, and tags `m09-natural-spawning-720` /
+`m09-natural-spawning-1080`. Both exited in **4 seconds**, with zero
+GL/KHR/native-audio errors (`m09-native-controls-720.log`,
+`m09-native-controls-1080.log`). Both screenshots were inspected: the updated
+Pause natural spawning control is legible and contained in the panel.
+
+### Limits and next gate
+
+These are scripted native mechanics fixtures with observer poses and
+instrumented fire/projectile inputs; they supply no scavenging or ammunition
+economy evidence. Human attack readability, comfort and listening are deferred
+until after 22 under D-80, not claimed as passed. Spawn sanctuary guards do not
+prevent an already active infected from pursuing into an exposed refuge.
+Supported same-floor pursuit is verified. Multi-floor portals, edited-door/stair
+routes, vertical pursuit and sound attenuation remain **10**; door/barricade
+destruction remains **18**. No healing, migration or repopulation is supported.
+The next concrete step is milestone 10 with budgeted portal/navigation fixtures
+and a native pursuit/escape, preserving the existing encounter identities and
+permanent depletion state.

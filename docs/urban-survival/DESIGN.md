@@ -176,7 +176,8 @@ seeds prove the apartment/shop route within 96 walking blocks of the courtyard
 refuge door, food distribution, treatment, water, sleep and a reinforced spear.
 The five-item kit can be spent before this route. The refuge has no NPCs or
 invulnerability area; doors, walls, beds, storage and stations remain editable
-and destructible. The first infected encounter is the next package's gate.
+and destructible. Package 09 adds encounters through generator 10 with the same
+geometry and loot, keeping generator 9 encounter-free (D-83–D-85).
 
 The courtyard collector begins with 3 litres and refills through existing rain
 simulation; its fire begins with 240 seconds of fuel. Recovered planks fuel fire
@@ -266,6 +267,30 @@ Guardrails, to keep both original:
 | Environmental | Flooding, contamination, darkness, fire, spills | Gear, route choice | Districts | 13 |
 
 New hostiles must not copy the current creature pattern. Creature perception is 3D distance without line of sight, and creatures never pathfind (B-64). They use occluded sight, WorldNoise hearing, `Pathfinder` with portals, and the existing damage and Creative gates (B-56).
+
+**Implemented in 09 — Veilbound (D-81–D-85).** Alien membrane tissue changes
+former colonists into hearing-led, unarmed humanoids. A pale tilted head,
+forward torso, braced shoulder and muted clothing carry the silhouette. Health
+28, pursuit 1.65 blocks/s; loaded solid voxels occlude sight, whose full-light
+range is 18, reduced in darkness and while the player crouches. Hearing follows
+the actual WorldNoise radius/location, with no continuous hidden-player tracking.
+Idle bodies hold their anchor; they investigate sound for eight seconds or
+last sight for ten. The 1.55-block strike winds up for 0.65 s and recovers for
+1.8 s (minimum 2.45 s between impacts), rechecking range, walls and mode.
+Physical damage 6 uses existing bleeding/treatment. Pain interrupts for 0.35 s;
+body fire/panic takes priority. Four procedural positioned cues signal notice,
+strike, pain and death. No new infection disease, kill drops or meat/hide.
+Shared HUMANOID hit zones, ragdolls, fragments and non-harvestable corpses apply.
+
+Two stable ground-floor slots per selected residential building use street
+and room anchors. Admission checks actual loaded support/clearance, sanctuary,
+player breathing room, occupied property, overlap and view. Global cap 12;
+two spawns, 16 parcels and 16 stored snapshots per slow tick. Dormant bodies
+pause without healing; health-zero rows never reactivate. At 32,768 visited
+records new encounters stop, with no death eviction or migration. Same-floor
+pursuit has two bounded 400-expansion A* searches per fast tick; doors and unsafe
+strides stop it. **Portal routing, multi-floor pursuit and sound attenuation
+remain 10.** These guards do not protect an exposed refuge from an existing body.
 
 ## 8. Scavenging economy: scarcity and depletion (D-12, D-13)
 
@@ -402,16 +427,16 @@ The table is in dependency order: an item may depend only on items above it. Sec
 | # | State | Kind | Owner | Package | Depends on | Persistence; absence default | Reset (new / load / dormancy) | Bound |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | 1 | Generator version `GEN_URBAN` | Persistent | `World` | 02 | — | v3 base int; values above `MAX_SUPPORTED_GENERATOR` rejected | Fixed per `World` | — |
-| 2 | Urban content revision | Persistent | `UrbanRevision` | 02, 07–08 | 1 | `urban.meta`; absent means 1 for older layouts; generator 9 requires content 3 | New and load | — |
+| 2 | Urban content revision | Persistent | `UrbanRevision` | 02, 07–08 | 1 | `urban.meta`; absent means 1 for older layouts; generators 9–10 require content 3 | New and load | — |
 | 3 | Region, district, street and parcel plans | Derived | `CityPlanner` | 03 | 1, 2 | Not saved | Cache per `World` | ≤ 16 regions |
-| 4 | Building, floor, room and fixture plans | Derived | `BuildingPlanner` / `BuildingPlan` | 05–06, 08 | 3 | Generator 6 selects template 1 / layout 3; 7 furnished template 2 / layout 4; 8 shaped template 3 / layout 5; 9 starter template 4 / layout 6. Unchanged `urban.meta` v1 validates the layout; plans not serialized | Cache per `World`, discarded on new/load | ≤ 256 buildings; ≤ 73,984 cells/plan |
+| 4 | Building, floor, room and fixture plans | Derived | `BuildingPlanner` / `BuildingPlan` | 05–06, 08 | 3 | Generator 6 selects template 1 / layout 3; 7 furnished template 2 / layout 4; 8 shaped template 3 / layout 5; 9 starter template 4 / layout 6; 10 same geometry plus encounter catalogue 1 / layout 7. Unchanged `urban.meta` v1 validates the layout; plans not serialized | Cache per `World`, discarded on new/load | ≤ 256 buildings; ≤ 73,984 cells/plan |
 | 5 | Generated blocks plus edits | Derived plus deltas | Generator and `World` | 03, 06 | 3, 4 | `changedBlocks` (v3 base, last-write log, B-29) | — | 4,000,000 edits |
 | 6 | Fixture state: door or window open, keyed lock or one-sided bar (broken is a recorded block edit); barricade health later | Persistent, touched cells only | `FixtureStates` on `World` | 04, 06 | 4 | `world.fixtures` v1 (D-49); absent follows generated lock defaults, or unlocked for edited/player-placed fixtures; explicit saved unlock overrides the plan | Load replaces; reapplied after structure and recorded edits on chunk generation | ≤ 32,768 cells on write and read |
 | 7 | Container identity, state and owner; authoritative contents | Persistent, touched only | `UrbanContainers` metadata; `World.crateContents` inventory | 07–08 | 2, 4 | `urban.containers` v1; required for content ≥ 2; content-1 absence adopts core contents/empties and edited reservations | Load replaces; never re-rolled | ≤ 32,768 rows/core inventories; 12 slots; 20-byte header + 36 bytes/row metadata |
 | 8 | Search progress; open target and rummage timer | Progress persistent; target/timer transient | Ledger; `CrateTransactionSystem` | 07 | 7 | Progress in `urban.containers`; load closes UI but retains elapsed work (D-72 revises the initial transient proposal) | Load replaces progress; resets target/timer | One active search |
-| 9 | Starter refuge identity and ground-floor respawn anchor; claims later | Persistent | `UrbanWorldState` / `UrbanBootstrap`; `RefugeSystem` later | 08, 18 | 4 | `urban.refuges` v1, required for generator 9; absent on older worlds means no claim | New sets starter once; load replaces without replenishing | One starter anchor; ≤ 3 claims in 18 |
-| 10 | Encounter outcomes: deaths, depletion, migration counters | Persistent | `UrbanEncounterDirector` | 09, 15 | 4 | `urban.population`; absent means all present | Dormancy uses a coarse model; never respawns a defeated id | Capped |
-| 11 | Live hostile AI state | Transient | entity | 09 | 10 | Not saved; re-derived on activation | — | Active cap |
+| 9 | Starter refuge identity and ground-floor respawn anchor; claims later | Persistent | `UrbanWorldState` / `UrbanBootstrap`; `RefugeSystem` later | 08, 18 | 4 | `urban.refuges` v1, required for generators 9–10; absent on older worlds means no claim | New sets starter once; load replaces without replenishing | One starter anchor; ≤ 3 claims in 18 |
+| 10 | Encounter identities, durable injuries/positions and permanent deaths | Persistent | `EntityManager.encounters` / `UrbanEncounterDirector` | 09, 15 | 4 | `urban.population` v1/catalogue 1; required for generator 10, absent on earlier worlds means no encounters | New clears; load replaces; dormancy pauses; no migration or replacement generation | 32,768 rows, 47 bytes/row + 12-byte header |
+| 11 | Live hostile brain, pain, fire, panic and route intent | Transient | `Npc` / `InfectedAI` | 09 | 10 | Body health/position/yaw remain in frozen core when active, linked by population index; durable torso wounds in population | Re-derived on activation/load; pending strikes forgotten by Creative perception controls | 12 active, two per building; two spawns/slow tick |
 | 12 | Portals, route caches, path budget | Derived and transient | `PortalGraph`, `PathBudget` | 10 | 4, 6 | Not saved | Invalidated by edits and doors | ≤ 64 routes |
 | 13 | District overlays (flood, contamination, growth) | Derived; consequential changes persistent | `DistrictRules` | 13, 15 | 3 | Within `urban.population` or `urban.sites` as decided | — | Capped |
 | 14 | Discovery: buildings, secrets, rumours | Persistent | `UrbanDiscovery` | 14, 16, 21 | 4 | `urban.discovery`; absent means nothing discovered | Load replaces | Capped |
@@ -424,11 +449,11 @@ The table is in dependency order: an item may depend only on items above it. Sec
 | 21 | Eviction bookkeeping, if eviction is chosen | Decided in 24 | `World` | 24 | All | Decided in 24 | — | — |
 
 Identity scheme (implemented by package 02 in `world/urban/UrbanIds`; the packed form is a save format and frozen):
-- **Canonical binary form**: a packed 64-bit id. Bits 63–60 hold a kind code: 1 district, 2 parcel, 3 building, 4 floor, 5 room, 6 fixture, 7 resident. Code 0 is never valid, and codes 8–15 are reserved and append-only. Bits 59–58 are reserved and must be zero. Then come region x and z (18 bits each, signed, ±131,071 regions, about ±33.5 million blocks, well past float precision), parcel (7 bits, 0–127), building slot (2 bits, 0–3), floor + 2 (4 bits, floors −2 to 12, where floor *n* of an *n*-storey building is its roof), room (5 bits, 0–31) and slot (4 bits, 0–15).
+- **Canonical binary form**: a packed 64-bit id. Bits 63–60 hold a kind code: 1 district, 2 parcel, 3 building, 4 floor, 5 room, 6 fixture, 7 resident, 8 encounter. Code 0 is never valid, and codes 9–15 are reserved and append-only. Bits 59–58 are reserved and must be zero. Then come region x and z (18 bits each, signed, ±131,071 regions, about ±33.5 million blocks, well past float precision), parcel (7 bits, 0–127), building slot (2 bits, 0–3), floor + 2 (4 bits, floors −2 to 12, where floor *n* of an *n*-storey building is its roof), room (5 bits, 0–31) and slot (4 bits, 0–15).
 - Every field a kind does not use must be zero, so a building, its first floor and that floor's first room have distinct ids. Doors, windows and containers are all fixtures: a container id is its fixture's id.
 - **Resident ids**: the building that the site occupies, plus a resident slot (5 bits, 0–31) and a generation counter for replacements (8 bits, 0–255), stored in the floor, room and slot bits. Never a list index.
 - **Canonical text form**, for mission targets and logs, following the existing `storage:<sid>:x:y:z` precedent: `urban:<kind>:<rx>,<rz>` followed by one `:`-separated index per level, for example `urban:fixture:-3,12:7:2:-2:31:15`. A resident ends `:<slot>:<generation>`. The parser accepts only the canonical form, up to 64 characters.
-- **Encounter ids** (anchor plus slot) take a reserved kind code in package 09.
+- **Encounter ids** (09) use appended kind code 8, the ground-floor room id plus slot 0 (street) or 1 (indoor). These packed ids have their sign bit set; they live in a separate population ledger and are not player-container ids. Codes 9–15 remain reserved.
 - **Player container ids** (07): negative monotonic ids in the separate container ledger, disjoint from packed generated ids. They are not accepted by `UrbanIds`; generated ownership still uses canonical building ids.
 - The proposal of milestone 01 used 21-bit regions, a 1-bit building slot and a signed 4-bit floor. A signed 4-bit field cannot hold storey 11, so the floor became a biased field, and a kind tag replaced the spare bits.
 

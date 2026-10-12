@@ -6,10 +6,10 @@ This is the running record for the 26-package urban-survival roadmap. The pack i
 
 | Item | Value |
 | --- | --- |
-| Last completed package | **08 — Urban spawn and survival progression** (2026-10-11). Six seeded production routes, save/capacity/Creative regressions, normal-controls native scavenging return and final portable build passed. |
-| Source revision | 08: `89a0edd` independent crafting-capacity fix → `bc0a363` starter generator/refuge, finite supplies, repair/reuse progression and coupled regression/native QA coverage. Records follow separately. |
-| Default new world | Legacy (`World.DEFAULT_NEW_WORLD_GENERATOR = GEN_CAVE_IDENTITIES`), unchanged until 26 passes. Isolated `VEYLON_GENERATOR=urban-dev` creates generator 9 (`GEN_URBAN_STARTER`, layout 6 / template 4 / content 3). Generators 1–8 stay loadable with their original geometry. |
-| Next package | **09 — Infected threats and encounters, IN PROGRESS.** Veilbound humanoid body/brain slice implemented; generated encounter director, persistence and native QA remain. No required 08 gate is pending. |
+| Last completed package | **09 — Infected threats and encounters** (2026-10-12). Veilbound combat/senses, bounded seeded street/ground-floor encounters, durable depletion, Creative/reset/save/population checks, generated native scenes and final portable build passed. |
+| Source revision | 09: `e3211a7` independently validated humanoid threat → `7827f3c` coupled encounter director, population codec, safety/regression coverage and native QA. Records follow separately. |
+| Default new world | Legacy (`World.DEFAULT_NEW_WORLD_GENERATOR = GEN_CAVE_IDENTITIES`), unchanged until 26 passes. Isolated `VEYLON_GENERATOR=urban-dev` creates generator 10 (`GEN_URBAN_ENCOUNTERS`, layout 7 / template 4 / content 3, encounter catalogue 1). Generators 1–9 stay loadable with their original geometry and no new encounters. |
+| Next package | **10 — Indoor navigation and perception, NOT STARTED.** Add budgeted portal routes through edited doors/stairs, vertical pursuit, sound attenuation and native pursuit/escape. No required automated/native 09 gate remains pending; human-only checks are deferred by D-80. |
 | Human testing schedule | Owner instruction (2026-10-11, D-80): consolidated human playtesting/listening after milestone 22. Through 22, run automated and scripted native validation and record human-only checks as deferred; do not request interim human walks. |
 | Commits | Separate `feat`, `test`, `docs` and `chore` commits on `feature/urban-survival`; see the reconstruction ledger below. `main` stays at `923345f`. Original combined commit retained at `backup/urban-m01-m04-before-split`. No merge, push, tag or publication. |
 
@@ -27,7 +27,7 @@ The status vocabulary is NOT STARTED, IN PROGRESS, PARTIAL, BLOCKED or COMPLETE.
 | 06 | Generated apartments and interiors | 04–05 | `UrbanBuildingStamper`, `BuildingFurnishing`, `UrbanIndoorQueries`; `World`/`Chunk` height/light/state hooks; shelter, temperature, ambience/audio; generated QA scenes | Generated apartments and a shop have recognisable rooms, usable stairs, matching windows and exits. Blocks and ids are identical in every order. Persisted breaks survive. Native street-to-basement walks in day and night. | **COMPLETE** (2026-10-11; final build, day/night appearance and full human Survival route passed) |
 | 07 | Contextual loot and persistence | 06, 02 | `UrbanContainers`, `LootTables`, `urban.containers`; `CrateTransactionSystem`, `ui/CrateScreen`, `simulation/ItemConditionSystem`, one removal path for hand, blast, fire and salvage | Open, partially loot, leave, reload, revisit, break and replace: no refill or duplication. Abandoned property is not theft; owned property has a consequence. Interrupted search, full-inventory and corruption tests. Native searching while the world runs. | **COMPLETE** (2026-10-11; focused checks, final build and generated native searches passed) |
 | 08 | Urban spawn and survival progression | 07 | `UrbanBootstrap`, `UrbanStarterSite`, generator 9 / template 4 / content 3, `urban.refuges`, `item/UrbanCrafting`, atomic transfers, indoor safety/prompts, read-only native QA and production route tests; no enum additions | Six starter seeds reach shelter, food, water, treatment, sleep and a first upgrade from urban sources only. Legacy/Creative/save/build pass. Fresh normal-controls native search/take/return with captures. | **COMPLETE** (2026-10-11) |
-| 09 | Infected threats and encounters | 08 | Entity kind (D-20, appended enums), a new AI brain, `gfx/model`, `engine/AudioManager`, new `UrbanEncounterDirector` and `urban.population`, caps in `qa/RuntimeBudgetSnapshot` | Infected notice the player fairly, pursue in a fixture, attack through the damage gates, react to fire and die cleanly. Defeated state survives save, load and reactivation. Caps and sanctuary hold. Creative twin. Natives in a street and a ground-floor apartment. | NOT STARTED |
+| 09 | Infected threats and encounters | 08 | Appended `NpcArchetype.VEILBOUND`, `ai/InfectedAI`, humanoid models/anatomy, `engine/InfectedSounds`, `UrbanEncounterDirector`, `EncounterAnchors`, `urban.population`, `RuntimeBudgetSnapshot` | Infected notice the player fairly, pursue in a fixture, attack through the damage gates, react to fire and die cleanly. Defeated state survives save, load and reactivation. Caps and sanctuary hold. Creative twin. Natives in a street and a ground-floor apartment. | **COMPLETE** (2026-10-12; human-only validation deferred by D-80) |
 | 10 | Indoor navigation and perception | 09, 04–06 | `ai/Pathfinder` plus new `PortalGraph` and `PathBudget`; `ai/Steering` guards; `combat/WorldNoise` attenuation; AI loaded-column guard | Multi-floor pursuit through doors and stairs, losing sight, searching and giving up. Door edits change routes. A shared measured budget. No roof or ground confusion and no void pathing. A native pursuit and escape. | NOT STARTED |
 | 11 | Playable vertical slice gate | 02–10 | Integration: `UrbanQaScenes`, `AutomatedRunDriver` urban route, integration tests | The DESIGN §14 slice holds headless and native with normal controls; save, revisit, no refill and no resurrection; Creative twins. Regression seeds frozen. Memory per explored area recorded (§4.3). | NOT STARTED |
 | 12 | Commercial and civic buildings | 11 | `BuildingTemplates` catalog (6 archetypes), `LootTables` | Every family has connected interiors with reachable containers and exits across the family matrix. Earlier urban layouts and legacy fingerprints are unchanged. | NOT STARTED |
@@ -880,6 +880,79 @@ Next concrete step: **09**, append the first
 infected kind and bounded encounter state, prove damage/Creative gates and a
 persisted encounter at least 24 walking blocks from the refuge door without
 spawn visibility. Do not switch the ordinary generator default.
+
+## Milestone 09 — infected threats and encounters (2026-10-12)
+
+**Status: COMPLETE.** Decisions D-81–D-85; human-only validation deferred by D-80.
+
+The Veilbound is a former colonist altered by alien membrane tissue. Its tilted
+pale head, forward torso and single braced shoulder distinguish it from people.
+The shared humanoid infrastructure supplies hit zones, melee/projectiles, pain,
+fire/panic, dismemberment and non-harvestable remains. Explicit infected dispatch
+excludes settlement allegiance, jobs, hunger, trust rewards and animal food.
+It has 28 health, moves at 1.65 blocks/s and strikes for 6 physical damage after
+a 0.65-second windup, then recovers for 1.8 seconds. Sight uses light, crouching,
+facing and loaded occlusion; hearing investigates the real noise position.
+Pain interrupts attacks; range, sight and Creative immunity are checked again
+at impact. No new disease or kill drops were added; existing bleeding/treatment
+and finite household belongings remain the resource paths.
+
+Generator 10 / layout 7 / template 4 / content 3 adds frozen encounter catalogue
+1 while retaining generator-9 blocks and loot. Earlier generators remain
+encounter-free; the ordinary default remains generator 3. Two seeded slots per
+selected residential building use a street approach and a ground-floor room
+anchor. Activation requires loaded whole footprints, supported clear bodies,
+16 blocks of player breathing room, 24 from the refuge approach/anchor, exclusion
+of the refuge parcel and occupied buildings, spacing from people and occlusion
+from the camera's forward half-space. At most 12 are active, with two admissions,
+16 parcel checks and 16 saved-position checks per slow tick. Shared NPC limits
+and counterattack reservation remain effective. Creative natural-spawn pause
+also gates infected activation.
+
+`urban.population` v1 requires codec/catalogue/count headers and 47-byte rows
+with packed encounter id, stable species, injury/position/yaw and optional core
+NPC binding. Dormant bodies pause at their saved injury and position, including
+pursuers away from their original parcel. Health-zero tombstones never refill.
+The 32,768-record cap refuses new encounters rather than evicting deaths. Counts,
+lengths, planned identities, species, finite scalars, wounds and core bindings
+are validated before replacing the live world. New/load resets state. Saving
+immediately after a lethal impact commits the death and humanoid remains once.
+Unloaded living bodies freeze before dormancy, preventing unloaded AIR from
+changing the saved floor.
+
+The independently validated humanoid slice is committed as `e3211a7`. Its exact
+intermediate worktree passed the portable build: 1,762 tests, zero failures/errors,
+one existing Windows symlink-privilege skip, plus Javadoc/doclint. The final
+encounter/save/Creative/reset/selector focused run passed 38 tests with zero
+failures/errors/skips. Street and ground-floor apartment native scenes both
+passed attack, pain, fire, projectile death and save/load/depletion checks, with
+zero GL/KHR/native-audio errors. Creative controls were captured at 1280×720 and
+1920×1080. Exact commands and artifacts are in
+[VALIDATION.md](VALIDATION.md#milestone-09--infected-threats-and-encounters-2026-10-12).
+
+Final `.\gradlew.bat build --console=plain` passed in **7 min 50 s** on
+`7827f3c`: **1,773 tests, zero failures/errors, one existing Windows
+symlink-privilege skip**, including Javadoc/doclint. Source stayed unchanged
+through this run and the final native captures. The single completion graph
+refresh, `graphify update . --no-cluster`, exited 0 with **7,748 nodes / 29,822
+edges**; existing Gradle extractor warnings remain. No clustering or semantic
+extraction ran. Scoped code commits are `e3211a7` and `7827f3c`, followed by the
+independent record handoff. All 57 relative links/anchors in the seven changed
+documents and staged/unstaged whitespace checks pass. The exact intermediate
+validation checkout was verified and removed, retaining its log/counts locally.
+No push, merge, tag or publication was performed.
+
+These native scenes use scripted observer poses, instrumented ignition and a
+projectile; they do not prove scavenging, ammunition economy or human comfort.
+Human playtesting/listening remains deferred until after 22 under D-80. Pursuit
+is supported on the same floor; multi-floor portals, vertical routing and sound
+attenuation are pending 10. Closed doors stop pursuit; destruction is 18. No
+migration or repopulation is implemented.
+
+Next concrete step: **10**, introduce
+budgeted indoor portal routing and perception through edited doors and stairs,
+with multi-floor pursuit/escape fixtures and native evidence. Preserve catalogue-1
+identities, tombstones and generator-9/10 geometry. Do not switch the default.
 
 ## Resume rules
 
