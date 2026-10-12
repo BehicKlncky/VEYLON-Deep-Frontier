@@ -117,6 +117,7 @@ public final class SaveSystem {
     public static boolean save(Game g, Path savePath) {
         Objects.requireNonNull(g, "g");
         Objects.requireNonNull(savePath, "savePath");
+        g.entities.flushInfectedDeaths(g);
         // Falling bodies are transient and are not written. Freezing them here
         // rather than dropping them is what makes a save taken mid-fall come
         // back as a settled corpse instead of losing one.
@@ -708,6 +709,7 @@ public final class SaveSystem {
             UrbanMetaSection.finishLoad(g);
             UrbanContainersSection.finishLoad(g);
             UrbanRefugesSection.finishLoad(g);
+            UrbanPopulationSection.finishLoad(g);
             g.settlementManager.onWorldLoaded(g);
             return true;
         } catch (IOException ex) {

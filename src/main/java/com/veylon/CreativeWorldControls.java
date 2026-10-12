@@ -8,7 +8,7 @@ import com.veylon.ui.WorldControlsScreen;
 import java.util.Objects;
 
 /**
- * R25: the builder's controls over time, weather and wildlife spawning.
+ * R25: the builder's controls over time, weather and natural spawning.
  *
  * <p>Three flags and two immediate commands, all Creative-only. They are held
  * here rather than on the systems they gate so that one object owns the whole
@@ -109,7 +109,7 @@ final class CreativeWorldControls {
     /** Pauses natural spawning only; the creatures already here stay and still despawn. */
     void toggleSpawning() {
         spawningPaused = !spawningPaused;
-        game.log(spawningPaused ? "Wildlife spawning paused." : "Wildlife spawning resumed.");
+        game.log(spawningPaused ? "Natural spawning paused." : "Natural spawning resumed.");
     }
 
     /** Pause [T] (R25): Creative worlds only. */

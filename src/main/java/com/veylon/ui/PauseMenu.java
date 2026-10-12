@@ -55,7 +55,7 @@ public class PauseMenu {
                 "              collector, bedroll (sleep), beacon, fill waterskin",
                 "E             Inventory + gear  C   Crafting (Q/R station tabs)",
                 "Creative: E catalog, instant LMB, free RMB, middle mouse picks",
-                "Creative: T sets the time, weather and wildlife spawning",
+                "Creative: T sets the time, weather and natural spawning",
                 "1-9 / scroll  Hotbar            Tab  Simulation panel",
                 "M             Map (POIs)        F3   Debug overlay",
                 "P             Pause simulation  F5/F9  Save / Load",

@@ -162,6 +162,8 @@ class GameLoopIntegrationTest {
         game.newWorld(4242L, true);
 
         // Dirty every category of cross-world state the reset is meant to clear.
+        game.entities.encounters.restored = true;
+        game.entities.encounters.lastSpawns = 2;
         game.uiMode = Game.UiMode.INVENTORY;
         game.simPaused = true;
         game.miningProgress = 0.7f;
@@ -212,6 +214,9 @@ class GameLoopIntegrationTest {
         assertTrue(game.blockActions.creativeBreakRemaining() > 0, "precondition: Creative break timer is active");
         game.newWorld(4242L, true);
         assertEquals(0, game.blockActions.creativeBreakRemaining(), "R19: Creative break timing resets with the world");
+        assertFalse(game.entities.encounters.restored);
+        assertEquals(0, game.entities.encounters.lastSpawns);
+        assertEquals(0, game.entities.encounters.size());
         assertEquals("", game.creativeCatalogScreen.query(),
                 "R16: the catalog query does not survive into a new world");
         assertFalse(game.creativeCatalogScreen.inventoryTab() || game.creativeCatalogScreen.searchFocused(),

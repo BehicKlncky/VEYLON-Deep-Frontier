@@ -15,6 +15,8 @@ package com.veylon.world.urban;
  * a new salt; an existing one is never edited.
  */
 public final class UrbanSalts {
+    /** Catalogue-one infected site selection; independent from furnishings and loot. */
+    public static final long ENCOUNTERS = 0x5645_494c_504f_5055L;
 
     /** District identity of a planning region. */
     public static final long DISTRICT = 0x5644_4953_5452_4943L;

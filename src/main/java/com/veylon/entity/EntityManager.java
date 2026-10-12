@@ -23,6 +23,7 @@ public class EntityManager {
 
     public final List<Creature> creatures = new ArrayList<>();
     public final List<Npc> npcs = new ArrayList<>();
+    public final UrbanEncounterDirector encounters = new UrbanEncounterDirector();
     public final List<Carcass> carcasses = new ArrayList<>();
     /**
      * Settled human bodies. Deliberately a list of its own rather than dead
@@ -68,15 +69,21 @@ public class EntityManager {
         }
         for (Iterator<Npc> it = npcs.iterator(); it.hasNext(); ) {
             Npc n = it.next();
+            if (n.infected() && !n.dead && !UrbanEncounterDirector.bodyLoaded(g.world, n.pos.x, n.pos.z)) {
+                // The slow director will make it dormant. Freeze gravity too until then,
+                // otherwise unloaded AIR would corrupt the durable feet height.
+                n.vel.zero(); continue;
+            }
             NpcAI.update(g, n, dt);
             if (!n.abstractTravel) {
                 n.applyPhysics(dt, true);
             }
             if (n.dead) {
-                if (n.infected() && reallyDied(n)) {
-                    g.log("The Veilbound collapses.");
-                    g.audio.playInfected(com.veylon.engine.InfectedSounds.Cue.DEATH,
-                            n.pos.x, n.pos.y, n.pos.z);
+                if (n.infected()) {
+                    finishInfectedDeath(g, n);
+                    it.remove();
+                    forgetTarget(n);
+                    continue;
                 }
                 if (n.isTrader && n.partyMissionId != null && !n.partyMissionId.isBlank()) {
                     g.faction.failMission(n.partyMissionId, "the escorted trader was lost");
@@ -118,6 +125,27 @@ public class EntityManager {
         }
     }
 
+    private void finishInfectedDeath(Game g, Npc n) {
+        if (!reallyDied(n)) { depart(g, n); return; }
+        encounters.onDeath(n);
+        g.log("The Veilbound collapses.");
+        g.audio.playInfected(com.veylon.engine.InfectedSounds.Cue.DEATH, n.pos.x, n.pos.y, n.pos.z);
+        if (n.dismemberOnDeath) {
+            g.fragments.spawnFromNpc(g, n, g.fragments.deathPose(n),
+                    n.blastX, n.blastY, n.blastZ, n.blastStrength);
+        } else { g.ragdolls.spawn(g, n); }
+    }
+
+    /** A save between projectile impact and the next fast tick must commit that death once. */
+    public void flushInfectedDeaths(Game g) {
+        for (int i = npcs.size() - 1; i >= 0; i--) {
+            Npc n = npcs.get(i);
+            if (n.infected() && n.dead) {
+                finishInfectedDeath(g, n); npcs.remove(i); forgetTarget(n);
+            }
+        }
+    }
+
     /**
      * A person leaving the world without dying — a settlement going dormant,
      * a party going abstract or being retired, a captive led away, a trader or
@@ -129,6 +157,10 @@ public class EntityManager {
      * health and standing are whatever the leaving code wrote back.
      */
     public void depart(Game g, Npc n) {
+        if (n.infected()) {
+            var resident = encounters.resident(n.encounterId);
+            if (resident != null && !resident.dead()) { resident.capture(n); resident.live = null; }
+        }
         g.combustion.clear(n);
         FirePanic.forget(n);
         forgetTarget(n);
@@ -398,6 +430,7 @@ public class EntityManager {
 
     /** Population control: spawn/despawn wildlife around the player. */
     public void slowTick(Game g) {
+        encounters.slowTick(g);
         float px = g.player.pos.x, pz = g.player.pos.z;
 
         for (int i = creatures.size() - 1; i >= 0; i--) {

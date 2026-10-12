@@ -158,7 +158,7 @@ public final class InfectedAI {
         float dx = step.x() + 0.5f - n.pos.x, dz = step.z() + 0.5f - n.pos.z;
         for (int i = 1; i <= 5; i++) {
             float x = n.pos.x + dx * i / 5, z = n.pos.z + dz * i / 5;
-            if (!w.isColumnLoaded(cell(x), cell(z)) || n.collidesAt(x, n.pos.y, z)
+            if (!com.veylon.entity.UrbanEncounterDirector.bodyLoaded(w, x, z) || n.collidesAt(x, n.pos.y, z)
                     || !w.getBlock(cell(x), cell(n.pos.y) - 1, cell(z)).solid) { return false; }
         }
         return true;

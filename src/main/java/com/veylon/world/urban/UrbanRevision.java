@@ -55,6 +55,7 @@ public final class UrbanRevision {
     public static final int BUILDING_TEMPLATE_SHAPED_STAIRS = 3;
     public static final int LAYOUT_STARTER = 6;
     public static final int BUILDING_TEMPLATE_STARTER = 4;
+    public static final int LAYOUT_ENCOUNTERS = 7;
 
     /** Content revision every new urban world records. */
     public static final int CURRENT_CONTENT = 3;
@@ -68,7 +69,7 @@ public final class UrbanRevision {
     public static final int ABSENT_CONTENT = 1;
 
     /** The urban generator the development selector creates: the newest layout. */
-    public static final int DEVELOPMENT_GENERATOR = World.GEN_URBAN_STARTER;
+    public static final int DEVELOPMENT_GENERATOR = World.GEN_URBAN_ENCOUNTERS;
 
     private UrbanRevision() {
     }
@@ -86,6 +87,7 @@ public final class UrbanRevision {
             case World.GEN_URBAN_APARTMENTS -> LAYOUT_GENERATED_APARTMENTS;
             case World.GEN_URBAN_SHAPED_STAIRS -> LAYOUT_SHAPED_STAIRS;
             case World.GEN_URBAN_STARTER -> LAYOUT_STARTER;
+            case World.GEN_URBAN_ENCOUNTERS -> LAYOUT_ENCOUNTERS;
             default -> throw new IllegalArgumentException(
                     "generator " + generatorVersion + " is not an urban generator");
         };
@@ -98,7 +100,7 @@ public final class UrbanRevision {
             case World.GEN_URBAN_PLANS -> BUILDING_TEMPLATE_WALKUPS;
             case World.GEN_URBAN_APARTMENTS -> BUILDING_TEMPLATE_FURNISHED;
             case World.GEN_URBAN_SHAPED_STAIRS -> BUILDING_TEMPLATE_SHAPED_STAIRS;
-            case World.GEN_URBAN_STARTER -> BUILDING_TEMPLATE_STARTER;
+            case World.GEN_URBAN_STARTER, World.GEN_URBAN_ENCOUNTERS -> BUILDING_TEMPLATE_STARTER;
             default -> throw new IllegalArgumentException("not an urban generator " + generatorVersion);
         };
     }

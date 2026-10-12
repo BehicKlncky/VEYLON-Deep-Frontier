@@ -37,6 +37,7 @@ final class UrbanQaScenes {
     private final UrbanFixtureQaScene fixtures;
     private final UrbanApartmentQaScene apartments;
     private final UrbanLootQaScene loot;
+    private final UrbanInfectedQaScene infected;
     private final PlayerMovementSystem.Command walk = new PlayerMovementSystem.Command();
     private boolean holding;
     private float holdX;
@@ -66,6 +67,7 @@ final class UrbanQaScenes {
         this.fixtures = new UrbanFixtureQaScene(game);
         this.apartments = new UrbanApartmentQaScene(game);
         this.loot = new UrbanLootQaScene(game);
+        this.infected = new UrbanInfectedQaScene(game);
     }
 
     /** Stages one of the urban scenes; inert, with a notice, outside a street-network world. */
@@ -107,6 +109,7 @@ final class UrbanQaScenes {
             case "urban_apartments", "urban_apartments_night", "urban_apartments_manual",
                  "urban_apartments_manual_night", "urban_apartments_lit_night" -> apartments.stage(scene);
             case "urban_loot" -> loot.stage();
+            case "urban_infected_street", "urban_infected_apartment" -> infected.stage(scene.endsWith("apartment"));
             default -> System.out.println("[urban-qa] unknown urban scene '" + scene + "'");
         }
     }
@@ -180,6 +183,7 @@ final class UrbanQaScenes {
         fixtures.update(elapsed);
         apartments.update(elapsed);
         loot.update(elapsed);
+        infected.update(elapsed);
         if (holding) {
             apply();
         }

@@ -114,6 +114,7 @@ final class WorldBootstrap {
         game.projectiles.reset();
         game.explosions.reset();
         game.settlementManager.reset();
+        game.entities.encounters.reset();
         game.ragdolls.reset();
         game.fragments.reset();
         // Fires live on the bodies a new world replaces; only the tallies stay here.

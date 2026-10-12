@@ -91,14 +91,15 @@ public class SettlementManager
         PATROL,
         BOUNTY_HUNTER,
         COUNTERATTACK,
-        LEGACY
+        LEGACY,
+        INFECTED
     }
 
     /** Immutable measured snapshot used by gameplay, QA and the debug overlay. */
     public record NpcCounts(int total, int residents, int warParties, int patrols,
-                            int bountyHunters, int counterattackers, int legacy) {
+                            int bountyHunters, int counterattackers, int legacy, int infected) {
         public int nonResidents() {
-            return warParties + legacy;
+            return warParties + legacy + infected;
         }
     }
 
@@ -844,6 +845,7 @@ public class SettlementManager
         int bounty = 0;
         int counterattack = 0;
         int legacy = 0;
+        int infected = 0;
         for (Npc npc : g.entities.npcs) {
             if (npc.dead) {
                 continue;
@@ -865,13 +867,15 @@ public class SettlementManager
                     counterattack++;
                 }
                 case LEGACY -> legacy++;
+                case INFECTED -> infected++;
             }
         }
-        return new NpcCounts(total, residents, parties, patrols, bounty, counterattack, legacy);
+        return new NpcCounts(total, residents, parties, patrols, bounty, counterattack, legacy, infected);
     }
 
     /** Classifies an NPC without relying on resident-index sentinel values for parties. */
     public NpcCategory categoryOf(Npc npc) {
+        if (npc.infected()) { return NpcCategory.INFECTED; }
         if (npc.settled()) {
             return NpcCategory.SETTLEMENT_RESIDENT;
         }
@@ -914,6 +918,7 @@ public class SettlementManager
             case COUNTERATTACK -> c.warParties() < MAX_ACTIVE_WAR_PARTY_NPCS
                     && c.counterattackers() < MAX_ACTIVE_COUNTERATTACKERS;
             case LEGACY -> c.legacy() < MAX_ACTIVE_LEGACY_NPCS;
+            case INFECTED -> c.infected() < com.veylon.entity.UrbanEncounterDirector.MAX_ACTIVE;
         };
     }
 
@@ -950,6 +955,7 @@ public class SettlementManager
                     MAX_ACTIVE_WAR_PARTY_NPCS - c.warParties(),
                     MAX_ACTIVE_COUNTERATTACKERS - c.counterattackers()));
             case LEGACY -> Math.min(available, MAX_ACTIVE_LEGACY_NPCS - c.legacy());
+            case INFECTED -> Math.min(available, com.veylon.entity.UrbanEncounterDirector.MAX_ACTIVE - c.infected());
             case SETTLEMENT_RESIDENT -> available;
         };
         return Math.max(0, available);

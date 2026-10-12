@@ -91,7 +91,8 @@ public final class UrbanWorldState {
                 || layoutRevision == UrbanRevision.LAYOUT_SHAPED_STAIRS || hasStarter();
     }
 
-    public boolean hasStarter() { return layoutRevision == UrbanRevision.LAYOUT_STARTER; }
+    public boolean hasStarter() { return layoutRevision == UrbanRevision.LAYOUT_STARTER || hasEncounters(); }
+    public boolean hasEncounters() { return layoutRevision == UrbanRevision.LAYOUT_ENCOUNTERS; }
 
     public boolean contentRevisionResolved() {
         return contentRevision != UNRESOLVED;

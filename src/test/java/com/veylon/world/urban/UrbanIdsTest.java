@@ -28,7 +28,7 @@ class UrbanIdsTest {
         assertEquals(0x63FFFD000303C1FFL, fixture(-3, 12, 7, 2, -2, 31, 15));
         assertEquals(0x701000FC003FFFFFL, UrbanIds.resident(
                 building(4096, -4096, 127, 3), 31, 255));
-        assertEquals(List.of(1, 2, 3, 4, 5, 6, 7),
+        assertEquals(List.of(1, 2, 3, 4, 5, 6, 7, 8),
                 List.of(Kind.values()).stream().map(kind -> kind.code).toList(),
                 "kind codes are stored, append-only and never ordinals");
     }
@@ -122,7 +122,7 @@ class UrbanIdsTest {
         long room = UrbanIds.room(UrbanIds.floor(building, 0), 2);
         long[] invalid = {
                 UrbanIds.NONE,
-                8L << 60,                                   // reserved kind code
+                9L << 60,                                   // reserved kind code
                 0xF000000000000000L,                        // reserved kind code
                 -1L,
                 district | (1L << 58),                      // reserved bits

@@ -109,7 +109,7 @@ public final class WorldControlsScreen {
         y += SECTION_GAP;
         heading(g, y, "WILDLIFE");
         y += HEADING_GAP;
-        if (toggle(g, y, "[K] Pause wildlife spawning", g.spawningPaused())) {
+        if (toggle(g, y, "[K] Pause natural spawning", g.spawningPaused())) {
             row.take(Action.of(Action.Kind.TOGGLE_SPAWNING));
         }
 

@@ -51,7 +51,8 @@ public record RuntimeBudgetSnapshot(
         int urbanRegionPlans,
         int urbanBuildingPlans,
         int fixtureStates,
-        int residentDoors) {
+        int residentDoors,
+        int urbanEncounterRecords) {
 
     public static RuntimeBudgetSnapshot capture(Game game) {
         int pathNodes = 0;
@@ -98,7 +99,7 @@ public record RuntimeBudgetSnapshot(
                 game.world.urban == null ? 0 : game.world.urban.cachedRegionPlans(),
                 game.world.urban == null ? 0 : game.world.urban.cachedBuildingPlans(),
                 game.world.fixtures.size(),
-                game.world.fixtures.transitTimers().size());
+                game.world.fixtures.transitTimers().size(), game.entities.encounters.size());
     }
 
     /** True when every collection with a hard runtime ceiling is within it. */
@@ -110,6 +111,8 @@ public record RuntimeBudgetSnapshot(
                 && npcs.bountyHunters() <= SettlementManager.MAX_ACTIVE_BOUNTY_HUNTERS
                 && npcs.counterattackers() <= SettlementManager.MAX_ACTIVE_COUNTERATTACKERS
                 && npcs.legacy() <= SettlementManager.MAX_ACTIVE_LEGACY_NPCS
+                && npcs.infected() <= com.veylon.entity.UrbanEncounterDirector.MAX_ACTIVE
+                && urbanEncounterRecords <= com.veylon.entity.UrbanEncounterDirector.MAX_RECORDS
                 && liveProjectiles <= ProjectileSystem.MAX_LIVE
                 && stuckArrows <= ProjectileSystem.MAX_STUCK
                 && largestCachedPath <= Pathfinder.MAX_PATH_NODES
@@ -145,7 +148,7 @@ public record RuntimeBudgetSnapshot(
                 + ",patrols=" + npcs.patrols()
                 + ",bounty=" + npcs.bountyHunters()
                 + ",counterattack=" + npcs.counterattackers()
-                + ",legacy=" + npcs.legacy() + "}"
+                + ",legacy=" + npcs.legacy() + ",infected=" + npcs.infected() + "}"
                 + " projectiles={live=" + liveProjectiles + ",stuck=" + stuckArrows + "}"
                 + " paths={nodes=" + cachedPathNodes + ",largest=" + largestCachedPath + "}"
                 + " missions={active=" + counterattackMissions
@@ -165,12 +168,14 @@ public record RuntimeBudgetSnapshot(
                 + " ragdolls=" + liveRagdolls
                 + " panicking=" + panickingBodies
                 + " urbanPlans=" + urbanRegionPlans
-                + " buildingPlans=" + urbanBuildingPlans
+                + " buildingPlans=" + urbanBuildingPlans + " encounterRecords=" + urbanEncounterRecords
                 + " fixtures={states=" + fixtureStates + ",residentDoors=" + residentDoors + "}";
     }
 
     public static String hardLimitSummary() {
         return "npc=" + SettlementManager.MAX_ACTIVE_NPCS
+                + " infected=" + com.veylon.entity.UrbanEncounterDirector.MAX_ACTIVE
+                + " encounterRecords=" + com.veylon.entity.UrbanEncounterDirector.MAX_RECORDS
                 + " resident=" + SettlementManager.MAX_ACTIVE_RESIDENTS
                 + " party=" + SettlementManager.MAX_ACTIVE_WAR_PARTY_NPCS
                 + " projectile=" + ProjectileSystem.MAX_LIVE

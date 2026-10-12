@@ -4,7 +4,7 @@ import java.util.Locale;
 
 /**
  * Stable identities for urban plan objects: districts, parcels, buildings,
- * floors, rooms, fixtures and residents.
+ * floors, rooms, fixtures, residents and encounters.
  *
  * <p>An id names a place in the plan hierarchy and nothing else. It is built
  * from plan coordinates — region, parcel index, building slot, floor, room,
@@ -22,7 +22,7 @@ import java.util.Locale;
  * <table>
  *   <caption>Packed urban id</caption>
  *   <tr><th>Bits</th><th>Field</th><th>Range</th></tr>
- *   <tr><td>63–60</td><td>kind code ({@link Kind#code})</td><td>1–7; 0 is never valid</td></tr>
+ *   <tr><td>63–60</td><td>kind code ({@link Kind#code})</td><td>1–8; 0 is never valid</td></tr>
  *   <tr><td>59–58</td><td>reserved</td><td>always 0</td></tr>
  *   <tr><td>57–40</td><td>region x, 18-bit two's complement</td>
  *       <td>{@value #MIN_REGION}..{@value #MAX_REGION}</td></tr>
@@ -52,7 +52,7 @@ public final class UrbanIds {
 
     /**
      * What an id names. The {@link #code} is what saves store — never the
-     * ordinal — and codes are append-only: 8 to 15 are reserved for later kinds.
+     * ordinal — and codes are append-only: 9 to 15 are reserved for later kinds.
      */
     public enum Kind {
         DISTRICT(1, "district"),
@@ -61,7 +61,8 @@ public final class UrbanIds {
         FLOOR(4, "floor"),
         ROOM(5, "room"),
         FIXTURE(6, "fixture"),
-        RESIDENT(7, "resident");
+        RESIDENT(7, "resident"),
+        ENCOUNTER(8, "encounter");
 
         /** Stored code, bits 63–60 of a packed id. */
         public final int code;
@@ -174,6 +175,13 @@ public final class UrbanIds {
         return relabel(roomId, Kind.FIXTURE) | slot;
     }
 
+    /** One immutable infected resident at a room/street anchor; slots never change on reactivation. */
+    public static long encounter(long roomId, int slot) {
+        requireKind(roomId, Kind.ROOM);
+        requireRange(slot, 0, MAX_SLOT, "encounter slot");
+        return relabel(roomId, Kind.ENCOUNTER) | slot;
+    }
+
     /** A resident of the site occupying a building, in a stable slot. */
     public static long resident(long buildingId, int slot, int generation) {
         requireKind(buildingId, Kind.BUILDING);
@@ -210,7 +218,7 @@ public final class UrbanIds {
                     && roomBits == 0 && slotBits == 0;
             case ROOM -> floorBits + UrbanDatum.MIN_FLOOR <= UrbanDatum.MAX_FLOOR
                     && slotBits == 0;
-            case FIXTURE -> floorBits + UrbanDatum.MIN_FLOOR <= UrbanDatum.MAX_FLOOR;
+            case FIXTURE, ENCOUNTER -> floorBits + UrbanDatum.MIN_FLOOR <= UrbanDatum.MAX_FLOOR;
             case RESIDENT -> true;
         };
     }
@@ -300,7 +308,7 @@ public final class UrbanIds {
             case BUILDING -> relabel(id & ~(BUILDING_MASK << BUILDING_SHIFT), Kind.PARCEL);
             case FLOOR, RESIDENT -> relabel(id & ~TAIL_MASK, Kind.BUILDING);
             case ROOM -> relabel(id & ~((ROOM_MASK << ROOM_SHIFT) | SLOT_MASK), Kind.FLOOR);
-            case FIXTURE -> relabel(id & ~SLOT_MASK, Kind.ROOM);
+            case FIXTURE, ENCOUNTER -> relabel(id & ~SLOT_MASK, Kind.ROOM);
         };
     }
 
@@ -357,7 +365,7 @@ public final class UrbanIds {
             case BUILDING -> 4;
             case FLOOR -> 5;
             case ROOM, RESIDENT -> 6;
-            case FIXTURE -> 7;
+            case FIXTURE, ENCOUNTER -> 7;
         };
         if (parts.length != expectedParts) {
             throw new IllegalArgumentException("malformed urban id: " + text);
@@ -383,7 +391,8 @@ public final class UrbanIds {
                 id = room(id, parseIndex(parts[5], text));
             }
             if (parts.length > 6) {
-                id = fixture(id, parseIndex(parts[6], text));
+                id = kind == Kind.ENCOUNTER ? encounter(id, parseIndex(parts[6], text))
+                        : fixture(id, parseIndex(parts[6], text));
             }
         }
         if (!format(id).equals(text)) {

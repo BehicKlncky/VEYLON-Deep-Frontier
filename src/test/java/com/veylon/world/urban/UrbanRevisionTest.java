@@ -25,7 +25,8 @@ class UrbanRevisionTest {
         assertEquals(UrbanRevision.LAYOUT_SHAPED_STAIRS,
                 UrbanRevision.layoutRevisionOf(World.GEN_URBAN_SHAPED_STAIRS));
         assertEquals(UrbanRevision.LAYOUT_STARTER, UrbanRevision.layoutRevisionOf(World.GEN_URBAN_STARTER));
-        assertEquals(World.GEN_URBAN_STARTER, UrbanRevision.DEVELOPMENT_GENERATOR,
+        assertEquals(UrbanRevision.LAYOUT_ENCOUNTERS, UrbanRevision.layoutRevisionOf(World.GEN_URBAN_ENCOUNTERS));
+        assertEquals(World.GEN_URBAN_ENCOUNTERS, UrbanRevision.DEVELOPMENT_GENERATOR,
                 "the development selector builds the newest layout (decision D-35)");
         for (int notUrban : new int[]{0, World.GEN_LEGACY, World.GEN_DEEP,
                 World.GEN_CAVE_IDENTITIES, World.MAX_SUPPORTED_GENERATOR + 1}) {
