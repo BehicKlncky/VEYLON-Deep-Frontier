@@ -46,20 +46,21 @@ public final class InfectedAI {
         }
         boolean sight = seesPlayer(g, n);
         if (n.decideTimer <= 0) {
-            n.decideTimer = 0.25f;
+            n.decideTimer = 0.25f + g.entities.nextSettledNpcAiFloat() * .1f;
             boolean quiet = n.searchTimer <= 0;
             if (sight) {
                 n.lastKnown.set(g.player.pos);
                 n.lastKnownAge = 0;
-                n.searchTimer = 10;
+                n.searchTimer = 18;
             } else {
-                WorldNoise.NoiseEvent heard = g.noise.loudestAudible(n.pos.x, n.pos.y, n.pos.z, 0);
+                WorldNoise.NoiseEvent heard = g.noise.loudestAudible(g.world,
+                        n.pos.x, n.pos.y, n.pos.z, 0, n.lastHeard, n);
                 if (heard != null && heard != n.lastHeard && heard.source != n
                         && (heard.playerSource || heard.intensity >= 0.6f)) {
                     n.lastHeard = heard;
                     n.lastKnown.set(heard.x, heard.y, heard.z);
-                    n.searchTimer = 8;
-                    n.path = null;
+                    n.lastKnownAge = 0;
+                    n.searchTimer = 14;
                 }
             }
             if (quiet && n.searchTimer > 0) {
@@ -98,6 +99,7 @@ public final class InfectedAI {
             pursue(g, n, dt);
         } else {
             n.state = Npc.NpcState.IDLE;
+            n.path = null;
             Steering.stop(n);
         }
     }
@@ -122,6 +124,7 @@ public final class InfectedAI {
     public static boolean clearSight(World world, float x, float y, float z, float tx, float ty, float tz) {
         float dx = tx - x, dy = ty - y, dz = tz - z;
         int steps = Math.max(1, (int) Math.ceil(Math.sqrt(dx * dx + dy * dy + dz * dz) * 5));
+        if (steps > 640) { return false; }
         for (int i = 0; i <= steps; i++) {
             float f = i / (float) steps;
             int bx = cell(x + dx * f), by = cell(y + dy * f), bz = cell(z + dz * f);

@@ -54,7 +54,7 @@ public record RuntimeBudgetSnapshot(
         int residentDoors,
         int urbanEncounterRecords,
         int navigationRoutes, int pathQueries, int pathExpansions, int pathDeferred,
-        int pathFailures, int unsupportedEntries) {
+        int pathFailures, int unsupportedEntries, int hearingSamples) {
 
     public static RuntimeBudgetSnapshot capture(Game game) {
         int pathNodes = 0;
@@ -104,7 +104,8 @@ public record RuntimeBudgetSnapshot(
                 game.world.fixtures.transitTimers().size(), game.entities.encounters.size(),
                 game.world.navigation.size(), game.world.navigation.budget.queries(),
                 game.world.navigation.budget.expansions(), game.world.navigation.budget.deferred(),
-                game.world.navigation.budget.failures(), game.world.navigation.budget.unsupportedEntries());
+                game.world.navigation.budget.failures(), game.world.navigation.budget.unsupportedEntries(),
+                game.noise.hearingSamples());
     }
 
     /** True when every collection with a hard runtime ceiling is within it. */
@@ -144,6 +145,7 @@ public record RuntimeBudgetSnapshot(
                 && navigationRoutes <= com.veylon.ai.NavigationCache.MAX_ROUTES
                 && pathQueries <= com.veylon.ai.PathBudget.MAX_QUERIES
                 && pathExpansions <= com.veylon.ai.PathBudget.MAX_EXPANSIONS
+                && hearingSamples <= WorldNoise.MAX_HEARING_SAMPLES
                 // The player never panics.
                 && panickingBodies < livingBodies;
     }
@@ -162,6 +164,7 @@ public record RuntimeBudgetSnapshot(
                 + ",routes=" + navigationRoutes + ",queries=" + pathQueries
                 + ",expanded=" + pathExpansions + ",deferred=" + pathDeferred
                 + ",failed=" + pathFailures + ",unsupported=" + unsupportedEntries + "}"
+                + " hearingSamples=" + hearingSamples
                 + " missions={active=" + counterattackMissions
                 + ",dormantAttackers=" + dormantCounterattackers + "}"
                 + " noise=" + noiseEvents

@@ -12,8 +12,16 @@ import java.util.ArrayDeque;
  * wildlife gets a one-shot reaction on emit. Bounded and short-lived.
  */
 public class WorldNoise {
+    public static final int MAX_HEARING_SAMPLES = 4096;
+    public static final int MAX_HEARING_QUERIES = 16;
+    private int hearingSamples, hearingQueries;
+    private long sequence;
+    public void beginTick() { hearingSamples = hearingQueries = 0; }
+    public int hearingSamples() { return hearingSamples; }
+    public int hearingQueries() { return hearingQueries; }
 
     public static final class NoiseEvent {
+        public long sequence;
         public final float x, y, z;
         /** Audible radius in blocks. */
         public final float radius;
@@ -51,6 +59,8 @@ public class WorldNoise {
 
     public void reset() {
         events.clear();
+        // Keep event ordering monotonic even if live listeners survive a queue reset.
+        beginTick();
     }
 
     /** Drops queued player-attributed events once the player stops being perceivable. */
@@ -75,6 +85,7 @@ public class WorldNoise {
         }
         NoiseEvent e = new NoiseEvent(x, y, z, radius, intensity, category,
                 playerSource, source, EVENT_LIFE);
+        e.sequence = ++sequence;
         events.addLast(e);
         while (events.size() > MAX_EVENTS) {
             events.removeFirst();
@@ -133,6 +144,50 @@ public class WorldNoise {
 
     public int count() {
         return events.size();
+    }
+
+    /**
+     * Indoor hearing uses a bounded direct ray, with distance penalties per solid
+     * cell: closed door 6, glass 4, other partition/slab 8 blocks. Open doors add
+     * no loss; locks have the same acoustic policy as an otherwise closed door.
+     * Unloaded columns and exhausted work are inaudible. This deliberately does
+     * not simulate sound propagating around a whole building.
+     */
+    public NoiseEvent loudestAudible(com.veylon.world.World world, float x, float y, float z,
+                                    float bonus, NoiseEvent after, Entity listener) {
+        if (hearingQueries >= MAX_HEARING_QUERIES) { return null; }
+        hearingQueries++;
+        NoiseEvent best = null;
+        double bestScore = -1;
+        for (NoiseEvent e : events) {
+            if (e.source == listener || after != null && e.sequence <= after.sequence
+                    || !e.playerSource && e.intensity < .6f) { continue; }
+            double distance = Math.sqrt(e.distSq(x, y, z));
+            double radius = e.radius + bonus;
+            if (distance > radius || distance > 128 || radius <= 0) { continue; }
+            int steps = Math.max(1, (int) Math.ceil(distance * 2));
+            int lastX = Integer.MIN_VALUE, lastY = Integer.MIN_VALUE, lastZ = Integer.MIN_VALUE;
+            float loss = 0;
+            for (int i = 0; i <= steps; i++) {
+                if (hearingSamples >= MAX_HEARING_SAMPLES) { loss = Float.POSITIVE_INFINITY; break; }
+                hearingSamples++;
+                float f = i / (float) steps;
+                int bx = (int) Math.floor(x + (e.x - x) * f);
+                int by = (int) Math.floor(y + 1.4f + (e.y + .1f - y - 1.4f) * f);
+                int bz = (int) Math.floor(z + (e.z - z) * f);
+                if (!world.isColumnLoaded(bx, bz)) { loss = Float.POSITIVE_INFINITY; break; }
+                if (bx == lastX && by == lastY && bz == lastZ) { continue; }
+                lastX = bx; lastY = by; lastZ = bz;
+                var block = world.getBlock(bx, by, bz);
+                if (com.veylon.world.Fixtures.isClosedDoor(block)) { loss += 6; }
+                else if (block == com.veylon.world.BlockType.WINDOW) { loss += 4; }
+                else if (block.solid && !block.isClimbable()) { loss += 8; }
+            }
+            if (distance + loss > radius) { continue; }
+            double score = e.intensity * (1 - (distance + loss) / radius) + e.life * .01;
+            if (score > bestScore) { best = e; bestScore = score; }
+        }
+        return best;
     }
 
     public int countCategory(String category) {

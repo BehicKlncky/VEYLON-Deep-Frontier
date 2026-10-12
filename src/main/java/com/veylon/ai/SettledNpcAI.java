@@ -1,6 +1,5 @@
 package com.veylon.ai;
 
-import com.veylon.FixtureActions;
 import com.veylon.Game;
 import com.veylon.combat.WeaponDefinition;
 import com.veylon.combat.WeaponRegistry;
@@ -13,7 +12,6 @@ import com.veylon.settlement.CounterattackMission;
 import com.veylon.settlement.Settlement;
 import com.veylon.util.Vec3i;
 import com.veylon.world.BlockType;
-import com.veylon.world.Fixtures;
 
 import java.util.List;
 
@@ -28,9 +26,6 @@ public final class SettledNpcAI {
 
     /** Seconds between perception (LOS) evaluations per NPC. */
     public static final float PERCEPTION_INTERVAL = 0.3f;
-
-    /** Seconds between repath attempts. */
-    private static final float REPATH_COOLDOWN = 1.6f;
 
     private SettledNpcAI() {
     }
@@ -126,7 +121,7 @@ public final class SettledNpcAI {
         if (n.decideTimer > 0) {
             return;
         }
-        n.decideTimer = PERCEPTION_INTERVAL;
+        n.decideTimer = PERCEPTION_INTERVAL + g.entities.nextSettledNpcAiFloat() * .15f;
         n.perceptionChecks++;
         var p = g.player;
         if (p == null || p.dead) {
@@ -172,9 +167,10 @@ public final class SettledNpcAI {
         }
 
         // Hearing: world noise events.
-        WorldNoise.NoiseEvent heard = g.noise.loudestAudible(
-                n.pos.x, n.pos.y, n.pos.z, n.archetype.hearRange * 0.3f);
+        WorldNoise.NoiseEvent heard = g.noise.loudestAudible(g.world,
+                n.pos.x, n.pos.y, n.pos.z, n.archetype.hearRange * 0.3f, n.lastHeard, n);
         if (heard != null && (heard.playerSource || heard.intensity > 0.6f)) {
+            n.lastHeard = heard;
             if (heard.playerSource && hostile) {
                 n.lastKnown.set(heard.x, heard.y, heard.z);
                 n.lastKnownAge = Math.min(n.lastKnownAge, 6f);
@@ -207,18 +203,7 @@ public final class SettledNpcAI {
     }
 
     private static boolean hasLineOfSight(Game g, Npc n, float tx, float ty, float tz) {
-        float ox = n.pos.x, oy = n.pos.y + 1.55f, oz = n.pos.z;
-        float dx = tx - ox, dy = ty - oy, dz = tz - oz;
-        float dist = (float) Math.sqrt(dx * dx + dy * dy + dz * dz);
-        int steps = Math.max(1, (int) (dist * 1.6f));
-        for (int i = 1; i < steps; i++) {
-            float f = i / (float) steps;
-            if (g.world.getBlock((int) Math.floor(ox + dx * f), (int) Math.floor(oy + dy * f),
-                    (int) Math.floor(oz + dz * f)).opaque) {
-                return false;
-            }
-        }
-        return true;
+        return InfectedAI.clearSight(g.world, n.pos.x, n.pos.y + 1.55f, n.pos.z, tx, ty, tz);
     }
 
     /** First contact: scouts sprint for the bell; others shout (noise event). */
@@ -573,7 +558,8 @@ public final class SettledNpcAI {
     private static void meleeCombatPlayer(Game g, Npc n, NpcArchetype a, double dist, float dt) {
         var p = g.player;
         n.attackCooldown -= dt;
-        if (dist < 1.9) {
+        if (dist < 1.9 && Math.abs(n.pos.y - p.pos.y) < .8f
+                && hasLineOfSight(g, n, p.pos.x, p.pos.y + 1.4f, p.pos.z)) {
             Steering.stop(n);
             faceToward(n, p.pos.x, p.pos.z);
             if (n.attackCooldown <= 0 && !p.abilities.invulnerable()) {
@@ -583,9 +569,6 @@ public final class SettledNpcAI {
                 g.audio.playHit();
                 g.log(n.name + " strikes you!");
             }
-        } else if (n.lastKnownAge < 1.0f) {
-            moveTo(g, n, new Vec3i((int) p.pos.x, (int) p.pos.y, (int) p.pos.z),
-                    a.speed * 1.1f, 1.6f);
         } else {
             moveTo(g, n, new Vec3i((int) n.lastKnown.x, (int) n.lastKnown.y,
                     (int) n.lastKnown.z), a.speed, 2f);
@@ -863,7 +846,7 @@ public final class SettledNpcAI {
     }
 
     // ------------------------------------------------------------------
-    // Movement: cached A* with steering fallback and gate handling
+    // Movement: shared bounded paths and fixture handling
     // ------------------------------------------------------------------
 
     /**

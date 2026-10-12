@@ -47,6 +47,10 @@ public final class PlayerAwareness {
             }
         }
         for (Npc n : g.entities.npcs) {
+            if (n.lastHeard != null && n.lastHeard.playerSource) { n.lastHeard = null; }
+            if (n.searchTimer > 0 || n.combatTarget == g.player) {
+                n.path = null; n.navigationGoal = null; Steering.stop(n);
+            }
             if (n.infected()) { n.strikeWindup = -1; n.lastHeard = null; }
             n.lastKnownAge = FORGOTTEN_AGE;
             n.searchTimer = 0;

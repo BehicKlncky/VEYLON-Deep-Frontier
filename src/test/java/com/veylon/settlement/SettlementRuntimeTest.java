@@ -265,6 +265,7 @@ class SettlementRuntimeTest {
 
         // The player approaches and is genuinely perceived; contact is not
         // injected into party state by the test.
+        g.world.ensureChunks((int) scout.pos.x, (int) scout.pos.z, 1, 10_000);
         g.player.pos.set(scout.pos.x + 1.2f, scout.pos.y, scout.pos.z);
         scout.decideTimer = 0f;
         SettledNpcAI.update(g, scout, 0.31f);

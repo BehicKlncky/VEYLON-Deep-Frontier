@@ -43,6 +43,7 @@ public class EntityManager {
 
     public void fastTick(Game g, float dt) {
         g.world.navigation.budget.beginTick();
+        g.noise.beginTick();
         for (Iterator<Creature> it = creatures.iterator(); it.hasNext(); ) {
             Creature c = it.next();
             CreatureAI.update(g, c, dt);
@@ -150,6 +151,7 @@ public class EntityManager {
      */
     public void depart(Game g, Npc n) {
         n.path = null; n.navigationGoal = null; n.combatTarget = null;
+        n.lastHeard = null; n.searchTimer = 0; n.strikeWindup = -1;
         if (n.infected()) {
             var resident = encounters.resident(n.encounterId);
             if (resident != null && !resident.dead()) { resident.capture(n); resident.live = null; }
