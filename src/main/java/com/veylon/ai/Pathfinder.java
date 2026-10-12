@@ -14,12 +14,11 @@ import java.util.PriorityQueue;
 /**
  * Bounded voxel A* for settlement NPCs: walkable-cell evaluation with 1-block
  * step-up, limited step-down, water cost, gate/ladder awareness and a strict
- * expansion budget. Never touches unloaded chunks. Callers cache the result
- * and fall back to direct steering when no path is found.
+ * expansion budget shared by populations. No route means waiting safely.
  */
 public final class Pathfinder {
 
-    /** Default expansion budget per query (keeps worst case ~0.1 ms). */
+    /** Default expansion budget per query; wall time depends on the host. */
     public static final int DEFAULT_BUDGET = 700;
     /** Maximum straight-line range accepted for a query. */
     public static final int MAX_RANGE = 56;
@@ -86,12 +85,33 @@ public final class Pathfinder {
 
     /**
      * Finds a path of standable cells from start to goal, or null. Both ends
-     * snap down up to 2 cells to find footing. Budgeted; never exhaustive.
+     * snap at most one cell to find footing. Budgeted; never exhaustive.
      */
     public static List<Vec3i> find(World w, int sx, int sy, int sz,
                                    int tx, int ty, int tz, int budget) {
-        int dx = tx - sx, dz = tz - sz;
-        if (dx * dx + dz * dz > MAX_RANGE * MAX_RANGE) {
+        return findBounded(w, sx, sy, sz, tx, ty, tz, budget, false);
+    }
+
+    /** A safe connected prefix may advance a long route when this tick's local search runs out. */
+    public static List<Vec3i> findSegment(World w, int sx, int sy, int sz,
+                                         int tx, int ty, int tz, int budget) {
+        return findBounded(w, sx, sy, sz, tx, ty, tz, budget, true);
+    }
+
+    private static List<Vec3i> findBounded(World w, int sx, int sy, int sz,
+                                          int tx, int ty, int tz, int budget, boolean partial) {
+        budget = w.navigation.budget.query(Math.min(budget, DEFAULT_BUDGET));
+        if (budget <= 0) { return null; }
+        List<Vec3i> result = search(w, sx, sy, sz, tx, ty, tz, budget, partial);
+        if (result == null) { w.navigation.budget.failed(); }
+        return result;
+    }
+
+    private static List<Vec3i> search(World w, int sx, int sy, int sz,
+                                    int tx, int ty, int tz, int budget, boolean partial) {
+        long dx = (long) tx - sx, dz = (long) tz - sz;
+        if (Math.abs(dx) > MAX_RANGE || Math.abs(dz) > MAX_RANGE
+                || dx * dx + dz * dz > MAX_RANGE * MAX_RANGE) {
             return null;
         }
         sy = snapDown(w, sx, sy, sz);
@@ -99,11 +119,20 @@ public final class Pathfinder {
         if (sy < 0 || ty < 0) {
             return null;
         }
+        Vec3i start = new Vec3i(sx, sy, sz), goal = new Vec3i(tx, ty, tz);
+        List<Vec3i> cached = w.navigation.get(start, goal);
+        if (cached != null && cached.stream().allMatch(p -> w.isColumnLoaded(p.x(), p.z()))) {
+            w.navigation.budget.hit();
+            return cached;
+        }
         long startKey = key(sx, sy, sz);
         long goalKey = key(tx, ty, tz);
         if (startKey == goalKey) {
-            return List.of(new Vec3i(tx, ty, tz));
+            List<Vec3i> route = List.of(goal);
+            w.navigation.put(start, goal, route);
+            return route;
         }
+        com.veylon.world.VoxelAccess opened = traversalAccess(w);
 
         PriorityQueue<Node> open = new PriorityQueue<>((a, b) -> Float.compare(a.f, b.f));
         Map<Long, Float> gScore = new HashMap<>();
@@ -112,22 +141,28 @@ public final class Pathfinder {
         open.add(new Node(startKey, 0f, heuristic(sx, sy, sz, tx, ty, tz)));
 
         int expansions = 0;
+        long nearest = startKey;
+        float nearestDistance = heuristic(sx, sy, sz, tx, ty, tz);
         while (!open.isEmpty() && expansions < budget) {
             Node cur = open.poll();
             if (cur.g > gScore.getOrDefault(cur.key, Float.MAX_VALUE)) {
                 continue; // stale entry
             }
             expansions++;
+            w.navigation.budget.expanded();
             int cx = kx(cur.key), cy = ky(cur.key), cz = kz(cur.key);
-            if (cur.key == goalKey
-                    || (Math.abs(cx - tx) + Math.abs(cz - tz) <= 1 && Math.abs(cy - ty) <= 1)) {
-                return reconstruct(parent, cur.key, startKey);
+            float remaining = heuristic(cx, cy, cz, tx, ty, tz);
+            if (remaining < nearestDistance) { nearest = cur.key; nearestDistance = remaining; }
+            if (cur.key == goalKey) {
+                List<Vec3i> route = reconstruct(parent, cur.key, startKey);
+                if (route != null) { w.navigation.put(start, goal, route); }
+                return route;
             }
 
             // Ladder cells allow direct vertical movement.
             if (w.getBlock(cx, cy, cz).isClimbable()) {
-                relax(w, open, gScore, parent, cur, cx, cy + 1, cz, tx, ty, tz, 1.2f);
-                relax(w, open, gScore, parent, cur, cx, cy - 1, cz, tx, ty, tz, 1.2f);
+                relax(w, opened, open, gScore, parent, cur, cx, cy + 1, cz, tx, ty, tz, 1.2f);
+                relax(w, opened, open, gScore, parent, cur, cx, cy - 1, cz, tx, ty, tz, 1.2f);
             }
 
             for (int[] d : DIRS) {
@@ -137,16 +172,16 @@ public final class Pathfinder {
                 }
                 // Same level, step up 1, or step down up to MAX_DROP.
                 if (standable(w, nx, cy, nz)) {
-                    relax(w, open, gScore, parent, cur, nx, cy, nz, tx, ty, tz, 0f);
+                    relax(w, opened, open, gScore, parent, cur, nx, cy, nz, tx, ty, tz, 0f);
                 } else if (standable(w, nx, cy + 1, nz) && passable(w, cx, cy + 2, cz)) {
-                    relax(w, open, gScore, parent, cur, nx, cy + 1, nz, tx, ty, tz, 0.6f);
+                    relax(w, opened, open, gScore, parent, cur, nx, cy + 1, nz, tx, ty, tz, 0.6f);
                 } else {
                     for (int drop = 1; drop <= MAX_DROP; drop++) {
                         if (!passable(w, nx, cy - drop + 1, nz)) {
                             break;
                         }
                         if (standable(w, nx, cy - drop, nz)) {
-                            relax(w, open, gScore, parent, cur, nx, cy - drop, nz,
+                            relax(w, opened, open, gScore, parent, cur, nx, cy - drop, nz,
                                     tx, ty, tz, drop * 0.3f);
                             break;
                         }
@@ -154,12 +189,26 @@ public final class Pathfinder {
                 }
             }
         }
+        if (partial && expansions == budget && nearest != startKey) {
+            List<Vec3i> prefix = reconstruct(parent, nearest, startKey);
+            if (prefix != null) {
+                // This is complete to its own endpoint, never cached as a complete route to the original goal.
+                w.navigation.put(start, prefix.getLast(), prefix);
+                w.navigation.budget.failed();
+                return prefix;
+            }
+        }
         return null;
     }
 
-    private static void relax(World w, PriorityQueue<Node> open, Map<Long, Float> gScore,
+    private static void relax(World w, com.veylon.world.VoxelAccess opened, PriorityQueue<Node> open, Map<Long, Float> gScore,
                               Map<Long, Long> parent, Node cur, int nx, int ny, int nz,
                               int tx, int ty, int tz, float extra) {
+        int cx = kx(cur.key), cy = ky(cur.key), cz = kz(cur.key);
+        if (nx == cx && nz == cz) {
+            if (ny < 1 || ny + 1 >= com.veylon.world.Chunk.SY || !standable(w, nx, ny, nz)) { return; }
+        } else if (!com.veylon.world.urban.AccessibilityValidator.canMove(opened,
+                new Vec3i(cx, cy, cz), new Vec3i(nx, ny, nz))) { return; }
         long nk = key(nx, ny, nz);
         float ng = cur.g + moveCost(w, nx, ny, nz) + extra;
         Float old = gScore.get(nk);
@@ -187,21 +236,37 @@ public final class Pathfinder {
             out.add(new Vec3i(kx(k), ky(k), kz(k)));
             if (k == start) {
                 java.util.Collections.reverse(out);
-                return out;
+                return List.copyOf(out);
             }
             k = parent.get(k);
         }
         return null;
     }
 
-    /** Snaps a cell downward to footing (max 3); -1 when none. */
+    /** Snaps one cell to footing to tolerate body/step rounding; never guesses another floor. */
     private static int snapDown(World w, int x, int y, int z) {
-        for (int dy = 0; dy <= 3; dy++) {
+        if (!w.isColumnLoaded(x, z) || y < 1 || y + 1 >= com.veylon.world.Chunk.SY) { return -1; }
+        // A flight/teleport target must never silently become a different floor.
+        for (int dy = 0; dy <= 1; dy++) {
             if (standable(w, x, y - dy, z)) {
                 return y - dy;
             }
         }
         // Also allow snapping up one (target on a step).
         return standable(w, x, y + 1, z) ? y + 1 : -1;
+    }
+
+    /** Planning may open unlocked doors, but cannot erase any other solid or unloaded cell. */
+    static com.veylon.world.VoxelAccess traversalAccess(World w) {
+        return new com.veylon.world.VoxelAccess() {
+            public boolean isColumnLoaded(int x, int z) { return w.isColumnLoaded(x, z); }
+            public int fixtureLockAt(int x, int y, int z) { return w.fixtureLockAt(x, y, z); }
+            public BlockType getBlock(int x, int y, int z) {
+                if (!w.isColumnLoaded(x, z)) { return BlockType.STONE; }
+                BlockType b = w.getBlock(x, y, z);
+                return (b == BlockType.GATE || Fixtures.isClosedDoor(b)) && passable(w, x, y, z)
+                        ? BlockType.AIR : b;
+            }
+        };
     }
 }

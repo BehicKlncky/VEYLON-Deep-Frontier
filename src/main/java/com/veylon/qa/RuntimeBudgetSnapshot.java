@@ -52,7 +52,9 @@ public record RuntimeBudgetSnapshot(
         int urbanBuildingPlans,
         int fixtureStates,
         int residentDoors,
-        int urbanEncounterRecords) {
+        int urbanEncounterRecords,
+        int navigationRoutes, int pathQueries, int pathExpansions, int pathDeferred,
+        int pathFailures, int unsupportedEntries) {
 
     public static RuntimeBudgetSnapshot capture(Game game) {
         int pathNodes = 0;
@@ -99,7 +101,10 @@ public record RuntimeBudgetSnapshot(
                 game.world.urban == null ? 0 : game.world.urban.cachedRegionPlans(),
                 game.world.urban == null ? 0 : game.world.urban.cachedBuildingPlans(),
                 game.world.fixtures.size(),
-                game.world.fixtures.transitTimers().size(), game.entities.encounters.size());
+                game.world.fixtures.transitTimers().size(), game.entities.encounters.size(),
+                game.world.navigation.size(), game.world.navigation.budget.queries(),
+                game.world.navigation.budget.expansions(), game.world.navigation.budget.deferred(),
+                game.world.navigation.budget.failures(), game.world.navigation.budget.unsupportedEntries());
     }
 
     /** True when every collection with a hard runtime ceiling is within it. */
@@ -136,6 +141,9 @@ public record RuntimeBudgetSnapshot(
                 && urbanBuildingPlans <= UrbanWorldState.MAX_BUILDING_PLANS
                 && fixtureStates <= FixtureStates.MAX_ENTRIES
                 && residentDoors <= FixtureStates.MAX_TRANSIT
+                && navigationRoutes <= com.veylon.ai.NavigationCache.MAX_ROUTES
+                && pathQueries <= com.veylon.ai.PathBudget.MAX_QUERIES
+                && pathExpansions <= com.veylon.ai.PathBudget.MAX_EXPANSIONS
                 // The player never panics.
                 && panickingBodies < livingBodies;
     }
@@ -150,7 +158,10 @@ public record RuntimeBudgetSnapshot(
                 + ",counterattack=" + npcs.counterattackers()
                 + ",legacy=" + npcs.legacy() + ",infected=" + npcs.infected() + "}"
                 + " projectiles={live=" + liveProjectiles + ",stuck=" + stuckArrows + "}"
-                + " paths={nodes=" + cachedPathNodes + ",largest=" + largestCachedPath + "}"
+                + " paths={nodes=" + cachedPathNodes + ",largest=" + largestCachedPath
+                + ",routes=" + navigationRoutes + ",queries=" + pathQueries
+                + ",expanded=" + pathExpansions + ",deferred=" + pathDeferred
+                + ",failed=" + pathFailures + ",unsupported=" + unsupportedEntries + "}"
                 + " missions={active=" + counterattackMissions
                 + ",dormantAttackers=" + dormantCounterattackers + "}"
                 + " noise=" + noiseEvents

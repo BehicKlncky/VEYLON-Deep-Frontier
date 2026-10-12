@@ -41,17 +41,8 @@ public class EntityManager {
     /** Goals of people and animals fleeing the fire on their bodies ({@code ai.FirePanic}). */
     private final Random panicRng = new Random();
 
-    /** At most two 400-expansion infected searches per fast tick, shared by all twelve bodies. */
-    private int infectedPathQueries;
-
-    public boolean takeInfectedPathQuery() {
-        if (infectedPathQueries >= 2) { return false; }
-        infectedPathQueries++;
-        return true;
-    }
-
     public void fastTick(Game g, float dt) {
-        infectedPathQueries = 0;
+        g.world.navigation.budget.beginTick();
         for (Iterator<Creature> it = creatures.iterator(); it.hasNext(); ) {
             Creature c = it.next();
             CreatureAI.update(g, c, dt);
@@ -69,10 +60,11 @@ public class EntityManager {
         }
         for (Iterator<Npc> it = npcs.iterator(); it.hasNext(); ) {
             Npc n = it.next();
-            if (n.infected() && !n.dead && !UrbanEncounterDirector.bodyLoaded(g.world, n.pos.x, n.pos.z)) {
+            if ((n.infected() || n.settled() && !n.warParty) && !n.abstractTravel && !n.dead
+                    && !UrbanEncounterDirector.bodyLoaded(g.world, n.pos.x, n.pos.z)) {
                 // The slow director will make it dormant. Freeze gravity too until then,
                 // otherwise unloaded AIR would corrupt the durable feet height.
-                n.vel.zero(); continue;
+                n.vel.zero(); n.path = null; continue;
             }
             NpcAI.update(g, n, dt);
             if (!n.abstractTravel) {
@@ -157,6 +149,7 @@ public class EntityManager {
      * health and standing are whatever the leaving code wrote back.
      */
     public void depart(Game g, Npc n) {
+        n.path = null; n.navigationGoal = null; n.combatTarget = null;
         if (n.infected()) {
             var resident = encounters.resident(n.encounterId);
             if (resident != null && !resident.dead()) { resident.capture(n); resident.live = null; }

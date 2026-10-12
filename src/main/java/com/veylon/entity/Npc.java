@@ -61,6 +61,8 @@ public class Npc extends Entity {
     /** Current path (world cell centers) and progress index. */
     public java.util.List<Vec3i> path;
     public int pathIndex;
+    /** Final hierarchical destination; never serialized. */
+    public Vec3i navigationGoal;
     public float repathCooldown;
     /** Patrol progress for guards/patrollers. */
     public int patrolIndex;

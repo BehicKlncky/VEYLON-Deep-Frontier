@@ -22,7 +22,7 @@ import java.util.List;
  * (sleep, work, patrol, guard), perception (occluded sight, hearing via world
  * noise events), alarm/search/return-to-duty, ranged and melee combat with
  * friendly-fire awareness, morale-driven flight, and gate handling — all on
- * top of bounded A* with steering fallback.
+ * top of shared bounded indoor routing with safe waiting.
  */
 public final class SettledNpcAI {
 
@@ -868,72 +868,11 @@ public final class SettledNpcAI {
 
     /**
      * Moves toward a target using the cached path; returns false when arrived.
-     * Falls back to direct steering when pathing fails or the target is close.
+     * Waits safely when a route is blocked or the shared allowance is exhausted.
      * Package-private so navigation tests drive the production path follower.
      */
     static boolean moveTo(Game g, Npc n, Vec3i target, float speed, float arrive) {
-        double flat = Math.sqrt((n.pos.x - target.x() - 0.5) * (n.pos.x - target.x() - 0.5)
-                + (n.pos.z - target.z() - 0.5) * (n.pos.z - target.z() - 0.5));
-        if (flat < arrive && Math.abs(n.pos.y - target.y()) < 3) {
-            Steering.stop(n);
-            n.path = null;
-            return false;
-        }
-
-        // Validate / advance the cached path.
-        if (n.path != null) {
-            if (n.pathIndex >= n.path.size()) {
-                n.path = null;
-            } else {
-                Vec3i last = n.path.getLast();
-                if (last.distSq(target.x() + 0.5, target.y() + 0.5, target.z() + 0.5) > 6 * 6) {
-                    n.path = null; // target moved too far from the planned goal
-                }
-            }
-        }
-
-        if (n.path == null && n.repathCooldown <= 0) {
-            n.repathCooldown = REPATH_COOLDOWN
-                    + g.entities.nextSettledNpcAiFloat() * 0.7f;
-            n.path = Pathfinder.find(g.world,
-                    (int) Math.floor(n.pos.x), (int) Math.floor(n.pos.y), (int) Math.floor(n.pos.z),
-                    target.x(), target.y(), target.z(), Pathfinder.DEFAULT_BUDGET);
-            n.pathIndex = 0;
-        }
-
-        if (n.path != null && n.pathIndex < n.path.size()) {
-            Vec3i cell = n.path.get(n.pathIndex);
-            // Gates along the path get shoved open.
-            BlockType inCell = g.world.getBlock(cell.x(), cell.y(), cell.z());
-            BlockType headCell = g.world.getBlock(cell.x(), cell.y() + 1, cell.z());
-            if (inCell == BlockType.GATE) {
-                g.settlementManager.openGate(g, cell);
-            }
-            if (headCell == BlockType.GATE) {
-                g.settlementManager.openGate(g, new Vec3i(cell.x(), cell.y() + 1, cell.z()));
-            }
-            // Doors too: opened as one, and they swing shut behind (D-52).
-            if (Fixtures.isClosedDoor(inCell)) {
-                FixtureActions.residentOpens(g, cell.x(), cell.y(), cell.z());
-            } else if (Fixtures.isClosedDoor(headCell)) {
-                FixtureActions.residentOpens(g, cell.x(), cell.y() + 1, cell.z());
-            }
-            double cd = n.distSqTo(cell.x() + 0.5f, n.pos.y, cell.z() + 0.5f);
-            if (cd < 0.55 * 0.55 && Math.abs(n.pos.y - cell.y()) < 1.6f) {
-                n.pathIndex++;
-            } else {
-                Steering.moveToward(n, cell.x() + 0.5f, cell.z() + 0.5f, speed);
-                // Climb ladders along the path.
-                if (cell.y() > n.pos.y + 0.6f && n.onLadder) {
-                    n.vel.y = 2.4f;
-                }
-            }
-            return true;
-        }
-
-        // Fallback: direct steering (existing behavior).
-        Steering.moveToward(n, target.x() + 0.5f, target.z() + 0.5f, speed);
-        return true;
+        return IndoorNavigation.moveTo(g, n, target, speed, arrive);
     }
 
     private static void faceToward(Npc n, float tx, float tz) {

@@ -36,6 +36,12 @@ import java.util.function.BiConsumer;
  * them again and the save writes them closed.
  */
 public final class FixtureStates {
+    private final java.util.function.Consumer<Vec3i> traversalChanged;
+
+    public FixtureStates() { this(p -> { }); }
+    public FixtureStates(java.util.function.Consumer<Vec3i> traversalChanged) {
+        this.traversalChanged = traversalChanged;
+    }
 
     /** Most fixture cells with saved state; the reader accepts no more. */
     public static final int MAX_ENTRIES = 32_768;
@@ -111,6 +117,7 @@ public final class FixtureStates {
         }
         Map<Vec3i, Byte> bucket = byChunk.get(chunkKey(x, z));
         Vec3i pos = new Vec3i(x, y, z);
+        int oldLock = lockAt(x, y, z);
         if (bucket == null || !bucket.containsKey(pos)) {
             if (size >= MAX_ENTRIES) {
                 return false;
@@ -122,6 +129,7 @@ public final class FixtureStates {
             size++;
         }
         bucket.put(pos, (byte) state);
+        if (oldLock != lock(state)) { traversalChanged.accept(pos); }
         return true;
     }
 
@@ -135,6 +143,7 @@ public final class FixtureStates {
         Map<Vec3i, Byte> bucket = byChunk.get(key);
         Vec3i pos = new Vec3i(x, y, z);
         if (bucket != null && bucket.remove(pos) != null) {
+            traversalChanged.accept(pos);
             size--;
             if (bucket.isEmpty()) {
                 byChunk.remove(key);

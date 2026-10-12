@@ -120,8 +120,10 @@ public class World implements VoxelAccess {
     public static final float LANTERN_MAX_FUEL = 4 * LANTERN_FUEL_PER_CHARCOAL;
     /** Finite lantern state keyed by the placed block position. */
     public final Map<Vec3i, LanternState> lanterns = new HashMap<>();
+    /** Transient bounded traversal routes and the shared population work allowance. */
+    public final com.veylon.ai.NavigationCache navigation = new com.veylon.ai.NavigationCache();
     /** Door and window state no block id expresses: open, locks and bars (D-48). */
-    public final FixtureStates fixtures = new FixtureStates();
+    public final FixtureStates fixtures = new FixtureStates(navigation::changed);
 
     public BlockListener listener;
     public Vec3i campPos;
@@ -413,6 +415,12 @@ public class World implements VoxelAccess {
         Vec3i pos = new Vec3i(x, y, z);
         if (urban != null && !urban.containers.changing(this,pos,old,t)) { return; }
         c.set(lx, y, lz, t);
+        if (!(Fixtures.isClosedDoor(old) || Fixtures.isOpen(old))
+                || Fixtures.kindOf(old) != Fixtures.kindOf(t)
+                || Fixtures.kindOf(old) == null || !Fixtures.kindOf(old).door
+                || fixtureLockAt(x, y, z) != FixtureStates.LOCK_NONE) {
+            navigation.changed(x, y, z);
+        }
         if (old == BlockType.POWDER_KEG) {
             kegFuses.remove(pos);
             kegFusePlayerAttribution.remove(pos);

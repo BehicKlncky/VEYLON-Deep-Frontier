@@ -95,7 +95,7 @@ public final class InfectedAI {
             Steering.stop(n);
         } else if (n.searchTimer > 0 && !canStrike) {
             n.state = Npc.NpcState.GUARD;
-            pursue(g, n);
+            pursue(g, n, dt);
         } else {
             n.state = Npc.NpcState.IDLE;
             Steering.stop(n);
@@ -130,39 +130,9 @@ public final class InfectedAI {
         return true;
     }
 
-    private static void pursue(Game g, Npc n) {
-        if (n.distSqTo(n.lastKnown.x, n.lastKnown.y, n.lastKnown.z) < 0.5f) {
-            Steering.stop(n);
-            return;
-        }
-        if (n.repathCooldown <= 0 && g.entities.takeInfectedPathQuery()) {
-            n.repathCooldown = 1.5f;
-            n.path = Pathfinder.find(g.world, cell(n.pos.x), cell(n.pos.y), cell(n.pos.z),
-                    cell(n.lastKnown.x), cell(n.lastKnown.y), cell(n.lastKnown.z), 400);
-            n.pathIndex = 0;
-        }
-        if (n.path == null || n.pathIndex >= n.path.size()) { Steering.stop(n); return; }
-        Vec3i step = n.path.get(n.pathIndex);
-        // Existing A* can propose an unswept stair-side drop. Refuse it; portal routing belongs to 10.
-        if (!safeStride(g.world, n, step)) { n.path = null; Steering.stop(n); return; }
-        if (n.distSqTo(step.x() + 0.5f, n.pos.y, step.z() + 0.5f) < 0.18f) {
-            n.pathIndex++;
-            Steering.stop(n);
-        } else {
-            Steering.moveToward(n, step.x() + 0.5f, step.z() + 0.5f, n.archetype.speed);
-        }
+    private static void pursue(Game g, Npc n, float dt) {
+        if (!IndoorNavigation.moveTo(g, n, new Vec3i(cell(n.lastKnown.x), cell(n.lastKnown.y + .01f),
+                cell(n.lastKnown.z)), n.archetype.speed, .65f)) { n.yaw += 35f * dt; }
     }
-
-    private static boolean safeStride(World w, Npc n, Vec3i step) {
-        if (Math.abs(step.y() - n.pos.y) > 0.6f) { return false; }
-        float dx = step.x() + 0.5f - n.pos.x, dz = step.z() + 0.5f - n.pos.z;
-        for (int i = 1; i <= 5; i++) {
-            float x = n.pos.x + dx * i / 5, z = n.pos.z + dz * i / 5;
-            if (!com.veylon.entity.UrbanEncounterDirector.bodyLoaded(w, x, z) || n.collidesAt(x, n.pos.y, z)
-                    || !w.getBlock(cell(x), cell(n.pos.y) - 1, cell(z)).solid) { return false; }
-        }
-        return true;
-    }
-
     private static int cell(float value) { return (int) Math.floor(value); }
 }
