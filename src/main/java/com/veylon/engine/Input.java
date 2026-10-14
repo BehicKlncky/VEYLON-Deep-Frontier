@@ -93,6 +93,13 @@ public class Input {
         return key >= 0 && key <= GLFW_KEY_LAST && keyPressed[key];
     }
 
+    /** Marks this frame's press of {@code key} as handled, so a later reader cannot act on it again. */
+    public void consumePress(int key) {
+        if (key >= 0 && key <= GLFW_KEY_LAST) {
+            keyPressed[key] = false;
+        }
+    }
+
     public boolean isMouseDown(int button) {
         return button >= 0 && button < 8 && mouseDown[button];
     }
