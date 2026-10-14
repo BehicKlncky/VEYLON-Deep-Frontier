@@ -14,8 +14,6 @@ import com.veylon.util.Vec3i;
 import com.veylon.world.BlockType;
 import com.veylon.world.Chunk;
 import com.veylon.world.FixtureStates;
-import com.veylon.world.Fixtures;
-import com.veylon.world.VoxelClearance;
 import com.veylon.world.World;
 import com.veylon.world.urban.BuildingPlan.Fixture;
 import com.veylon.world.urban.EncounterAnchors;
@@ -23,12 +21,9 @@ import com.veylon.world.urban.UrbanContainers;
 
 import java.lang.management.ManagementFactory;
 import java.lang.management.MemoryUsage;
-import java.util.ArrayDeque;
 import java.util.ArrayList;
-import java.util.BitSet;
 import java.util.EnumMap;
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -49,42 +44,26 @@ import static org.lwjgl.glfw.GLFW.*;
  * first upgrade, quick-saves, quick-loads over the live world, then revisits in reverse order and
  * checks for refills, resurrection and stale state. Failures throw, like the other urban scenes.
  */
-final class UrbanSliceQaScene {
+final class UrbanSliceQaScene extends UrbanRouteScene {
     /** Wall-clock seconds in a native session, simulated seconds in a headless route. */
     static final double DEADLINE_SECONDS = 900;
-    private static final float MAX_STEP = 0.1f;
-    private static final float THREAT_RADIUS = 7f, STRIKE_REACH = 2.6f;
-    private static final float FIGHT_SECONDS = 45f, LOST_SECONDS = 4f, HUNT_WAIT_SECONDS = 60f;
+    private static final float HUNT_WAIT_SECONDS = 60f;
 
-    private final Game game;
-    private final ArrayDeque<Task> tasks = new ArrayDeque<>();
-    private Task current;
     private UrbanSlicePlan plan;
-    private boolean staged, reported, passed;
-    private double last = -1, elapsed;
+    private boolean passed;
     private float gameMinutesAtStart;
 
-    // Input the runner holds through the production seam.
-    private final BitSet heldKeys = new BitSet();
-    private final List<Integer> releaseKeys = new ArrayList<>(4);
-    private boolean leftHeld, rightRelease;
-
-    // Threat handling and route observations.
-    private Npc fighting;
-    private float fightTime, lostTime;
-    private final Set<Long> engaged = new LinkedHashSet<>(), defeated = new LinkedHashSet<>();
+    // Route observations.
     private float walked, damage, lastX, lastZ, lastHealth = -1;
     private int searches, revisits, harm, lastHarm;
     private Player observed;
     private float minHealth = Float.MAX_VALUE, minBodyTemp = Float.MAX_VALUE;
     private final Set<String> eventsSeen = new java.util.TreeSet<>(), afflictionsSeen = new java.util.TreeSet<>();
-    private final List<String> timeline = new ArrayList<>();
 
     // State saved by the quick-save, compared after the quick-load and on the revisit.
     private final Map<Vec3i, Touched> touched = new LinkedHashMap<>();
     private final Map<Vec3i, BlockType> doorBlocks = new LinkedHashMap<>();
     private final Map<Vec3i, Integer> doorLocks = new LinkedHashMap<>();
-    private Vec3i forcedAt;
     private World savedWorld;
     private Player savedPlayer;
     private List<Npc> savedNpcs = List.of();
@@ -93,11 +72,17 @@ final class UrbanSliceQaScene {
     private record Touched(long id, UrbanContainers.State state, Map<ItemType, Integer> contents) { }
 
     UrbanSliceQaScene(Game game) {
-        this.game = game;
+        super(game);
+    }
+
+    @Override protected String tag() { return "urban-slice"; }
+    @Override protected double deadline() { return DEADLINE_SECONDS; }
+    @Override protected void threatInReach() { capture("08-threat"); }
+    @Override protected void defeatedThreat() {
+        if (defeated.size() == 1) { capture("09-defeated"); }
     }
 
     boolean passed() { return passed; }
-    boolean reported() { return reported; }
     Set<Long> defeated() { return defeated; }
     Vec3i forcedAt() { return forcedAt; }
     UrbanSlicePlan plan() { return plan; }
@@ -120,7 +105,7 @@ final class UrbanSliceQaScene {
         add(new Wait("settle", 1.5f), new Capture("01-refuge-start"),
                 new Walk(court), new Capture("02-courtyard"),
                 new Walk(apartmentDoor), new Capture("03-apartment-entry"),
-                new Force(plan.forcedDoor()),
+                new Force(plan.forcedDoor(), "04-forced-door"),
                 new Search(plan.locker(), Policy.TAKE_EXCEPT_LIGHT), new Search(plan.kitchen(), Policy.TAKE_ALL),
                 new Search(plan.bathroom(), Policy.TAKE_ALL), new Search(plan.upstairs(), Policy.TAKE_ALL),
                 new Capture("07-upper-floor"), new Hunt(), new Walk(apartmentDoor),
@@ -135,290 +120,9 @@ final class UrbanSliceQaScene {
         staged = true;
     }
 
-    /** Per-frame hook, before the frame step reads input; inert until staged. */
-    void update(double now) {
-        if (!staged || reported) {
-            return;
-        }
-        float dt = last < 0 ? 0f : (float) Math.min(MAX_STEP, Math.max(0, now - last));
-        last = now;
-        elapsed += dt;
-        releaseQueued();
-        if (elapsed > DEADLINE_SECONDS) {
-            throw fail("deadline at " + (current == null ? "start" : current.name));
-        }
-        if (game.player.dead || game.appState == Game.AppState.DEATH) {
-            throw fail("the player died at " + (current == null ? "start" : current.name));
-        }
-        observe();
-        if (game.uiMode == Game.UiMode.NONE && (current == null || current.threatsInterrupt()) && fight(dt)) {
-            return;
-        }
-        if (current == null) {
-            current = tasks.poll();
-            if (current == null) { return; }
-            timeline.add(String.format(Locale.ROOT, "%.0f:%s", elapsed, current.name));
-        }
-        current.age += dt;
-        if (current.step(dt)) {
-            current = null;
-        }
-    }
-
-    // ------------------------------------------------------------------
-    // Input through the production seam
-    // ------------------------------------------------------------------
-
-    private void hold(int key, boolean down) {
-        if (heldKeys.get(key) == down) { return; }
-        heldKeys.set(key, down);
-        game.input.onKey(key, down ? GLFW_PRESS : GLFW_RELEASE);
-    }
-
-    /** One press seen by this frame; released before the next. */
-    private void press(int key) {
-        game.input.onKey(key, GLFW_PRESS);
-        releaseKeys.add(key);
-    }
-
-    private void leftMouse(boolean down) {
-        if (leftHeld == down) { return; }
-        leftHeld = down;
-        game.input.onMouseButton(GLFW_MOUSE_BUTTON_LEFT, down ? GLFW_PRESS : GLFW_RELEASE);
-    }
-
-    private void rightClick() {
-        game.input.onMouseButton(GLFW_MOUSE_BUTTON_RIGHT, GLFW_PRESS);
-        rightRelease = true;
-    }
-
-    private void releaseQueued() {
-        for (int key : releaseKeys) { game.input.onKey(key, GLFW_RELEASE); }
-        releaseKeys.clear();
-        if (rightRelease) {
-            game.input.onMouseButton(GLFW_MOUSE_BUTTON_RIGHT, GLFW_RELEASE);
-            rightRelease = false;
-        }
-    }
-
-    private void releaseAll() {
-        for (int key = heldKeys.nextSetBit(0); key >= 0; key = heldKeys.nextSetBit(key + 1)) {
-            game.input.onKey(key, GLFW_RELEASE);
-        }
-        heldKeys.clear();
-        leftMouse(false);
-        releaseQueued();
-    }
-
-    /** Mouse look toward a point from the player's eye. */
-    private void look(float x, float y, float z) {
-        Player p = game.player;
-        float dx = x - p.pos.x, dy = y - (p.pos.y + p.eyeHeight()), dz = z - p.pos.z;
-        game.camera.yaw = (float) Math.toDegrees(Math.atan2(dx, -dz));
-        game.camera.pitch = (float) -Math.toDegrees(Math.atan2(dy, Math.hypot(dx, dz)));
-    }
-
-    private void lookAtBlock(Vec3i b, float height) {
-        look(b.x() + .5f, b.y() + height, b.z() + .5f);
-    }
-
-    /** Digit key for the hotbar slot holding {@code type}, or false when it is not on the hotbar. */
-    private boolean select(ItemType type) {
-        Inventory inv = game.player.inventory;
-        for (int slot = 0; slot < 9; slot++) {
-            ItemStack s = inv.get(slot);
-            if (s != null && s.type == type) {
-                if (game.player.hotbarSel != slot) { press(GLFW_KEY_1 + slot); }
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private void selectWeapon() {
-        if (select(ItemType.IRON_SPEAR) || select(ItemType.IRON_PICKAXE)) { return; }
-        Inventory inv = game.player.inventory;
-        for (int slot = 8; slot >= 0; slot--) {
-            if (inv.get(slot) == null) {
-                if (game.player.hotbarSel != slot) { press(GLFW_KEY_1 + slot); }
-                return;
-            }
-        }
-    }
-
-    // ------------------------------------------------------------------
-    // Threats: a pursuing infected interrupts walking until it is handled
-    // ------------------------------------------------------------------
-
-    private boolean fight(float dt) {
-        if (fighting == null) {
-            fighting = threat();
-            if (fighting == null) { return false; }
-            fightTime = lostTime = 0;
-            engaged.add(fighting.encounterId);
-            hold(GLFW_KEY_W, false);
-        }
-        Npc n = fighting;
-        if (n.dead) {
-            defeated.add(n.encounterId);
-            leftMouse(false);
-            fighting = null;
-            approach = null;
-            if (defeated.size() == 1) { capture("09-defeated"); }
-            return true;
-        }
-        if (!game.entities.npcs.contains(n)) { // dormant or unloaded: no longer here
-            leftMouse(false);
-            fighting = null;
-            approach = null;
-            return false;
-        }
-        fightTime += dt;
-        if (fightTime > FIGHT_SECONDS) { throw fail("fight did not resolve with " + n.encounterId); }
-        selectWeapon();
-        float dx = n.pos.x - game.player.pos.x, dz = n.pos.z - game.player.pos.z;
-        float dist = (float) Math.hypot(dx, dz);
-        lostTime = n.searchTimer <= 0 && dist > 6 ? lostTime + dt : 0;
-        if (lostTime > LOST_SECONDS && !hunting) {
-            leftMouse(false);
-            fighting = null;
-            approach = null;
-            return false;
-        }
-        look(n.pos.x, n.pos.y + n.height * .5f, n.pos.z);
-        boolean inReach = dist <= STRIKE_REACH && Math.abs(n.pos.y - game.player.pos.y) < 1.2f;
-        leftMouse(inReach);
-        if (inReach && !threatCaptured) { // the first infected faced within reach
-            capture("08-threat");
-            threatCaptured = true;
-        }
-        if (!inReach) {
-            game.camera.pitch = 6;
-            Vec3i target = cell(n.pos.x, n.pos.y, n.pos.z);
-            approachAge += dt;
-            // A fresh walker per target, re-planned once the target has moved on or the route ended.
-            if (approach == null || approachFor != n || approachAge > .75f && !target.equals(approach.goal)) {
-                approach = new Walk(target);
-                approachFor = n;
-                approachAge = 0;
-            }
-            if (approach.step(dt)) { approach = null; }
-        } else {
-            hold(GLFW_KEY_W, false);
-        }
-        return true;
-    }
-
-    private boolean hunting, threatCaptured;
-    private Walk approach;
-    private Npc approachFor;
-    private float approachAge;
-
-    private Npc threat() {
-        if (!game.player.isPerceivableByAi()) { return null; }
-        Npc best = null;
-        float bestD = Float.MAX_VALUE;
-        for (Npc n : game.entities.npcs) {
-            if (!n.infected() || n.dead) { continue; }
-            float dx = n.pos.x - game.player.pos.x, dz = n.pos.z - game.player.pos.z;
-            float d = dx * dx + dz * dz;
-            boolean pursuing = n.searchTimer > 0 && d < THREAT_RADIUS * THREAT_RADIUS;
-            if (Math.abs(n.pos.y - game.player.pos.y) < 2.5f && (pursuing || d < 6.25f) && d < bestD) {
-                bestD = d;
-                best = n;
-            }
-        }
-        return best;
-    }
-
     // ------------------------------------------------------------------
     // Tasks
     // ------------------------------------------------------------------
-
-    private abstract static class Task {
-        final String name;
-        float age;
-        Task(String name) { this.name = name; }
-        /** @return true once complete */
-        abstract boolean step(float dt);
-        boolean threatsInterrupt() { return true; }
-    }
-
-    private void add(Task... list) {
-        tasks.addAll(List.of(list));
-    }
-
-    private final class Wait extends Task {
-        final float seconds;
-        Wait(String name, float seconds) { super("wait " + name); this.seconds = seconds; }
-        @Override boolean step(float dt) { return age >= seconds; }
-    }
-
-    private final class Capture extends Task {
-        Capture(String label) { super("capture " + label); }
-        @Override boolean step(float dt) {
-            capture(name.substring("capture ".length()));
-            return true;
-        }
-        @Override boolean threatsInterrupt() { return false; }
-    }
-
-    /** Walks a bounded route with W and mouse look, opening closed doors with F on the way. */
-    private final class Walk extends Task {
-        private final Vec3i goal;
-        private List<Vec3i> path;
-        private int index, replans, doorPresses;
-        private float stuck, best = Float.MAX_VALUE, doorWait;
-
-        Walk(Vec3i goal) { super("walk " + goal); this.goal = goal; }
-
-        @Override boolean step(float dt) {
-            if (path == null) {
-                path = UrbanSlicePlan.route(game.world, feet(), goal);
-                if (path == null) { throw fail("no walking route from " + feet() + " to " + goal); }
-                index = 0; best = Float.MAX_VALUE; stuck = 0;
-            }
-            if (index >= path.size()) {
-                hold(GLFW_KEY_W, false);
-                return horizontalSpeed() < .5f;
-            }
-            Vec3i next = path.get(index);
-            Vec3i door = closedDoor(next);
-            if (door != null) {
-                hold(GLFW_KEY_W, false);
-                lookAtBlock(door, .9f);
-                doorWait += dt;
-                if (doorWait > .35f) {
-                    if (++doorPresses > 12) { throw fail("door " + door + " never opened"); }
-                    press(GLFW_KEY_F);
-                    doorWait = 0;
-                }
-                return false;
-            }
-            doorWait = 0;
-            float dx = next.x() + .5f - game.player.pos.x, dz = next.z() + .5f - game.player.pos.z;
-            float d = (float) Math.hypot(dx, dz);
-            boolean finalCell = index == path.size() - 1;
-            if (d < (finalCell ? .3f : .45f) && Math.abs(game.player.pos.y - next.y()) < .75f) {
-                index++;
-                best = Float.MAX_VALUE;
-                stuck = 0;
-                return false;
-            }
-            game.camera.yaw = (float) Math.toDegrees(Math.atan2(dx, -dz));
-            game.camera.pitch = 8;
-            hold(GLFW_KEY_W, true);
-            if (d < best - .05f) {
-                best = d;
-                stuck = 0;
-            } else if ((stuck += dt) > 2.5f) {
-                if (++replans > 8) { throw fail("stuck walking to " + goal + " at " + game.player.pos); }
-                hold(GLFW_KEY_W, false);
-                path = null;
-            }
-            return false;
-        }
-    }
 
     private enum Policy { TAKE_ALL, TAKE_EXCEPT_LIGHT, TAKE_FOOD_AND_WATER, DEPOSIT_PLANKS, VERIFY }
 
@@ -550,49 +254,6 @@ final class UrbanSliceQaScene {
     }
 
     private boolean hiddenCaptured, revealedCaptured;
-
-    /** Holds the left mouse button on a closed interior door until it gives way. */
-    private final class Force extends Task {
-        private final Fixture door;
-        private Walk walk;
-        private float closeWait;
-
-        Force(Fixture door) { super("force " + door.position()); this.door = door; }
-
-        @Override boolean step(float dt) {
-            Vec3i p = door.position();
-            if (walk == null) {
-                Vec3i a = door.target(), b = UrbanSlicePlan.inside(door);
-                List<Vec3i> ra = UrbanSlicePlan.route(game.world, feet(), a), rb = UrbanSlicePlan.route(game.world, feet(), b);
-                walk = new Walk(rb == null || ra != null && ra.size() <= rb.size() ? a : b);
-            }
-            if (!walk.step(dt)) { return false; }
-            BlockType block = game.world.getBlock(p.x(), p.y(), p.z());
-            if (age > 30) { throw fail("door " + p + " did not give way: " + block); }
-            if (Fixtures.isClosedDoor(block)) {
-                selectWeapon();
-                lookAtBlock(p, .9f);
-                leftMouse(true);
-                return false;
-            }
-            if (Fixtures.isOpen(block)) { // an open leaf would only be dismantled: close it first
-                leftMouse(false);
-                lookAtBlock(p, .9f);
-                if ((closeWait += dt) > .4f) {
-                    press(GLFW_KEY_F);
-                    closeWait = 0;
-                }
-                return false;
-            }
-            leftMouse(false);
-            forcedAt = p;
-            capture("04-forced-door");
-            timeline.add(String.format(Locale.ROOT, "%.0f:forced=%s", elapsed, block));
-            return true;
-        }
-
-        @Override boolean threatsInterrupt() { return !leftHeld; }
-    }
 
     /** Ensures at least one infected is handled, seeking one when none came to the player. */
     private final class Hunt extends Task {
@@ -930,7 +591,7 @@ final class UrbanSliceQaScene {
     // Helpers
     // ------------------------------------------------------------------
 
-    private void observe() {
+    @Override protected void observe() {
         Player p = game.player;
         if (p != observed) { // a quick-load replaces the player: carry the totals over
             observed = p;
@@ -949,38 +610,6 @@ final class UrbanSliceQaScene {
         if (step < 2) { walked += step; } // a reload restores a saved position, not a walk
         lastX = p.pos.x;
         lastZ = p.pos.z;
-    }
-
-    private void capture(String label) {
-        game.automation.requestCapture(label);
-        System.out.println("[urban-slice] capture=" + label + " t=" + String.format(Locale.ROOT, "%.1f", elapsed)
-                + " pos=" + game.player.pos + " screen=" + game.uiMode);
-    }
-
-    private Vec3i feet() {
-        Player p = game.player;
-        int x = (int) Math.floor(p.pos.x), z = (int) Math.floor(p.pos.z), y = (int) Math.floor(p.pos.y + .01f);
-        for (int dy : new int[]{0, 1, -1}) {
-            if (VoxelClearance.standable(game.world, x, y + dy, z)) { return new Vec3i(x, y + dy, z); }
-        }
-        return new Vec3i(x, y, z);
-    }
-
-    private static Vec3i cell(float x, float y, float z) {
-        return new Vec3i((int) Math.floor(x), (int) Math.floor(y + .01f), (int) Math.floor(z));
-    }
-
-    private float horizontalSpeed() {
-        return (float) Math.hypot(game.player.vel.x, game.player.vel.z);
-    }
-
-    private Vec3i closedDoor(Vec3i cell) {
-        for (int dy = 0; dy <= 1; dy++) {
-            if (Fixtures.isClosedDoor(game.world.getBlock(cell.x(), cell.y() + dy, cell.z()))) {
-                return cell.offset(0, dy, 0);
-            }
-        }
-        return null;
     }
 
     private static Map<ItemType, Integer> counts(Inventory inv) {
@@ -1013,14 +642,5 @@ final class UrbanSliceQaScene {
     private String lastLog() {
         var all = game.eventLog.all();
         return all.isEmpty() ? "" : all.getLast();
-    }
-
-    private IllegalStateException fail(String reason) {
-        releaseAll();
-        reported = true;
-        System.out.println("[urban-slice] pass=false reason=" + reason + " mode="
-                + game.gameMode().name().toLowerCase(Locale.ROOT) + " seed=" + game.world.seed
-                + " pos=" + game.player.pos + " timeline " + String.join(" ", timeline));
-        return new IllegalStateException("urban slice: " + reason);
     }
 }
