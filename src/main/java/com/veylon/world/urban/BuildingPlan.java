@@ -11,12 +11,26 @@ public record BuildingPlan(long id, int templateRevision, String template, Famil
                            Variant variant, ParcelPlan parcel, int storeys, boolean basement,
                            List<Floor> floors, List<Fixture> fixtures, List<Vec3i> approaches,
                            List<Stair> stairs, PlanVolume voxels) {
-    public enum Family { APARTMENT, SHOP }
+    /**
+     * Walk-ups first, then the commercial and civic catalogue of template revision five (D-98).
+     * Appended only: names appear in plan fingerprints, never as saved ordinals.
+     */
+    public enum Family {
+        APARTMENT, SHOP, GROCERY, CLINIC, SCHOOL, OFFICE, SECURITY, WAREHOUSE;
+
+        /** The frozen walk-up families of template revisions one to four. */
+        public boolean walkUp() { return this == APARTMENT || this == SHOP; }
+    }
     public enum Variant { INTACT, DAMAGED, PICKED_CLEAN, OCCUPIED }
     /** Stable names are plan metadata; these enums are never serialized as ordinals. */
     public enum Function {
         ENTRY, KITCHEN, LIVING, BEDROOM, BATHROOM, STORAGE, UTILITY,
-        CORRIDOR_STAIRS, SHOP_FLOOR, STOCKROOM, BASEMENT_STORAGE, BASEMENT_UTILITY
+        CORRIDOR_STAIRS, SHOP_FLOOR, STOCKROOM, BASEMENT_STORAGE, BASEMENT_UTILITY,
+        // Template revision five (milestone 12). PHARMACY and SECURITY rooms are the secured ones.
+        CLINIC, PHARMACY, CLASSROOM, OFFICE, SECURITY, WAREHOUSE, WORKSHOP;
+
+        /** Specialist stock behind a forcible lock: dispensary medicine, armoury ammunition. */
+        public boolean secured() { return this == PHARMACY || this == SECURITY; }
     }
     public enum FixtureKind { DOOR, WINDOW, CONTAINER, FURNITURE, QUEST }
 
@@ -52,6 +66,15 @@ public record BuildingPlan(long id, int templateRevision, String template, Famil
 
     /** Roof is a playable reservation too; the switchback continues to it. */
     public int roofY() { return UrbanDatum.slabY(storeys); }
+
+    /**
+     * Whether survivors own a fixture's contents. An occupied walk-up is owned throughout; an
+     * occupied commercial or civic building is held only at street level and below, while its
+     * upper storeys stay abandoned (partial occupation, D-100).
+     */
+    public boolean survivorOwned(Fixture fixture) {
+        return variant == Variant.OCCUPIED && (family.walkUp() || UrbanIds.floorIndex(fixture.id()) <= 0);
+    }
 
     /** Plan default for a fixture cell; touched saved entries take precedence, including explicit unlock. */
     public int fixtureStateAt(FixtureStates overrides, int x, int y, int z) {

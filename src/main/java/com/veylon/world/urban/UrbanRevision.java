@@ -56,6 +56,11 @@ public final class UrbanRevision {
     public static final int LAYOUT_STARTER = 6;
     public static final int BUILDING_TEMPLATE_STARTER = 4;
     public static final int LAYOUT_ENCOUNTERS = 7;
+    /**
+     * Commercial and civic catalogue (milestone 12): template four's walk-ups and starter
+     * superblock unchanged, plus six specialist families on the same skeleton.
+     */
+    public static final int BUILDING_TEMPLATE_CIVIC = 5;
 
     /** Content revision every new urban world records. */
     public static final int CURRENT_CONTENT = 3;

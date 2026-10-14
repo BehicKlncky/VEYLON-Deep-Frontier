@@ -41,7 +41,7 @@ class BuildingPlannerTest {
         for (int[] size : new int[][]{{12, 16}, {16, 20}, {20, 24}, {12, 12}}) {
             for (ParcelPlan.Side side : ParcelPlan.Side.values()) {
                 for (Variant variant : Variant.values()) {
-                    for (Family family : Family.values()) {
+                    for (Family family : new Family[]{Family.APARTMENT, Family.SHOP}) {
                         for (long seed : SEEDS) {
                             ParcelPlan parcel = parcel(size[0], size[1], side, 14, 14);
                             int floors = family == Family.SHOP ? 2 : 2 + (int) Math.floorMod(seed, 4);
@@ -64,7 +64,8 @@ class BuildingPlannerTest {
                 }
             }
         }
-        assertEquals(EnumSet.allOf(BuildingPlan.Function.class), functions, "all twelve initial room functions exist");
+        assertEquals(EnumSet.range(BuildingPlan.Function.ENTRY, BuildingPlan.Function.BASEMENT_UTILITY), functions,
+                "all twelve initial room functions exist");
     }
 
     @Test

@@ -31,12 +31,18 @@ public final class LootTables {
 
     private LootTables() { }
 
-    /** Function first, then specialist building/district context; common necessities have several sources. */
+    /**
+     * Function first, then specialist building/district context; common necessities have several
+     * sources. Specialist medicine and ammunition come from secured dispensaries and armouries
+     * (behind a forced lock) or survivor-held storage (theft), never from an ordinary shelf.
+     */
     public static Table table(BuildingPlan building, BuildingPlan.Fixture fixture, UrbanDistrict district) {
         var use = BuildingFurnishing.containerUse(building, fixture);
-        if (building.variant() == BuildingPlan.Variant.OCCUPIED
+        if (building.survivorOwned(fixture)
                 && (use == BuildingFurnishing.ContainerUse.UTILITY_LOCKER
                 || use == BuildingFurnishing.ContainerUse.STOCKROOM_CRATE)) { return Table.SECURED; }
+        boolean grocery = building.family() == BuildingPlan.Family.SHOP
+                || building.family() == BuildingPlan.Family.GROCERY;
         return switch (use) {
             case KITCHEN_CABINET -> Table.KITCHEN;
             case FRIDGE -> Table.FRIDGE;
@@ -45,9 +51,14 @@ public final class LootTables {
             case WARDROBE -> Table.WARDROBE;
             case DRESSER_DESK -> Table.DESK;
             case UTILITY_LOCKER -> Table.UTILITY;
-            case STOCKROOM_CRATE -> Table.WAREHOUSE;
-            case SHOP_SHELF -> district == UrbanDistrict.CIVIC ? Table.CLINIC
-                    : building.family() == BuildingPlan.Family.SHOP ? Table.GROCER : Table.SHOP;
+            // A grocer's back room holds packaged food, not hardware.
+            case STOCKROOM_CRATE -> building.family() == BuildingPlan.Family.GROCERY ? Table.PANTRY : Table.WAREHOUSE;
+            case SHOP_SHELF -> district == UrbanDistrict.CIVIC ? Table.CLINIC : grocery ? Table.GROCER : Table.SHOP;
+            case MEDICINE_CABINET -> Table.CLINIC;
+            case ARMORY_LOCKER -> Table.SECURED;
+            case TREATMENT_CABINET -> Table.BATHROOM;
+            case WAREHOUSE_RACK -> Table.WAREHOUSE;
+            case TOOL_CHEST -> Table.UTILITY;
         };
     }
 

@@ -28,14 +28,33 @@ public final class BuildingTemplates {
     public static boolean supportsRevision(int revision) {
         return revision == REVISION || revision == UrbanRevision.BUILDING_TEMPLATE_FURNISHED
                 || revision == UrbanRevision.BUILDING_TEMPLATE_SHAPED_STAIRS
-                || revision == UrbanRevision.BUILDING_TEMPLATE_STARTER;
+                || revision == UrbanRevision.BUILDING_TEMPLATE_STARTER
+                || revision == UrbanRevision.BUILDING_TEMPLATE_CIVIC;
     }
 
-    /** Low-level proposal; callers must validate it, or use {@link BuildingPlanner#plan}. */
+    /** Tallest building of a family, before the parcel's own storey envelope applies. */
+    public static int maxStoreys(Family family) {
+        return switch (family) {
+            case APARTMENT -> MAX_STOREYS;
+            case SHOP -> 2;
+            default -> CivicTemplates.envelope(family).maxStoreys();
+        };
+    }
+
+    /**
+     * Low-level proposal; callers must validate it, or use {@link BuildingPlanner#plan}.
+     * Revision five proposes the commercial and civic families; its walk-ups are revision four's.
+     */
     public static BuildingPlan propose(ParcelPlan parcel, int revision, Family family, Variant variant,
                                        int storeys, boolean basement, boolean minimal) {
         if (!supportsRevision(revision)) {
             throw new IllegalArgumentException("unsupported building template revision " + revision);
+        }
+        if (family.walkUp() == (revision == UrbanRevision.BUILDING_TEMPLATE_CIVIC)) {
+            throw new IllegalArgumentException(family + " is not in building template revision " + revision);
+        }
+        if (!family.walkUp()) {
+            return CivicTemplates.propose(parcel, family, variant, storeys, basement, minimal);
         }
         if (parcel.width() < 12 || parcel.width() > 32 || parcel.depth() < 12 || parcel.depth() > 32
                 || storeys < 1 || storeys > Math.min(MAX_STOREYS, parcel.maxStoreys())

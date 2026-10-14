@@ -27,7 +27,9 @@ public final class BuildingFurnishing {
     /** Derived plan metadata, never persisted as an enum ordinal. */
     public enum ContainerUse {
         KITCHEN_CABINET, FRIDGE, PANTRY_SHELF, BATHROOM_CABINET, WARDROBE,
-        DRESSER_DESK, UTILITY_LOCKER, SHOP_SHELF, STOCKROOM_CRATE
+        DRESSER_DESK, UTILITY_LOCKER, SHOP_SHELF, STOCKROOM_CRATE,
+        // Template revision five: secured dispensary and armoury stock, treatment rooms, racks and tools.
+        MEDICINE_CABINET, ARMORY_LOCKER, TREATMENT_CABINET, WAREHOUSE_RACK, TOOL_CHEST
     }
 
     private BuildingFurnishing() { }
@@ -42,6 +44,16 @@ public final class BuildingFurnishing {
             for (Room room : floor.rooms()) {
                 if (room.id() != roomId) { continue; }
                 List<Function> functions = room.functions();
+                // Revision-five functions never occur in earlier rooms, so checking them first
+                // leaves every frozen walk-up role unchanged.
+                if (functions.contains(Function.PHARMACY)) { return ContainerUse.MEDICINE_CABINET; }
+                if (functions.contains(Function.SECURITY)) { return ContainerUse.ARMORY_LOCKER; }
+                if (functions.contains(Function.CLINIC)) { return ContainerUse.TREATMENT_CABINET; }
+                if (functions.contains(Function.CLASSROOM) || functions.contains(Function.OFFICE)) {
+                    return ContainerUse.DRESSER_DESK;
+                }
+                if (functions.contains(Function.WAREHOUSE)) { return ContainerUse.WAREHOUSE_RACK; }
+                if (functions.contains(Function.WORKSHOP)) { return ContainerUse.TOOL_CHEST; }
                 if (functions.contains(Function.KITCHEN)) {
                     return UrbanIds.slotIndex(fixture.id()) == 5 ? ContainerUse.FRIDGE : ContainerUse.KITCHEN_CABINET;
                 }
@@ -160,9 +172,11 @@ public final class BuildingFurnishing {
         }
     }
 
-    private record Bounds(int u0, int v0, int u1, int v1) { }
+    /** Inclusive skeleton-local bounds: u along the frontage, v away from it. */
+    record Bounds(int u0, int v0, int u1, int v1) { }
 
-    private record Layout(ParcelPlan parcel) {
+    /** Converts between world cells and the skeleton's frontage-local (u, v) frame. */
+    record Layout(ParcelPlan parcel) {
         Bounds bounds(ParcelPlan.Rect rect) {
             int a = u(rect.x0(), rect.z0()), b = u(rect.x1(), rect.z1());
             int c = v(rect.x0(), rect.z0()), d = v(rect.x1(), rect.z1());

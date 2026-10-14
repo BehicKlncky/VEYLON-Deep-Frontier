@@ -75,7 +75,7 @@ class BuildingFurnishingTest {
         for (int[] size : new int[][]{{12, 12}, {12, 16}, {16, 20}, {20, 24}, {32, 32}}) {
             for (ParcelPlan.Side side : ParcelPlan.Side.values()) {
                 for (Variant variant : Variant.values()) {
-                    for (Family family : Family.values()) {
+                    for (Family family : new Family[]{Family.APARTMENT, Family.SHOP}) {
                         for (boolean minimal : new boolean[]{false, true}) {
                             ParcelPlan parcel = BuildingPlannerTest.parcel(size[0], size[1], side, 14, 14);
                             BuildingPlan plan = BuildingTemplates.propose(parcel, 2, family, variant,
@@ -127,7 +127,8 @@ class BuildingFurnishingTest {
             }
         }
         assertEquals(EnumSet.allOf(ParcelPlan.Use.class), uses, "service parcels also have real interiors");
-        assertEquals(EnumSet.allOf(Function.class), functions);
+        assertEquals(EnumSet.range(Function.ENTRY, Function.BASEMENT_UTILITY), functions,
+                "the frozen walk-up catalogue keeps its twelve functions");
         System.out.println("furnished-building-city-matrix plans=" + checked + " repaired=" + repaired);
     }
 

@@ -99,18 +99,28 @@ final class CrateTransactionSystem {
             }
             openEntry = entry;
             var plan = entry.id > 0 ? UrbanContainers.planned(game.world,pos) : null;
-            containerTitle = plan == null ? entry.block.displayName : switch (BuildingFurnishing.containerUse(plan.building(),plan.fixture())) {
+            var use = plan == null ? null : BuildingFurnishing.containerUse(plan.building(),plan.fixture());
+            boolean walkUp = plan == null || plan.building().family().walkUp();
+            containerTitle = plan == null ? entry.block.displayName : switch (use) {
                 case KITCHEN_CABINET -> "Kitchen cupboard";
                 case FRIDGE -> "Fridge shelf";
                 case PANTRY_SHELF -> "Pantry shelf";
                 case BATHROOM_CABINET -> "Bathroom cabinet";
                 case WARDROBE -> "Wardrobe";
-                case DRESSER_DESK -> "Dresser";
+                case DRESSER_DESK -> walkUp ? "Dresser" : "Desk drawers";
                 case UTILITY_LOCKER -> "Utility locker";
-                case SHOP_SHELF -> "Shop shelf";
+                case SHOP_SHELF -> walkUp ? "Shop shelf" : "Grocery shelf";
                 case STOCKROOM_CRATE -> "Supply cupboard";
+                case MEDICINE_CABINET -> "Dispensary cabinet";
+                case ARMORY_LOCKER -> "Armoury locker";
+                case TREATMENT_CABINET -> "Treatment cabinet";
+                case WAREHOUSE_RACK -> "Warehouse rack";
+                case TOOL_CHEST -> "Tool chest";
             };
-            if (plan != null && plan.table() == LootTables.Table.SECURED) { containerTitle = "Secured supply locker"; }
+            if (plan != null && plan.table() == LootTables.Table.SECURED
+                    && use != BuildingFurnishing.ContainerUse.ARMORY_LOCKER) {
+                containerTitle = "Secured supply locker";
+            }
             containerTitle = containerTitle.toUpperCase(java.util.Locale.ROOT);
             searchHarm = game.player.harmEvents;
             rummageCooldown = 0;

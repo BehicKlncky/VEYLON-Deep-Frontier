@@ -60,6 +60,16 @@ public final class UrbanSalts {
     public static final long LOOT_PRESENCE = 0x564c_4f4f_545f_5052L;
     public static final long LOOT_COUNT = 0x564c_4f4f_545f_434eL;
     public static final long LOOT_CONDITION = 0x564c_4f4f_545f_4344L;
+    /** Template revision five (milestone 12): which family a commercial parcel carries. */
+    public static final long CIVIC_FAMILY = 0x5643_4956_4641_4d49L;
+    /** Which residential parcel of a region hosts its school or security post. */
+    public static final long CIVIC_SITE = 0x5643_4956_5349_5445L;
+    /** Abandonment, damage or partial occupation of a commercial or civic building. */
+    public static final long CIVIC_VARIANT = 0x5643_4956_5641_5249L;
+    /** Whether a school or office block has a first basement. */
+    public static final long CIVIC_BASEMENT = 0x5643_4956_4241_5345L;
+    /** The name painted on a frontage sign; presentation only. */
+    public static final long CIVIC_NAME = 0x5643_4956_4e41_4d45L;
 
     private UrbanSalts() {
     }

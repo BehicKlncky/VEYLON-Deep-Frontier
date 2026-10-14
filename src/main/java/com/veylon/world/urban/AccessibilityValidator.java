@@ -17,6 +17,11 @@ import java.util.Set;
  * Exhaustive bounded directed voxel reachability, including exit routes and swept body clearance.
  * Unlocked doors are evaluated after their ordinary open action; locks remain solid. No key or
  * force-tool is assumed. The validator therefore proves a usable alternative for every lock.
+ *
+ * <p>The one deliberate exception is a secured room (pharmacy or armoury stock, D-99): its lock
+ * is the access cost. Such a room must be unreachable by ordinary routes, its door must be
+ * reachable from them, and with that door forced open every reservation inside must have an
+ * entry and an exit route. Ordinary rooms are never accepted on the strength of a forced door.
  */
 public final class AccessibilityValidator {
     public static final int MAX_MESSAGES = 32;
@@ -151,8 +156,11 @@ public final class AccessibilityValidator {
         final List<String> messages = new ArrayList<>();
         int violations, transitions, forwardVisits, reverseVisits;
         PlanVolume opened;
-        boolean[] walk, reached, escaped;
+        boolean[] walk, reached, escaped, forcedReached, forcedEscaped;
         int[] edges, reverseHead, reverseNext, reverseFrom;
+        /** Rooms behind a forcible lock, and those locked doors. */
+        final Set<Long> securedRooms = new HashSet<>();
+        final List<BuildingPlan.Fixture> forcible = new ArrayList<>();
 
         Check(BuildingPlan p) { this(p, false); }
         Check(BuildingPlan p, boolean worldContext) {
@@ -171,8 +179,42 @@ public final class AccessibilityValidator {
             reached = flood(false);
             escaped = flood(true);
             stairs();
+            if (!forcible.isEmpty()) { forcedPhase(); }
             targets();
             return report(volume.cellCount());
+        }
+
+        /**
+         * Secured rooms: the lock must be the only way in, its door must stand on an ordinary
+         * route, and forcing it must open entry and exit routes to everything inside.
+         */
+        void forcedPhase() {
+            for (BuildingPlan.Fixture door : forcible) {
+                Vec3i p = door.position(), t = door.target();
+                Vec3i outside = new Vec3i(2 * p.x() - t.x(), t.y(), 2 * p.z() - t.z());
+                int i = worldIndex(outside);
+                if (i < 0 || !reached[i] || !escaped[i]) {
+                    fail("SECURED: forcible door is not on an ordinary route " + p);
+                }
+            }
+            for (BuildingPlan.Floor floor : plan.floors()) {
+                for (BuildingPlan.Room room : floor.rooms()) {
+                    int i = worldIndex(room.anchor());
+                    if (securedRooms.contains(room.id()) && i >= 0 && reached[i]) {
+                        fail("SECURED: room is reachable without forcing its lock " + room.anchor());
+                    }
+                }
+            }
+            PlanVolume.Builder b = opened.edit();
+            for (BuildingPlan.Fixture door : forcible) {
+                Vec3i p = door.position();
+                for (int h = 0; h < door.height(); h++) { b.set(p.x(), p.y() + h, p.z(), BlockType.BROKEN_DOOR); }
+            }
+            opened = b.build();
+            transitions = 0;
+            buildGraph();
+            forcedReached = flood(false);
+            forcedEscaped = flood(true);
         }
 
         boolean boundedMetadata() {
@@ -184,11 +226,12 @@ public final class AccessibilityValidator {
 
         void metadata() {
             if (!UrbanIds.isValid(plan.id()) || plan.id() != UrbanIds.building(plan.parcel().id(), 0)
-                    || !BuildingTemplates.supportsRevision(plan.templateRevision())) {
+                    || !BuildingTemplates.supportsRevision(plan.templateRevision())
+                    || plan.family().walkUp() == (plan.templateRevision() == UrbanRevision.BUILDING_TEMPLATE_CIVIC)) {
                 fail("IDENTITY: unsupported building/template identity");
             }
-            if (plan.storeys() < 1 || plan.storeys() > Math.min(5, plan.parcel().maxStoreys())
-                    || plan.family() == BuildingPlan.Family.SHOP && plan.storeys() > 2
+            if (plan.storeys() < 1
+                    || plan.storeys() > Math.min(BuildingTemplates.maxStoreys(plan.family()), plan.parcel().maxStoreys())
                     || plan.roofY() + 3 >= 94 || volume.minY < 35 || volume.maxY != plan.roofY() + 3
                     || volume.x0 != plan.parcel().x0() - 1 || volume.z0 != plan.parcel().z0() - 1
                     || volume.width != plan.parcel().width() + 2 || volume.depth != plan.parcel().depth() + 2) {
@@ -213,6 +256,9 @@ public final class AccessibilityValidator {
                         fail("ROOM: invalid bounds, function, anchor or identity");
                     }
                     roomIds.add(room.id());
+                    if (room.functions().stream().anyMatch(BuildingPlan.Function::secured)) {
+                        securedRooms.add(room.id());
+                    }
                     for (BuildingPlan.Room other : floor.rooms()) {
                         if (room.id() < other.id() && intersects(r, other.interior())) {
                             fail("ROOM: overlapping playable interiors");
@@ -250,6 +296,11 @@ public final class AccessibilityValidator {
                         || fixture.locked() && fixture.kind() != FixtureKind.DOOR) {
                     fail("FIXTURE: opening conflicts with floor bands/lock policy");
                 }
+                // A secured room's own locked door is the forced entry; every other lock stays solid.
+                if (fixture.locked() && securedRooms.contains(UrbanIds.parent(fixture.id()))
+                        && UrbanIds.slotIndex(fixture.id()) == 0) {
+                    forcible.add(fixture);
+                }
                 if (fixture.kind() == FixtureKind.WINDOW && (!plan.parcel().onOutline(p.x(), p.z())
                         || Math.abs(p.x() - fixture.target().x()) + Math.abs(p.z() - fixture.target().z()) > 2)) {
                     fail("WINDOW: facade/interaction reach mismatch");
@@ -266,6 +317,9 @@ public final class AccessibilityValidator {
             if (violations == 0 && (plan.templateRevision() == UrbanRevision.BUILDING_TEMPLATE_FURNISHED
                     || plan.templateRevision() == UrbanRevision.BUILDING_TEMPLATE_SHAPED_STAIRS)) {
                 furnishingBounds();
+            }
+            if (violations == 0 && plan.templateRevision() == UrbanRevision.BUILDING_TEMPLATE_CIVIC) {
+                civicBounds();
             }
             // No structure is allowed to spill into the approach halo, even if its route still works.
             if (!worldContext) {
@@ -303,6 +357,31 @@ public final class AccessibilityValidator {
                 if (domestic && (flatContainers < BuildingFurnishing.MIN_FLAT_CONTAINERS
                         || flatContainers > BuildingFurnishing.MAX_FLAT_CONTAINERS)) {
                     fail("FURNISHING: apartment searchable reservation budget exceeded");
+                }
+            }
+        }
+
+        /** Revision five: bounded stock per room and storey; secured rooms only on the ground floor. */
+        void civicBounds() {
+            for (BuildingPlan.Floor floor : plan.floors()) {
+                int floorContainers = 0;
+                for (BuildingPlan.Room room : floor.rooms()) {
+                    int containers = 0;
+                    for (BuildingPlan.Fixture fixture : plan.fixtures()) {
+                        if (UrbanIds.parent(fixture.id()) == room.id() && fixture.kind() == FixtureKind.CONTAINER) {
+                            containers++;
+                        }
+                    }
+                    if (containers > CivicTemplates.MAX_ROOM_CONTAINERS) {
+                        fail("FURNISHING: civic room container budget exceeded " + room.anchor());
+                    }
+                    if (securedRooms.contains(room.id()) && floor.index() != 0) {
+                        fail("SECURED: secured stock above or below street level " + room.anchor());
+                    }
+                    floorContainers += containers;
+                }
+                if (floorContainers > CivicTemplates.MAX_FLOOR_CONTAINERS) {
+                    fail("FURNISHING: civic storey container budget exceeded on floor " + floor.index());
                 }
             }
         }
@@ -405,15 +484,18 @@ public final class AccessibilityValidator {
         }
 
         void targets() {
+            Set<Long> forced = new HashSet<>();
+            for (BuildingPlan.Fixture door : forcible) { forced.add(UrbanIds.parent(door.id())); }
             for (BuildingPlan.Floor floor : plan.floors()) {
                 target(floor.landing(), "LANDING");
                 for (BuildingPlan.Room room : floor.rooms()) {
-                    target(room.anchor(), "ROOM");
+                    boolean inside = forced.contains(room.id());
+                    target(room.anchor(), "ROOM", inside);
                     for (int x = room.interior().x0(); x <= room.interior().x1(); x++) {
                         for (int z = room.interior().z0(); z <= room.interior().z1(); z++) {
                             Vec3i at = new Vec3i(x, floor.slabY() + 1, z);
                             int i = worldIndex(at);
-                            if (i >= 0 && walk[i]) { target(at, "ROOM_CELL"); }
+                            if (i >= 0 && walk[i]) { target(at, "ROOM_CELL", inside); }
                             else if (!plan.parcel().core().contains(x, z)
                                     && !opened.getBlock(x, at.y(), z).solid) {
                                 fail("ROOM_CLEARANCE: missing floor or standing headroom " + at);
@@ -423,8 +505,11 @@ public final class AccessibilityValidator {
                 }
             }
             for (BuildingPlan.Fixture fixture : plan.fixtures()) {
-                target(fixture.target(), fixture.kind().name());
-                if (fixture.kind() == FixtureKind.DOOR && !fixture.locked()) { target(fixture.position(), "DOOR"); }
+                boolean inside = forced.contains(UrbanIds.parent(fixture.id()));
+                target(fixture.target(), fixture.kind().name(), inside);
+                if (fixture.kind() == FixtureKind.DOOR && (!fixture.locked() || forcible.contains(fixture))) {
+                    target(fixture.position(), "DOOR", inside);
+                }
                 if (fixture.kind() == FixtureKind.CONTAINER || fixture.kind() == FixtureKind.FURNITURE) {
                     Vec3i a = fixture.position(), b = fixture.target();
                     if (a.y() != b.y() || Math.abs(a.x() - b.x()) + Math.abs(a.z() - b.z()) != 1
@@ -481,10 +566,13 @@ public final class AccessibilityValidator {
                     i / volume.width % volume.depth);
         }
         boolean at(int x, int y, int z) { int i = index(x, y, z); return i >= 0 && walk[i]; }
-        void target(Vec3i p, String kind) {
+        void target(Vec3i p, String kind) { target(p, kind, false); }
+        /** Secured-room targets count only once their lock is forced; everything else ordinarily. */
+        void target(Vec3i p, String kind, boolean forced) {
             int i = worldIndex(p);
-            if (i < 0 || !reached[i]) { fail(kind + ": unreachable " + p); }
-            else if (!escaped[i]) { fail(kind + ": no exit route " + p); }
+            boolean[] in = forced ? forcedReached : reached, out = forced ? forcedEscaped : escaped;
+            if (i < 0 || !in[i]) { fail(kind + ": unreachable " + p); }
+            else if (!out[i]) { fail(kind + ": no exit route " + p); }
         }
         void fail(String message) { violations++; if (messages.size() < MAX_MESSAGES) { messages.add(message); } }
         Report report(int cells) { return new Report(violations, messages, cells, transitions, forwardVisits, reverseVisits); }
