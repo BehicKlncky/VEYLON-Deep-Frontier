@@ -42,7 +42,8 @@ public final class BuildingTemplates {
                 || family == Family.SHOP && storeys > 2) {
             throw new IllegalArgumentException("building does not fit parcel/storey envelope");
         }
-        BuildingPlan original = new Builder(parcel, family, variant, storeys, basement, minimal).build();
+        BuildingPlan original = new Builder(parcel, family, variant, storeys, basement, minimal,
+                f -> walkUp(family, f, minimal, parcel)).build();
         if (revision == REVISION) { return original; }
         BuildingPlan furnished = BuildingFurnishing.apply(original);
         if (revision == UrbanRevision.BUILDING_TEMPLATE_FURNISHED) { return furnished; }
@@ -50,22 +51,54 @@ public final class BuildingTemplates {
         return revision == UrbanRevision.BUILDING_TEMPLATE_STARTER ? UrbanStarterSite.furnish(shaped) : shaped;
     }
 
-    private static final class Builder {
+    /**
+     * Room functions of one storey of the shared skeleton. The front block beside the entry hall
+     * is one room or, when split, an upper and a lower room; each back block (left, then right of
+     * the hall) holds its first and second function as two rooms when split, otherwise as one.
+     * Walls, doors, windows and reservations follow from the skeleton, never from the program.
+     */
+    record FloorProgram(List<Function> front, boolean splitFront, List<Function> left,
+                        List<Function> right, boolean splitBack) {
+        FloorProgram {
+            front = List.copyOf(front); left = List.copyOf(left); right = List.copyOf(right);
+            if (splitFront && front.size() != 2 || left.size() != 2 || right.size() != 2) {
+                throw new IllegalArgumentException("a split block needs exactly two functions");
+            }
+        }
+    }
+
+    /** Frozen walk-up and shop functions of revision one, by storey. */
+    static FloorProgram walkUp(Family family, int f, boolean minimal, ParcelPlan parcel) {
+        boolean shop = family == Family.SHOP && f == 0;
+        int depth = parcel.frontage().dx == 0 ? parcel.depth() : parcel.width();
+        List<Function> front = f < 0 ? List.of(Function.BASEMENT_UTILITY)
+                : shop ? List.of(Function.SHOP_FLOOR) : List.of(Function.BEDROOM, Function.BATHROOM);
+        Function first = f < 0 ? Function.BASEMENT_STORAGE : shop ? Function.STOCKROOM : null;
+        Function second = f < 0 ? Function.BASEMENT_UTILITY : shop ? Function.UTILITY : null;
+        return new FloorProgram(front, !(minimal || shop || f < 0),
+                List.of(first != null ? first : Function.KITCHEN, second != null ? second : Function.LIVING),
+                List.of(first != null ? first : Function.STORAGE, second != null ? second : Function.UTILITY),
+                !minimal && !shop && f >= 0 && depth >= 16);
+    }
+
+    static final class Builder {
         final ParcelPlan parcel;
         final Family family;
         final Variant variant;
         final int storeys, width, depth, entry, core;
         final boolean basement, minimal;
         final long id;
+        final java.util.function.IntFunction<FloorProgram> program;
         final PlanVolume.Builder voxels;
         final List<Floor> floors = new ArrayList<>();
         final List<Fixture> fixtures = new ArrayList<>();
         final List<Vec3i> approaches = new ArrayList<>();
         final List<Stair> stairs = new ArrayList<>();
 
-        Builder(ParcelPlan p, Family family, Variant variant, int storeys, boolean basement, boolean minimal) {
+        Builder(ParcelPlan p, Family family, Variant variant, int storeys, boolean basement, boolean minimal,
+                java.util.function.IntFunction<FloorProgram> program) {
             parcel = p; this.family = family; this.variant = variant; this.storeys = storeys;
-            this.basement = basement; this.minimal = minimal;
+            this.basement = basement; this.minimal = minimal; this.program = program;
             boolean alongX = p.frontage().dx == 0;
             width = alongX ? p.width() : p.depth();
             depth = alongX ? p.depth() : p.width();
@@ -141,36 +174,31 @@ public final class BuildingTemplates {
             rooms.add(room(floorId, 3, List.of(Function.CORRIDOR_STAIRS), core, 1, width - 2, 6, slab));
             wall(entry - 1, 1, entry - 1, depth - 2, slab);
             wall(entry + 2, 7, entry + 2, depth - 2, slab);
-            boolean shop = family == Family.SHOP && f == 0;
-            if (minimal || shop || f < 0) {
-                List<Function> front = f < 0 ? List.of(Function.BASEMENT_UTILITY)
-                        : shop ? List.of(Function.SHOP_FLOOR) : List.of(Function.BEDROOM, Function.BATHROOM);
-                addRoom(rooms, floorId, 4, front, 1, 1, entry - 2, 6, slab, entry - 1, 4);
+            FloorProgram plan = program.apply(f);
+            if (!plan.splitFront()) {
+                addRoom(rooms, floorId, 4, plan.front(), 1, 1, entry - 2, 6, slab, entry - 1, 4);
             } else {
                 wall(1, 3, entry - 2, 3, slab);
-                addRoom(rooms, floorId, 4, List.of(Function.BEDROOM), 1, 1, entry - 2, 2,
+                addRoom(rooms, floorId, 4, List.of(plan.front().get(0)), 1, 1, entry - 2, 2,
                         slab, entry - 1, 1);
-                addRoom(rooms, floorId, 5, List.of(Function.BATHROOM), 1, 4, entry - 2, 6,
+                addRoom(rooms, floorId, 5, List.of(plan.front().get(1)), 1, 4, entry - 2, 6,
                         slab, entry - 1, 5);
             }
             int mid = (9 + depth - 2) / 2;
-            boolean split = !minimal && !shop && f >= 0 && depth >= 16;
             for (int side = 0; side < 2; side++) {
                 int a = side == 0 ? 1 : entry + 3, b = side == 0 ? entry - 2 : width - 2;
                 int doorU = side == 0 ? entry - 1 : entry + 2;
                 int index = side == 0 ? 6 : 8;
-                Function first = f < 0 ? Function.BASEMENT_STORAGE : shop ? Function.STOCKROOM
-                        : side == 0 ? Function.KITCHEN : Function.STORAGE;
-                Function second = f < 0 ? Function.BASEMENT_UTILITY : shop ? Function.UTILITY
-                        : side == 0 ? Function.LIVING : Function.UTILITY;
-                if (split) {
+                List<Function> back = side == 0 ? plan.left() : plan.right();
+                Function first = back.get(0), second = back.get(1);
+                if (plan.splitBack()) {
                     wall(a, mid, b, mid, slab);
                     addRoom(rooms, floorId, index, List.of(first), a, 9, b, mid - 1, slab, doorU, 9);
                     addRoom(rooms, floorId, index + 1, List.of(second), a, mid + 1, b, depth - 2,
                             slab, doorU, mid + 1);
                 } else {
-                    addRoom(rooms, floorId, index, List.of(first, second), a, 9, b, depth - 2,
-                            slab, doorU, 9);
+                    addRoom(rooms, floorId, index, first == second ? List.of(first) : List.of(first, second),
+                            a, 9, b, depth - 2, slab, doorU, 9);
                 }
             }
             // The cross hall is two wide; doors in the separating walls keep it continuous.
