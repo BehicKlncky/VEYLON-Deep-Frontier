@@ -488,44 +488,7 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
             hotkeys.update();
         }
         window.captureCursor(appState == AppState.PLAYING && uiMode == UiMode.NONE, input);
-
-        boolean simulate = simulates();
-
-        swingTimer = Math.max(0, swingTimer - dt);
-        hitSoundTimer = Math.max(0, hitSoundTimer - dt);
-
-        if (sleeping && simulate) {
-            tickSleep(dt);
-        } else if (!sleeping) {
-            sleepFade = Math.max(0, sleepFade - dt * 1.2f);
-        }
-
-        if (uiMode == UiMode.NONE && simulate && !sleeping) {
-            if (!automatedRun) {
-                updateMouseLook();
-            }
-            updateMovement(dt);
-            updateActions(dt);
-        } else {
-            miningProgress = 0;
-            interactPrompt = null;
-            if (uiMode == UiMode.NONE && !sleeping && !automatedRun) {
-                updateMouseLook();
-            }
-        }
-
-        if (simulate) {
-            advanceWorld(dtD);
-        }
-
-        // Camera follows the player eye.
-        camera.position.set(player.pos.x, player.pos.y + player.eyeHeight(), player.pos.z);
-        player.yaw = camera.yaw;
-        qa.updateMiningShowcase(dt);
-        audio.setListener(camera.position.x, camera.position.y, camera.position.z, camera.yaw);
-        audio.update(dt);
-
-        enterDeathIfDue();
+        playStep(dt, dtD);
 
         // Stream chunks and rebuild meshes near the player.
         world.ensureChunks((int) player.pos.x, (int) player.pos.z, renderer.renderRadius(), 2);
@@ -568,6 +531,47 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
             PresentationOverlay.victory(ui, totalTime, creativeMarked());
         }
         ui.end();
+    }
+
+    /** Controls, simulation and the eye for one frame; deterministic routes run it headless. */
+    void playStep(float dt, double dtD) {
+        boolean simulate = simulates();
+
+        swingTimer = Math.max(0, swingTimer - dt);
+        hitSoundTimer = Math.max(0, hitSoundTimer - dt);
+
+        if (sleeping && simulate) {
+            tickSleep(dt);
+        } else if (!sleeping) {
+            sleepFade = Math.max(0, sleepFade - dt * 1.2f);
+        }
+
+        if (uiMode == UiMode.NONE && simulate && !sleeping) {
+            if (!automatedRun) {
+                updateMouseLook();
+            }
+            updateMovement(dt);
+            updateActions(dt);
+        } else {
+            miningProgress = 0;
+            interactPrompt = null;
+            if (uiMode == UiMode.NONE && !sleeping && !automatedRun) {
+                updateMouseLook();
+            }
+        }
+
+        if (simulate) {
+            advanceWorld(dtD);
+        }
+
+        // Camera follows the player eye.
+        camera.position.set(player.pos.x, player.pos.y + player.eyeHeight(), player.pos.z);
+        player.yaw = camera.yaw;
+        qa.updateMiningShowcase(dt);
+        audio.setListener(camera.position.x, camera.position.y, camera.position.z, camera.yaw);
+        audio.update(dt);
+
+        enterDeathIfDue();
     }
 
     void beginUiFrame() {
