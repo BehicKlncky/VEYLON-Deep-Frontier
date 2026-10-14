@@ -50,6 +50,8 @@ final class UrbanTextures {
             case "locker_top" -> lockerTop(p);
             case "table_top" -> planksFlat(p, 0x8a6a44);
             case "debris" -> debris(p);
+            case "sign_board" -> signBoard(p, variant);
+            case "sign_edge" -> planksFlat(p, 0x5a4a36);
             default -> {
                 return false;
             }
@@ -497,6 +499,44 @@ final class UrbanTextures {
 
     private static void lockerTop(Painter p) {
         p.fillFbm(0x56685f, 0.07f, 5, 1311);
+        p.grain(0.05f);
+    }
+
+    /**
+     * A painted frontage board: a worn cream frame around a faded slate field with blocky
+     * pale lettering, peeling to bare wood. The words themselves are read from the building
+     * plan through the interaction prompt; the tile only has to read as "a sign" at a distance.
+     */
+    private static void signBoard(Painter p, int variant) {
+        int n = p.size;
+        p.fillFbm(0x34495a, 0.07f, 6, 1331 + variant);
+        p.box(0, 0, n - 1, n - 1, 3, 0xcfc4a4);
+        p.box(3, 3, n - 4, n - 4, 1, 0x1e2a34);
+        // Letter rows: runs of narrow blocks with word gaps, one or two lines by layout.
+        int rows = variant == 0 ? 2 : 1;
+        int glyph = variant == 0 ? 6 : 9;
+        for (int r = 0; r < rows; r++) {
+            int top = rows == 1 ? n / 2 - glyph / 2 : n / 3 - glyph / 2 + r * (n / 3);
+            int x = 8;
+            for (int i = 0; x < n - 10; i++) {
+                float roll = p.rf(1340 + variant * 97 + r * 31 + i);
+                if (roll < 0.16f) {
+                    x += glyph / 2 + 2; // a word gap
+                    continue;
+                }
+                int w = Math.max(2, (int) (glyph * (0.45f + roll * 0.4f)));
+                for (int yy = top; yy < top + glyph; yy++) {
+                    for (int xx = x; xx < Math.min(n - 10, x + w); xx++) {
+                        p.set(xx, yy, p.shade(0xe2d9bc, 0.9f + p.noise(xx, yy, 5, 1335) * 0.15f));
+                    }
+                }
+                x += w + 2;
+            }
+        }
+        // Peeling paint shows the board beneath; rust runs from the fixing bolts.
+        p.fillFbmBlend(0x6e5a40, 0.7f, 8, 1336 + variant, 0.5f);
+        p.blob(5, 5, 1, 0x5a4a3a);
+        p.blob(n - 6, 5, 1, 0x5a4a3a);
         p.grain(0.05f);
     }
 

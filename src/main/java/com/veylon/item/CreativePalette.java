@@ -108,6 +108,9 @@ public final class CreativePalette {
                 + " only as the result of breaking the closed form";
         excluded.put(BlockType.BROKEN_DOOR, brokenHalf);
         excluded.put(BlockType.BROKEN_WINDOW, brokenHalf);
+        excluded.put(BlockType.SIGN,
+                "a generated frontage board whose words come from its building's plan; a placed"
+                        + " copy would name nothing");
         EXCLUDED = Collections.unmodifiableMap(excluded);
     }
 

@@ -103,7 +103,11 @@ public enum BlockType {
     STAIRS_NORTH("Concrete Stairs", Shape.STAIRS, true, false, false, 6.0f, ToolKind.PICKAXE, false, ItemType.STAIRS, 1, 0, 0f, 0.60f, 0.60f, 0.58f),
     STAIRS_SOUTH("Concrete Stairs", Shape.STAIRS, true, false, false, 6.0f, ToolKind.PICKAXE, false, ItemType.STAIRS, 1, 0, 0f, 0.60f, 0.60f, 0.58f),
     STAIRS_WEST("Concrete Stairs", Shape.STAIRS, true, false, false, 6.0f, ToolKind.PICKAXE, false, ItemType.STAIRS, 1, 0, 0f, 0.60f, 0.60f, 0.58f),
-    STAIRS_EAST("Concrete Stairs", Shape.STAIRS, true, false, false, 6.0f, ToolKind.PICKAXE, false, ItemType.STAIRS, 1, 0, 0f, 0.60f, 0.60f, 0.58f);
+    STAIRS_EAST("Concrete Stairs", Shape.STAIRS, true, false, false, 6.0f, ToolKind.PICKAXE, false, ItemType.STAIRS, 1, 0, 0f, 0.60f, 0.60f, 0.58f),
+
+    // Milestone 12: a painted frontage board set into the facade above an entrance. Its words
+    // come from the building plan, so breaking it salvages nothing and no item places one.
+    SIGN("Painted Sign", Shape.CUBE, true, true, true, 1.5f, ToolKind.AXE, false, null, 0, 0, 0f, 0.66f, 0.58f, 0.40f);
 
     /**
      * How a block is meshed. Not persisted: only {@link BlockType} ordinals are

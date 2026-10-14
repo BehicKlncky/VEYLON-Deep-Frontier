@@ -21,7 +21,7 @@ class UrbanMaterialsTest {
             "asphalt", "paving", "concrete", "brick", "plaster", "sheet_metal", "rubble",
             "door_wood_lower", "door_wood_upper", "door_metal_lower", "door_metal_upper",
             "stair_tread", "stair_riser", "shelf_side", "shelf_top", "cabinet_front", "cabinet_top",
-            "locker_front", "locker_top", "table_top");
+            "locker_front", "locker_top", "table_top", "sign_board", "sign_edge");
     private static final List<String> CUTOUT_TILES = List.of(
             "window_glass", "window_broken", "door_broken", "debris");
 

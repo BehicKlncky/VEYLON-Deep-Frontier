@@ -211,6 +211,8 @@ public final class MaterialRegistry {
             register("stairs_south", BlockType.STAIRS_SOUTH, "stair_tread", "stair_riser", "concrete", 1, TintMode.NONE, false, 0f, 0.85f);
             register("stairs_west", BlockType.STAIRS_WEST, "stair_tread", "stair_riser", "concrete", 1, TintMode.NONE, false, 0f, 0.85f);
             register("stairs_east", BlockType.STAIRS_EAST, "stair_tread", "stair_riser", "concrete", 1, TintMode.NONE, false, 0f, 0.85f);
+            // Milestone 12 frontage sign: two weathered lettering layouts by position.
+            register("sign", BlockType.SIGN, "sign_edge", "sign_board", "sign_edge", 2, TintMode.NONE, false, 0f, 0.8f);
 
             // Standalone prop tiles used by special shapes (torch flame, campfire, basin water...).
             propTile("torch_head", 1.0f, 0.9f);

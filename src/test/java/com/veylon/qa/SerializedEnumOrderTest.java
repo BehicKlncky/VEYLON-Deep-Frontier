@@ -40,7 +40,9 @@ class SerializedEnumOrderTest {
             "WINDOW", "WINDOW_OPEN", "BROKEN_WINDOW", "STAIRS", "SHELF", "CABINET", "LOCKER",
             "TABLE", "DEBRIS",
             // Milestone 06 native-QA stair shapes; old STAIRS remains at its original ordinal.
-            "STAIRS_NORTH", "STAIRS_SOUTH", "STAIRS_WEST", "STAIRS_EAST");
+            "STAIRS_NORTH", "STAIRS_SOUTH", "STAIRS_WEST", "STAIRS_EAST",
+            // Milestone 12 frontage signs.
+            "SIGN");
 
     private static final List<String> ITEM_TYPE_ORDER = List.of(
             "DIRT", "STONE", "SAND", "GRAVEL", "CLAY", "SNOW", "LOG", "PLANK", "WALL", "STICK",
