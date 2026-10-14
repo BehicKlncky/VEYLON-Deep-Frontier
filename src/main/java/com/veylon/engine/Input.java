@@ -34,7 +34,8 @@ public class Input {
         }
     }
 
-    void onMouseButton(int button, int action) {
+    /** GLFW mouse-button events; also the production input seam for deterministic routes. */
+    public void onMouseButton(int button, int action) {
         if (button < 0 || button >= 8) {
             return;
         }

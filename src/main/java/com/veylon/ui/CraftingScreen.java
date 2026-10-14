@@ -189,21 +189,31 @@ public class CraftingScreen {
         boolean doCraft = (g.input.wasMousePressed(GLFW_MOUSE_BUTTON_LEFT) && btnHover)
                 || g.input.wasKeyPressed(GLFW_KEY_ENTER);
         if (doCraft && canCraft) {
-            String result = CraftingSystem.craft(g.player.inventory, r, nearby, g.player.blueprints);
-            if (result != null) {
-                g.audio.playCraft();
-                if (r.result == null) {
-                    g.log("Blueprint decoded: " + CraftingSystem.blueprintTitle(result)
-                            + "! New recipe available.");
-                } else {
-                    g.log("Crafted " + r.resultCount + " x " + r.result.displayName);
-                }
-            }
+            craft(g, r, nearby);
         }
 
         ui.textCentered(w / 2f, y0 + ph - 24, 1.2f,
                 "[C] close   [W/S] select   [Q/R] station tab   [Enter] craft",
                 0.7f, 0.7f, 0.7f, 1f);
+    }
+
+    /**
+     * The screen's craft command ([Enter] or the button), shared with scripted routes.
+     *
+     * @return the crafted item's name, a decoded blueprint id, or null when nothing was made
+     */
+    public static String craft(Game g, Recipe r, Set<Station> nearby) {
+        String result = CraftingSystem.craft(g.player.inventory, r, nearby, g.player.blueprints);
+        if (result != null) {
+            g.audio.playCraft();
+            if (r.result == null) {
+                g.log("Blueprint decoded: " + CraftingSystem.blueprintTitle(result)
+                        + "! New recipe available.");
+            } else {
+                g.log("Crafted " + r.resultCount + " x " + r.result.displayName);
+            }
+        }
+        return result;
     }
 
     private void drawTab(UiRenderer ui, float x, float y, String label, boolean active, boolean inRange) {

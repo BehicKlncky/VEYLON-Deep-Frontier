@@ -11,6 +11,7 @@ import com.veylon.world.World;
 import com.veylon.world.urban.UrbanRevision;
 
 import java.nio.file.Path;
+import java.util.ArrayDeque;
 import java.util.Locale;
 
 /**
@@ -62,6 +63,11 @@ final class AutomatedRunDriver {
     private boolean smokeSaveOk;
     private boolean smokeLoadOk;
     private String smokeGateFailure;
+    /** Labelled captures a scripted scene requested, written after their frames render. */
+    private final ArrayDeque<String> sceneCaptures = new ArrayDeque<>();
+    private static final int MAX_SCENE_CAPTURES = 16;
+    private boolean sceneSession;
+    private boolean finishAfterCaptures;
     private final Path smokeSave =
             AppPaths.dataDirectory().resolve("build/qa/smoke-save.dat");
 
@@ -88,7 +94,8 @@ final class AutomatedRunDriver {
                 AppPaths.isolatedFromPlayerData());
         game.frontend.newWorldGenerator = generator;
 
-        if (automated && !frontendQa) {
+        sceneSession = automated && !frontendQa;
+        if (sceneSession) {
             game.newWorld(game.sessionSeed, true, generator,
                     UrbanApartmentQaScene.manualNavigation(scene) ? GameMode.SURVIVAL
                             : configuredGameMode(System.getenv("VEYLON_GAME_MODE")));
@@ -189,16 +196,39 @@ final class AutomatedRunDriver {
         return "shot";
     }
 
+    /** A scripted scene asks for a labelled capture of the frame about to render; inert headless. */
+    void requestCapture(String label) {
+        if (sceneSession && sceneCaptures.size() < MAX_SCENE_CAPTURES) {
+            sceneCaptures.add(label.replaceAll("[^A-Za-z0-9._-]", "_"));
+        }
+    }
+
+    /** Closes a scripted scene's session once its queued captures are written; inert headless. */
+    void finishScriptedRun() {
+        finishAfterCaptures = sceneSession;
+    }
+
     /** Captures any screenshot due by {@code now}, after the frame has rendered. */
     void captureDueScreenshots(double now) {
+        if (!sceneCaptures.isEmpty()) {
+            capture(capturePrefix + "_" + sceneCaptures.remove());
+        } else if (finishAfterCaptures) {
+            game.window.requestClose();
+        }
         double elapsed = now - sessionStart;
         if (shotIndex >= shotMarks.length || elapsed < shotMarks[shotIndex]) {
             return;
         }
-        ScreenshotUtil.capture(game.window.framebufferWidth(),
-                game.window.framebufferHeight(),
-                capturePrefix + "_" + (int) shotMarks[shotIndex] + "s");
-        System.out.println("[capture] tag=" + capturePrefix
+        capture(capturePrefix + "_" + (int) shotMarks[shotIndex] + "s");
+        shotIndex++;
+        if (shotIndex >= shotMarks.length && !smoke) {
+            game.window.requestClose();
+        }
+    }
+
+    private void capture(String name) {
+        ScreenshotUtil.capture(game.window.framebufferWidth(), game.window.framebufferHeight(), name);
+        System.out.println("[capture] name=" + name + " tag=" + capturePrefix
                 + " scene=" + (scene == null ? "frontend" : scene)
                 + " framebuffer=" + game.window.framebufferWidth()
                 + "x" + game.window.framebufferHeight()
@@ -210,10 +240,6 @@ final class AutomatedRunDriver {
                 + " triangles=" + game.renderer.trianglesRendered
                 + " glErrors=" + game.window.glErrorCount()
                 + " khrErrors=" + game.window.glDebugErrorCount());
-        shotIndex++;
-        if (shotIndex >= shotMarks.length && !smoke) {
-            game.window.requestClose();
-        }
     }
 
     /** Advances the scripted smoke session; inert outside a smoke run. */

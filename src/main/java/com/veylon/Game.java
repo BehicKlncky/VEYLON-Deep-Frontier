@@ -215,7 +215,7 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
     final FrontendController frontend = new FrontendController(this);
 
     /** VEYLON_* benchmark scenes, timed captures and the release smoke gate. */
-    private final AutomatedRunDriver automation = new AutomatedRunDriver(this);
+    final AutomatedRunDriver automation = new AutomatedRunDriver(this);
     final CreativeQaScenes creativeQa = new CreativeQaScenes(this);
 
     /** Global keys: screens, debug overlays, quick save/load, hotbar. */

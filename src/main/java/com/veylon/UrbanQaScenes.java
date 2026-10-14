@@ -39,6 +39,8 @@ final class UrbanQaScenes {
     private final UrbanLootQaScene loot;
     private final UrbanInfectedQaScene infected;
     private final UrbanNavigationQaScene navigation;
+    /** Package 11: the playable slice route ({@code urban_slice}). */
+    private final UrbanSliceQaScene slice;
     private final PlayerMovementSystem.Command walk = new PlayerMovementSystem.Command();
     private boolean holding;
     private float holdX;
@@ -70,6 +72,7 @@ final class UrbanQaScenes {
         this.loot = new UrbanLootQaScene(game);
         this.infected = new UrbanInfectedQaScene(game);
         this.navigation = new UrbanNavigationQaScene(game);
+        this.slice = new UrbanSliceQaScene(game);
     }
 
     /** Stages one of the urban scenes; inert, with a notice, outside a street-network world. */
@@ -82,6 +85,10 @@ final class UrbanQaScenes {
             starterManual = true;
             System.out.println("[urban-starter] evidence=normal-controls-only seed=" + world.seed
                     + " refuge=" + world.urban.refugeBuilding + " spawn=" + game.player.pos);
+            return;
+        }
+        if (scene.equals("urban_slice")) {
+            slice.stage(); // a normal fresh session: its own clock, weather and events
             return;
         }
         if (!world.isUrban() || !world.urban.hasCityPlan()) {
@@ -171,6 +178,8 @@ final class UrbanQaScenes {
                 + world.urban.surfaceAt(-1, walkZ) + "|" + world.urban.surfaceAt(0, walkZ) + ")");
     }
 
+    UrbanSliceQaScene slice() { return slice; }
+
     /** Per-frame hook, before streaming and rendering; inert unless a scene is staged. */
     void update(double elapsed) {
         if (starterManual && (int) (elapsed / 5) != lastStarterReport) {
@@ -188,6 +197,7 @@ final class UrbanQaScenes {
         loot.update(elapsed);
         infected.update(elapsed);
         navigation.update(elapsed);
+        slice.update(elapsed);
         if (holding) {
             apply();
         }

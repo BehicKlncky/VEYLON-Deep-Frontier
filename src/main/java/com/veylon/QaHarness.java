@@ -775,7 +775,7 @@ final class QaHarness {
             case "creative_flight" -> game.creativeQa.stageFlightScene();
             case "urban_streets", "urban_intersection", "urban_seam_walk", "urban_fixtures",
                  "urban_fixtures_night", "urban_apartments", "urban_apartments_night",
-                 "urban_apartments_manual", "urban_apartments_manual_night",
+                 "urban_apartments_manual", "urban_apartments_manual_night", "urban_slice",
                  "urban_apartments_lit_night", "urban_loot", "urban_starter_manual",
                  "urban_infected_street", "urban_infected_apartment", "urban_navigation" -> urbanScene.stage(normalized);
             default -> System.out.println("[scene] unknown VEYLON_SCENE '" + scene + "'");
