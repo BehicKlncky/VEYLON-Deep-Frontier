@@ -101,7 +101,7 @@ final class UrbanContainersSection {
                 throw new IOException("invalid generated container id");
             }
             var plan=UrbanContainers.planned(game.world,entry.position);
-            boolean occupied=plan!=null && plan.building().variant()==com.veylon.world.urban.BuildingPlan.Variant.OCCUPIED;
+            boolean occupied=plan!=null && plan.building().survivorOwned(plan.fixture());
             if (plan==null || plan.fixture().id()!=entry.id || plan.fixture().block()!=entry.block
                     || entry.owner==UrbanContainers.Owner.PLAYER
                     || (entry.owner==UrbanContainers.Owner.SURVIVOR)!=occupied

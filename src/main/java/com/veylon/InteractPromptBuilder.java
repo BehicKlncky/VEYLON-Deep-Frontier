@@ -221,8 +221,9 @@ final class InteractPromptBuilder {
                         ? "Alarm bell — destroy it to silence the garrison"
                         : "[F] Ring the alarm";
             }
-            case CAGE_BARS -> game.interactPrompt =
-                    "Cage bars (mine through to free captives)";
+            case CAGE_BARS -> game.interactPrompt = world.isUrban() ? "Security bars over a window"
+                    : "Cage bars (mine through to free captives)";
+            case SIGN -> game.interactPrompt = signPrompt(targetX, targetZ);
             default -> {
             }
         }
@@ -309,6 +310,14 @@ final class InteractPromptBuilder {
         return state.lit()
                 ? "[F] Extinguish lantern — LIT, " + fuel + "s fuel"
                 : "[F] Light lantern — UNLIT, " + fuel + "s fuel";
+    }
+
+    /** A frontage sign reads its building's plan; it never loads a chunk or rolls anything. */
+    private String signPrompt(int x, int z) {
+        World world = game.world;
+        var plan = world.urban == null ? null : world.urban.buildingAt(x, z);
+        String text = plan == null ? null : com.veylon.world.urban.CivicCatalogue.signText(world.seed, plan);
+        return text == null ? "A weathered sign; the paint is unreadable" : "Sign: \"" + text + "\"";
     }
 
     private String beaconPrompt() {

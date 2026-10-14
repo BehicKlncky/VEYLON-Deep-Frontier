@@ -138,6 +138,34 @@ class WorldGeneratorFingerprintTest {
                 + "instead of re-recording:\n  " + String.join("\n  ", moved));
     }
 
+    /**
+     * Generator 11 (layout 8, template 5), recorded 2026-10-14 when the commercial and civic
+     * catalogue was introduced. Its four terrain chunks reach specialist buildings in the
+     * neighbouring regions, so they differ from generator 10's; the plan pin covers every
+     * building of three regions, one of them downtown.
+     */
+    private static final long[] URBAN_CIVIC_TERRAIN_FINGERPRINTS = {
+            0x1fc4b2fa9e641966L, 0x3cb0188f5688d77cL, 0x0da8ac69b04b6045L};
+    private static final long[] URBAN_CIVIC_BUILDING_FINGERPRINTS = {
+            0xfe99001b21b99d30L, 0x3788fac8651d269cL, 0xded50cb05c42ee09L};
+    private static final long[] URBAN_CIVIC_PLAN_FINGERPRINTS = {
+            0x3fb3b0d5f7ea59c7L, 0x89e28b3e511b2b96L, 0xd9a11c2e0b203863L};
+
+    @Test
+    void theCivicCatalogueKeepsItsRecordedBlocksAndBuildingPlans() {
+        assertTerrainPinned(World.GEN_URBAN_CIVIC, URBAN_CIVIC_TERRAIN_FINGERPRINTS);
+        List<String> moved = new ArrayList<>();
+        for (int i = 0; i < SEEDS.length; i++) {
+            long blocks = furnishedBuildingFingerprint(SEEDS[i], World.GEN_URBAN_CIVIC);
+            long plans = buildingPlanFingerprint(SEEDS[i], World.GEN_URBAN_CIVIC);
+            if (blocks != URBAN_CIVIC_BUILDING_FINGERPRINTS[i] || plans != URBAN_CIVIC_PLAN_FINGERPRINTS[i]) {
+                moved.add(String.format("seed %d: blocks 0x%016xL, plans 0x%016xL", SEEDS[i], blocks, plans));
+            }
+        }
+        assertTrue(moved.isEmpty(), () -> "generator 11 changed; add a generator version instead of "
+                + "re-recording:\n  " + String.join("\n  ", moved));
+    }
+
     /** Every building plan (geometry, rooms, fixtures, ids) of three regions, in parcel order. */
     private static long buildingPlanFingerprint(long seed, int generatorVersion) {
         World world = new World(seed, generatorVersion);

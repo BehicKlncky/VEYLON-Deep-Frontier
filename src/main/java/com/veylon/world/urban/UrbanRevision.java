@@ -61,6 +61,8 @@ public final class UrbanRevision {
      * superblock unchanged, plus six specialist families on the same skeleton.
      */
     public static final int BUILDING_TEMPLATE_CIVIC = 5;
+    /** Layout of {@link World#GEN_URBAN_CIVIC}: layout seven plus template five. */
+    public static final int LAYOUT_CIVIC = 8;
 
     /** Content revision every new urban world records. */
     public static final int CURRENT_CONTENT = 3;
@@ -74,7 +76,7 @@ public final class UrbanRevision {
     public static final int ABSENT_CONTENT = 1;
 
     /** The urban generator the development selector creates: the newest layout. */
-    public static final int DEVELOPMENT_GENERATOR = World.GEN_URBAN_ENCOUNTERS;
+    public static final int DEVELOPMENT_GENERATOR = World.GEN_URBAN_CIVIC;
 
     private UrbanRevision() {
     }
@@ -93,6 +95,7 @@ public final class UrbanRevision {
             case World.GEN_URBAN_SHAPED_STAIRS -> LAYOUT_SHAPED_STAIRS;
             case World.GEN_URBAN_STARTER -> LAYOUT_STARTER;
             case World.GEN_URBAN_ENCOUNTERS -> LAYOUT_ENCOUNTERS;
+            case World.GEN_URBAN_CIVIC -> LAYOUT_CIVIC;
             default -> throw new IllegalArgumentException(
                     "generator " + generatorVersion + " is not an urban generator");
         };
@@ -106,6 +109,7 @@ public final class UrbanRevision {
             case World.GEN_URBAN_APARTMENTS -> BUILDING_TEMPLATE_FURNISHED;
             case World.GEN_URBAN_SHAPED_STAIRS -> BUILDING_TEMPLATE_SHAPED_STAIRS;
             case World.GEN_URBAN_STARTER, World.GEN_URBAN_ENCOUNTERS -> BUILDING_TEMPLATE_STARTER;
+            case World.GEN_URBAN_CIVIC -> BUILDING_TEMPLATE_CIVIC;
             default -> throw new IllegalArgumentException("not an urban generator " + generatorVersion);
         };
     }

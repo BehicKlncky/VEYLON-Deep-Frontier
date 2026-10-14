@@ -70,6 +70,8 @@ public final class UrbanSalts {
     public static final long CIVIC_BASEMENT = 0x5643_4956_4241_5345L;
     /** The name painted on a frontage sign; presentation only. */
     public static final long CIVIC_NAME = 0x5643_4956_4e41_4d45L;
+    /** Encounter catalogue two: which unguarded specialist buildings hold a resident threat. */
+    public static final long CIVIC_ENCOUNTERS = 0x5643_4956_454e_434fL;
 
     private UrbanSalts() {
     }

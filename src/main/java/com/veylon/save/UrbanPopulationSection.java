@@ -30,7 +30,7 @@ final class UrbanPopulationSection {
         var bytes = new ByteArrayOutputStream();
         Set<Integer> indices = new HashSet<>();
         try (var out = new DataOutputStream(bytes)) {
-            out.writeInt(1); out.writeInt(1); // codec and frozen encounter catalogue
+            out.writeInt(1); out.writeInt(EncounterAnchors.catalogue(g.world)); // codec and frozen catalogue
             out.writeInt(director.size());
             var ordered = director.residents().stream().sorted(java.util.Comparator.comparingLong(r -> r.id)).toList();
             for (Resident r : ordered) {
@@ -50,7 +50,10 @@ final class UrbanPopulationSection {
         List<Resident> rows = new ArrayList<>();
         Set<Long> ids = new HashSet<>(); Set<Integer> indices = new HashSet<>();
         try (var in = new DataInputStream(new ByteArrayInputStream(bytes))) {
-            if (in.readInt() != 1 || in.readInt() != 1) { throw new IOException("unsupported population version/catalogue"); }
+            // Each generator freezes one catalogue; any other is rejected, never reinterpreted (D-83).
+            if (in.readInt() != 1 || in.readInt() != EncounterAnchors.catalogue(g.world)) {
+                throw new IOException("unsupported population version/catalogue");
+            }
             int count = SaveSystem.readCount(in, "urban encounters", UrbanEncounterDirector.MAX_RECORDS);
             // Every v1 row has exactly 47 bytes, including the stable species string.
             if (in.available() != count * 47) { throw new IOException("invalid population payload length"); }

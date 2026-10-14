@@ -91,8 +91,14 @@ public final class UrbanWorldState {
                 || layoutRevision == UrbanRevision.LAYOUT_SHAPED_STAIRS || hasStarter();
     }
 
-    public boolean hasStarter() { return layoutRevision == UrbanRevision.LAYOUT_STARTER || hasEncounters(); }
-    public boolean hasEncounters() { return layoutRevision == UrbanRevision.LAYOUT_ENCOUNTERS; }
+    public boolean hasStarter() {
+        return layoutRevision == UrbanRevision.LAYOUT_STARTER || hasEncounters() || hasCivicCatalogue();
+    }
+    public boolean hasEncounters() {
+        return layoutRevision == UrbanRevision.LAYOUT_ENCOUNTERS || hasCivicCatalogue();
+    }
+    /** Layout eight: commercial and civic families on the generator-ten starter city. */
+    public boolean hasCivicCatalogue() { return layoutRevision == UrbanRevision.LAYOUT_CIVIC; }
 
     public boolean contentRevisionResolved() {
         return contentRevision != UNRESOLVED;
@@ -175,8 +181,9 @@ public final class UrbanWorldState {
         if (buildingPlans == null) { return null; }
         ParcelPlan parcel = parcelAt(x, z);
         if (parcel == null) { return null; }
+        // Template five chooses each family from the parcel's own (pure, cached) district plan.
         return buildingPlans.get(UrbanIds.building(parcel.id(), 0),
-                ignored -> BuildingPlanner.plan(seed, buildingTemplateRevision, parcel).plan());
+                ignored -> BuildingPlanner.plan(seed, buildingTemplateRevision, parcel, planAt(x, z)).plan());
     }
 
     /** Region plans currently cached; never above {@value #MAX_REGION_PLANS}. */

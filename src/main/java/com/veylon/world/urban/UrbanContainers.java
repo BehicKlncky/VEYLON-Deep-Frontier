@@ -74,7 +74,7 @@ public final class UrbanContainers {
         if (entry!=null) { return entry.owner==Owner.SURVIVOR ? entry.ownerId : UrbanIds.NONE; }
         Planned plan=planned(world,position);
         return plan!=null && !world.urban.containers.entries.containsKey(plan.fixture.id())
-                && plan.building.variant()==BuildingPlan.Variant.OCCUPIED ? plan.building.id() : UrbanIds.NONE;
+                && plan.building.survivorOwned(plan.fixture) ? plan.building.id() : UrbanIds.NONE;
     }
     public static boolean manages(World world) {
         return world.urban != null && world.urban.hasGeneratedBuildings();
@@ -139,7 +139,7 @@ public final class UrbanContainers {
     }
 
     private Entry generated(Planned plan, State state) {
-        boolean owned = plan.building.variant() == BuildingPlan.Variant.OCCUPIED;
+        boolean owned = plan.building.survivorOwned(plan.fixture);
         return new Entry(plan.fixture.id(),plan.fixture.position(),plan.fixture.block(),
                 owned ? Owner.SURVIVOR : Owner.ABANDONED, owned ? plan.building.id() : UrbanIds.NONE,state,0);
     }

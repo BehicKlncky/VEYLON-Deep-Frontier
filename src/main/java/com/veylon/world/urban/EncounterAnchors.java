@@ -4,10 +4,21 @@ import com.veylon.util.Vec3i;
 import com.veylon.world.World;
 import java.util.List;
 
-/** Frozen catalogue one. Geometry is inherited unchanged from generator 9. */
+/**
+ * Frozen encounter catalogues. Catalogue one (generator 10) reserves two ground-floor slots in
+ * selected residential buildings. Catalogue two (generator 11) keeps exactly that rule for its
+ * walk-ups and adds guard reservations to the commercial and civic families: every clinic and
+ * security post keeps its lobby occupied (the encounter cost of secured medicine and
+ * ammunition), and one in four other specialist buildings keeps its main back room.
+ */
 public final class EncounterAnchors {
     public record Anchor(long id, long building, Vec3i cell, boolean indoor) { }
     private EncounterAnchors() { }
+
+    /** The catalogue a world's generator freezes; it is written beside the population codec. */
+    public static int catalogue(World world) {
+        return world.urban != null && world.urban.hasCivicCatalogue() ? 2 : 1;
+    }
 
     public static boolean selected(World world, ParcelPlan parcel) {
         return parcel.use() == ParcelPlan.Use.RESIDENTIAL
@@ -16,6 +27,10 @@ public final class EncounterAnchors {
     }
 
     public static List<Anchor> forParcel(World world, ParcelPlan parcel) {
+        if (catalogue(world) == 2) {
+            BuildingPlan plan = world.urban.buildingAt(parcel.x0(), parcel.z0());
+            if (!plan.family().walkUp()) { return civic(world, plan); }
+        }
         if (!selected(world, parcel)) { return List.of(); }
         BuildingPlan plan = world.urban.buildingAt(parcel.x0(), parcel.z0());
         if (plan.variant() == BuildingPlan.Variant.OCCUPIED) { return List.of(); }
@@ -26,6 +41,29 @@ public final class EncounterAnchors {
                         && !room.functions().contains(BuildingPlan.Function.KITCHEN)) { continue; }
                 return List.of(new Anchor(UrbanIds.encounter(room.id(), 0), plan.id(),
                                 plan.approaches().getFirst(), false),
+                        new Anchor(UrbanIds.encounter(room.id(), 1), plan.id(), room.anchor(), true));
+            }
+        }
+        return List.of();
+    }
+
+    /**
+     * Catalogue two's specialist reservations: the street approach plus the lobby of a clinic
+     * or security post, or the first back room of a selected grocer, school, office or
+     * warehouse. Held (occupied) buildings have none, as in catalogue one.
+     */
+    private static List<Anchor> civic(World world, BuildingPlan plan) {
+        if (plan.variant() == BuildingPlan.Variant.OCCUPIED) { return List.of(); }
+        boolean guarded = plan.family() == BuildingPlan.Family.CLINIC || plan.family() == BuildingPlan.Family.SECURITY;
+        if (!guarded && UrbanHash.range(0, 3, world.seed, 2, UrbanSalts.CIVIC_ENCOUNTERS, plan.parcel().id(), 0, 0) != 0) {
+            return List.of();
+        }
+        int roomIndex = guarded ? 0 : 6;
+        for (var floor : plan.floors()) {
+            if (floor.index() != 0) { continue; }
+            for (var room : floor.rooms()) {
+                if (UrbanIds.roomIndex(room.id()) != roomIndex) { continue; }
+                return List.of(new Anchor(UrbanIds.encounter(room.id(), 0), plan.id(), plan.approaches().getFirst(), false),
                         new Anchor(UrbanIds.encounter(room.id(), 1), plan.id(), room.anchor(), true));
             }
         }

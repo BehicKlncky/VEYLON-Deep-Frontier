@@ -40,14 +40,15 @@ class UrbanGeneratorDispatchTest {
         assertEquals(8, World.GEN_URBAN_SHAPED_STAIRS);
         assertEquals(9, World.GEN_URBAN_STARTER);
         assertEquals(10, World.GEN_URBAN_ENCOUNTERS);
-        assertEquals(World.GEN_URBAN_ENCOUNTERS, World.MAX_SUPPORTED_GENERATOR);
+        assertEquals(11, World.GEN_URBAN_CIVIC, "the commercial and civic catalogue (D-98)");
+        assertEquals(World.GEN_URBAN_CIVIC, World.MAX_SUPPORTED_GENERATOR);
         for (int version = -1; version <= World.MAX_SUPPORTED_GENERATOR + 2; version++) {
             boolean known = version >= World.GEN_LEGACY && version <= World.MAX_SUPPORTED_GENERATOR;
             assertEquals(known, World.isSupportedGenerator(version), "supported " + version);
             assertEquals(version == World.GEN_URBAN || version == World.GEN_URBAN_STREETS
                             || version == World.GEN_URBAN_PLANS || version == World.GEN_URBAN_APARTMENTS
                             || version == World.GEN_URBAN_SHAPED_STAIRS || version == World.GEN_URBAN_STARTER
-                            || version == World.GEN_URBAN_ENCOUNTERS,
+                            || version == World.GEN_URBAN_ENCOUNTERS || version == World.GEN_URBAN_CIVIC,
                     World.isUrbanGenerator(version), "urban " + version);
             assertEquals(version == World.GEN_DEEP || version == World.GEN_CAVE_IDENTITIES,
                     World.hasDeepFrontier(version), "deep frontier " + version);
