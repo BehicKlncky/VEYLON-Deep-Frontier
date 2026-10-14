@@ -43,7 +43,7 @@ runs. All are inert when unset. Everything below is handled by `QaHarness`;
 | `VEYLON_GAME_MODE=survival\|creative` | Initial mode for automated world runs only; absent means Survival. Invalid values fail explicitly. Ignored for normal title sessions and frontend-only captures. |
 | `VEYLON_GENERATOR=urban-dev` | Development selector: NEW FRONTIER and automated worlds use the newest urban generator (`UrbanRevision.DEVELOPMENT_GENERATOR`, now `World.GEN_URBAN_ENCOUNTERS`: generator 10, layout 7 / template 4 / content 3, encounter catalogue 1). Absent keeps the ordinary default. Any other value fails, and so does `urban-dev` without an isolated data directory (see below). |
 | `VEYLON_SMOKE=<seconds>` | Release smoke gate: save/load, fire, storm, a fortress approach, then a pass/fail report. Throws on failure |
-| `VEYLON_SCENE=<name>` | Stage a deterministic benchmark scene (`day`, `pinefog`, `nightfire`, `ruin`, `toxic`, `ao_shadow`, `phase4`, `ashwolf`, `silhouette30`, `vfx_blood`, `vfx_mining`, `vfx_beacon`, `death_ragdoll_showcase`, `death_ragdoll_sequence`, `dismember_showcase`, `dismember_wall`, `dismember_bomb` (a real scrap bomb thrown into a group of six, one outside the lethal radius; it goes off at 2.4 s), `dismember_species`, `dismember_species_wall` and `dismember_species_close` (every species, a guard and the player's remains blown apart at 1 s; open meadow, a step and a wall, and a close view of the small bodies), `molotov_ground`, `molotov_tree` and `molotov_rain` (a real fire bomb thrown at 0.5 s onto a dry clearing at dusk, beside a round tree that catches, or with rain from 3 s that puts the pool out; shots `0.7,1.2,3,7,11`, `1,4,10,20` and `2,3.5,5`), the burning-body scenes `body_fire_row`, `body_fire_row_night`, `body_fire_close`, `body_fire_out`, `body_fire_blast`, `body_fire_panic`, `body_fire_bird`, `body_fire_rain`, `body_fire_ragdoll` and `body_fire_player` (see "Burning bodies QA" below), `movement`, `inventory`, `ui_cycle`, `held_*`, `creative_flight` with `VEYLON_GAME_MODE=creative`, which flies east at Shift speed and prints a `[flight]` streaming report at 29 s, and the urban scenes `urban_streets`, `urban_intersection`, `urban_seam_walk`, `urban_fixtures`, `urban_fixtures_night`, `urban_apartments`, `urban_apartments_night`, `urban_apartments_lit_night`, `urban_apartments_manual`, `urban_apartments_manual_night` and `urban_loot` with `VEYLON_GENERATOR=urban-dev` (see "Urban planning QA" below)) |
+| `VEYLON_SCENE=<name>` | Stage a deterministic benchmark scene (`day`, `pinefog`, `nightfire`, `ruin`, `toxic`, `ao_shadow`, `phase4`, `ashwolf`, `silhouette30`, `vfx_blood`, `vfx_mining`, `vfx_beacon`, `death_ragdoll_showcase`, `death_ragdoll_sequence`, `dismember_showcase`, `dismember_wall`, `dismember_bomb` (a real scrap bomb thrown into a group of six, one outside the lethal radius; it goes off at 2.4 s), `dismember_species`, `dismember_species_wall` and `dismember_species_close` (every species, a guard and the player's remains blown apart at 1 s; open meadow, a step and a wall, and a close view of the small bodies), `molotov_ground`, `molotov_tree` and `molotov_rain` (a real fire bomb thrown at 0.5 s onto a dry clearing at dusk, beside a round tree that catches, or with rain from 3 s that puts the pool out; shots `0.7,1.2,3,7,11`, `1,4,10,20` and `2,3.5,5`), the burning-body scenes `body_fire_row`, `body_fire_row_night`, `body_fire_close`, `body_fire_out`, `body_fire_blast`, `body_fire_panic`, `body_fire_bird`, `body_fire_rain`, `body_fire_ragdoll` and `body_fire_player` (see "Burning bodies QA" below), `movement`, `inventory`, `ui_cycle`, `held_*`, `creative_flight` with `VEYLON_GAME_MODE=creative`, which flies east at Shift speed and prints a `[flight]` streaming report at 29 s, and the urban scenes `urban_streets`, `urban_intersection`, `urban_seam_walk`, `urban_fixtures`, `urban_fixtures_night`, `urban_apartments`, `urban_apartments_night`, `urban_apartments_lit_night`, `urban_apartments_manual`, `urban_apartments_manual_night`, `urban_loot` and the playable-slice route `urban_slice` with `VEYLON_GENERATOR=urban-dev` (see "Urban planning QA" below)) |
 | `VEYLON_SHOT="5,10"` | Capture screenshots at those elapsed seconds |
 | `VEYLON_FRONTEND=<name>` | Pin a front-end screen (`options`, `audio`, `loading`, `death`, `victory`, `glyphs`, `newworld`). `newworld-save` shows the replace-save notice without writing a save. `pause` and `gamemode` stage a Survival world with the pause menu or the mode confirmation open; `pause-creative`, `gamemode-creative` and `victory-creative` stage a Creative world; `catalog`, `catalog-tools`, `catalog-search` (query "iron") and `catalog-inventory` open the Creative catalog; `worldcontrols` and `worldcontrols-held` open the Creative world controls, the second with dusk, a frozen clock, a locked storm and paused spawning already applied |
 | `VEYLON_RESOLUTION=1920x1080` | Framebuffer override |
@@ -98,6 +98,7 @@ the spawn column.
 | `urban_apartments_manual`, `urban_apartments_manual_night` | Start-only positioning outside the same generated apartment, forced Survival, normal mouse look/movement/F interactions afterward. Without `VEYLON_SHOT`, stays open for a human walk. Record the seed, building id, mode, actual route, clipping/stair findings and exit. The scene itself never records a manual success. |
 | `urban_loot` | Survival on real generated cupboards: abandoned kitchen search/take at 0–4 s, survivor cupboard search/take at 5–9 s, simulation/noise/ownership gate at 10 s. No structure or loot injection; the normal scheduler must advance searches. Capture `1,4,6,10,14`. Throws if the gate fails or searches have not completed by 13 s. Scripted positioning/commands, not a human walk. |
 | `urban_starter_manual` | Fresh starter-compatible Survival, normal controls and read-only five-second position/inventory evidence. No pose, weather, clock or supply injection. Walk from the bedroom through the courtyard to an apartment/shop, search with F, take supplies and return. Use a fresh isolated directory, capture the spawn, save with F5 and capture the return. |
+| `urban_slice` | The package-11 slice gate in either mode on a fresh generator-10 world, with its own clock, weather and events. The route forces an interior door and searches a multi-floor apartment that hosts an encounter. It handles an infected, searches the shop, bars the refuge's street door, eats, drinks, crafts the reinforced spear, quick-saves with F5 and quick-loads with F9 over the live world. It then revisits in reverse order. Prints `[urban-slice] pass=true`, three `memory` checkpoints and a timeline, writes 16 labelled captures and closes itself. |
 
 ```powershell
 $env:VEYLON_GENERATOR='urban-dev'; $env:VEYLON_SEED='20260731'
@@ -169,6 +170,37 @@ with F, search cupboards, click supplies, return and save with F5. Its five-seco
 log records position, camera, screen, searched rows, food, water and first upgrade.
 The final timed shot closes the session; close earlier after capturing the return.
 Treat OS-scripted normal controls and human playtests as distinct evidence.
+
+For the playable-slice gate (package 11), run each mode in a fresh directory:
+
+```powershell
+$env:VEYLON_GENERATOR='urban-dev'; $env:VEYLON_SEED='20260731'
+$env:VEYLON_GAME_MODE='survival'; $env:VEYLON_SCENE='urban_slice'
+$env:VEYLON_RESOLUTION='1280x720'; $env:VEYLON_CAPTURE_TAG='m11-slice-survival'
+Remove-Item Env:VEYLON_SHOT -ErrorAction SilentlyContinue
+.\gradlew.bat run -PveylonDataDir=build/qa/m11-slice-survival --console=plain
+```
+
+Repeat with `creative` in the mode, tag and directory for the twin. The runner
+plays through the production input seam. It holds W, Ctrl, F, C, 1–9, F5, F9
+and the left and right mouse buttons, and turns the camera as mouse look would.
+Container and crafting clicks use the commands those screens call. Nothing is
+staged: no item, pose, block, body, clock or weather. The frozen capture list,
+written as `<tag>_<label>.png` under the data directory's `screenshots/`, is:
+
+`01-refuge-start`, `02-courtyard`, `03-apartment-entry`, `04-forced-door`,
+`05-search-hidden`, `06-search-revealed`, `07-upper-floor`, `08-threat`,
+`09-defeated`, `10-shop`, `11-barred-door`, `12-craft`, `13-after-load`,
+`14-revisit-shop`, `15-revisit-locker` and `16-end`.
+
+Require `[urban-slice] pass=true` and zero GL, KHR and native-audio errors.
+Record the host, the three `[urban-slice] memory` lines and the route
+observations (engaged and defeated ids, damage, harm events, minimum body
+temperature, events, walked blocks and game minutes). The memory lines give
+retained chunks and a post-GC best-effort heap sample; they are host
+measurements, not budgets. `UrbanSliceRouteTest` plays the same scene headlessly
+in `Game.run` order on the frozen slice seeds. This scripted route is not the
+human playtest deferred by D-80.
 
 For the generated apartment appearance sequence use an isolated directory and a
 tag such as `m06_scripted_camera_day`. Change the scene to

@@ -175,7 +175,10 @@ while (!window.shouldClose())
 1. **Frontend short-circuit** — in `TITLE`, `TITLE_OPTIONS`, `TITLE_AUDIO_OPTIONS` or `LOADING`, call
    `frameFrontend(dt)` and return. No world exists in these states.
 2. **State machine** — `DEATH`/`VICTORY` handle Esc/Enter; otherwise
-   `handleGlobalKeys()` (inventory, crafting, map, pause, debug overlays).
+   `handleGlobalKeys()` (inventory, crafting, map, pause, debug overlays). When F
+   closes a crate or NPC screen the press is consumed, so the same frame cannot
+   reopen what the player faces. Steps 3–7 are `Game.playStep`, which headless
+   routes such as `UrbanSliceRouteTest` run in the same order.
 3. `simulate = simulates()`: `appState == PLAYING`, no pausing screen (`UiMode.pausesSimulation`:
    the pause menu and the options, audio, game-mode and world-controls screens opened from it)
    and not `simPaused`. The inventory, crafting, map, crate, catalog and NPC screens do not pause.
@@ -535,7 +538,9 @@ mutations needing a record fail without changing blocks or moving supplies.
 `CrateTransactionSystem` advances 1.5/2.5/3.5-second searches on normal fast ticks
 after needs, entities and settlements. Rummaging emits actual bounded
 `WorldNoise` events and audio. Closing, damage, death, range over five blocks,
-unloaded columns or fixture replacement interrupt the screen; elapsed search
+unloaded columns or fixture replacement interrupt the screen. Damage means a
+discrete blow, fall, burn or blast counted by `Player.harmEvents`; cold, bleeding,
+hunger and other over-time drains do not interrupt a search. Elapsed search
 progress remains durable. Opening a screen never pauses simulation. Left click
 transfers a stack, right click one item. Full destinations preserve the source;
 partial transfers remove only delivered quantities. Stack merging preserves

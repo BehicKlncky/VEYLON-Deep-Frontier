@@ -6,10 +6,10 @@ This is the running record for the 26-package urban-survival roadmap. The pack i
 
 | Item | Value |
 | --- | --- |
-| Last completed package | **10 — Indoor navigation and perception** (2026-10-12). Shared bounded routes, selective invalidation, multi-floor pursuit, occluded evidence/expiry, retained settlement travel, scripted native QA and final portable build passed. |
-| Source revision | 10: `edf3d45` independently validated navigation → `ae80b14` indoor perception, lifecycle, regression fixtures and native QA. Records follow separately. |
+| Last completed package | **11 — Playable vertical slice gate** (2026-10-13; final build and commits 2026-10-14). The generated starter neighbourhood supports the scavenge, risk and return loop through the production input seam. It passes on six frozen seeds in both modes headless, and on seed `20260731` natively in both modes. Save, load, revisit and chunk-order checks pass. Four blockers were fixed. Human-only checks are deferred by D-80. |
+| Source revision | 11: `0318966`, `01c42ec`, `2f63652` blocker fixes → `51578ad` frame step → `1e60097` F-close fix → `51c5a9c` slice runner → `406803b` slice gate test. Records follow separately. |
 | Default new world | Legacy (`World.DEFAULT_NEW_WORLD_GENERATOR = GEN_CAVE_IDENTITIES`), unchanged until 26 passes. Isolated `VEYLON_GENERATOR=urban-dev` creates generator 10 (`GEN_URBAN_ENCOUNTERS`, layout 7 / template 4 / content 3, encounter catalogue 1). Generators 1–9 stay loadable with their original geometry and no new encounters. |
-| Next package | **11 — Playable vertical slice gate, NOT STARTED.** Integrate scavenging, refuge return, infected evidence, save/revisit and explored-area memory accounting. No required automated/native 10 gate remains pending; human-only checks remain deferred by D-80. |
+| Next package | **12 — Commercial and civic buildings, NOT STARTED.** The 11 gate is met, so expansion may proceed. Keep `UrbanSliceRouteTest` and the frozen slice seeds as the starter-loop regression gate. The D-97 tuning findings belong to 13, 19, 21, 22 and 23. |
 | Human testing schedule | Owner instruction (2026-10-11, D-80): consolidated human playtesting/listening after milestone 22. Through 22, run automated and scripted native validation and record human-only checks as deferred; do not request interim human walks. |
 | Commits | Separate `feat`, `test`, `docs` and `chore` commits on `feature/urban-survival`; see the reconstruction ledger below. `main` stays at `923345f`. Original combined commit retained at `backup/urban-m01-m04-before-split`. No merge, push, tag or publication. |
 
@@ -29,7 +29,7 @@ The status vocabulary is NOT STARTED, IN PROGRESS, PARTIAL, BLOCKED or COMPLETE.
 | 08 | Urban spawn and survival progression | 07 | `UrbanBootstrap`, `UrbanStarterSite`, generator 9 / template 4 / content 3, `urban.refuges`, `item/UrbanCrafting`, atomic transfers, indoor safety/prompts, read-only native QA and production route tests; no enum additions | Six starter seeds reach shelter, food, water, treatment, sleep and a first upgrade from urban sources only. Legacy/Creative/save/build pass. Fresh normal-controls native search/take/return with captures. | **COMPLETE** (2026-10-11) |
 | 09 | Infected threats and encounters | 08 | Appended `NpcArchetype.VEILBOUND`, `ai/InfectedAI`, humanoid models/anatomy, `engine/InfectedSounds`, `UrbanEncounterDirector`, `EncounterAnchors`, `urban.population`, `RuntimeBudgetSnapshot` | Infected notice the player fairly, pursue in a fixture, attack through the damage gates, react to fire and die cleanly. Defeated state survives save, load and reactivation. Caps and sanctuary hold. Creative twin. Natives in a street and a ground-floor apartment. | **COMPLETE** (2026-10-12; human-only validation deferred by D-80) |
 | 10 | Indoor navigation and perception | 09, 04–06 | `ai/Pathfinder`, `PortalGraph`, `PathBudget`, `NavigationCache`, `IndoorNavigation`; `combat/WorldNoise`; AI and lifecycle guards | Multi-floor pursuit through doors and stairs, losing sight, searching and giving up. Door edits change routes. A shared measured budget. No roof or ground confusion and no void pathing. A native pursuit and escape. | **COMPLETE** (2026-10-12; human-only validation deferred by D-80) |
-| 11 | Playable vertical slice gate | 02–10 | Integration: `UrbanQaScenes`, `AutomatedRunDriver` urban route, integration tests | The DESIGN §14 slice holds headless and native with normal controls; save, revisit, no refill and no resurrection; Creative twins. Regression seeds frozen. Memory per explored area recorded (§4.3). | NOT STARTED |
+| 11 | Playable vertical slice gate | 02–10 | Integration: `UrbanQaScenes`, `AutomatedRunDriver` urban route, integration tests | The DESIGN §14 slice holds headless and native with normal controls; save, revisit, no refill and no resurrection; Creative twins. Regression seeds frozen. Memory per explored area recorded (§4.3). | **COMPLETE** (2026-10-13; human-only validation deferred by D-80) |
 | 12 | Commercial and civic buildings | 11 | `BuildingTemplates` catalog (6 archetypes), `LootTables` | Every family has connected interiors with reachable containers and exits across the family matrix. Earlier urban layouts and legacy fingerprints are unchanged. | NOT STARTED |
 | 13 | Urban biome differentiation | 12, 03 | New `DistrictRules`, overlays, district-to-climate mapping (D-08) | Six distinct districts change player choices. Seams connect. Basics never depend on rare districts. Overlays keep accessibility. Legacy biome consumers are unchanged. | NOT STARTED |
 | 14 | Basements, transit and rooftop routes | 13, 05–06, 10 | Basement, transit and roof planners; hidden entrances; portals; `urban.discovery` | Street → basement → service passage → street and street → fire escape → roof → exit work without clipping or traps. Underground joins agree across borders. Secrets are discoverable through real clues. | NOT STARTED |
@@ -1029,6 +1029,202 @@ D-80. No required automated/native 10 gate remains pending.
 Next concrete step after the local handoff: **11**, build the generated
 scavenge/return/save/revisit integration route with a real infected encounter,
 preserved depletion, Creative twin and explored-area memory measurements.
+
+## Milestone 11 — playable vertical slice gate (2026-10-13)
+
+**Status: COMPLETE.** A generated starter neighbourhood now supports the full
+scavenging → risk → return loop on all six frozen seeds headless, in both modes,
+and natively on seed `20260731` in both modes. Human-only validation remains
+deferred by D-80. This gate does not claim the city transformation is complete.
+
+### Start state
+
+- Branch: `feature/urban-survival` at `d16be92`; the tree was clean.
+- Context read: the full revised base
+  (`build/urban-survival-roadmap-revision/00_BASE_KNOWLEDGE.md`, which holds the
+  local-commit section), the prompt, `AGENTS.md`, `docs/COMMIT_WORKFLOW.md`, and
+  the urban design, decisions, progress and validation records.
+- A read-only, five-area mapping workflow and headless probes measured the
+  neighbourhood, encounter density, climate and a natural loot-and-fight policy
+  before the route was written.
+
+### The slice and its route
+
+- **The neighbourhood (D-91).** The generator-10 starter superblock exactly as
+  generated:
+  - the unattended refuge, its provisional camp, with bed, workbench, storage,
+    courtyard fire and collector;
+  - four three-storey apartments with B1;
+  - the corner shop and the street lattice;
+  - the courtyard ring reached through two passages. That ring is the alley
+    alternative: every destination can be reached both around the streets and
+    across the courtyard.
+- **Choosing the apartment (D-91).** `UrbanSlicePlan` chooses, from the frozen
+  plan alone, the apartment whose ground-floor kitchen encounter clears the
+  sanctuary, plus the fixtures and doors the route uses. Its route search is
+  bounded: at most 60,000 cells within 128 blocks.
+- **The scene (D-96).** `UrbanSliceQaScene` (`VEYLON_SCENE=urban_slice`) plays
+  the route with normal controls:
+  - held keys and mouse buttons through `Input`;
+  - mouse-look camera turns;
+  - the crate transfer and craft commands those screens call.
+
+  The route itself:
+  1. Walks from the refuge across the courtyard.
+  2. Forces an interior apartment door.
+  3. Searches the utility locker, kitchen, bathroom and first-floor kitchen,
+     leaving two torches behind.
+  4. Handles a Veilbound.
+  5. Searches the shop, leaving fibre and planks behind.
+  6. Bars the refuge's street door and stores planks.
+  7. Eats, drinks and treats a wound if bleeding.
+  8. Crafts the reinforced spear.
+  9. Quick-saves (F5), then quick-loads (F9) over the live world.
+  10. Checks for stale state.
+  11. Revisits in reverse order and verifies there was no refill or
+      resurrection.
+  12. Prints memory checkpoints and a timeline, writes 16 labelled captures and
+      closes.
+
+  It stages no item, pose, block, body, clock or weather.
+- **Shared seams (D-96).**
+  - `Game.playStep` is the frame's control and simulation step, moved verbatim
+    (Game is at 995 lines).
+  - `Input.onMouseButton` is public.
+  - `CraftingScreen.craft` is the screen's Enter command.
+  - `AutomatedRunDriver` gains labelled scene captures and a scripted finish.
+- **Regression set and capture list (D-96, VALIDATION §6).** Frozen as the six
+  urban design seeds in both modes headless, plus native `20260731` in both
+  modes. The 16-capture list is in DEVELOPING.
+
+### Blockers fixed while playing it
+
+Each fix is in existing package scope, with a regression test proven to fail
+without it:
+
+- **B1 (07), D-92.** Searches now stop only on discrete harm
+  (`Player.harmEvents`). Cold-snap, bleeding and hunger drains previously
+  cancelled every search.
+- **B2 (09), D-93.** Camp illness no longer chooses a Veilbound, which had
+  produced "The camp needs MEDICINE" in a city with no camp.
+- **B3 (09), D-94.** `urban.population` accepts projectile torso wounds. A torso
+  arrow made F5 fail, and a shot-down tombstone broke every later save.
+- **B4 (07), D-95.** F closes a container the player is facing. Before, the same
+  frame's interaction pass reopened it.
+
+### Findings assigned rather than tuned (D-97)
+
+None of these blocks the loop.
+
+- **Encounter pressure → 23.** Continuous melee pain-locks a Veilbound: only two
+  of twelve headless routes took a blow. Up to eight starter slots exceed
+  DESIGN §4.4's "1–2 bodies".
+- **Economy → 23.** The refuge's own starter containers already fund the spear,
+  and supplies are generous.
+- **Event drains → climate 13 and utilities 19.** Event cold and toxic fog drain
+  up to 41 health on some seeds.
+- **No locked flat in the starter block → 12 and 18.**
+- **HUD → 21.** A brief "Exposed" after a load, a "Search" prompt on searched
+  furniture, and a doubled broken-door label.
+- **Lighting → 22.** Dark ground-floor interiors at noon.
+
+### Changed paths
+
+**Production** (`src/main/java/com/veylon/`):
+
+- New: `UrbanSlicePlan.java`, `UrbanSliceQaScene.java`.
+- Edited: `Game.java`, `HotkeyRouter.java`, `CrateTransactionSystem.java`,
+  `AutomatedRunDriver.java`, `QaHarness.java` (one label on an existing line,
+  still 1,496), `UrbanQaScenes.java`, `engine/Input.java`, `entity/Player.java`,
+  `save/UrbanPopulationSection.java`, `simulation/EventSystem.java`,
+  `ui/CraftingScreen.java`.
+
+**Tests** (`src/test/java/com/veylon/`):
+
+- New: `ContainerCloseKeyRoutingTest`, `UrbanSliceQaSceneTest`,
+  `UrbanSliceRouteTest`, `UrbanSliceRun`.
+- Extended: `UrbanLootGameplayTest`, `save/UrbanPopulationSaveTest`,
+  `simulation/UrbanSurfaceSpawnGateTest`.
+
+**Documents:** `docs/ARCHITECTURE.md` (the frame step, the consumed F press,
+harm-based interruption), `docs/DEVELOPING.md` (`urban_slice`, its command and
+capture list), and these four records.
+
+### Compatibility
+
+- **Unchanged:** generator, layout, template, content revision, encounter
+  catalogue, section layout and version, serialized enums, and the new-world
+  default. Generators 1–10 keep their fingerprints; the portable build covers
+  this.
+- **D-94 widens accepted wound values only.**
+  - This build reads every older save.
+  - A pre-11 urban build rejects a new save that holds projectile wounds; it
+    already failed to write one.
+  - No older binary was run.
+- **Transient only.** `harmEvents` is never saved. Input and screen behaviour
+  changed only as D-92 and D-95 describe.
+
+### Commands and results
+
+The exact commands, iteration failures, mutation results, review outcome,
+memory measurements, host and capture inspection are in
+[VALIDATION.md](VALIDATION.md#milestone-11--playable-vertical-slice-gate-2026-10-13).
+
+In short:
+
+- **Focused checks.** Each blocker's regression test fails without its fix.
+  Refill and resurrection mutations fail the route gate.
+- **Review.** The four-dimension adversarial review confirmed seven
+  low-severity runner and test issues; all are fixed.
+- **Native routes.** Both modes pass with 16 captures each and zero GL, KHR
+  and native-audio errors.
+- **Portable build.** Final run on 2026-10-14: 8 min 53 s, 1,796 tests in 195
+  classes, zero failures or errors, one existing Windows symlink-privilege
+  skip.
+- **Graph.** The single completion update produced 7,966 nodes and 30,714
+  edges.
+
+The code commits are below. Each was validated against its exact tree in a
+detached worktree before it was committed:
+
+| Commit | Subject |
+| --- | --- |
+| `0318966` | `fix(save): keep projectile torso wounds in Veilbound population rows` |
+| `01c42ec` | `fix(events): keep camp illness away from Veilbound encounters` |
+| `2f63652` | `fix(loot): interrupt searches on blows rather than slow drains` |
+| `51578ad` | `refactor(game): share the frame's control and simulation step` |
+| `1e60097` | `fix(input): let F close a faced container without reopening it` |
+| `51c5a9c` | `feat(qa): play the urban slice route through normal controls` |
+| `406803b` | `test(urban): gate the slice loop on frozen seeds, reloads and chunk orders` |
+
+These records follow in their own commit. No push, merge, tag or publication
+was performed.
+
+### Limitations and next concrete step
+
+**Evidence types.**
+
+- The headless and native routes are scripted, through the production input
+  seam. They are not a human playtest: human legibility, comfort, threat
+  fairness and listening judgements stay deferred until after 22 (D-80).
+- Mouse clicks inside the crate and crafting screens are represented by those
+  screens' commands.
+- The reload regenerates the spawn ring, which contains the starter superblock,
+  in its fixed order. Order independence of the saved slice is proven by the
+  headless five-order matrix. The native revisit changes only the walking and
+  streaming order.
+
+**Memory.**
+
+- Memory is recorded for this one explored area on one host. CPU chunk
+  retention and the streaming policy remain package 24.
+
+**Next.**
+
+- **Package 12, commercial and civic buildings,** is unblocked. Add the six
+  families under a new generator. Keep the slice route and its frozen seeds as
+  the regression gate for the starter loop, and keep the ordinary default at
+  generator 3.
 
 ## Resume rules
 

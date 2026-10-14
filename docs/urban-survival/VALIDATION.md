@@ -234,7 +234,7 @@ Dense interiors do not enlarge block arrays. They do add plan caches and contain
 Required handling:
 - urban caches are LRU-bounded;
 - urban state is sparse (touched only);
-- package 11 records retained chunks and heap after the slice route;
+- package 11 records retained chunks and heap after the slice route (measured in [Milestone 11](#milestone-11--playable-vertical-slice-gate-2026-10-13); its fixed arrays are 26,624 B per chunk, because the precipitation height map adds 1,024 B to the ≈26 KB above);
 - package 24 decides eviction or a finite metropolis (D-24, P-03) and proves that no state is lost.
 
 ### 4.4 The single real save slot
@@ -290,9 +290,9 @@ Test names in the table are relative to `com.veylon.`. Run them with `.\gradlew.
 | Legacy pins | Gen 3: `20260731`, `-4242`, `7`. Gen 1 fixture: `1122334455`. Gen 2 deep-cave tests: `987654321`. Since 02, absolute gen-1 and gen-2 terrain fingerprints over `20260731`, `-4242`, `7` (recorded at `923345f` from unchanged code). | Existing tests; 02 | In force |
 | Urban generator 4 (placeholder) | `20260731`, `-4242`, `7` (fingerprint); the six design candidates for the datum, dispatch and order checks (`world.UrbanGeneratorDispatchTest`) | 02 | In force, frozen with generator 4 |
 | Urban design | `20260731`, `-4242`, `7`, `0`, `987654321`, `-9000000000000000000`, over the regions `(0,0)`, `(-1,-1)`, `(1,-1)`, `(-1,1)`, `(2,3)`, `(-3,-2)`, `(4096,-4096)` and `(-4097,4095)` (`world.urban.CityPlannerTest`, `world.UrbanStreetNetworkGenerationTest`); generator-5 fingerprints over `20260731`, `-4242`, `7` | 03 | **Frozen** (2026-10-08) |
-| Starter | — | 08 | Not yet frozen |
+| Starter | The six urban design seeds `20260731`, `-4242`, `7`, `0`, `987654321`, `-9000000000000000000` (`UrbanStarterProgressionTest.SEEDS`, `world.urban.UrbanStarterGenerationTest`, `UrbanEncounterPopulationTest`) | 08 (exercised); recorded by 11 | **Frozen** (2026-10-13) |
 | Building template 1 | Family fingerprints at `20260731`, `-4242`, `7`; nominal matrix at all six urban-design seeds, four footprint sizes, four frontages, four variants and both families; actual parcels across all eight frozen design regions | 05 | Frozen by generator 6 / layout 3; existing generator 1–5 pins retained |
-| Slice regression | — | 11 | Not yet frozen |
+| Slice regression | The same six seeds in Survival and Creative, headless (`UrbanSliceRouteTest`; chunk-order matrix on `20260731` and `7`), plus native `20260731` in both modes with the 16-capture list in DEVELOPING ("playable-slice gate") | 11 | **Frozen** (2026-10-13) |
 | Districts | — | 13 | Not yet frozen |
 | Economy | — | 23 | Not yet frozen |
 
@@ -1356,3 +1356,284 @@ calibrated dense-city timing is 24. Human pursuit/escape, comfort and listening
 are deferred after 22 under D-80. The next concrete step is **11**: the integrated
 generated scavenging/refuge/save/revisit route, permanent depletion, Creative
 twin, frozen regression seeds and explored-area memory accounting.
+
+## Milestone 11 — playable vertical slice gate (2026-10-13)
+
+### Scope and baseline
+
+Baseline: clean `feature/urban-survival` at `d16be92`. I read the full revised
+base knowledge (`build/urban-survival-roadmap-revision/00_BASE_KNOWLEDGE.md`)
+and the prompt, then AGENTS, the commit workflow and these records. D-80 still
+defers human playtesting and listening until after 22; D-91–D-97 record this
+package's contracts.
+
+Nothing below changed in this package, and ordinary new worlds remain
+generator 3:
+
+- generator, layout, template and content revision;
+- encounter catalogue;
+- save section layout and serialized enums;
+- the new-world default.
+
+### Probes before the route
+
+These were throwaway headless probes, deleted before commit and not repository
+tests.
+
+- **Starter neighbourhood on generator 10, six seeds.**
+  - Every seed has the refuge (parcel 44), the shop (41) and four three-storey
+    apartments with B1 (40, 42, 43, 45). No starter door is locked.
+  - Every apartment has two encounter slots.
+  - After 64 slow ticks from the bedroom spawn, 6–12 Veilbound were active about
+    25–48 blocks from the refuge door. That count includes selected parcels in
+    neighbouring superblocks.
+  - Parcel 40's anchors never activate, because they lie inside the refuge
+    sanctuary.
+- **Climate on generators 9 and 10.** I stood in the refuge bedroom for ten
+  minutes on both generators, with identical results. A cold snap lowered the
+  outside temperature to −3.4 °C and body temperature fell below the 33 °C
+  freezing threshold. On seed 0, health dropped to 95.9.
+- **A natural loot-and-fight policy.** I searched all four apartments and the
+  shop using continuous melee.
+  - The player took 0–2 damage, even unarmed, because melee pain-locks a
+    Veilbound.
+  - Two runs stalled because a cold-snap drain cancelled every search (B1).
+
+### Blockers fixed in existing package scope
+
+For each blocker, the regression test fails against the old code and passes
+with the fix. I reverted each mutation afterwards.
+
+| Id | Defect | Fix | Regression |
+| --- | --- | --- | --- |
+| B1 (07) | Any health decrease cancelled a search, including freezing drains of about 0.002 HP per tick. During a cold snap nothing could be searched. | `Player.harmEvents`; only discrete harm interrupts (D-92) | `UrbanLootGameplayTest.overTimeDrainsDoNotInterruptASearchThatABlowWould` fails with the original `CrateTransactionSystem` |
+| B2 (09) | The camp-illness event chose a Veilbound and logged "The camp needs MEDICINE" in a city without a camp. | The victim search skips infected (D-93) | `UrbanSurfaceSpawnGateTest.campIllnessNeverChoosesAVeilboundInACity` fails when the skip is removed; `EventRollLadderTest` is unchanged |
+| B3 (09) | `urban.population` validation (live ≤ 1, dead ≤ 2) rejected projectile torso wounds. One torso arrow made F5 fail. A shot-down tombstone made every later save fail. | Bounds derived from `ProjectileLethality` (D-94) | `UrbanPopulationSaveTest.projectileTorsoWoundsSaveWhileAliveAndAfterAShotKill` fires real arrows and fails with the old bounds; the corruption cases moved to 6 and −1 |
+| B4 (07) | F closed a container the player was facing, and the same frame's interaction pass reopened it. The screen says "[F or Esc] close". | The press is consumed (D-95) | `ContainerCloseKeyRoutingTest` fails without the consume |
+
+### The route and its evidence
+
+`UrbanSlicePlan` and `UrbanSliceQaScene` (`VEYLON_SCENE=urban_slice`) play the
+route described in DESIGN §14 through these production paths, and stage
+nothing:
+
+- `Input.onKey` and `Input.onMouseButton`;
+- camera turns as mouse look;
+- the crate transfer commands;
+- `CraftingScreen.craft`.
+
+`Game.playStep` is the frame's control and simulation step, moved verbatim.
+`UrbanSliceRun` drives the scene headlessly in `Game.run` order and streams at
+the render radius.
+
+`UrbanSliceRouteTest` runs the six frozen seeds in both modes. Besides the
+route's own checks, it asserts:
+
+- tombstones, and reactivation refused;
+- the reinforced spear in the inventory, and no log, coal or ore;
+- the changed doors: `BROKEN_DOOR` (Creative: `AIR`) and `LOCK_BARRED`
+  (Creative: `LOCK_KEYED`);
+- the Creative body;
+- walking reachability of every apartment room after the edits;
+- runtime bounds.
+
+The neighbourhood test proves, for every seed:
+
+- a courtyard route between the refuge and the apartment that crosses the
+  courtyard;
+- a street route that never enters the superblock;
+- shop access;
+- every slice target within 96 walking cells of the refuge's courtyard door;
+- `AccessibilityValidator.inspectGenerated` passing for the refuge, apartment
+  and shop.
+
+The order matrix:
+
+1. Saves after the route and loads the save into a new `Game`.
+2. Regenerates the starter superblock's chunks in row-major, reverse,
+   column-major, shuffled and far-corner-spiral orders, comparing every block
+   and height map.
+3. Checks that the forced door and the barred leaves are present and that no
+   container inventory is created.
+
+Headless route observations from the final focused run. Game time runs at 1.6
+minutes per real second.
+
+| Seed | Mode | Engaged / defeated | Damage | Harm events | Events | Notes |
+| --- | --- | --- | --- | --- | --- | --- |
+| 20260731 | Survival | 2 / 2 | 0.0 | 0 | ashfall | apartment 42 |
+| -4242 | Survival | 1 / 1 | 0.0 | 0 | cold snap | body 33.2 °C |
+| 7 | Survival | 3 / 3 | 8.0 | 1 | toxic fog | one blow landed; sickness |
+| 0 | Survival | 2 / 2 | 10.9 | 0 | cold snap, storm | body 29.6 °C (freezing drain) |
+| 987654321 | Survival | 1 / 1 | 0.0 | 0 | heat wave | — |
+| -9000000000000000000 | Survival | 2 / 2 | 41.3 | 1 | toxic fog | bleeding and sickness; minimum 58.7 HP |
+| all six | Creative | 1 / 1 each | 0.0 | 0 | as Survival | eating declined while full; drinking free; no tool wear |
+
+Every Survival route:
+
+- walked 563–657 blocks in 168–188 route seconds (268–300 game minutes);
+- searched six containers;
+- verified three on the revisit;
+- ended with the spear.
+
+Two production mutations each failed `UrbanSliceRouteTest`; I restored both
+with `git checkout`:
+
+- reopening an emptied, searched container re-rolled its starter supplies
+  ("refill or stale container at 65, 41, 114");
+- dead residents reactivated ("encounter … came back").
+
+### Commands and iteration results
+
+All Gradle commands used the bundled Temurin 25.0.4.1+1
+(`build/tools/jdk25/jdk-25.0.4.1+1`) and the Windows wrapper. Logs are local
+ignored artifacts under `build/`.
+
+- `test --tests com.veylon.save.UrbanPopulationSaveTest`: passed with B3 and
+  failed with the old bounds (`m11-wounds.log`, `m11-wounds-mutant.log`).
+- `test --tests com.veylon.simulation.UrbanSurfaceSpawnGateTest --tests com.veylon.simulation.EventRollLadderTest`:
+  passed with B2 and failed without it (`m11-illness*.log`).
+- `test --tests com.veylon.UrbanLootGameplayTest --tests com.veylon.UrbanLootQaSceneTest --tests com.veylon.CreativeHazardsTest --tests com.veylon.SurvivalCreativeParityTest`:
+  passed with B1. The B1 test failed against the original
+  `CrateTransactionSystem` (`m11-search-drain*.log`).
+- `test --tests com.veylon.ContainerCloseKeyRoutingTest --tests com.veylon.CreativeCatalogRoutingTest --tests com.veylon.AudioMenuRoutingTest`:
+  passed with B4 and failed without it (`m11-fclose*.log`).
+- `test --tests com.veylon.UrbanSliceRouteTest --tests com.veylon.UrbanSliceQaSceneTest`:
+  5 tests passed (`m11-slice-tests.log`); the route class takes about 11 s.
+  Earlier failures were in the runner or test, not the game:
+  - the save check compared the whole timestamped log line;
+  - `inspectGenerated` rejects player-opened and forced doors as fixture
+    mismatches, so post-route reachability now walks routes instead;
+  - the Creative eat step is declined while the body is full.
+
+An adversarial review covered four dimensions (fixes, runner, tests, contracts),
+with a skeptic for each finding. It confirmed seven distinct low-severity runner
+or test issues and refuted three. All seven are fixed:
+
+- per-target approach walkers;
+- releasing the replaced world before the memory checkpoints;
+- counting a resumed search once;
+- checking F5, F9 and consumption by log identity;
+- an explicit Creative decline;
+- a street route restricted to cells outside the block;
+- an isolation guard before the quick-save.
+
+The final portable build ran on 2026-10-14:
+`.\gradlew.bat build --console=plain` passed in 8 min 53 s with 1,796 tests in
+195 classes, zero failures or errors, and one existing Windows
+symlink-privilege skip in `AppPathsTest` (`m11-build.log`). Its Javadoc task
+was up to date from an earlier run on identical inputs, which was then
+interrupted inside `:test` when the session restarted; that interrupted run is
+not counted. Production source did not change between the final native runs
+and this build.
+
+Each code commit was checked against its exact tree in the detached worktree
+`build/m11-check`. Each check compiled main and test sources, ran Javadoc and
+ran the commit's focused tests. Every tree hash matched the index that was then
+committed. All checks had zero failures, errors or skips.
+
+| Commit | Tests | Notes |
+| --- | --- | --- |
+| `0318966` | 11 | |
+| `01c42ec` | 15 | |
+| `2f63652` | 53 | |
+| `51578ad` | 45 | Also a line comparison proving a pure move |
+| `1e60097` | 29 | |
+| `51c5a9c` | 34 | |
+| `406803b` | 39 | Includes the always-required compatibility set |
+
+`graphify update . --no-cluster` ran once on the final code and produced
+7,966 nodes and 30,714 edges (`m11-graph-update.log`), with the existing
+Gradle-file extractor warnings. No clustering or semantic extraction ran.
+
+### Final native route, both modes
+
+Host and settings:
+
+- Windows 11 Pro 10.0.26200, AMD Ryzen 5 5600X 6-core;
+- NVIDIA GeForce RTX 3060 Ti, driver 610.88, OpenGL 3.3.0 with KHR_debug on;
+- Temurin 25.0.4.1+1, launcher `-Xmx2G`;
+- 1280 × 720, default render distance 6, fresh data directory.
+
+I ran the command once with `survival` and once with `creative`:
+
+```powershell
+$env:VEYLON_GENERATOR='urban-dev'; $env:VEYLON_SEED='20260731'
+$env:VEYLON_GAME_MODE='<mode>'; $env:VEYLON_SCENE='urban_slice'
+$env:VEYLON_RESOLUTION='1280x720'; $env:VEYLON_CAPTURE_TAG='m11-slice-<mode>'
+.\gradlew.bat run -PveylonDataDir=build/qa/m11-slice-<mode> --console=plain
+```
+
+| Mode | Result | Route s | Captures | GL / KHR / native-audio errors | Defeated | Damage |
+| --- | --- | --- | --- | --- | --- | --- |
+| Survival | `pass=true`, exit 0, 3 min 9 s | 187 | 16 | 0 / 0 / 0 | 2 | 0 |
+| Creative | `pass=true`, exit 0, 2 min 50 s | 168 | 16 | 0 / 0 / 0 | 1 | 0 |
+
+Memory checkpoints. Heap is a best-effort sample after a GC. Retained chunks
+are `World.loadedCount()`, at 26,624 B of fixed arrays per chunk.
+
+| Mode | Phase | Retained chunks | Meshed | Chunk arrays | Containers / edits / fixture states | Heap used MiB |
+| --- | --- | --- | --- | --- | --- | --- |
+| Survival | route end | 254 | 239 | 6.76 MB | 6 / 29 / 24 | 22.2 |
+| Survival | after F9 | 129 | 12 | 3.43 MB | 6 / 29 / 24 | 27.5 |
+| Survival | after revisit | 238 | 238 | 6.34 MB | 6 / 40 / 26 | 21.7 |
+| Creative | route end | 239 | 239 | 6.36 MB | 6 / 24 / 26 | 21.6 |
+| Creative | after F9 | 129 | 12 | 3.43 MB | 6 / 24 / 26 | 26.9 |
+| Creative | after revisit | 238 | 238 | 6.34 MB | 6 / 30 / 28 | 31.0 |
+
+At every checkpoint region plans stayed at 4 or fewer (2 after the load),
+building plans at 104 or fewer, routes at 4 or fewer and encounter records at 6
+or fewer, all with `withinHardLimits=true`.
+
+- These numbers cover this one explored area on this host; they are not
+  budgets.
+- The edits added after the load are the revisit's doors and ecology.
+
+Captures I inspected:
+
+- **Survival 04:** a forced doorway with debris.
+- **Survival 06:** the locker with two torches left and the pry tool in hand.
+- **Survival 08:** a Veilbound faced in reach on the street.
+- **Survival 09:** blood on the street after the kill.
+- **Survival 11:** both leaves barred, the "Lift the bar" prompt and its log
+  lines.
+- **Survival 12:** the spear crafted after one drink.
+- **Survival 13:** "Game loaded." at the workbench.
+- **Survival 14:** the 4 fibre and 4 planks left on the shelf before the save.
+- **Survival 15:** the locker still holding exactly two torches.
+- **Creative 08:** an idle Veilbound, with the pick at 300/300.
+- **Creative 11:** the keyed lock and its log.
+
+The revisit re-opened containers without a new search. The world reloaded from
+the isolated `saves/veylon.sav`; the real save slot was not used.
+
+The production reload regenerates the spawn ring in its fixed ring order, and
+that ring holds the whole starter superblock. The native revisit changes the
+walking and streaming order only for chunks outside that ring. That the saved
+slice does not depend on order comes from the headless five-order matrix.
+
+### Native observations (scripted, not a human playtest)
+
+- **Legibility:** room hints, prompts ("Search cabinet", "Lift the bar",
+  "Broken doorway"), container titles, ownership state and the search progress
+  bar read well at 1280 × 720.
+- **Distances:** refuge to the apartment's courtyard door is about 11 s on foot,
+  and to the shop's courtyard door also about 11 s. The whole route walks
+  616–671 blocks.
+- **Stairs:** the switchback to the first floor was climbed without help.
+- **Loot:** generous. Each kitchen holds three berries, water, planks and scrap,
+  and every utility locker holds a pry tool.
+- **Noise:** rummaging, the forced door and melee drew pursuers on some seeds.
+- **Threat:** fair but weak. Melee pain-locks a Veilbound; only seeds 7 and
+  −9e18 saw a blow land.
+- **Return:** coming back matters for the workbench, bed, storage and barred
+  door. But the refuge's own starter containers already fund the spear.
+- **Minor presentation issues:**
+  - for about half a second after a load the HUD shows "Exposed" until the next
+    shelter evaluation;
+  - searched furniture still prompts "Search";
+  - the forced door shows two near-identical labels;
+  - the ground-floor utility room is dark at noon.
+
+D-97 assigns these findings to later packages. Human comfort and listening
+remain deferred until after 22.

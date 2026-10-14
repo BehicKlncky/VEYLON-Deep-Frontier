@@ -487,6 +487,15 @@ The slice is complete when, on a **generated** neighbourhood (not a staged arena
 
 Saving after partial looting, a changed door or wall and a defeated encounter, then reloading over a live world and revisiting in a different chunk order, shows no refill, no resurrection and no stale state. All tested generated rooms are reachable, Survival and Creative twins pass, and the loop is understandable without debug overlays. A missing native route or capture keeps the gate pending and blocks package 12.
 
+**Implemented in 11 (D-91–D-97).** The slice is the generator-10 starter superblock as generated. `urban_slice` plays it through the production input seam. It leaves the refuge across the courtyard and forces an interior door of the apartment that hosts an encounter. It searches that apartment's utility locker, kitchen, bathroom and first-floor kitchen. It handles a Veilbound, searches the shop and returns to bar the refuge's street door. It eats, drinks, crafts the reinforced spear, quick-saves and quick-loads over the live world, then revisits in reverse order. The six frozen seeds pass it headless in both modes, and seed `20260731` passes it natively in both modes. Four blockers found while playing it were fixed:
+
+- over-time drains interrupted searches (D-92);
+- the camp-illness event chose infected (D-93);
+- projectile torso wounds broke saves (D-94);
+- F reopened a faced container (D-95).
+
+The tuning findings in D-97 (threat pressure, a self-sufficient refuge, generous supplies, event drains) are assigned to later packages. They do not block the loop. Human playtesting and listening remain deferred until after 22 (D-80).
+
 ## 15. Out of scope
 
 Whole-city simulation, driving (vehicles only as static salvage props), multiplayer, structural collapse, simulated elevators, procedural dialogue AI, a citywide electricity solver, a full food web, a full-building acoustic simulation, and an expanded anatomical-gore goal. Each needs an explicit owner scope change (DECISIONS §5).
