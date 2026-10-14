@@ -79,6 +79,30 @@ class UrbanSurfaceSpawnGateTest {
                 EventType.METEOR_SHOWER)), "legacy events: " + rolled);
     }
 
+    @Test
+    void campIllnessNeverChoosesAVeilboundInACity() {
+        // An infected encounter is an NPC, but never a camp resident needing medicine.
+        Game g = com.veylon.UrbanEncounterArena.session(7);
+        var infected = com.veylon.UrbanEncounterArena.activate(g, false);
+        int logged = g.eventLog.all().size();
+        illness().effect().apply(g.events, g);
+        assertFalse(infected.sick);
+        assertFalse(g.events.isActive(EventType.NPC_ILLNESS));
+        assertEquals(logged, g.eventLog.all().size(), "no camp-medicine message in a city without a camp");
+
+        Game legacy = new Game();
+        legacy.newWorld(4_242L, true, World.GEN_CAVE_IDENTITIES, GameMode.SURVIVAL);
+        var resident = legacy.entities.npcs.stream().filter(n -> !n.isTrader && !n.raider).findFirst().orElseThrow();
+        illness().effect().apply(legacy.events, legacy);
+        assertTrue(resident.sick, "legacy camp residents still fall ill");
+        assertTrue(legacy.events.isActive(EventType.NPC_ILLNESS));
+    }
+
+    private static EventDefinition illness() {
+        return EventSystem.definitions().stream()
+                .filter(d -> d.type() == EventType.NPC_ILLNESS).findFirst().orElseThrow();
+    }
+
     private static Set<EventType> roll(Game g) {
         Set<EventType> rolled = EnumSet.noneOf(EventType.class);
         for (int i = 0; i < ROLLS; i++) {

@@ -382,11 +382,11 @@ public class EventSystem implements SlowTickSystem {
                     (events, g) -> !g.world.isUrban(),
                     (events, g) -> events.meteorShard(g, true)));
 
-    /** Makes one healthy camp resident sick, or does nothing if there is none. */
+    /** Makes one healthy camp resident sick, or does nothing if there is none; infected are never residents. */
     private static void afflictCampWithIllness(EventSystem events, Game g) {
         Npc victim = null;
         for (Npc n : g.entities.npcs) {
-            if (!n.isTrader && !n.raider && !n.sick && !n.dead) {
+            if (!n.isTrader && !n.raider && !n.sick && !n.dead && !n.infected()) {
                 victim = n;
                 break;
             }
