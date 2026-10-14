@@ -28,6 +28,8 @@ public class Player extends Entity {
     /** Worn gear, indexed by {@link EquipSlot#ordinal()}. */
     public final ItemStack[] equipment = new ItemStack[EquipSlot.values().length];
     public int hotbarSel;
+    /** Discrete harm received (blows, falls, burns, blasts); over-time drains subtract health directly. */
+    public int harmEvents;
 
     public float hunger = MAX_NEED;
     public float thirst = MAX_NEED;
@@ -240,7 +242,9 @@ public class Player extends Entity {
     /** Direct environmental damage shares the same body gate as weapon damage. */
     @Override
     public void hurt(float dmg, boolean byPlayer) {
-        if (!abilities.invulnerable()) super.hurt(dmg, byPlayer);
+        if (abilities.invulnerable()) return;
+        if (dmg > 0 && !dead) harmEvents++;
+        super.hurt(dmg, byPlayer);
     }
 
     @Override

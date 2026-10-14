@@ -115,6 +115,21 @@ class UrbanLootGameplayTest {
     }
 
     @Test
+    void overTimeDrainsDoNotInterruptASearchThatABlowWould() {
+        var f=UrbanLootFixture.create(BuildingPlan.Variant.INTACT); Game g=f.game();
+        // A cold snap, an open wound and an empty stomach all drain health without a blow.
+        g.player.bodyTemp=30; g.player.hunger=0;
+        g.player.addAffliction(com.veylon.entity.Affliction.BLEEDING,120);
+        float health=g.player.health; int harm=g.player.harmEvents;
+        assertTrue(g.openCrateAt(f.position()));
+        for (int i=0;i<200 && g.crateSearching();i++) { simulate(g,.05f); }
+        assertTrue(g.player.health<health,"the drains really ran during the search");
+        assertEquals(harm,g.player.harmEvents);
+        assertEquals(Game.UiMode.CRATE,g.uiMode,"the search was not interrupted");
+        assertTrue(g.world.urban.containers.at(f.position()).state.revealed());
+    }
+
+    @Test
     void anUnsearchedHandBreakRollsOnceAndRefusesLossWhenFull() {
         var f=UrbanLootFixture.create(BuildingPlan.Variant.INTACT); Game g=f.game(); Vec3i p=f.position();
         fill(g,ItemType.STONE); assertFalse(g.completePlayerBlockBreak(p));

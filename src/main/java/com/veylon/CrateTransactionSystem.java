@@ -59,7 +59,8 @@ final class CrateTransactionSystem {
     private Vec3i openUrbanContainer;
     private UrbanContainers.Entry openEntry;
     private float searchDuration;
-    private float searchHealth;
+    /** Discrete harm already received when the search began; over-time drains do not interrupt it. */
+    private int searchHarm;
     private float rummageCooldown;
     private String containerTitle;
 
@@ -111,7 +112,7 @@ final class CrateTransactionSystem {
             };
             if (plan != null && plan.table() == LootTables.Table.SECURED) { containerTitle = "Secured supply locker"; }
             containerTitle = containerTitle.toUpperCase(java.util.Locale.ROOT);
-            searchHealth = game.player.health;
+            searchHarm = game.player.harmEvents;
             rummageCooldown = 0;
             if (!entry.state.revealed()) {
                 searchDuration = LootTables.searchSeconds(plan.table());
@@ -144,7 +145,7 @@ final class CrateTransactionSystem {
                     && game.world.isColumnLoaded(p.x(),p.z())
                     && game.world.urban.containers.at(p) == openEntry
                     && game.world.getBlock(p.x(),p.y(),p.z()) == openEntry.block
-                    && !game.player.dead && game.player.health >= searchHealth
+                    && !game.player.dead && game.player.harmEvents == searchHarm
                     && p.distSq(game.player.pos.x,game.player.pos.y,game.player.pos.z) <= 25) {
                 return false;
             }
@@ -177,7 +178,6 @@ final class CrateTransactionSystem {
     /** Runs on the normal fast simulation tick; CRATE never pauses threats, needs or fire. */
     void fastTick(float dt) {
         if (openEntry == null || openUrbanContainerGone()) { return; }
-        searchHealth = game.player.health;
         if (!openEntry.state.revealed()) {
             openEntry.progress += dt;
             rummageCooldown -= dt;
