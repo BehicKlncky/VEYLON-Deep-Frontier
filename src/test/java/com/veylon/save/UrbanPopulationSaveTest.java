@@ -52,6 +52,42 @@ class UrbanPopulationSaveTest {
         assertEquals(dormant.encounterId, returned.encounterId);
     }
 
+    @Test void projectileTorsoWoundsSaveWhileAliveAndAfterAShotKill() {
+        Game g = UrbanEncounterArena.session(20260731);
+        var n = UrbanEncounterArena.activate(g, false);
+        long id = n.encounterId;
+        Path save = directory.resolve("wounded.sav");
+        // Real arrows through the production projectile path: two torso hits wound, a third kills.
+        for (int arrow = 1; arrow <= 3; arrow++) {
+            var body = g.entities.encounters.resident(id).live;
+            g.player.pos.set(body.pos.x - 4, body.pos.y, body.pos.z);
+            int before = body.torsoWounds;
+            g.projectiles.fire(g, g.player, true, g.player.pos.x, body.pos.y + 1.0f, body.pos.z,
+                    1, 0, 0, com.veylon.combat.WeaponRegistry.byId("primitive_bow"), null);
+            for (int tick = 0; tick < 40 && body.torsoWounds == before; tick++) { g.projectiles.update(g, .05f); }
+            assertEquals(before + com.veylon.combat.ProjectileLethality.ARROW_TORSO_WOUNDS, body.torsoWounds);
+            if (arrow < 3) {
+                assertFalse(body.dead);
+                assertTrue(SaveSystem.save(g, save), "a wounded Veilbound must not block saving");
+                assertTrue(SaveSystem.load(g, save));
+                var live = g.entities.encounters.resident(id).live;
+                assertNotNull(live); assertEquals(body.torsoWounds, live.torsoWounds);
+                assertEquals(body.health, live.health);
+            } else {
+                assertTrue(body.dead);
+            }
+        }
+        for (int cycle = 0; cycle < 2; cycle++) {
+            assertTrue(SaveSystem.save(g, save), "a shot-down Veilbound's tombstone must keep saving");
+            assertTrue(SaveSystem.load(g, save));
+            var r = g.entities.encounters.resident(id);
+            assertTrue(r.dead()); assertEquals(3 * com.veylon.combat.ProjectileLethality.ARROW_TORSO_WOUNDS, r.torsoWounds);
+            var anchor = EncounterAnchors.resolve(g.world, id);
+            UrbanEncounterArena.observeAway(g, anchor);
+            assertNull(g.entities.encounters.tryActivate(g, anchor));
+        }
+    }
+
     @Test void invalidCountsIdentitySpeciesScalarsBindingsAndMissingRequiredSectionKeepLiveWorld() throws Exception {
         Game g = UrbanEncounterArena.session(7); UrbanEncounterArena.activate(g, false);
         Path valid = directory.resolve("valid.sav"); assertTrue(SaveSystem.save(g, valid));
@@ -69,7 +105,9 @@ class UrbanPopulationSaveTest {
         for (int offset : new int[]{31, 35, 39, 43, 47}) {
             byte[] bad = payload.clone(); ByteBuffer.wrap(bad).putFloat(offset, Float.NaN); invalid.add(bad);
         }
-        byte[] wounds = payload.clone(); ByteBuffer.wrap(wounds).putInt(51, 2); invalid.add(wounds);
+        for (int count : new int[]{-1, UrbanPopulationSection.MAX_LIVING_WOUNDS + 1}) {
+            byte[] wounds = payload.clone(); ByteBuffer.wrap(wounds).putInt(51, count); invalid.add(wounds);
+        }
         byte[] hiddenActive = payload.clone(); ByteBuffer.wrap(hiddenActive).putInt(55, -1); invalid.add(hiddenActive);
         byte[] badIndex = payload.clone(); ByteBuffer.wrap(badIndex).putInt(55, 500); invalid.add(badIndex);
         byte[] mismatch = payload.clone(); ByteBuffer.wrap(mismatch).putFloat(31, 3); invalid.add(mismatch);

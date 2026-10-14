@@ -1,6 +1,7 @@
 package com.veylon.save;
 
 import com.veylon.Game;
+import com.veylon.combat.ProjectileLethality;
 import com.veylon.entity.Npc;
 import com.veylon.entity.UrbanEncounterDirector;
 import com.veylon.entity.UrbanEncounterDirector.Resident;
@@ -16,6 +17,10 @@ final class UrbanPopulationSection {
     static final String ID = "urban.population";
     private static final String SPECIES = "veilbound";
     private static final float HORIZONTAL = 33_000_000;
+    /** A living body stays below the lethal torso wound count; the killing torso hit adds at most one hit more. */
+    static final int MAX_LIVING_WOUNDS = ProjectileLethality.LETHAL_TORSO_WOUNDS - 1;
+    static final int MAX_DEAD_WOUNDS = MAX_LIVING_WOUNDS
+            + Math.max(ProjectileLethality.BULLET_TORSO_WOUNDS, ProjectileLethality.ARROW_TORSO_WOUNDS);
     private UrbanPopulationSection() { }
 
     static byte[] write(Game g) throws IOException {
@@ -78,7 +83,7 @@ final class UrbanPopulationSection {
                 || !Float.isFinite(r.z) || Math.abs(r.z) > HORIZONTAL
                 || !Float.isFinite(r.y) || r.y < 0 || r.y > 94.2f
                 || !Float.isFinite(r.yaw) || Math.abs(r.yaw) > 360
-                || r.torsoWounds < 0 || r.torsoWounds > (r.dead() ? 2 : 1)
+                || r.torsoWounds < 0 || r.torsoWounds > (r.dead() ? MAX_DEAD_WOUNDS : MAX_LIVING_WOUNDS)
                 || index < -1 || index >= g.entities.npcs.size() || r.dead() && index != -1) {
             throw new IOException("invalid encounter snapshot");
         }
