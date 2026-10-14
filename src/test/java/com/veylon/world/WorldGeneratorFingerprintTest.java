@@ -98,6 +98,59 @@ class WorldGeneratorFingerprintTest {
     private static final long[] URBAN_FURNISHED_BUILDING_FINGERPRINTS = {
             0xa508a4ab6554fd94L, 0x1a6aa1a4c08df7f3L, 0xd3544779f9af6166L};
 
+    /**
+     * Generators 8 (shaped stairs), 9 (starter) and 10 (encounters), recorded
+     * 2026-10-14 at {@code daadff0} from unchanged code, before the commercial
+     * and civic catalogue. Until then they were pinned only relative to
+     * generator 7 and to each other. The four terrain chunks are shared streets,
+     * so the refuge/shop chunks and every building plan of three regions are
+     * pinned too; generators 9 and 10 share geometry by design (D-83).
+     */
+    private static final long[] URBAN_LATER_TERRAIN_FINGERPRINTS = {
+            0x637fb4a86840a518L, 0xc5034a89e7c9e4acL, 0x7349170213056b70L};
+    private static final long[][] URBAN_LATER_BUILDING_FINGERPRINTS = {
+            {0x76909c0605b884deL, 0xf456c87bab7640b3L, 0x70e438a82b115748L},
+            {0x63c9196652129a3aL, 0x0c27b92837b0551cL, 0x77b16ecb683f8d06L},
+            {0x63c9196652129a3aL, 0x0c27b92837b0551cL, 0x77b16ecb683f8d06L}};
+    private static final long[][] URBAN_LATER_PLAN_FINGERPRINTS = {
+            {0x371b1e07bdda477eL, 0x2659a42d27014f65L, 0xf37efa67ed546064L},
+            {0xfd5c157e318b162bL, 0x2754649b31bb5fa6L, 0x648fee1d1dd33bddL},
+            {0xfd5c157e318b162bL, 0x2754649b31bb5fa6L, 0x648fee1d1dd33bddL}};
+    private static final int[] URBAN_LATER_GENERATORS = {
+            World.GEN_URBAN_SHAPED_STAIRS, World.GEN_URBAN_STARTER, World.GEN_URBAN_ENCOUNTERS};
+
+    @Test
+    void laterUrbanCataloguesKeepTheirRecordedBlocksAndBuildingPlans() {
+        List<String> moved = new ArrayList<>();
+        for (int g = 0; g < URBAN_LATER_GENERATORS.length; g++) {
+            int generator = URBAN_LATER_GENERATORS[g];
+            assertTerrainPinned(generator, URBAN_LATER_TERRAIN_FINGERPRINTS);
+            for (int i = 0; i < SEEDS.length; i++) {
+                long blocks = furnishedBuildingFingerprint(SEEDS[i], generator);
+                long plans = buildingPlanFingerprint(SEEDS[i], generator);
+                if (blocks != URBAN_LATER_BUILDING_FINGERPRINTS[g][i] || plans != URBAN_LATER_PLAN_FINGERPRINTS[g][i]) {
+                    moved.add(String.format("generator %d seed %d: blocks 0x%016xL, plans 0x%016xL",
+                            generator, SEEDS[i], blocks, plans));
+                }
+            }
+        }
+        assertTrue(moved.isEmpty(), () -> "saved urban catalogues changed; add a generator version "
+                + "instead of re-recording:\n  " + String.join("\n  ", moved));
+    }
+
+    /** Every building plan (geometry, rooms, fixtures, ids) of three regions, in parcel order. */
+    private static long buildingPlanFingerprint(long seed, int generatorVersion) {
+        World world = new World(seed, generatorVersion);
+        long hash = 0xcbf29ce484222325L;
+        for (int[] region : new int[][]{{0, 0}, {-1, -1}, {1, -1}}) {
+            for (ParcelPlan parcel : world.urban.regionPlan(region[0], region[1]).parcels()) {
+                hash = mix(hash, com.veylon.world.urban.BuildingPlanDiagnostics.fingerprint(
+                        world.urban.buildingAt(parcel.x0(), parcel.z0())));
+            }
+        }
+        return hash;
+    }
+
     /** Chunks fingerprinted per seed: origin, offset, and two negative ones. */
     private static final int[][] CHUNKS = {{0, 0}, {3, -2}, {-1, -1}, {-4, 5}};
 
@@ -138,7 +191,8 @@ class WorldGeneratorFingerprintTest {
     @Test
     void completeGeneratedRefugeAndShopMatchTheirRecordedBlocksAndHeightmaps() {
         for (int i = 0; i < SEEDS.length; i++) {
-            assertEquals(URBAN_FURNISHED_BUILDING_FINGERPRINTS[i], furnishedBuildingFingerprint(SEEDS[i]),
+            assertEquals(URBAN_FURNISHED_BUILDING_FINGERPRINTS[i],
+                    furnishedBuildingFingerprint(SEEDS[i], World.GEN_URBAN_APARTMENTS),
                     "generator 7 furnished building cells and heights are a saved-world contract; seed=" + SEEDS[i]);
         }
     }
@@ -293,8 +347,8 @@ class WorldGeneratorFingerprintTest {
         return hash;
     }
 
-    private static long furnishedBuildingFingerprint(long seed) {
-        World world = new World(seed, World.GEN_URBAN_APARTMENTS);
+    private static long furnishedBuildingFingerprint(long seed, int generatorVersion) {
+        World world = new World(seed, generatorVersion);
         DistrictPlan district = world.urban.regionPlan(0, 0);
         LinkedHashSet<Long> chunks = new LinkedHashSet<>();
         for (ParcelPlan.Use use : new ParcelPlan.Use[]{ParcelPlan.Use.REFUGE, ParcelPlan.Use.COMMERCIAL}) {
