@@ -8,6 +8,7 @@ import com.veylon.settlement.NpcArchetype;
 import com.veylon.util.Vec3i;
 import com.veylon.world.BlockType;
 import com.veylon.world.FixtureStates;
+import com.veylon.world.Fixtures;
 import com.veylon.world.World;
 import com.veylon.world.urban.BuildingPlan;
 import com.veylon.world.urban.ParcelPlan;
@@ -80,6 +81,52 @@ class IndoorNavigationTest {
         assertEquals(0, n.vel.x); assertEquals(0, n.vel.z);
         System.out.println("[indoor-work] mode=" + mode + " peakQueries=" + peakQueries
                 + " peakExpansions=" + peakExpansions + " routes=" + g.world.navigation.size());
+    }
+
+    /**
+     * A clinic keeps its rear staff door locked (D-101). A body by that door leaving the building
+     * must head for the open street door, not the nearer locked one, and an outsider by the back
+     * must be sent round to the street door rather than through the lock.
+     */
+    @Test void buildingExitsAndEntriesUseAnUnlockedEntranceOverANearerLockedOne() {
+        Game g = new Game();
+        g.newWorld(20260731, true, World.GEN_URBAN_CIVIC, GameMode.SURVIVAL);
+        g.entities.npcs.clear();
+        BuildingPlan clinic = null;
+        for (int[] r : new int[][]{{0, 0}, {-1, -1}, {1, -1}, {-1, 0}, {0, -1}}) {
+            for (ParcelPlan p : g.world.urban.regionPlan(r[0], r[1]).parcels()) {
+                BuildingPlan b = g.world.urban.buildingAt(p.x0(), p.z0());
+                if (clinic == null && b.family() == BuildingPlan.Family.CLINIC
+                        && b.variant() == BuildingPlan.Variant.INTACT) { clinic = b; }
+            }
+        }
+        assertNotNull(clinic);
+        BuildingPlan plan = clinic;
+        g.world.ensureChunks((plan.parcel().x0() + plan.parcel().x1()) / 2,
+                (plan.parcel().z0() + plan.parcel().z1()) / 2, 4, 10_000);
+        BuildingPlan.Fixture rearDoor = plan.fixtures().stream().filter(f -> f.kind() == BuildingPlan.FixtureKind.DOOR
+                && f.target().equals(plan.approaches().getLast())).findFirst().orElseThrow();
+        assertTrue(rearDoor.locked(), "the staff door is locked");
+        Vec3i rear = rearDoor.position(), front = plan.approaches().getFirst();
+        Vec3i byRear = new Vec3i(2 * rear.x() - rearDoor.target().x(), rearDoor.target().y(),
+                2 * rear.z() - rearDoor.target().z());
+        ParcelPlan.Side out = plan.parcel().frontage();
+        Vec3i street = new Vec3i(front.x() + 3 * out.dx, front.y(), front.z() + 3 * out.dz);
+
+        assertEquals(front, PortalGraph.waypoint(g.world, byRear, street), "leave by the open street door");
+        Vec3i lobby = plan.floors().stream().filter(f -> f.index() == 0).findFirst().orElseThrow().rooms().getFirst().anchor();
+        Vec3i outsideRear = plan.approaches().getLast();
+        assertEquals(front, PortalGraph.waypoint(g.world, outsideRear, lobby), "go round to the street door");
+
+        Npc n = infected(g, byRear);
+        boolean arrived = false;
+        for (int i = 0; i < 1200 && !arrived; i++) {
+            g.world.navigation.budget.beginTick(); n.repathCooldown -= DT;
+            arrived = !IndoorNavigation.moveTo(g, n, street, 2, .5f);
+            n.applyPhysics(DT, true);
+        }
+        assertTrue(arrived, "the guard left by the street door: at=" + n.pos + " street=" + street);
+        assertTrue(Fixtures.isClosedDoor(g.world.getBlock(rear.x(), rear.y(), rear.z())), "the lock held");
     }
 
     @Test void editedDoorInvalidatesOnlyIntersectingRoutesAndBlocksSafelyUntilReopened() {

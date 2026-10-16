@@ -1,6 +1,8 @@
 package com.veylon.ai;
 
 import com.veylon.util.Vec3i;
+import com.veylon.world.FixtureStates;
+import com.veylon.world.Fixtures;
 import com.veylon.world.World;
 import com.veylon.world.urban.BuildingPlan;
 import com.veylon.world.urban.UrbanIndoorQueries;
@@ -19,11 +21,11 @@ public final class PortalGraph {
         UrbanIndoorQueries.Location b = w.urbanLocation(goal.x(), goal.y(), goal.z());
         if (a != null && (b == null || a.building().id() != b.building().id())) {
             if (a.floor().index() != 0) { return stair(w, a.building(), a.floor().index(), 0); }
-            return local(w, from, nearest(a.building(), from));
+            return local(w, from, nearest(w, a.building(), from));
         }
         if (b != null) {
             if (a == null) {
-                Vec3i entry = nearest(b.building(), from);
+                Vec3i entry = nearest(w, b.building(), from);
                 if (entry != null && from.distSq(entry.x(), entry.y(), entry.z()) > 4) { return local(w, from, entry); }
                 // At the street entry, aim at the ground-floor landing before going upstairs.
                 for (var floor : b.building().floors()) {
@@ -73,13 +75,32 @@ public final class PortalGraph {
         return null;
     }
 
-    private static Vec3i nearest(BuildingPlan plan, Vec3i from) {
-        Vec3i best = null;
-        double distance = Double.MAX_VALUE;
+    /**
+     * The nearest entrance whose door is usable now; a locked or barred one (a clinic's staff
+     * door, a security post's sally port, a held street door, a barred refuge) only when every
+     * entrance is shut. Live state wins over the plan, so a forced lock opens the route again.
+     */
+    private static Vec3i nearest(World w, BuildingPlan plan, Vec3i from) {
+        Vec3i open = null, shut = null;
+        double openD = Double.MAX_VALUE, shutD = Double.MAX_VALUE;
         for (Vec3i entry : plan.approaches()) {
             double d = from.distSq(entry.x(), entry.y(), entry.z());
-            if (d < distance) { distance = d; best = entry; }
+            if (locked(w, plan, entry)) {
+                if (d < shutD) { shutD = d; shut = entry; }
+            } else if (d < openD) { openD = d; open = entry; }
         }
-        return best;
+        return open != null ? open : shut;
+    }
+
+    /** An entrance's first leaf faces its approach; it is shut when that leaf is closed and locked. */
+    private static boolean locked(World w, BuildingPlan plan, Vec3i approach) {
+        for (BuildingPlan.Fixture f : plan.fixtures()) {
+            if (f.kind() == BuildingPlan.FixtureKind.DOOR && f.target().equals(approach)) {
+                Vec3i p = f.position();
+                return Fixtures.isClosedDoor(w.getBlock(p.x(), p.y(), p.z()))
+                        && w.fixtureLockAt(p.x(), p.y(), p.z()) != FixtureStates.LOCK_NONE;
+            }
+        }
+        return false;
     }
 }
