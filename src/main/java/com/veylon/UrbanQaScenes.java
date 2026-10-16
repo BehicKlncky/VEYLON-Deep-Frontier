@@ -41,6 +41,8 @@ final class UrbanQaScenes {
     private final UrbanNavigationQaScene navigation;
     /** Package 11: the playable slice route ({@code urban_slice}). */
     private final UrbanSliceQaScene slice;
+    /** Package 12: one building of each commercial and civic family ({@code urban_catalogue}). */
+    private final UrbanCatalogueQaScene catalogue;
     private final PlayerMovementSystem.Command walk = new PlayerMovementSystem.Command();
     private boolean holding;
     private float holdX;
@@ -73,6 +75,7 @@ final class UrbanQaScenes {
         this.infected = new UrbanInfectedQaScene(game);
         this.navigation = new UrbanNavigationQaScene(game);
         this.slice = new UrbanSliceQaScene(game);
+        this.catalogue = new UrbanCatalogueQaScene(game);
     }
 
     /** Stages one of the urban scenes; inert, with a notice, outside a street-network world. */
@@ -89,6 +92,10 @@ final class UrbanQaScenes {
         }
         if (scene.equals("urban_slice")) {
             slice.stage(); // a normal fresh session: its own clock, weather and events
+            return;
+        }
+        if (scene.equals("urban_catalogue")) {
+            catalogue.stage(); // a normal session too: only poses between buildings and the kit are staged
             return;
         }
         if (!world.isUrban() || !world.urban.hasCityPlan()) {
@@ -179,6 +186,7 @@ final class UrbanQaScenes {
     }
 
     UrbanSliceQaScene slice() { return slice; }
+    UrbanCatalogueQaScene catalogue() { return catalogue; }
 
     /** Per-frame hook, before streaming and rendering; inert unless a scene is staged. */
     void update(double elapsed) {
@@ -198,6 +206,7 @@ final class UrbanQaScenes {
         infected.update(elapsed);
         navigation.update(elapsed);
         slice.update(elapsed);
+        catalogue.update(elapsed);
         if (holding) {
             apply();
         }
