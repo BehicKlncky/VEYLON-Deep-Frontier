@@ -17,7 +17,11 @@ final class UrbanSliceRun {
     double time;
 
     UrbanSliceRun(long seed, GameMode mode) {
-        game.newWorld(seed, true, World.GEN_URBAN_ENCOUNTERS, mode);
+        this(seed, mode, World.GEN_URBAN_ENCOUNTERS);
+    }
+
+    UrbanSliceRun(long seed, GameMode mode, int generator) {
+        game.newWorld(seed, true, generator, mode);
         game.appState = Game.AppState.PLAYING;
         scenes = new UrbanQaScenes(game);
         router = new HotkeyRouter(game);

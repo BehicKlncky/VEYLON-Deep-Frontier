@@ -37,6 +37,20 @@ class UrbanSliceRouteTest {
     static final long[] SLICE_SEEDS = UrbanStarterProgressionTest.SEEDS;
     @TempDir Path directory;
 
+    /**
+     * The development selector now creates generator 11, whose starter superblock is generator
+     * 10's but whose specialist buildings add guards nearby (D-102). The loop must still hold.
+     */
+    @Test
+    void theSliceLoopStillCompletesOnTheCivicCatalogueGenerator() {
+        for (long seed : SLICE_SEEDS) {
+            UrbanSliceRun run = new UrbanSliceRun(seed, GameMode.SURVIVAL, World.GEN_URBAN_CIVIC).play();
+            assertTrue(run.slice().passed(), "seed=" + seed);
+            assertEquals(World.GEN_URBAN_CIVIC, run.game.world.generatorVersion);
+            assertTrue(run.game.player.inventory.count(ItemType.IRON_SPEAR) >= 1, "the first upgrade seed=" + seed);
+        }
+    }
+
     @Test
     void frozenSeedsPlayTheScavengeRiskReturnLoopInSurvivalAndCreative() {
         for (GameMode mode : GameMode.values()) {
