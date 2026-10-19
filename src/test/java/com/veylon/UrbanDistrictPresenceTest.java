@@ -8,6 +8,7 @@ import com.veylon.world.World;
 import com.veylon.world.urban.DistrictMap;
 import com.veylon.world.urban.DistrictPlan;
 import com.veylon.world.urban.DistrictRules;
+import com.veylon.world.urban.StreetNetwork;
 import com.veylon.world.urban.UrbanDatum;
 import com.veylon.world.urban.UrbanDistrict;
 import com.veylon.world.urban.UrbanOverlay;
@@ -45,6 +46,42 @@ class UrbanDistrictPresenceTest {
             String last = g.eventLog.recent(1).getFirst();
             assertTrue(last.contains("Entering " + rules.displayName() + ".") && last.contains(rules.arrival()), last);
         }
+    }
+
+    @Test
+    void driftingAcrossABoundaryAvenueAnnouncesOnlyTheSideTheSurvivorLeavesBy() {
+        Game g = district();
+        int rx = 0, rz = 0;
+        search:
+        for (rz = -2; rz <= 2; rz++) {
+            for (rx = -2; rx <= 2; rx++) {
+                if (DistrictMap.districtOf(SEED, rx, rz) != DistrictMap.districtOf(SEED, rx + 1, rz)) {
+                    break search;
+                }
+            }
+        }
+        UrbanDistrict west = DistrictMap.districtOf(SEED, rx, rz), east = DistrictMap.districtOf(SEED, rx + 1, rz);
+        assertNotSame(west, east, "two different districts share an avenue near the spawn");
+        int edge = StreetNetwork.regionOrigin(rx + 1), z = StreetNetwork.regionOrigin(rz) + 128;
+
+        standAt(g, edge - 20, z);
+        assertEquals(west, g.player.district);
+        for (int i = 0; i < 4; i++) {
+            standAt(g, edge + 1, z);
+            assertEquals(east, g.player.district, "the HUD follows the centre line");
+            standAt(g, edge - 2, z);
+            assertEquals(west, g.player.district);
+        }
+        assertEquals(0, arrivals(g), "drifting across the avenue's centre line announces nothing");
+
+        standAt(g, edge + 20, z);
+        assertEquals(1, arrivals(g), "stepping off the avenue on the far side announces it once");
+        assertTrue(g.eventLog.recent(1).getFirst().contains("Entering " + DistrictRules.of(east).displayName() + "."));
+        standAt(g, edge - 2, z);
+        standAt(g, edge + 20, z);
+        assertEquals(1, arrivals(g), "turning back on the avenue announces nothing new");
+        standAt(g, edge - 20, z);
+        assertEquals(2, arrivals(g));
     }
 
     @Test
@@ -90,6 +127,19 @@ class UrbanDistrictPresenceTest {
         Game g = new Game();
         g.newWorld(SEED, true, World.GEN_URBAN_DISTRICTS, GameMode.SURVIVAL);
         return g;
+    }
+
+    /** Stands the player on the street datum at a column and runs one needs tick there. */
+    private static void standAt(Game g, int x, int z) {
+        g.world.getOrCreateChunk(Math.floorDiv(x, 16), Math.floorDiv(z, 16));
+        g.player.pos.set(x + 0.5f, UrbanDatum.STREET_Y + 1.001f, z + 0.5f);
+        g.player.vel.zero();
+        g.player.onGround = true;
+        g.player.tickNeeds(g, 0.05f);
+    }
+
+    private static long arrivals(Game g) {
+        return g.eventLog.all().stream().filter(s -> s.contains("Entering ")).count();
     }
 
     /** Puts the player on a clear sidewalk cell of the first region of a district. */

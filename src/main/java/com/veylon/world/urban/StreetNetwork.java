@@ -123,6 +123,20 @@ public final class StreetNetwork {
     }
 
     /**
+     * True on a boundary avenue: within an avenue's half width of a region edge along either
+     * axis. Every region boundary, and so every district boundary, runs down an avenue's
+     * centre line.
+     */
+    public static boolean onBoundaryAvenue(int x, int z) {
+        return nearRegionEdge(x) || nearRegionEdge(z);
+    }
+
+    private static boolean nearRegionEdge(int coord) {
+        int local = coord - regionOrigin(regionOf(coord));
+        return local < AVENUE_HALF_WIDTH || local >= REGION_SIZE - AVENUE_HALF_WIDTH;
+    }
+
+    /**
      * Which part of a street band a coordinate falls in, along one axis, packed
      * as {@code (part << 8) | m} with {@code m} the mirrored offset from the
      * band's centre line (0 next to it).

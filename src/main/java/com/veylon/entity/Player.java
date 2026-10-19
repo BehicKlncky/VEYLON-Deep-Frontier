@@ -12,6 +12,7 @@ import com.veylon.world.Biome;
 import com.veylon.world.BlockType;
 import com.veylon.world.World;
 import com.veylon.world.urban.DistrictRules;
+import com.veylon.world.urban.StreetNetwork;
 import com.veylon.world.urban.UrbanDistrict;
 
 import java.util.EnumMap;
@@ -56,6 +57,8 @@ public class Player extends Entity {
     public Biome biome = Biome.MEADOW;
     /** The six-district city's district underfoot (milestone 13); null in every other world. */
     public UrbanDistrict district;
+    /** The district last announced or started in; a crossing is announced off the boundary avenue. */
+    private UrbanDistrict announcedDistrict;
     public boolean exposedToSky = true;
     /** Cached shelter evaluation (refreshed on the medium tick). */
     public ShelterSystem.Shelter shelter = ShelterSystem.OPEN;
@@ -530,15 +533,21 @@ public class Player extends Entity {
     /**
      * Follows the district underfoot in a six-district city and, on crossing into another one,
      * logs what it means: its name and what to expect there. The district the player starts or
-     * loads in is noted silently, so only real transitions are announced.
+     * loads in is noted silently, so only real transitions are announced. Every district
+     * boundary runs down an avenue's centre line, so the announcement waits until the player
+     * steps off the avenue on the new side; drifting back and forth across the centre line
+     * changes the HUD but logs nothing.
      */
     private void trackDistrict(Game g, int bx, int bz) {
         UrbanDistrict here = world.urban != null && world.urban.hasDistricts() ? world.urban.districtAt(bx, bz) : null;
-        if (here != null && district != null && here != district) {
+        district = here;
+        if (here == null || announcedDistrict == null) {
+            announcedDistrict = here;
+        } else if (here != announcedDistrict && !StreetNetwork.onBoundaryAvenue(bx, bz)) {
             DistrictRules.Profile rules = DistrictRules.of(here);
             g.log("Entering " + rules.displayName() + ". " + rules.arrival());
+            announcedDistrict = here;
         }
-        district = here;
     }
 
     /** The HUD's location line: the district in a six-district city, the climate biome elsewhere. */
