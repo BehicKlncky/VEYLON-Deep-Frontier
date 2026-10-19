@@ -64,6 +64,7 @@ public final class CivicCatalogue {
             case SCHOOL -> Family.OFFICE;
             case OFFICE, SECURITY, WAREHOUSE, CLINIC -> Family.GROCERY;
             case GROCERY, APARTMENT, SHOP -> walkUp(parcel);
+            case TRANSIT -> throw new IllegalArgumentException("a station has no parcel to fall back on");
         };
     }
 
@@ -133,7 +134,7 @@ public final class CivicCatalogue {
             case OFFICE -> name + " House offices";
             case SECURITY -> name + " Security Post";
             case WAREHOUSE -> name + " Depot & Workshop";
-            case APARTMENT, SHOP -> null;
+            case APARTMENT, SHOP, TRANSIT -> null;
         };
     }
 }

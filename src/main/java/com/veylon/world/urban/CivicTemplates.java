@@ -71,7 +71,7 @@ public final class CivicTemplates {
             case OFFICE -> new Envelope(3, 5, 16, 12, true);
             case SECURITY -> new Envelope(1, 2, 16, 12, false);
             case WAREHOUSE -> new Envelope(1, 2, 16, 12, false);
-            case APARTMENT, SHOP -> throw new IllegalArgumentException(family + " uses the walk-up catalogue");
+            case APARTMENT, SHOP, TRANSIT -> throw new IllegalArgumentException(family + " uses the walk-up catalogue");
         };
     }
 
@@ -145,7 +145,7 @@ public final class CivicTemplates {
                     ? fp(Function.WORKSHOP, Function.WAREHOUSE, Function.WAREHOUSE,
                     Function.WAREHOUSE, Function.WAREHOUSE, false)
                     : fp(Function.OFFICE, Function.STORAGE, Function.STORAGE, Function.UTILITY, Function.BATHROOM, split);
-            case APARTMENT, SHOP -> throw new IllegalArgumentException(family + " uses the walk-up program");
+            case APARTMENT, SHOP, TRANSIT -> throw new IllegalArgumentException(family + " uses the walk-up program");
         };
     }
 
@@ -174,7 +174,7 @@ public final class CivicTemplates {
             case OFFICE -> "office-block";
             case SECURITY -> "security-post";
             case WAREHOUSE -> "warehouse";
-            case APARTMENT, SHOP -> throw new IllegalArgumentException(family + " is a walk-up");
+            case APARTMENT, SHOP, TRANSIT -> throw new IllegalArgumentException(family + " is a walk-up");
         };
     }
 

@@ -75,6 +75,18 @@ public final class UrbanRevision {
      * commercial and civic buildings, so it selects proven geometry rather than adding any.
      */
     public static final int BUILDING_TEMPLATE_DISTRICTS = 6;
+    /**
+     * Underground and rooftop routes (milestone 14): layout nine's six-district city plan,
+     * unchanged, plus the {@link TransitNetwork} under the boundary avenues and the service
+     * passages and roof connectors between buildings.
+     */
+    public static final int LAYOUT_UNDERGROUND = 10;
+    /**
+     * The route catalogue (milestone 14): the district catalogue's plans with basements under
+     * every walk-up apartment outside the starter superblock, service doors, hidden cellars,
+     * guarded parapets, stair bulkheads, fire escapes and roof connectors.
+     */
+    public static final int BUILDING_TEMPLATE_ROUTES = 7;
 
     /** Content revision every new urban world records. */
     public static final int CURRENT_CONTENT = 3;

@@ -16,7 +16,9 @@ public record BuildingPlan(long id, int templateRevision, String template, Famil
      * Appended only: names appear in plan fingerprints, never as saved ordinals.
      */
     public enum Family {
-        APARTMENT, SHOP, GROCERY, CLINIC, SCHOOL, OFFICE, SECURITY, WAREHOUSE;
+        APARTMENT, SHOP, GROCERY, CLINIC, SCHOOL, OFFICE, SECURITY, WAREHOUSE,
+        /** A transit station under a boundary avenue (milestone 14); no parcel of the district plan. */
+        TRANSIT;
 
         /** The frozen walk-up families of template revisions one to four. */
         public boolean walkUp() { return this == APARTMENT || this == SHOP; }
@@ -27,7 +29,10 @@ public record BuildingPlan(long id, int templateRevision, String template, Famil
         ENTRY, KITCHEN, LIVING, BEDROOM, BATHROOM, STORAGE, UTILITY,
         CORRIDOR_STAIRS, SHOP_FLOOR, STOCKROOM, BASEMENT_STORAGE, BASEMENT_UTILITY,
         // Template revision five (milestone 12). PHARMACY and SECURITY rooms are the secured ones.
-        CLINIC, PHARMACY, CLASSROOM, OFFICE, SECURITY, WAREHOUSE, WORKSHOP;
+        CLINIC, PHARMACY, CLASSROOM, OFFICE, SECURITY, WAREHOUSE, WORKSHOP,
+        // Milestone 14: a sealed cellar behind a loose panel, and a station's platform, track and
+        // service room.
+        HIDDEN_REFUGE, PLATFORM, TRACK, SERVICE;
 
         /** Specialist stock behind a forcible lock: dispensary medicine, armoury ammunition. */
         public boolean secured() { return this == PHARMACY || this == SECURITY; }

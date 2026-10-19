@@ -54,6 +54,9 @@ public final class BuildingFurnishing {
                 }
                 if (functions.contains(Function.WAREHOUSE)) { return ContainerUse.WAREHOUSE_RACK; }
                 if (functions.contains(Function.WORKSHOP)) { return ContainerUse.TOOL_CHEST; }
+                // Milestone 14: a station's maintenance lockers, and a hidden cellar's stash of food.
+                if (functions.contains(Function.SERVICE)) { return ContainerUse.UTILITY_LOCKER; }
+                if (functions.contains(Function.HIDDEN_REFUGE)) { return ContainerUse.PANTRY_SHELF; }
                 if (functions.contains(Function.KITCHEN)) {
                     return UrbanIds.slotIndex(fixture.id()) == 5 ? ContainerUse.FRIDGE : ContainerUse.KITCHEN_CABINET;
                 }

@@ -99,6 +99,14 @@ public final class UrbanSalts {
     public static final long DISTRICT_VARIANT = 0x5644_5641_5249_414eL;
     /** Encounter catalogue three: a region's threat budget and which buildings spend it. */
     public static final long DISTRICT_THREATS = 0x5644_5448_5245_4154L;
+    /** Milestone 14: whether a candidate avenue carries a transit tunnel. */
+    public static final long TRANSIT_SEGMENT = 0x5654_5345_474d_4e54L;
+    /** Whether a tunnel end has fallen in. */
+    public static final long TRANSIT_PLUG = 0x5654_504c_5547_5321L;
+    /** Low rubble mounds inside a tunnel. */
+    public static final long TRANSIT_MOUND = 0x5654_4d4f_554e_4421L;
+    /** Where along its avenue a station is sited, and its abandonment variant. */
+    public static final long TRANSIT_STATION = 0x5654_5354_4154_4e21L;
 
     private UrbanSalts() {
     }
