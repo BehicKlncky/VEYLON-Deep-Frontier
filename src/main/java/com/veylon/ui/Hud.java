@@ -206,7 +206,7 @@ public class Hud {
         text(ui, x, box.y() + 78, BODY, "Explore. Build. Shape the frontier.", MUTED);
         String[][] rows = {{"MOVEMENT", p.abilities.flying() ? "FLYING" : "GROUNDED"},
                 {"ENVIRONMENT", format("%.1f C", p.envTemp)}, {"SHELTER", p.shelter.label()},
-                {"TERRAIN", p.biome.displayName}};
+                {"TERRAIN", p.terrainLabel()}};
         for (int i = 0; i < rows.length; i++) {
             float y = box.y() + 116 + i * 46;
             rect(ui, x, y, BAR_WIDTH, 1, LINE, 0.65f);
@@ -227,7 +227,7 @@ public class Hud {
         fitted(ui, x, box.y() + 56, width, SMALL,
                 g.seasons.current(g.time).displayName + " / " + g.seasons.daysLeft(g.time) + " days left", AMBER);
         fitted(ui, x, box.y() + 77, width, SMALL, "Weather / " + g.weather.effective().displayName, TEXT);
-        fitted(ui, x, box.y() + 97, width, SMALL, "Biome / " + g.player.biome.displayName, MUTED);
+        fitted(ui, x, box.y() + 97, width, SMALL, g.player.locationLine(), MUTED);
     }
 
     private void renderMission(Game g, UiRenderer ui, Rect box) {

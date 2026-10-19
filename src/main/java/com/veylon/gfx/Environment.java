@@ -148,8 +148,12 @@ public class Environment {
         };
 
         // ---- Fog ----
-        fogStart = g.weather.fogStart();
-        fogEnd = g.weather.fogEnd();
+        // A six-district city thickens it by district: canal mist, yard haze, quarantine murk.
+        // Presentation only; perception and weather simulation are unchanged.
+        float visibility = g.player.district == null ? 1f
+                : com.veylon.world.urban.DistrictRules.of(g.player.district).visibility();
+        fogStart = g.weather.fogStart() * visibility;
+        fogEnd = g.weather.fogEnd() * visibility;
         fogColor.set(horizon).mul(0.9f).add(zenith.x * 0.1f, zenith.y * 0.1f, zenith.z * 0.1f);
         fogColor.mul(biomeFog.x, biomeFog.y, biomeFog.z);
 

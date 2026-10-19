@@ -11,6 +11,8 @@ import com.veylon.util.MathUtil;
 import com.veylon.world.Biome;
 import com.veylon.world.BlockType;
 import com.veylon.world.World;
+import com.veylon.world.urban.DistrictRules;
+import com.veylon.world.urban.UrbanDistrict;
 
 import java.util.EnumMap;
 import java.util.HashSet;
@@ -52,6 +54,8 @@ public class Player extends Entity {
     /** Cached environment readings, updated each fast tick. */
     public float envTemp = STARTING_ENV_TEMP;
     public Biome biome = Biome.MEADOW;
+    /** The six-district city's district underfoot (milestone 13); null in every other world. */
+    public UrbanDistrict district;
     public boolean exposedToSky = true;
     /** Cached shelter evaluation (refreshed on the medium tick). */
     public ShelterSystem.Shelter shelter = ShelterSystem.OPEN;
@@ -292,6 +296,7 @@ public class Player extends Entity {
     public void tickNeeds(Game g, float dt) {
         int bx = (int) Math.floor(pos.x), bz = (int) Math.floor(pos.z);
         biome = world.biomeAt(bx, bz);
+        trackDistrict(g, bx, bz);
         envTemp = g.temperature.envTempAt(g, pos.x, pos.y, pos.z);
         exposedToSky = world.isSkyExposed(bx, (int) Math.floor(pos.y + SKY_EXPOSURE_EYE_OFFSET), bz);
 
@@ -523,6 +528,31 @@ public class Player extends Entity {
     }
 
     /**
+     * Follows the district underfoot in a six-district city and, on crossing into another one,
+     * logs what it means: its name and what to expect there. The district the player starts or
+     * loads in is noted silently, so only real transitions are announced.
+     */
+    private void trackDistrict(Game g, int bx, int bz) {
+        UrbanDistrict here = world.urban != null && world.urban.hasDistricts() ? world.urban.districtAt(bx, bz) : null;
+        if (here != null && district != null && here != district) {
+            DistrictRules.Profile rules = DistrictRules.of(here);
+            g.log("Entering " + rules.displayName() + ". " + rules.arrival());
+        }
+        district = here;
+    }
+
+    /** The HUD's location line: the district in a six-district city, the climate biome elsewhere. */
+    public String locationLine() {
+        return district != null ? "District / " + DistrictRules.of(district).displayName()
+                : "Biome / " + biome.displayName;
+    }
+
+    /** The Creative panel's terrain value: the district name where there is one, else the biome. */
+    public String terrainLabel() {
+        return district != null ? DistrictRules.of(district).displayName() : biome.displayName;
+    }
+
+    /**
      * Rolls for sickness while a toxic-fog event has the player out in the
      * open. Driven from the medium tick, which is what evaluates shelter.
      *
@@ -534,7 +564,10 @@ public class Player extends Entity {
      * @return true only when this call inflicted sickness
      */
     public boolean tickToxicFogExposure(Game g) {
-        if (abilities.invulnerable() || !g.events.toxicFog() || !exposedToSky || shelter.roofed()
+        // In a six-district city the fog is the quarantine's own hazard: it drifts over the
+        // whole city but only sickens inside the cordon (milestone 13). Other worlds unchanged.
+        boolean harmless = district != null && district != UrbanDistrict.QUARANTINE;
+        if (abilities.invulnerable() || !g.events.toxicFog() || harmless || !exposedToSky || shelter.roofed()
                 || has(Affliction.SICKNESS)
                 || rng.nextDouble() >= TOXIC_FOG_SICKNESS_CHANCE) {
             return false;

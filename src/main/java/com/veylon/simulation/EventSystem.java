@@ -324,7 +324,10 @@ public class EventSystem implements SlowTickSystem {
                     idle(EventType.TOXIC_FOG),
                     (events, g) -> events.start(g, EventType.TOXIC_FOG,
                             TOXIC_FOG_SECONDS_MIN + events.rng.nextInt(TOXIC_FOG_SECONDS_RANGE),
-                            1f, "TOXIC FOG rolls in! Stay indoors or risk sickness.")),
+                            1f, g.world.urban != null && g.world.urban.hasDistricts()
+                                    ? "TOXIC FOG drifts out of the quarantine zone! Inside the cordon, stay"
+                                            + " indoors or risk sickness."
+                                    : "TOXIC FOG rolls in! Stay indoors or risk sickness.")),
 
             EventDefinition.of(EventType.ASHFALL, ASHFALL_ROLL,
                     idle(EventType.ASHFALL),
