@@ -32,7 +32,7 @@ public final class EncounterAnchors {
         if (world.urban == null) {
             return 1;
         }
-        return world.urban.hasDistricts() ? 3 : world.urban.hasCivicCatalogue() ? 2 : 1;
+        return world.urban.hasUnderground() ? 4 : world.urban.hasDistricts() ? 3 : world.urban.hasCivicCatalogue() ? 2 : 1;
     }
 
     public static boolean selected(World world, ParcelPlan parcel) {
@@ -43,7 +43,7 @@ public final class EncounterAnchors {
 
     public static List<Anchor> forParcel(World world, ParcelPlan parcel) {
         int catalogue = catalogue(world);
-        if (catalogue == 3 && !UrbanStarterSite.isNeighbour(parcel)) {
+        if (catalogue >= 3 && !UrbanStarterSite.isNeighbour(parcel)) {
             return budgeted(world, parcel);
         }
         if (catalogue == 2) {
@@ -101,10 +101,18 @@ public final class EncounterAnchors {
         return List.of();
     }
 
-    /** Catalogue three: a building inside its region's budget keeps its catalogue-one or -two slots. */
+    /**
+     * Catalogues three and four: a building inside its region's budget keeps its catalogue-one or
+     * -two slots.
+     */
     private static List<Anchor> budgeted(World world, ParcelPlan parcel) {
         DistrictPlan district = world.urban.regionPlan(UrbanIds.regionX(parcel.id()), UrbanIds.regionZ(parcel.id()));
-        if (!budget(world.seed, district).contains(parcel.index())) { return List.of(); }
+        List<Integer> chosen = budget(world.seed, district);
+        if (catalogue(world) == 4 && !forStation(world, district.rx, district.rz).isEmpty() && !chosen.isEmpty()) {
+            // The station spends one building's share of the district budget first.
+            chosen = chosen.subList(0, chosen.size() - 1);
+        }
+        if (!chosen.contains(parcel.index())) { return List.of(); }
         BuildingPlan plan = world.urban.buildingAt(parcel.x0(), parcel.z0());
         if (plan.variant() == BuildingPlan.Variant.OCCUPIED) { return List.of(); }
         return plan.family().walkUp() ? walkUp(plan) : specialist(plan);
@@ -141,9 +149,39 @@ public final class EncounterAnchors {
         return chosen;
     }
 
+    /**
+     * Catalogue four (generator 13, milestone 14): the station a region owns keeps two slots,
+     * the street at the top of its stair and its platform, outside the spawn region. They are
+     * part of the district's threat budget, which spends one building's share on them first.
+     */
+    public static List<Anchor> forStation(World world, int rx, int rz) {
+        if (catalogue(world) != 4 || rx == 0 && rz == 0) { return List.of(); }
+        TransitStation station = ownedStation(world, rx, rz);
+        if (station == null) { return List.of(); }
+        BuildingPlan plan = station.plan();
+        BuildingPlan.Room platform = plan.floors().getFirst().rooms().getFirst();
+        return List.of(new Anchor(UrbanIds.encounter(platform.id(), 0), plan.id(), plan.approaches().getFirst(), false),
+                new Anchor(UrbanIds.encounter(platform.id(), 1), plan.id(), platform.anchor(), true));
+    }
+
+    /** The station of the one candidate segment a region owns, or null when that segment is absent. */
+    public static TransitStation ownedStation(World world, int rx, int rz) {
+        int ns = TransitNetwork.candidate(rx) ? rx : rx + 1, ew = TransitNetwork.candidate(rz) ? rz : rz + 1;
+        boolean nsOwner = java.util.Arrays.equals(TransitNetwork.region(true, ns, rz,
+                TransitNetwork.ownerPositive(true, rz)), new int[]{rx, rz});
+        TransitNetwork.Segment s = nsOwner ? world.urban.segment(true, ns, rz) : world.urban.segment(false, ew, rx);
+        return s.present() ? s.station() : null;
+    }
+
     /** Resolves against the frozen plan, never accepts a merely well-shaped arbitrary id. */
     public static Anchor resolve(World world, long id) {
         UrbanIds.requireKind(id, UrbanIds.Kind.ENCOUNTER);
+        if (UrbanIds.floorIndex(id) == -2 && UrbanIds.parcelIndex(id) % ParcelPlan.SLOTS_PER_SUPERBLOCK == TransitStation.ID_SLOT) {
+            for (Anchor anchor : forStation(world, UrbanIds.regionX(id), UrbanIds.regionZ(id))) {
+                if (anchor.id == id) { return anchor; }
+            }
+            throw new IllegalArgumentException("encounter has no planned station anchor");
+        }
         if (UrbanIds.floorIndex(id) != 0 || UrbanIds.slotIndex(id) > 1) {
             throw new IllegalArgumentException("invalid encounter floor or slot");
         }

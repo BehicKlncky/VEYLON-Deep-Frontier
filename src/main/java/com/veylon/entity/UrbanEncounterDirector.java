@@ -113,7 +113,23 @@ public final class UrbanEncounterDirector {
             int ax = rx + REGIONS[regionCursor][0], az = rz + REGIONS[regionCursor][1];
             if (!CityPlanner.isPlannable(ax, az)) { advanceRegion(); lastParcels++; continue; }
             var parcels = g.world.urban.regionPlan(ax, az).parcels();
-            if (parcelCursor >= parcels.size()) { advanceRegion(); lastParcels++; continue; }
+            boolean stations = EncounterAnchors.catalogue(g.world) == 4;
+            if (parcelCursor > parcels.size() || !stations && parcelCursor == parcels.size()) {
+                advanceRegion(); lastParcels++; continue;
+            }
+            if (parcelCursor == parcels.size()) {
+                // After its parcels, a region's transit station (encounter catalogue four only, so the
+                // scan of every earlier catalogue keeps its schedule).
+                parcelCursor++; lastParcels++;
+                for (var anchor : EncounterAnchors.forStation(g.world, ax, az)) {
+                    var c = anchor.cell();
+                    if (lastSpawns >= MAX_SPAWNS_PER_TICK) { break; }
+                    if (g.player.distSqTo(c.x(), g.player.pos.y, c.z()) > 112 * 112
+                            || !g.world.isColumnLoaded(c.x(), c.z())) { continue; }
+                    if (tryActivate(g, anchor) != null) { lastSpawns++; }
+                }
+                continue;
+            }
             var parcel = parcels.get(parcelCursor++); lastParcels++;
             float cx = (parcel.x0() + parcel.x1()) * 0.5f, cz = (parcel.z0() + parcel.z1()) * 0.5f;
             if (g.player.distSqTo(cx, g.player.pos.y, cz) > 112 * 112
