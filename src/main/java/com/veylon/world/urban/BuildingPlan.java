@@ -37,7 +37,11 @@ public record BuildingPlan(long id, int templateRevision, String template, Famil
         /** Specialist stock behind a forcible lock: dispensary medicine, armoury ammunition. */
         public boolean secured() { return this == PHARMACY || this == SECURITY; }
     }
-    public enum FixtureKind { DOOR, WINDOW, CONTAINER, FURNITURE, QUEST }
+    /**
+     * What a fixture reservation is. {@link #ROUTE} (template seven) marks the head of an exterior
+     * route: a fire-escape gap or a roof opening the route stamper builds on outside the parcel.
+     */
+    public enum FixtureKind { DOOR, WINDOW, CONTAINER, FURNITURE, QUEST, ROUTE }
 
     /** Inclusive interior rectangle; every clear standing cell must have a return route. */
     public record Room(long id, List<Function> functions, ParcelPlan.Rect interior, Vec3i anchor) {

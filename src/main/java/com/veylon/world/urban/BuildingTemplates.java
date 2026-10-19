@@ -29,7 +29,8 @@ public final class BuildingTemplates {
         return revision == REVISION || revision == UrbanRevision.BUILDING_TEMPLATE_FURNISHED
                 || revision == UrbanRevision.BUILDING_TEMPLATE_SHAPED_STAIRS
                 || revision == UrbanRevision.BUILDING_TEMPLATE_STARTER
-                || revision == UrbanRevision.BUILDING_TEMPLATE_CIVIC;
+                || revision == UrbanRevision.BUILDING_TEMPLATE_CIVIC
+                || revision == UrbanRevision.BUILDING_TEMPLATE_ROUTES;
     }
 
     /** Tallest building of a family, before the parcel's own storey envelope applies. */
@@ -47,7 +48,8 @@ public final class BuildingTemplates {
      */
     public static BuildingPlan propose(ParcelPlan parcel, int revision, Family family, Variant variant,
                                        int storeys, boolean basement, boolean minimal) {
-        if (!supportsRevision(revision)) {
+        if (!supportsRevision(revision) || revision == UrbanRevision.BUILDING_TEMPLATE_ROUTES) {
+            // Revision seven is an overlay (RouteTemplates) on a revision-four or -five proposal.
             throw new IllegalArgumentException("unsupported building template revision " + revision);
         }
         if (family.walkUp() == (revision == UrbanRevision.BUILDING_TEMPLATE_CIVIC)) {

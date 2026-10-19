@@ -83,6 +83,12 @@ public final class PlanVolume implements VoxelAccess {
             return this;
         }
 
+        /** The cell a builder holds now; air outside its bounds, like a built volume. */
+        public BlockType get(int x, int y, int z) {
+            if (x < x0 || x >= x0 + width || z < z0 || z >= z0 + depth || y < minY || y > maxY) { return BlockType.AIR; }
+            return BlockType.byId(blocks[((y - minY) * depth + z - z0) * width + x - x0]);
+        }
+
         public PlanVolume build() { return new PlanVolume(this); }
     }
 }

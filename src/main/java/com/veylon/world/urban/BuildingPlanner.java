@@ -22,7 +22,8 @@ public final class BuildingPlanner {
      * chooses families from the parcel's district, so it needs {@link #plan(long, int, ParcelPlan, DistrictPlan)}.
      */
     public static Result plan(long seed, int revision, ParcelPlan parcel) {
-        if (revision == UrbanRevision.BUILDING_TEMPLATE_CIVIC || revision == UrbanRevision.BUILDING_TEMPLATE_DISTRICTS) {
+        if (revision == UrbanRevision.BUILDING_TEMPLATE_CIVIC || revision == UrbanRevision.BUILDING_TEMPLATE_DISTRICTS
+                || revision == UrbanRevision.BUILDING_TEMPLATE_ROUTES) {
             throw new IllegalArgumentException("template revision " + revision + " plans a parcel within its district");
         }
         Family family = parcel.use() == ParcelPlan.Use.COMMERCIAL ? Family.SHOP : Family.APARTMENT;
@@ -48,6 +49,9 @@ public final class BuildingPlanner {
      * walk-up there is exactly the revision-four plan, starter superblock included.
      */
     public static Result plan(long seed, int revision, ParcelPlan parcel, DistrictPlan district) {
+        if (revision == UrbanRevision.BUILDING_TEMPLATE_ROUTES) {
+            return planRoutes(seed, parcel, district, RouteCatalogue.of(seed, district));
+        }
         if (revision == UrbanRevision.BUILDING_TEMPLATE_DISTRICTS) { return planDistrict(seed, parcel, district); }
         if (revision != UrbanRevision.BUILDING_TEMPLATE_CIVIC) { return plan(seed, revision, parcel); }
         Family family = CivicCatalogue.family(seed, district, parcel);
@@ -81,6 +85,33 @@ public final class BuildingPlanner {
                 DistrictCatalogue.variant(seed, district, parcel), storeys, CivicCatalogue.basement(seed, family, parcel),
                 false);
         return repair(candidate);
+    }
+
+    /**
+     * Revision seven, the route catalogue (milestone 14). The starter superblock and refuge are
+     * exactly their revision-six plans. Every other parcel keeps its district family, storeys
+     * and variant, an apartment always gets its first basement, and {@link RouteTemplates}
+     * overlays the parcel's routes on every attempt of the same finite repair sequence.
+     */
+    public static Result planRoutes(long seed, ParcelPlan parcel, DistrictPlan district, RouteCatalogue routes) {
+        if (UrbanStarterSite.isNeighbour(parcel) || parcel.use() == ParcelPlan.Use.REFUGE) {
+            return planDistrict(seed, parcel, district);
+        }
+        RouteCatalogue.Expect expect = routes.expected(parcel.index());
+        RouteCatalogue.Features features = routes.features(parcel.index());
+        boolean flooded = district.district == UrbanDistrict.FLOODED;
+        int base = expect.family().walkUp() ? UrbanRevision.BUILDING_TEMPLATE_STARTER : UrbanRevision.BUILDING_TEMPLATE_CIVIC;
+        List<String> repairs = new ArrayList<>();
+        BuildingPlan candidate = null;
+        for (int attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+            Variant variant = attempt == 1 ? expect.variant() : Variant.INTACT;
+            candidate = RouteTemplates.apply(BuildingTemplates.propose(parcel, base, expect.family(), variant,
+                    expect.storeys(), expect.basement(), attempt == 3), expect, features, flooded);
+            AccessibilityValidator.Report report = AccessibilityValidator.inspect(candidate);
+            if (report.ok()) { return new Result(candidate, attempt, repairs, report); }
+            repairs.add("attempt=" + attempt + " " + identity(candidate) + " " + report.summary());
+        }
+        throw new IllegalStateException("no valid building in finite fallback: " + repairs);
     }
 
     /** Candidate, intact alternate, then minimal rooms on the same footprint and vertical envelope. */

@@ -160,6 +160,8 @@ public final class AccessibilityValidator {
         int[] edges, reverseHead, reverseNext, reverseFrom;
         /** Rooms behind a forcible lock, and those locked doors. */
         final Set<Long> securedRooms = new HashSet<>();
+        /** Hidden cellars (template seven), behind a loose panel. */
+        final Set<Long> concealedRooms = new HashSet<>();
         final List<BuildingPlan.Fixture> forcible = new ArrayList<>();
 
         Check(BuildingPlan p) { this(p, false); }
@@ -200,7 +202,8 @@ public final class AccessibilityValidator {
             for (BuildingPlan.Floor floor : plan.floors()) {
                 for (BuildingPlan.Room room : floor.rooms()) {
                     int i = worldIndex(room.anchor());
-                    if (securedRooms.contains(room.id()) && i >= 0 && reached[i]) {
+                    boolean behind = securedRooms.contains(room.id()) || concealedRooms.contains(room.id());
+                    if (behind && i >= 0 && reached[i]) {
                         fail("SECURED: room is reachable without forcing its lock " + room.anchor());
                     }
                 }
@@ -217,6 +220,9 @@ public final class AccessibilityValidator {
             forcedEscaped = flood(true);
         }
 
+        /** Cells above the roof slab the volume holds: three, or four under a template-seven bulkhead. */
+        int top() { return plan.templateRevision() == UrbanRevision.BUILDING_TEMPLATE_ROUTES ? 4 : 3; }
+
         boolean boundedMetadata() {
             return plan.floors().size() <= MAX_FLOORS && plan.fixtures().size() <= MAX_FIXTURES
                     && plan.approaches().size() <= 4 && plan.stairs().size() <= 6
@@ -225,14 +231,18 @@ public final class AccessibilityValidator {
         }
 
         void metadata() {
+            int revision = plan.templateRevision();
+            boolean routes = revision == UrbanRevision.BUILDING_TEMPLATE_ROUTES;
+            // Template seven overlays both walk-ups and the commercial and civic families.
+            boolean familyFits = plan.family() != BuildingPlan.Family.TRANSIT
+                    && (routes || plan.family().walkUp() != (revision == UrbanRevision.BUILDING_TEMPLATE_CIVIC));
             if (!UrbanIds.isValid(plan.id()) || plan.id() != UrbanIds.building(plan.parcel().id(), 0)
-                    || !BuildingTemplates.supportsRevision(plan.templateRevision())
-                    || plan.family().walkUp() == (plan.templateRevision() == UrbanRevision.BUILDING_TEMPLATE_CIVIC)) {
+                    || !BuildingTemplates.supportsRevision(revision) || !familyFits) {
                 fail("IDENTITY: unsupported building/template identity");
             }
             if (plan.storeys() < 1
                     || plan.storeys() > Math.min(BuildingTemplates.maxStoreys(plan.family()), plan.parcel().maxStoreys())
-                    || plan.roofY() + 3 >= 94 || volume.minY < 35 || volume.maxY != plan.roofY() + 3
+                    || plan.roofY() + top() >= 94 || volume.minY < 35 || volume.maxY != plan.roofY() + top()
                     || volume.x0 != plan.parcel().x0() - 1 || volume.z0 != plan.parcel().z0() - 1
                     || volume.width != plan.parcel().width() + 2 || volume.depth != plan.parcel().depth() + 2) {
                 fail("ENVELOPE: footprint or vertical overflow");
@@ -258,6 +268,9 @@ public final class AccessibilityValidator {
                     roomIds.add(room.id());
                     if (room.functions().stream().anyMatch(BuildingPlan.Function::secured)) {
                         securedRooms.add(room.id());
+                    }
+                    if (room.functions().contains(BuildingPlan.Function.HIDDEN_REFUGE)) {
+                        concealedRooms.add(room.id());
                     }
                     for (BuildingPlan.Room other : floor.rooms()) {
                         if (room.id() < other.id() && intersects(r, other.interior())) {
@@ -301,11 +314,15 @@ public final class AccessibilityValidator {
                         && UrbanIds.slotIndex(fixture.id()) == 0) {
                     forcible.add(fixture);
                 }
+                // A hidden cellar's loose panel is its only way in, proven like a secured room's lock.
+                if (fixture.block() == BlockType.HIDDEN_PANEL && concealedRooms.contains(UrbanIds.parent(fixture.id()))) {
+                    forcible.add(fixture);
+                }
                 if (fixture.kind() == FixtureKind.WINDOW && (!plan.parcel().onOutline(p.x(), p.z())
                         || Math.abs(p.x() - fixture.target().x()) + Math.abs(p.z() - fixture.target().z()) > 2)) {
                     fail("WINDOW: facade/interaction reach mismatch");
                 }
-                if (fixture.kind() != FixtureKind.QUEST) {
+                if (fixture.kind() != FixtureKind.QUEST && fixture.kind() != FixtureKind.ROUTE) {
                     for (int h = 0; h < fixture.height(); h++) {
                         Vec3i cell = new Vec3i(p.x(), p.y() + h, p.z());
                         if (!occupied.add(cell) || volume.getBlock(cell.x(), cell.y(), cell.z()) != fixture.block()) {
@@ -318,7 +335,8 @@ public final class AccessibilityValidator {
                     || plan.templateRevision() == UrbanRevision.BUILDING_TEMPLATE_SHAPED_STAIRS)) {
                 furnishingBounds();
             }
-            if (violations == 0 && plan.templateRevision() == UrbanRevision.BUILDING_TEMPLATE_CIVIC) {
+            if (violations == 0 && !plan.family().walkUp() && (plan.templateRevision() == UrbanRevision.BUILDING_TEMPLATE_CIVIC
+                    || plan.templateRevision() == UrbanRevision.BUILDING_TEMPLATE_ROUTES)) {
                 civicBounds();
             }
             // No structure is allowed to spill into the approach halo, even if its route still works.
@@ -393,7 +411,8 @@ public final class AccessibilityValidator {
         void openUnlockedDoors() {
             PlanVolume.Builder b = volume.edit();
             for (BuildingPlan.Fixture fixture : plan.fixtures()) {
-                if (fixture.kind() == FixtureKind.DOOR && !fixture.locked()) {
+                // A closed loose panel stays shut: it is a wall to every ordinary route.
+                if (fixture.kind() == FixtureKind.DOOR && !fixture.locked() && fixture.block() != BlockType.HIDDEN_PANEL) {
                     Vec3i p = fixture.position();
                     for (int h = 0; h < fixture.height(); h++) {
                         b.set(p.x(), p.y() + h, p.z(), BlockType.WOOD_DOOR_OPEN);

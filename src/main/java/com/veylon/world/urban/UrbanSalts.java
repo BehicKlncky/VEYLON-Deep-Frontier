@@ -107,6 +107,14 @@ public final class UrbanSalts {
     public static final long TRANSIT_MOUND = 0x5654_4d4f_554e_4421L;
     /** Where along its avenue a station is sited, and its abandonment variant. */
     public static final long TRANSIT_STATION = 0x5654_5354_4154_4e21L;
+    /** Template seven: which strip pairs share a service passage under their courtyard passage. */
+    public static final long ROUTE_PASSAGE = 0x5652_5041_5353_4721L;
+    /** Which equal roofs are joined by a parapet opening or a bridge. */
+    public static final long ROUTE_CONNECT = 0x5652_434f_4e4e_4354L;
+    /** Which buildings carry a fire escape up their rear wall. */
+    public static final long ROUTE_ESCAPE = 0x5652_4553_4341_5045L;
+    /** Which apartment of a residential region hides a cellar. */
+    public static final long ROUTE_REFUGE = 0x5652_5245_4655_4745L;
 
     private UrbanSalts() {
     }
