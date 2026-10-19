@@ -488,6 +488,24 @@ class GameLoopIntegrationTest {
         assertNotNull(game.faction.campPos, "the legacy load raises its own camp again");
     }
 
+    @Test
+    void whatASurvivorDiscoveredBelongsToItsOwnWorld() {
+        // Milestone 14: stations and hidden cellars found in one world never follow the player.
+        Game game = new Game();
+        game.newWorld(779L, true, World.GEN_URBAN_UNDERGROUND, GameMode.SURVIVAL);
+        long station = game.world.urban.segment(true, 0, 0).station().id();
+        assertTrue(game.world.urban.discovery.discover(station));
+        Path found = AppPaths.dataDirectory().resolve("build/qa/game-loop-discovery.dat");
+        assertTrue(SaveSystem.save(game, found));
+        game.newWorld(779L, true, World.GEN_URBAN_UNDERGROUND, GameMode.SURVIVAL);
+        assertEquals(0, game.world.urban.discovery.size(), "a new world has found nothing");
+        assertEquals(com.veylon.world.urban.UrbanPlaces.Place.NONE, game.player.place);
+        assertTrue(SaveSystem.load(game, found));
+        assertTrue(game.world.urban.discovery.discovered(station), "a load brings back its own world's finds");
+        game.newWorld(780L, true, World.GEN_URBAN_UNDERGROUND, GameMode.SURVIVAL);
+        assertFalse(game.world.urban.discovery.discovered(station));
+    }
+
     private static void assertUrbanFoundationOnly(Game game) {
         assertTrue(game.world.isUrban());
         assertEquals(UrbanRevision.CURRENT_CONTENT, game.world.urban.contentRevision());

@@ -14,6 +14,7 @@ import com.veylon.world.World;
 import com.veylon.world.urban.DistrictRules;
 import com.veylon.world.urban.StreetNetwork;
 import com.veylon.world.urban.UrbanDistrict;
+import com.veylon.world.urban.UrbanPlaces;
 
 import java.util.EnumMap;
 import java.util.HashSet;
@@ -59,6 +60,9 @@ public class Player extends Entity {
     public UrbanDistrict district;
     /** The district last announced or started in; a crossing is announced off the boundary avenue. */
     private UrbanDistrict announcedDistrict;
+    /** The route place underfoot in a layout-ten city (milestone 14); NONE in every other world. */
+    public UrbanPlaces.Place place = UrbanPlaces.Place.NONE;
+    private int placeX = Integer.MIN_VALUE, placeY, placeZ;
     public boolean exposedToSky = true;
     /** Cached shelter evaluation (refreshed on the medium tick). */
     public ShelterSystem.Shelter shelter = ShelterSystem.OPEN;
@@ -300,6 +304,7 @@ public class Player extends Entity {
         int bx = (int) Math.floor(pos.x), bz = (int) Math.floor(pos.z);
         biome = world.biomeAt(bx, bz);
         trackDistrict(g, bx, bz);
+        trackPlace(g, bx, (int) Math.floor(pos.y + 0.01f), bz);
         envTemp = g.temperature.envTempAt(g, pos.x, pos.y, pos.z);
         exposedToSky = world.isSkyExposed(bx, (int) Math.floor(pos.y + SKY_EXPOSURE_EYE_OFFSET), bz);
 
@@ -550,10 +555,28 @@ public class Player extends Entity {
         }
     }
 
-    /** The HUD's location line: the district in a six-district city, the climate biome elsewhere. */
+    /**
+     * Follows the route place underfoot (milestone 14) whenever the feet cell changes, and records
+     * a station or hidden cellar the first time the player stands in it, with one log line.
+     */
+    private void trackPlace(Game g, int x, int y, int z) {
+        if (x == placeX && y == placeY && z == placeZ) { return; }
+        placeX = x; placeY = y; placeZ = z;
+        UrbanPlaces.Observation seen = UrbanPlaces.at(world, x, y, z);
+        place = seen.place();
+        if (seen.site() != 0 && world.urban.discovery.discover(seen.site())) {
+            g.log(UrbanPlaces.discoveryLine(seen.place()));
+        }
+    }
+
+    /**
+     * The HUD's location line: the district in a six-district city, the climate biome elsewhere,
+     * then the route place underfoot when there is one.
+     */
     public String locationLine() {
-        return district != null ? "District / " + DistrictRules.of(district).displayName()
+        String line = district != null ? "District / " + DistrictRules.of(district).displayName()
                 : "Biome / " + biome.displayName;
+        return place == UrbanPlaces.Place.NONE ? line : line + " / " + place.label;
     }
 
     /** The Creative panel's terrain value: the district name where there is one, else the biome. */

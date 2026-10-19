@@ -64,6 +64,8 @@ public final class UrbanWorldState {
     private int contentRevision = UNRESOLVED;
     /** Persistent sparse state, separate from evictable pure plan caches. */
     public final UrbanContainers containers = new UrbanContainers();
+    /** Layout ten: the stations and hidden cellars this world's survivor has found. */
+    public final UrbanDiscovery discovery = new UrbanDiscovery();
     /** Starter anchor only; claims and upgrades are introduced in milestone 18. */
     public long refugeBuilding;
     public com.veylon.util.Vec3i refugeAnchor;

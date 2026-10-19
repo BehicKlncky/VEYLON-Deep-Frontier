@@ -180,6 +180,7 @@ public final class FixtureActions {
                 w.fixtures.transitTimers().remove(new Vec3i(x, bottom, z));
                 sound(g, kind, cx, cy, cz, true);
                 emitNoise(g, kind, cx, cy, cz, "door");
+                if (kind == Fixtures.Kind.HIDDEN_PANEL) { foundCellar(g, x, bottom, z); }
             }
             case CLOSE -> {
                 setOpening(w, x, bottom, z, height, kind, false, FixtureStates.LOCK_NONE);
@@ -219,6 +220,15 @@ public final class FixtureActions {
             }
         }
         return true;
+    }
+
+    /** Sliding a loose panel aside for the first time is how its hidden cellar is found. */
+    private static void foundCellar(Game g, int x, int y, int z) {
+        long cellar = com.veylon.world.urban.UrbanPlaces.cellarBehind(g.world, x, y, z);
+        if (cellar != 0 && g.world.urban.discovery.discover(cellar)) {
+            g.log("The loose panel slides aside. " + com.veylon.world.urban.UrbanPlaces.discoveryLine(
+                    com.veylon.world.urban.UrbanPlaces.Place.HIDDEN_CELLAR));
+        }
     }
 
     /** Opens or closes every cell of an opening with record = false, keeping the state map in step. */

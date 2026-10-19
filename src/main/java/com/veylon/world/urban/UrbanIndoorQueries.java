@@ -76,13 +76,18 @@ public final class UrbanIndoorQueries {
         return y >= chunk.precipitationHeight(lx, lz) ? 1f : GLASS_TRANSMISSION;
     }
 
-    /** Building/floor/room containing the cell; unloaded or outside generated buildings is null. */
+    /**
+     * Building/floor/room containing the cell; unloaded or outside generated buildings is null.
+     * In layout ten a transit station is a building too, but only below the street: its one
+     * floor (index -2) holds every station cell from the track bed to the stair's last tread
+     * under the pavement, so a body on the avenue above it is never inside.
+     */
     public static Location location(World world, int x, int y, int z) {
         if (world.urban == null || !world.urban.hasGeneratedBuildings() || loaded(world, x, z) == null) {
             return null;
         }
         BuildingPlan building = world.urban.buildingAt(x, z);
-        if (building == null) { return null; }
+        if (building == null) { return station(world, x, y, z); }
         for (BuildingPlan.Floor floor : building.floors()) {
             if (y < floor.slabY() || y >= floor.slabY() + UrbanDatum.STOREY_PITCH) { continue; }
             BuildingPlan.Room found = null;
@@ -92,6 +97,17 @@ public final class UrbanIndoorQueries {
             return new Location(building, floor, found);
         }
         return null;
+    }
+
+    private static Location station(World world, int x, int y, int z) {
+        if (y <= TransitNetwork.SLAB_Y || y >= UrbanDatum.STREET_Y) { return null; }
+        TransitStation station = world.urban.stationAt(x, z);
+        if (station == null) { return null; }
+        BuildingPlan.Floor floor = station.plan().floors().getFirst();
+        for (BuildingPlan.Room room : floor.rooms()) {
+            if (room.interior().contains(x, z)) { return new Location(station.plan(), floor, room); }
+        }
+        return new Location(station.plan(), floor, null);
     }
 
     private static Chunk loaded(World world, int x, int z) {

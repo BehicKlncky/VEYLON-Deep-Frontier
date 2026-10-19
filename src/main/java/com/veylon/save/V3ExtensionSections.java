@@ -95,6 +95,9 @@ final class V3ExtensionSections {
             if (com.veylon.world.urban.UrbanContainers.manages(g.world)) {
                 sections.add(new V3Section(UrbanContainersSection.ID, UrbanContainersSection.write(g)));
             }
+            if (UrbanDiscoverySection.present(g)) {
+                sections.add(new V3Section(UrbanDiscoverySection.ID, UrbanDiscoverySection.write(g)));
+            }
         }
         out.writeInt(V3_SECTION_ENVELOPE_MAGIC);
         out.writeInt(sections.size());
@@ -341,6 +344,8 @@ final class V3ExtensionSections {
                 containers = payload;
             } else if (UrbanRefugesSection.ID.equals(id)) {
                 UrbanRefugesSection.read(payload, g);
+            } else if (UrbanDiscoverySection.ID.equals(id)) {
+                UrbanDiscoverySection.read(payload, g);
             } else if (UrbanPopulationSection.ID.equals(id)) {
                 population = payload;
             }
