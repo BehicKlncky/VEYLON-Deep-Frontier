@@ -53,6 +53,9 @@ final class UrbanTextures {
             case "sign_board" -> signBoard(p, variant);
             case "sign_edge" -> planksFlat(p, 0x5a4a36);
             case "contaminated" -> contaminated(p, variant);
+            case "railing" -> railing(p);
+            case "railing_top" -> railingTop(p);
+            case "hidden_panel" -> hiddenPanel(p, variant);
             default -> {
                 return false;
             }
@@ -580,5 +583,79 @@ final class UrbanTextures {
                 p.dot(x + 1, y, 0x8ea4b0);
             }
         }
+    }
+
+    /**
+     * A guard rail in side view (milestone 14): a dark steel top rail and a kick rail joined
+     * by square balusters, the paint chipped to rust at the joints. Everything between the
+     * bars is cutout, so a rail on a parapet keeps the view over the edge.
+     */
+    private static void railing(Painter p) {
+        int n = p.size;
+        p.clearAlpha();
+        int rail = Math.max(3, n / 9);
+        for (int x = 0; x < n; x++) {
+            for (int y = 0; y < rail; y++) {
+                p.set(x, y, p.shade(0x4e5458, y == 0 ? 1.18f : 0.92f + p.noise(x, y, 8, 1351) * 0.12f));
+            }
+            for (int y = n - rail + 1; y < n; y++) {
+                p.set(x, y, p.shade(0x464c50, 0.88f + p.noise(x, y, 8, 1352) * 0.12f));
+            }
+        }
+        int pitch = Math.max(6, n / 4), width = Math.max(2, n / 16);
+        for (int x0 = pitch / 2 - width / 2; x0 < n; x0 += pitch) {
+            for (int x = x0; x < x0 + width && x < n; x++) {
+                for (int y = rail; y < n - rail + 1; y++) {
+                    p.set(x, y, p.shade(0x50565a, (x == x0 ? 1.1f : 0.86f) + p.noise(x, y, 6, 1353) * 0.1f));
+                }
+            }
+        }
+        // Rust where water sits: under the top rail and at each baluster foot.
+        for (int i = 0; i < 14; i++) {
+            int x = p.ri(i + 1354);
+            p.dot(x, rail, 0x7a4a2e);
+            p.dot(x, n - rail, 0x6e4228);
+        }
+    }
+
+    /** A rail seen from above: a narrow steel frame, open in the middle. */
+    private static void railingTop(Painter p) {
+        int n = p.size;
+        p.clearAlpha();
+        p.box(0, 0, n - 1, n - 1, Math.max(2, n / 12), 0x4e5458);
+        p.grain(0.04f);
+    }
+
+    /**
+     * The loose panel over a hidden cellar (milestone 14): the same worn coat as the plaster
+     * around it, so it reads as wall from across a room, but with a hairline seam inset from
+     * the edges, grey scuffing along the foot where it has been dragged, and on one layout a
+     * small chalk tally, the kind of mark people leave for each other.
+     */
+    private static void hiddenPanel(Painter p, int variant) {
+        int n = p.size;
+        plaster(p, 0);
+        int inset = Math.max(2, n / 14);
+        for (int i = inset; i < n - inset; i++) {
+            p.mulAt(i, inset, 0.86f);
+            p.mulAt(i, n - 1 - inset, 0.86f);
+            p.mulAt(inset, i, 0.86f);
+            p.mulAt(n - 1 - inset, i, 0.86f);
+        }
+        for (int y = n - n / 5; y < n; y++) {
+            for (int x = 0; x < n; x++) {
+                if (p.noise(x, y, 5, 1361 + variant) > 0.55f) {
+                    p.mulAt(x, y, 0.8f);
+                }
+            }
+        }
+        if (variant == 1) {
+            int x0 = n - n / 3, y0 = n / 4, h = n / 7;
+            for (int k = 0; k < 3; k++) {
+                p.line(x0 + k * 3, y0, x0 + k * 3, y0 + h, 0xe6e3da);
+            }
+            p.line(x0 - 2, y0 + h, x0 + 9, y0, 0xe6e3da);
+        }
+        p.grain(0.02f);
     }
 }

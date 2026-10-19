@@ -25,7 +25,13 @@ public final class Fixtures {
     public enum Kind {
         WOOD_DOOR(BlockType.WOOD_DOOR, BlockType.WOOD_DOOR_OPEN, BlockType.BROKEN_DOOR, true),
         METAL_DOOR(BlockType.METAL_DOOR, BlockType.METAL_DOOR_OPEN, BlockType.BROKEN_DOOR, true),
-        WINDOW(BlockType.WINDOW, BlockType.WINDOW_OPEN, BlockType.BROKEN_WINDOW, false);
+        WINDOW(BlockType.WINDOW, BlockType.WINDOW_OPEN, BlockType.BROKEN_WINDOW, false),
+        /**
+         * A loose wall panel over a hidden cellar doorway (milestone 14). It works like an
+         * unlocked door for whoever finds it, but it is not a {@link Fixtures#isClosedDoor closed door}:
+         * nobody routes through it, or shoulders it open, before it has been found and opened.
+         */
+        HIDDEN_PANEL(BlockType.HIDDEN_PANEL, BlockType.HIDDEN_PANEL_OPEN, BlockType.BROKEN_DOOR, true);
 
         public final BlockType closed;
         public final BlockType open;
@@ -54,6 +60,7 @@ public final class Fixtures {
             case WOOD_DOOR, WOOD_DOOR_OPEN -> Kind.WOOD_DOOR;
             case METAL_DOOR, METAL_DOOR_OPEN -> Kind.METAL_DOOR;
             case WINDOW, WINDOW_OPEN -> Kind.WINDOW;
+            case HIDDEN_PANEL, HIDDEN_PANEL_OPEN -> Kind.HIDDEN_PANEL;
             default -> null;
         };
     }

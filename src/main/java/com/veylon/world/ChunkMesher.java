@@ -264,9 +264,10 @@ public class ChunkMesher {
             if (opaqueAt(nx, ny, nz)) {
                 continue;
             }
-            if (t == BlockType.WINDOW && world.getBlock(nx, ny, nz) == BlockType.WINDOW) {
+            if ((t == BlockType.WINDOW || t == BlockType.RAILING) && world.getBlock(nx, ny, nz) == t) {
                 // Panes of one opening share faces; drawing them would put a
-                // sheet of glass inside the window at an angle.
+                // sheet of glass inside the window at an angle. A run of rail
+                // likewise reads as one rail, not a row of cages.
                 continue;
             }
             int layer = switch (d) {
@@ -378,7 +379,8 @@ public class ChunkMesher {
         if (!FixtureGeometry.thinBox(world, x, y, z, t, thinBox)) {
             return;
         }
-        int layer = Fixtures.kindOf(t) != null && Fixtures.kindOf(t).door
+        Fixtures.Kind kind = Fixtures.kindOf(t);
+        int layer = kind != null && kind.door && kind != Fixtures.Kind.HIDDEN_PANEL
                 ? doorLayer(t, x, y, z) : MaterialRegistry.of(t).sideLayer[0];
         box(thinBox[0], thinBox[1], thinBox[2], thinBox[3], thinBox[4], thinBox[5],
                 layer, x, y, z, 1f, 1f, 1f);

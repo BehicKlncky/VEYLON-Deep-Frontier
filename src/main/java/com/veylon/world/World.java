@@ -431,6 +431,8 @@ public class World implements VoxelAccess {
         if (!(Fixtures.isClosedDoor(old) || Fixtures.isOpen(old))
                 || Fixtures.kindOf(old) != Fixtures.kindOf(t)
                 || Fixtures.kindOf(old) == null || !Fixtures.kindOf(old).door
+                // A loose panel is a wall to every route while closed, so either swing changes them.
+                || Fixtures.kindOf(old) == Fixtures.Kind.HIDDEN_PANEL
                 || fixtureLockAt(x, y, z) != FixtureStates.LOCK_NONE) {
             navigation.changed(x, y, z);
         }

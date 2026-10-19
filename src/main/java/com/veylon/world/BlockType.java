@@ -111,7 +111,15 @@ public enum BlockType {
 
     // Milestone 13: spilled chemicals and quarantine runoff crusted over the ground. Standing on
     // it risks sickness in Survival; scraping it away by hand leaves a shallow pit and nothing else.
-    CONTAMINATED_GROUND("Contaminated Ground", Shape.CUBE, true, true, false, 1.2f, ToolKind.NONE, false, null, 0, 0, 0f, 0.36f, 0.42f, 0.20f);
+    CONTAMINATED_GROUND("Contaminated Ground", Shape.CUBE, true, true, false, 1.2f, ToolKind.NONE, false, null, 0, 0, 0f, 0.36f, 0.42f, 0.20f),
+
+    // Milestone 14: a see-through steel guard rail. On a parapet, a bridge or around a stair
+    // opening it makes a second course that nobody steps over, without hiding the view.
+    RAILING("Guard Rail", Shape.CUBE, true, false, false, 4.0f, ToolKind.PICKAXE, false, null, 0, 0, 0f, 0.36f, 0.38f, 0.40f),
+    // A loose plaster panel over a cellar doorway. Closed it is named and built like the wall
+    // around it; working it with F slides it aside like a door (Fixtures.Kind.HIDDEN_PANEL).
+    HIDDEN_PANEL("Plaster Wall", Shape.CUBE, true, true, false, 1.5f, ToolKind.PICKAXE, false, null, 0, 0, 0f, 0.78f, 0.75f, 0.68f),
+    HIDDEN_PANEL_OPEN("Loose Panel (open)", Shape.LEAF, false, false, false, 1.5f, ToolKind.PICKAXE, false, null, 0, 0, 0f, 0.78f, 0.75f, 0.68f);
 
     /**
      * How a block is meshed. Not persisted: only {@link BlockType} ordinals are

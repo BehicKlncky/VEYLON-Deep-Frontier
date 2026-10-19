@@ -216,6 +216,11 @@ public final class MaterialRegistry {
             // Milestone 13 district hazard: an oily crust with sickly blooms, glossy where it seeps.
             register("contaminated", BlockType.CONTAMINATED_GROUND, "contaminated", "contaminated", "contaminated",
                     2, TintMode.NONE, false, 0f, 0.55f);
+            // Milestone 14 routes: a cutout guard rail, and a loose panel that wears the plaster coat
+            // with a seam, scuffs and, on one layout, a chalk tally.
+            register("railing", BlockType.RAILING, "railing_top", "railing", "railing_top", 1, TintMode.NONE, true, 0f, 0.4f);
+            register("hidden_panel", BlockType.HIDDEN_PANEL, "plaster", "hidden_panel", "plaster", 2, TintMode.NONE, false, 0f, 0.9f);
+            register("hidden_panel_open", BlockType.HIDDEN_PANEL_OPEN, "plaster", "hidden_panel", "plaster", 1, TintMode.NONE, false, 0f, 0.9f);
 
             // Standalone prop tiles used by special shapes (torch flame, campfire, basin water...).
             propTile("torch_head", 1.0f, 0.9f);

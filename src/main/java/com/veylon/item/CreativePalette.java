@@ -114,6 +114,13 @@ public final class CreativePalette {
         excluded.put(BlockType.CONTAMINATED_GROUND,
                 "a district hazard crust planned with its yard or quarantine block; no item"
                         + " carries it, and scraping it away yields nothing");
+        excluded.put(BlockType.RAILING,
+                "a generated guard rail on roof edges, bridges and station stairs; no item carries"
+                        + " it yet, and its salvage belongs to fortification (urban package 18)");
+        excluded.put(BlockType.HIDDEN_PANEL,
+                "a generated loose panel whose hidden cellar and discovery come from its building's"
+                        + " plan; a placed copy would hide nothing");
+        excluded.put(BlockType.HIDDEN_PANEL_OPEN, openHalf);
         EXCLUDED = Collections.unmodifiableMap(excluded);
     }
 

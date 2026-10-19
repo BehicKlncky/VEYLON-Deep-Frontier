@@ -7,6 +7,7 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -21,9 +22,10 @@ class UrbanMaterialsTest {
             "asphalt", "paving", "concrete", "brick", "plaster", "sheet_metal", "rubble",
             "door_wood_lower", "door_wood_upper", "door_metal_lower", "door_metal_upper",
             "stair_tread", "stair_riser", "shelf_side", "shelf_top", "cabinet_front", "cabinet_top",
-            "locker_front", "locker_top", "table_top", "sign_board", "sign_edge", "contaminated");
+            "locker_front", "locker_top", "table_top", "sign_board", "sign_edge", "contaminated",
+            "hidden_panel");
     private static final List<String> CUTOUT_TILES = List.of(
-            "window_glass", "window_broken", "door_broken", "debris");
+            "window_glass", "window_broken", "door_broken", "debris", "railing", "railing_top");
 
     @Test
     void theFullRegistrationFitsTheLayerBudgetWithEveryBlockMaterialised() {
@@ -56,6 +58,34 @@ class UrbanMaterialsTest {
             int[] damaged = ProceduralTextures.generate(tile, 2, MaterialRegistry.TILE_SIZE);
             assertTrue(!java.util.Arrays.equals(clean, damaged), tile + " has a distinct damaged variant");
         }
+    }
+
+    /**
+     * A loose panel has to pass for the plaster wall it sits in from across a room, and still
+     * be a different surface up close: its seam and scuffs change pixels, not the overall coat.
+     */
+    @Test
+    void aLoosePanelWearsThePlasterCoatButIsNotTheSameSurface() {
+        int[] wall = ProceduralTextures.generate("plaster", 0, MaterialRegistry.TILE_SIZE);
+        for (int variant = 0; variant < 2; variant++) {
+            int[] panel = ProceduralTextures.generate("hidden_panel", variant, MaterialRegistry.TILE_SIZE);
+            assertFalse(java.util.Arrays.equals(wall, panel), "the panel shows its seam");
+            float[] a = meanRgb(wall), b = meanRgb(panel);
+            for (int c = 0; c < 3; c++) {
+                assertEquals(a[c], b[c], 14f, "channel " + c + " of panel layout " + variant);
+            }
+        }
+    }
+
+    private static float[] meanRgb(int[] px) {
+        float[] sum = new float[3];
+        for (int p : px) {
+            sum[0] += (p >> 16) & 255;
+            sum[1] += (p >> 8) & 255;
+            sum[2] += p & 255;
+        }
+        for (int c = 0; c < 3; c++) { sum[c] /= px.length; }
+        return sum;
     }
 
     @Test

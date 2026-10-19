@@ -40,6 +40,9 @@ import java.util.Map;
  *       open door or window into its item. Creative removes the block.</li>
  *   <li>Residents shoulder closed, unlocked doors on their path open; those
  *       doors swing shut again by themselves and are saved closed.</li>
+ *   <li>A loose panel over a hidden cellar (milestone 14) reads as wall until the
+ *       player aims at it; F slides it aside like a door, and opening it is the
+ *       moment the cellar is found. Residents never shoulder one open.</li>
  * </ul>
  *
  * <p>Salvage never conjures material: an opening yields at most the one item
@@ -120,12 +123,14 @@ public final class FixtureActions {
         if (kind == null) {
             return null;
         }
-        String noun = kind.door ? "door" : "window";
+        String noun = noun(kind);
         String bar = kind.door ? "bar" : "latch";
         String forceTool = t.requiresTool
                 ? " with a " + t.preferredTool.name().toLowerCase(Locale.ROOT) : "";
         return switch (decide(g, x, y, z)) {
-            case OPEN -> "[F] Open " + noun + "  (crouch: " + bar + " it from this side)";
+            case OPEN -> kind == Fixtures.Kind.HIDDEN_PANEL
+                    ? "[F] Slide the loose panel aside  (crouch: bar it from this side)"
+                    : "[F] Open " + noun + "  (crouch: " + bar + " it from this side)";
             case CLOSE -> "[F] Close " + noun;
             case BLOCKED -> "Something is in the " + (kind.door ? "doorway" : "window");
             case LOCKED -> kind.door
@@ -141,6 +146,11 @@ public final class FixtureActions {
             case FULL -> "This " + noun + " cannot change state: too many fixtures remembered";
             case NONE -> null;
         };
+    }
+
+    /** What the prompt and the log call an opening of this kind. */
+    private static String noun(Fixtures.Kind kind) {
+        return kind == Fixtures.Kind.HIDDEN_PANEL ? "panel" : kind.door ? "door" : "window";
     }
 
     private static String capitalize(String s) {
@@ -163,7 +173,7 @@ public final class FixtureActions {
         int bottom = Fixtures.stackBottom(w, x, y, z, kind);
         int height = Fixtures.stackHeight(w, x, bottom, z, kind);
         float cx = x + 0.5f, cy = bottom + 1f, cz = z + 0.5f;
-        String noun = kind.door ? "door" : "window";
+        String noun = noun(kind);
         switch (decide(g, x, y, z)) {
             case OPEN -> {
                 setOpening(w, x, bottom, z, height, kind, true, FixtureStates.LOCK_NONE);
@@ -414,7 +424,7 @@ public final class FixtureActions {
                 }
             }
             ItemType item = itemOf(kind);
-            return new ItemStack(item, 1);
+            return item == null ? null : new ItemStack(item, 1);
         }
         return t.drop == null || t.dropCount <= 0 ? null : new ItemStack(t.drop, t.dropCount);
     }
@@ -424,6 +434,8 @@ public final class FixtureActions {
             case WOOD_DOOR -> ItemType.WOOD_DOOR;
             case METAL_DOOR -> ItemType.METAL_DOOR;
             case WINDOW -> ItemType.WINDOW;
+            // A loose panel is part of its wall: dismantled, it leaves the doorway and nothing to carry.
+            case HIDDEN_PANEL -> null;
         };
     }
 

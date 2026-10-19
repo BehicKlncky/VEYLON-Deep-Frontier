@@ -44,7 +44,9 @@ class SerializedEnumOrderTest {
             // Milestone 12 frontage signs.
             "SIGN",
             // Milestone 13 district hazard ground.
-            "CONTAMINATED_GROUND");
+            "CONTAMINATED_GROUND",
+            // Milestone 14 guard rails and the loose panel over a hidden cellar, closed and open.
+            "RAILING", "HIDDEN_PANEL", "HIDDEN_PANEL_OPEN");
 
     private static final List<String> ITEM_TYPE_ORDER = List.of(
             "DIRT", "STONE", "SAND", "GRAVEL", "CLAY", "SNOW", "LOG", "PLANK", "WALL", "STICK",
