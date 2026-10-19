@@ -67,6 +67,21 @@ class UrbanSliceRouteTest {
         }
     }
 
+    /**
+     * Generator 13 (milestone 14) keeps that city and starter superblock exactly and adds
+     * transit under its avenues, a station on the spawn region's west edge, and routes between
+     * the other buildings. The development selector now creates it; the loop must still hold.
+     */
+    @Test
+    void theSliceLoopStillCompletesOnTheUndergroundGenerator() {
+        for (long seed : SLICE_SEEDS) {
+            UrbanSliceRun run = new UrbanSliceRun(seed, GameMode.SURVIVAL, World.GEN_URBAN_UNDERGROUND).play();
+            assertTrue(run.slice().passed(), "seed=" + seed);
+            assertEquals(World.GEN_URBAN_UNDERGROUND, run.game.world.generatorVersion);
+            assertTrue(run.game.player.inventory.count(ItemType.IRON_SPEAR) >= 1, "the first upgrade seed=" + seed);
+        }
+    }
+
     @Test
     void frozenSeedsPlayTheScavengeRiskReturnLoopInSurvivalAndCreative() {
         for (GameMode mode : GameMode.values()) {

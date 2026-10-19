@@ -44,6 +44,8 @@ public final class UrbanWorldState {
     public static final int MAX_REGION_PLANS = 16;
     /** Pure building plans only; no fixture or container state lives in this cache. */
     public static final int MAX_BUILDING_PLANS = 256;
+    /** Transit segments of layout ten kept at once; a region reads two, a junction chunk four. */
+    public static final int MAX_TRANSIT_SEGMENTS = 64;
 
     /** Spawn column of the street-datum placeholder (layout revision 1). */
     static final int PLACEHOLDER_SPAWN_X = 8;
@@ -56,6 +58,9 @@ public final class UrbanWorldState {
     private final BoundedPlanCache<Long, DistrictPlan> regionPlans;
     private final int buildingTemplateRevision;
     private final BoundedPlanCache<Long, BuildingPlan> buildingPlans;
+    /** Layout ten: each region's route catalogue, beside its plan. */
+    private final BoundedPlanCache<Long, RouteCatalogue> routeCatalogues;
+    private final BoundedPlanCache<Long, TransitNetwork.Segment> transitSegments;
     private int contentRevision = UNRESOLVED;
     /** Persistent sparse state, separate from evictable pure plan caches. */
     public final UrbanContainers containers = new UrbanContainers();
@@ -73,6 +78,8 @@ public final class UrbanWorldState {
         this.buildingTemplateRevision = UrbanRevision.buildingTemplateRevisionOf(generatorVersion);
         this.regionPlans = hasCityPlan() ? new BoundedPlanCache<>(MAX_REGION_PLANS) : null;
         this.buildingPlans = buildingTemplateRevision == 0 ? null : new BoundedPlanCache<>(MAX_BUILDING_PLANS);
+        this.routeCatalogues = hasUnderground() ? new BoundedPlanCache<>(MAX_REGION_PLANS) : null;
+        this.transitSegments = hasUnderground() ? new BoundedPlanCache<>(MAX_TRANSIT_SEGMENTS) : null;
     }
 
     public int layoutRevision() {
@@ -102,8 +109,13 @@ public final class UrbanWorldState {
      * layout nine, whose district catalogue places them by district.
      */
     public boolean hasCivicCatalogue() { return layoutRevision == UrbanRevision.LAYOUT_CIVIC || hasDistricts(); }
-    /** Layout nine: six districts with overlays, district climates and encounter catalogue three. */
-    public boolean hasDistricts() { return layoutRevision == UrbanRevision.LAYOUT_DISTRICTS; }
+    /**
+     * Six districts with overlays and district climates: layout nine, and layout ten, which
+     * keeps that city exactly and adds its routes.
+     */
+    public boolean hasDistricts() { return layoutRevision == UrbanRevision.LAYOUT_DISTRICTS || hasUnderground(); }
+    /** Layout ten: transit under the boundary avenues and template seven's routes (milestone 14). */
+    public boolean hasUnderground() { return layoutRevision == UrbanRevision.LAYOUT_UNDERGROUND; }
 
     public boolean contentRevisionResolved() {
         return contentRevision != UNRESOLVED;
@@ -157,6 +169,8 @@ public final class UrbanWorldState {
             UrbanBuildingStamper.stamp(chunk, district, this);
             if (hasDistricts()) { UrbanOverlayStamper.stamp(chunk, district); }
             if (hasStarter() && rx == 0 && rz == 0) { UrbanStarterSite.of(this).stamp(chunk); }
+            // Routes come last: tunnels under the avenues, then what buildings declared outside them.
+            if (hasUnderground()) { UrbanRouteStamper.stamp(chunk, district, this); }
         }
     }
 
@@ -189,9 +203,55 @@ public final class UrbanWorldState {
         if (buildingPlans == null) { return null; }
         ParcelPlan parcel = parcelAt(x, z);
         if (parcel == null) { return null; }
-        // Template five chooses each family from the parcel's own (pure, cached) district plan.
-        return buildingPlans.get(UrbanIds.building(parcel.id(), 0),
-                ignored -> BuildingPlanner.plan(seed, buildingTemplateRevision, parcel, planAt(x, z)).plan());
+        // Template five chooses each family from the parcel's own (pure, cached) district plan;
+        // template seven adds the region's routes from its cached catalogue.
+        return buildingPlans.get(UrbanIds.building(parcel.id(), 0), ignored -> hasUnderground()
+                ? BuildingPlanner.planRoutes(seed, parcel, planAt(x, z), routes(StreetNetwork.regionOf(x),
+                        StreetNetwork.regionOf(z))).plan()
+                : BuildingPlanner.plan(seed, buildingTemplateRevision, parcel, planAt(x, z)).plan());
+    }
+
+    /**
+     * The route catalogue of a layout-ten region: its service passages, hidden cellar, fire
+     * escapes and roof connectors. Pure and rebuilt identically after eviction.
+     *
+     * @throws IllegalStateException for a layout without routes
+     */
+    public RouteCatalogue routes(int rx, int rz) {
+        if (!hasUnderground()) { throw new IllegalStateException("layout " + layoutRevision + " has no routes"); }
+        return routeCatalogues.get(UrbanIds.district(rx, rz), ignored -> RouteCatalogue.of(seed, regionPlan(rx, rz)));
+    }
+
+    /** One transit segment of layout ten, planned once and cached; absent beyond the planned city. */
+    public TransitNetwork.Segment segment(boolean northSouth, int line, int index) {
+        if (!hasUnderground()) { throw new IllegalStateException("layout " + layoutRevision + " has no transit"); }
+        return transitSegments.get(TransitNetwork.key(northSouth, line, index),
+                ignored -> TransitNetwork.plan(seed, northSouth, line, index, this::regionPlan));
+    }
+
+    /** The segment a band position belongs to. */
+    public TransitNetwork.Segment segment(TransitNetwork.Band band) {
+        return segment(band.northSouth(), band.line(), band.index());
+    }
+
+    /**
+     * The transit station whose footprint holds a column, or null: only boundary-avenue columns
+     * of a layout-ten world can have one. Reads plans, never chunks.
+     */
+    public TransitStation stationAt(int x, int z) {
+        if (!hasUnderground()) { return null; }
+        for (boolean northSouth : new boolean[]{true, false}) {
+            TransitNetwork.Band band = TransitNetwork.band(northSouth, x, z);
+            if (band == null || !CityPlanner.isPlannable(StreetNetwork.regionOf(x), StreetNetwork.regionOf(z))) { continue; }
+            TransitNetwork.Segment s = segment(band);
+            if (s.present() && s.station().containsColumn(x, z)) { return s.station(); }
+        }
+        return null;
+    }
+
+    /** Route catalogues and transit segments currently cached, for the runtime bounds snapshot. */
+    public int cachedRoutePlans() {
+        return (routeCatalogues == null ? 0 : routeCatalogues.size()) + (transitSegments == null ? 0 : transitSegments.size());
     }
 
     /** Region plans currently cached; never above {@value #MAX_REGION_PLANS}. */

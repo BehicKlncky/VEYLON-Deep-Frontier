@@ -76,7 +76,8 @@ public final class UrbanRevision {
      */
     public static final int BUILDING_TEMPLATE_DISTRICTS = 6;
     /**
-     * Underground and rooftop routes (milestone 14): layout nine's six-district city plan,
+     * Layout of {@link World#GEN_URBAN_UNDERGROUND}, underground and rooftop routes (milestone
+     * 14): layout nine's six-district city plan,
      * unchanged, plus the {@link TransitNetwork} under the boundary avenues and the service
      * passages and roof connectors between buildings.
      */
@@ -100,7 +101,7 @@ public final class UrbanRevision {
     public static final int ABSENT_CONTENT = 1;
 
     /** The urban generator the development selector creates: the newest layout. */
-    public static final int DEVELOPMENT_GENERATOR = World.GEN_URBAN_DISTRICTS;
+    public static final int DEVELOPMENT_GENERATOR = World.GEN_URBAN_UNDERGROUND;
 
     private UrbanRevision() {
     }
@@ -121,6 +122,7 @@ public final class UrbanRevision {
             case World.GEN_URBAN_ENCOUNTERS -> LAYOUT_ENCOUNTERS;
             case World.GEN_URBAN_CIVIC -> LAYOUT_CIVIC;
             case World.GEN_URBAN_DISTRICTS -> LAYOUT_DISTRICTS;
+            case World.GEN_URBAN_UNDERGROUND -> LAYOUT_UNDERGROUND;
             default -> throw new IllegalArgumentException(
                     "generator " + generatorVersion + " is not an urban generator");
         };
@@ -136,6 +138,7 @@ public final class UrbanRevision {
             case World.GEN_URBAN_STARTER, World.GEN_URBAN_ENCOUNTERS -> BUILDING_TEMPLATE_STARTER;
             case World.GEN_URBAN_CIVIC -> BUILDING_TEMPLATE_CIVIC;
             case World.GEN_URBAN_DISTRICTS -> BUILDING_TEMPLATE_DISTRICTS;
+            case World.GEN_URBAN_UNDERGROUND -> BUILDING_TEMPLATE_ROUTES;
             default -> throw new IllegalArgumentException("not an urban generator " + generatorVersion);
         };
     }

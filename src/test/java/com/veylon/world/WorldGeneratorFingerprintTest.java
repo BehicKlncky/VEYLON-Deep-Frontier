@@ -201,6 +201,69 @@ class WorldGeneratorFingerprintTest {
                 + "re-recording:\n  " + String.join("\n  ", moved));
     }
 
+    /**
+     * Generator 13 (milestone 14), recorded 2026-10-19 at introduction: terrain at the pinned
+     * chunks (the spawn junction among them), every building plan of three regions under
+     * template seven, and the routes: transit segments near the spawn with their stations,
+     * three regions' route catalogues and the chunks of the spawn region's station.
+     */
+    private static final long[] URBAN_UNDERGROUND_TERRAIN_FINGERPRINTS = {
+            0xb9036588174436d2L, 0x80223cc179da0afbL, 0xac9d88062169a757L};
+    private static final long[] URBAN_UNDERGROUND_PLAN_FINGERPRINTS = {
+            0xb80763b64ac57e1eL, 0x736ab4750d631341L, 0xfe117dbe676a8e66L};
+    private static final long[] URBAN_UNDERGROUND_ROUTE_FINGERPRINTS = {
+            0x1ef3497d881038faL, 0xe3ff041873124fd6L, 0x81faa688c0675baeL};
+
+    @Test
+    void theUndergroundAndRooftopRoutesKeepTheirRecordedBlocksAndPlans() {
+        List<String> moved = new ArrayList<>();
+        for (int i = 0; i < SEEDS.length; i++) {
+            long terrain = terrainFingerprint(SEEDS[i], World.GEN_URBAN_UNDERGROUND);
+            long plans = buildingPlanFingerprint(SEEDS[i], World.GEN_URBAN_UNDERGROUND);
+            long routes = routeFingerprint(SEEDS[i]);
+            if (terrain != URBAN_UNDERGROUND_TERRAIN_FINGERPRINTS[i] || plans != URBAN_UNDERGROUND_PLAN_FINGERPRINTS[i]
+                    || routes != URBAN_UNDERGROUND_ROUTE_FINGERPRINTS[i]) {
+                moved.add(String.format("seed %d: terrain 0x%016xL, plans 0x%016xL, routes 0x%016xL",
+                        SEEDS[i], terrain, plans, routes));
+            }
+        }
+        assertTrue(moved.isEmpty(), () -> "generator 13 changed; add a generator version instead of "
+                + "re-recording:\n  " + String.join("\n  ", moved));
+    }
+
+    /** Transit segments around the spawn, three route catalogues and the spawn station's chunks. */
+    private static long routeFingerprint(long seed) {
+        World world = new World(seed, World.GEN_URBAN_UNDERGROUND);
+        long hash = 0xcbf29ce484222325L;
+        for (int line = -2; line <= 2; line += 2) {
+            for (int index = -1; index <= 1; index++) {
+                for (boolean ns : new boolean[]{true, false}) {
+                    var s = world.urban.segment(ns, line, index);
+                    hash = mix(hash, (s.present() ? 1 : 0) | (s.flooded() ? 2 : 0) | (s.plugLow() ? 4 : 0) | (s.plugHigh() ? 8 : 0));
+                    for (int m : s.mounds()) { hash = mix(hash, m); }
+                    if (s.present()) {
+                        hash = mix(hash, s.station().id());
+                        hash = mix(hash, s.station().start());
+                        hash = mix(hash, com.veylon.world.urban.BuildingPlanDiagnostics.fingerprint(s.station().plan()));
+                    }
+                }
+            }
+        }
+        for (int[] region : new int[][]{{0, 0}, {-1, -1}, {1, -1}}) {
+            var routes = world.urban.routes(region[0], region[1]);
+            hash = mix(hash, routes.corridors().toString().hashCode());
+            hash = mix(hash, routes.fireEscapes().toString().hashCode());
+            hash = mix(hash, routes.connectors().toString().hashCode());
+            hash = mix(hash, routes.hiddenCellar());
+        }
+        var top = world.urban.segment(true, 0, 0).station().plan().approaches().getFirst();
+        for (int dz = -2; dz <= 0; dz++) {
+            hash = mix(hash, hashChunk(world.getOrCreateChunk(Math.floorDiv(top.x(), Chunk.SX),
+                    Math.floorDiv(top.z(), Chunk.SZ) + dz)));
+        }
+        return hash;
+    }
+
     /** The first region of each district near the spawn: rasters, first plans, two chunks. */
     private static long districtFingerprint(long seed) {
         World world = new World(seed, World.GEN_URBAN_DISTRICTS);
