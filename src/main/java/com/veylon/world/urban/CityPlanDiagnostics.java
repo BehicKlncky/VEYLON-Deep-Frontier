@@ -9,15 +9,17 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * Bounded checks of a district plan against the rules of layout revision 2,
- * for tests, QA scenes and logs.
+ * Bounded checks of a district plan against the rules of layout revisions 2
+ * and 9, for tests, QA scenes and logs.
  *
  * <p>Each report covers one region: its seed and district, cell counts per kind
- * of space, and four violation counters — overlaps (a cell two plan elements
+ * of space, and five violation counters — overlaps (a cell two plan elements
  * wanted, or one left unassigned), parcel rules (sizes, counts, ids,
  * entrances, stair cores, storeys), routes (a parcel covering a reserved
- * route, open ground unreachable from the street) and seams (a border column
- * that does not mirror its neighbour). Work is fixed per region and the
+ * route, open ground unreachable from the street around solid overlays),
+ * seams (a border column that does not mirror its neighbour) and, in layout
+ * 9, overlay rules (an overlay too near a parcel, on the wrong surface, or a
+ * cordon side without a checkpoint). Work is fixed per region and the
  * message list keeps only the first {@value #MAX_MESSAGES}; the counters keep
  * the true totals.
  */
@@ -31,24 +33,26 @@ public final class CityPlanDiagnostics {
     /** One region's result. {@link #ok()} is true when every violation counter is zero. */
     public record Report(long seed, int layoutRevision, int rx, int rz, UrbanDistrict district,
                          int streetCells, int routeCells, int parcelCells, int openCells,
-                         int parcels, int courtyards, int shopRows, int parks, int plazas, int trees,
-                         int overlapViolations, int parcelViolations, int routeViolations,
-                         int seamViolations, int seamsChecked, List<String> messages, int droppedMessages) {
+                         int parcels, int courtyards, int shopRows, int parks, int plazas, int canals, int yards,
+                         int trees, int overlayCells, int overlapViolations, int parcelViolations,
+                         int routeViolations, int seamViolations, int overlayViolations, int seamsChecked,
+                         List<String> messages, int droppedMessages) {
 
         public boolean ok() {
             return overlapViolations == 0 && parcelViolations == 0 && routeViolations == 0
-                    && seamViolations == 0;
+                    && seamViolations == 0 && overlayViolations == 0;
         }
 
         /** One log line. */
         public String summary() {
             return String.format(Locale.ROOT, "region=%d,%d seed=%d layout=%d district=%s"
                             + " streets=%d routes=%d parcelCells=%d open=%d parcels=%d courtyards=%d"
-                            + " shopRows=%d parks=%d plazas=%d trees=%d overlaps=%d parcelRules=%d"
-                            + " routeRules=%d seams=%d/%d ok=%s",
+                            + " shopRows=%d parks=%d plazas=%d canals=%d yards=%d trees=%d overlays=%d"
+                            + " overlaps=%d parcelRules=%d routeRules=%d seams=%d/%d overlayRules=%d ok=%s",
                     rx, rz, seed, layoutRevision, district.id, streetCells, routeCells, parcelCells,
-                    openCells, parcels, courtyards, shopRows, parks, plazas, trees, overlapViolations,
-                    parcelViolations, routeViolations, seamViolations, seamsChecked, ok());
+                    openCells, parcels, courtyards, shopRows, parks, plazas, canals, yards, trees, overlayCells,
+                    overlapViolations, parcelViolations, routeViolations, seamViolations, seamsChecked,
+                    overlayViolations, ok());
         }
     }
 
@@ -75,6 +79,7 @@ public final class CityPlanDiagnostics {
         c.countCells();
         c.checkParcels();
         c.checkRoutes();
+        c.checkOverlays();
         c.seam(west, -1, 0);
         c.seam(east, 1, 0);
         c.seam(north, 0, -1);
@@ -132,6 +137,8 @@ public final class CityPlanDiagnostics {
         int routeRules;
         int seams;
         int seamsChecked;
+        int overlayCells;
+        int overlayRules;
 
         Collector(DistrictPlan plan) {
             this.plan = plan;
@@ -267,9 +274,16 @@ public final class CityPlanDiagnostics {
             }
         }
 
+        /** Open to walk on: a public surface without a solid overlay (fence or keg) on it. */
+        boolean walkable(int lx, int lz) {
+            int x = plan.originX() + lx;
+            int z = plan.originZ() + lz;
+            return plan.surfaceAt(x, z).publicWalkable && !plan.overlayAt(x, z).blocksWalking;
+        }
+
         /**
          * Every walkable cell of the region must be reachable from its streets
-         * without crossing a parcel or a tree bed.
+         * without crossing a parcel, a tree bed or a solid overlay.
          */
         void checkRoutes() {
             int size = StreetNetwork.REGION_SIZE;
@@ -277,7 +291,7 @@ public final class CityPlanDiagnostics {
             ArrayDeque<int[]> queue = new ArrayDeque<>();
             for (int lz = 0; lz < size; lz++) {
                 for (int lx = 0; lx < size; lx++) {
-                    if (plan.surfaceAt(plan.originX() + lx, plan.originZ() + lz).street) {
+                    if (plan.surfaceAt(plan.originX() + lx, plan.originZ() + lz).street && walkable(lx, lz)) {
                         seen[lz * size + lx] = true;
                         queue.add(new int[]{lx, lz});
                     }
@@ -292,7 +306,7 @@ public final class CityPlanDiagnostics {
                     if (lx < 0 || lz < 0 || lx >= size || lz >= size || seen[lz * size + lx]) {
                         continue;
                     }
-                    if (plan.surfaceAt(plan.originX() + lx, plan.originZ() + lz).publicWalkable) {
+                    if (walkable(lx, lz)) {
                         seen[lz * size + lx] = true;
                         queue.add(new int[]{lx, lz});
                     }
@@ -301,8 +315,7 @@ public final class CityPlanDiagnostics {
             int unreachable = 0;
             for (int lz = 0; lz < size; lz++) {
                 for (int lx = 0; lx < size; lx++) {
-                    UrbanSurface s = plan.surfaceAt(plan.originX() + lx, plan.originZ() + lz);
-                    if (s.publicWalkable && !seen[lz * size + lx]) {
+                    if (walkable(lx, lz) && !seen[lz * size + lx]) {
                         unreachable++;
                     }
                 }
@@ -317,6 +330,103 @@ public final class CityPlanDiagnostics {
                     note("tree at %d,%d is not on a tree bed", tree.x(), tree.z());
                 }
             }
+        }
+
+        /**
+         * Layout-nine overlays keep the A9 rules ({@link DistrictOverlays}): each stands at least
+         * two cells from every parcel and outside the starter superblock, on a surface its kind
+         * allows, with no water, duckboard or contamination in an avenue band; and every fenced
+         * side of a quarantine cordon has a checkpoint.
+         */
+        void checkOverlays() {
+            if (!plan.hasOverlays()) {
+                return;
+            }
+            int size = StreetNetwork.REGION_SIZE;
+            boolean[] nearParcel = new boolean[size * size];
+            int reach = DistrictOverlays.PARCEL_CLEARANCE - 1;
+            for (int lz = 0; lz < size; lz++) {
+                for (int lx = 0; lx < size; lx++) {
+                    if (plan.parcelIndexAt(plan.originX() + lx, plan.originZ() + lz) == DistrictPlan.NO_PARCEL) {
+                        continue;
+                    }
+                    for (int dz = -reach; dz <= reach; dz++) {
+                        for (int dx = -reach; dx <= reach; dx++) {
+                            int x = lx + dx;
+                            int z = lz + dz;
+                            if (x >= 0 && z >= 0 && x < size && z < size) {
+                                nearParcel[z * size + x] = true;
+                            }
+                        }
+                    }
+                }
+            }
+            Rect starter = plan.rx == 0 && plan.rz == 0
+                    ? plan.superblock(CityPlanner.STARTER_BLOCK).bounds() : null;
+            boolean[] fencedSide = new boolean[4];
+            int[] checkpoints = new int[4];
+            for (int lz = 0; lz < size; lz++) {
+                for (int lx = 0; lx < size; lx++) {
+                    int x = plan.originX() + lx;
+                    int z = plan.originZ() + lz;
+                    UrbanOverlay o = plan.overlayAt(x, z);
+                    if (o == UrbanOverlay.NONE) {
+                        continue;
+                    }
+                    overlayCells++;
+                    UrbanSurface s = plan.surfaceAt(x, z);
+                    if (nearParcel[lz * size + lx]) {
+                        overlayRule("%s at %d,%d is inside a parcel's clearance", o, x, z);
+                    } else if (starter != null && starter.contains(x, z)) {
+                        overlayRule("%s at %d,%d is in the starter superblock", o, x, z);
+                    } else if (!fits(o, s, lx, lz)) {
+                        overlayRule("%s on %s at %d,%d in a %s district", o, s, x, z, plan.district.id);
+                    }
+                    if ((o == UrbanOverlay.FENCE || o == UrbanOverlay.CHECKPOINT) && s.street) {
+                        // A corner closes two sides at once and belongs to neither.
+                        boolean alongX = lx > 0 && lx < size - 1;
+                        boolean alongZ = lz > 0 && lz < size - 1;
+                        int side = lz == 0 && alongX ? 0 : lz == size - 1 && alongX ? 1
+                                : lx == 0 && alongZ ? 2 : lx == size - 1 && alongZ ? 3 : -1;
+                        if (side >= 0) {
+                            fencedSide[side] = true;
+                            checkpoints[side] += o == UrbanOverlay.CHECKPOINT ? 1 : 0;
+                        }
+                    }
+                }
+            }
+            for (int side = 0; side < 4; side++) {
+                if (fencedSide[side] && checkpoints[side] == 0) {
+                    overlayRule("cordon side %d has no checkpoint", side);
+                }
+            }
+        }
+
+        boolean fits(UrbanOverlay o, UrbanSurface s, int lx, int lz) {
+            boolean avenue = DistrictOverlays.inAvenueBand(lx, lz);
+            boolean roadway = s == UrbanSurface.ROADWAY || s == UrbanSurface.LANE_MARK || s == UrbanSurface.CROSSWALK;
+            boolean fencedSquare = s == UrbanSurface.PLAZA
+                    && (plan.district == UrbanDistrict.CIVIC || plan.district == UrbanDistrict.QUARANTINE);
+            int last = StreetNetwork.REGION_SIZE - 1;
+            boolean boundary = lx == 0 || lz == 0 || lx == last || lz == last;
+            return switch (o) {
+                case NONE -> true;
+                case STANDING_WATER -> plan.district == UrbanDistrict.FLOODED && !avenue
+                        && (roadway || s == UrbanSurface.COURTYARD);
+                case DUCKBOARD -> plan.district == UrbanDistrict.FLOODED && !avenue && roadway;
+                case FENCE, CHECKPOINT -> fencedSquare || s == UrbanSurface.YARD
+                        || plan.district == UrbanDistrict.QUARANTINE && s.street && boundary;
+                case CONTAMINATED -> !avenue && (roadway || s == UrbanSurface.COURTYARD || s == UrbanSurface.PARK
+                        || s == UrbanSurface.PLAZA || s == UrbanSurface.YARD);
+                case OVERGROWN -> s == UrbanSurface.SIDEWALK;
+                case PLANTS -> s == UrbanSurface.COURTYARD || s == UrbanSurface.PARK || s == UrbanSurface.MEDIAN;
+                case KEG -> s == UrbanSurface.YARD;
+            };
+        }
+
+        void overlayRule(String format, Object... args) {
+            overlayRules++;
+            note(format, args);
         }
 
         void seam(DistrictPlan other, int dx, int dz) {
@@ -341,22 +451,30 @@ public final class CityPlanDiagnostics {
             int shopRows = 0;
             int parks = 0;
             int plazas = 0;
+            int canals = 0;
+            int yards = 0;
             for (SuperblockPlan block : plan.superblocks()) {
                 switch (block.kind()) {
                     case COURTYARD_HOUSING -> courtyards++;
                     case SHOP_ROW -> shopRows++;
                     case PARK -> parks++;
                     case PLAZA -> plazas++;
+                    case CANAL -> canals++;
+                    case YARD -> yards++;
                 }
             }
-            if (parks + plazas > 1 + plan.fallbackSuperblocks()) {
+            // Layout two keeps one park or plaza; a layout-nine district has at most two open
+            // superblocks of its own (canals, yards, or a square and a park).
+            int open = parks + plazas + canals + yards;
+            int limit = (plan.hasOverlays() ? 2 : 1) + plan.fallbackSuperblocks();
+            if (open > limit) {
                 parcelRules++;
-                note("%d parks and plazas; a region has at most one", parks + plazas);
+                note("%d open superblocks; this layout allows %d", open, limit);
             }
             return new Report(plan.seed, plan.layoutRevision, plan.rx, plan.rz, plan.district,
                     streetCells, routeCells, parcelCells, openCells, parcels, courtyards, shopRows, parks,
-                    plazas, plan.trees().size(), overlaps, parcelRules, routeRules, seams, seamsChecked,
-                    List.copyOf(messages), dropped);
+                    plazas, canals, yards, plan.trees().size(), overlayCells, overlaps, parcelRules, routeRules,
+                    seams, overlayRules, seamsChecked, List.copyOf(messages), dropped);
         }
     }
 }

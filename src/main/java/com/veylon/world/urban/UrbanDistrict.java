@@ -12,8 +12,8 @@ import java.util.Locale;
  * are append-only.
  *
  * <p>Layout revision 2 plans only {@link #RESIDENTIAL} and {@link #COMMERCIAL}
- * regions. The other four are defined here so later packages specialise them
- * under their own generator versions without renumbering.
+ * regions. Layout revision 9 (milestone 13) plans all six through
+ * {@link DistrictMap}.
  */
 public enum UrbanDistrict {
     /** Reclaimed residential: walk-ups around courtyards, corner shops; the starter district. */

@@ -4,8 +4,9 @@ import java.util.List;
 
 /**
  * The plan of one planning region: its district identity, street lattice,
- * superblocks, reserved parcels, planned trees and, for region (0, 0), the
- * starter refuge and spawn anchor.
+ * superblocks, reserved parcels, planned trees, for region (0, 0) the starter
+ * refuge and spawn anchor, and in layout revision 9 its district overlays
+ * ({@link UrbanOverlay}).
  *
  * <p>Built by {@link CityPlanner} as a pure function of (seed, layout revision,
  * rx, rz) and immutable afterwards, so it can be dropped from a cache and
@@ -44,11 +45,22 @@ public final class DistrictPlan {
     private final int[] spawnAnchor;
     private final int overlapConflicts;
     private final int fallbackSuperblocks;
+    /** District overlays of layout revision 9; null for earlier layouts, which have none. */
+    private final byte[] overlay;
 
     DistrictPlan(long seed, int layoutRevision, int rx, int rz, UrbanDistrict district,
                  int[] northSouthLines, int[] eastWestLines, List<SuperblockPlan> superblocks,
                  List<ParcelPlan> parcels, List<Tree> trees, byte[] surface, byte[] parcelIndex,
                  ParcelPlan refuge, int[] spawnAnchor, int overlapConflicts, int fallbackSuperblocks) {
+        this(seed, layoutRevision, rx, rz, district, northSouthLines, eastWestLines, superblocks, parcels,
+                trees, surface, parcelIndex, refuge, spawnAnchor, overlapConflicts, fallbackSuperblocks, null);
+    }
+
+    DistrictPlan(long seed, int layoutRevision, int rx, int rz, UrbanDistrict district,
+                 int[] northSouthLines, int[] eastWestLines, List<SuperblockPlan> superblocks,
+                 List<ParcelPlan> parcels, List<Tree> trees, byte[] surface, byte[] parcelIndex,
+                 ParcelPlan refuge, int[] spawnAnchor, int overlapConflicts, int fallbackSuperblocks,
+                 byte[] overlay) {
         this.seed = seed;
         this.layoutRevision = layoutRevision;
         this.rx = rx;
@@ -70,6 +82,23 @@ public final class DistrictPlan {
         this.spawnAnchor = spawnAnchor == null ? null : spawnAnchor.clone();
         this.overlapConflicts = overlapConflicts;
         this.fallbackSuperblocks = fallbackSuperblocks;
+        this.overlay = overlay;
+    }
+
+    /** True for a layout-9 plan, whose district overlays are planned with it. */
+    public boolean hasOverlays() {
+        return overlay != null;
+    }
+
+    /**
+     * The district overlay on a column of this region; {@link UrbanOverlay#NONE} everywhere in
+     * layouts without overlays.
+     *
+     * @throws IllegalArgumentException for a column of another region
+     */
+    public UrbanOverlay overlayAt(int x, int z) {
+        int c = cell(x, z);
+        return overlay == null ? UrbanOverlay.NONE : UrbanOverlay.fromCode(overlay[c]);
     }
 
     public int originX() {

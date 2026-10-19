@@ -22,8 +22,15 @@ public record SuperblockPlan(int index, int i, int j, Kind kind,
         SHOP_ROW,
         /** Lawn, crossing paths and trees; at most one park or plaza per region. */
         PARK,
-        /** A paved square with planted trees; commercial districts only. */
-        PLAZA
+        /** A paved square with planted trees; commercial, civic and quarantine districts. */
+        PLAZA,
+        /**
+         * A flooded district's canal basin (layout revision 9): two-deep water crossed by a
+         * causeway from each of its four streets.
+         */
+        CANAL,
+        /** An industrial district's fenced, paved yard (layout revision 9). */
+        YARD
     }
 
     public int width() {

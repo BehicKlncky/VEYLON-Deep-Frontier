@@ -23,8 +23,8 @@ import java.util.List;
  *
  * <ul>
  *   <li>A district identity: region (0, 0) is residential, every other region
- *       residential or commercial (the other four identities arrive in package
- *       13, under their own generator).</li>
+ *       residential or commercial. Layout revision 9 ({@link #planDistricts})
+ *       draws all six identities from {@link DistrictMap} on the same lattice.</li>
  *   <li>The street lattice of {@link StreetNetwork}.</li>
  *   <li>Sixteen superblocks. Residential regions are courtyard housing, with at
  *       most one park and possibly one shop row; commercial regions are shop
@@ -93,6 +93,26 @@ public final class CityPlanner {
     }
 
     /**
+     * Layout revision 9: the six districts of {@link DistrictMap} (milestone 13). The street
+     * lattice, subdivisions and starter constraints keep {@link #planStarter}'s layout-two
+     * inputs, so a residential or commercial region is planned by exactly the layout-two rules
+     * for its district; industrial, flooded, civic and quarantine regions choose their own
+     * superblocks, uses and storeys with layout-nine salts. Every region also gets its
+     * {@link UrbanOverlay} raster.
+     *
+     * @throws IllegalArgumentException for a region urban ids cannot name
+     */
+    public static DistrictPlan planDistricts(long seed, int rx, int rz) {
+        if (!isPlannable(rx, rz)) {
+            throw new IllegalArgumentException("region " + rx + "," + rz + " is outside the planned city");
+        }
+        Builder builder = new Builder(seed, UrbanRevision.LAYOUT_STREET_NETWORK, rx, rz,
+                DistrictMap.districtOf(seed, rx, rz), UrbanRevision.LAYOUT_DISTRICTS);
+        builder.starterRules = true;
+        return builder.build();
+    }
+
+    /**
      * True when urban ids can name every parcel of the region. Beyond about
      * 33.5 million blocks from the origin the city is the flat street datum,
      * far past where float positions stay usable.
@@ -118,6 +138,9 @@ public final class CityPlanner {
      *         network, or a region urban ids cannot name
      */
     public static DistrictPlan plan(long seed, int layoutRevision, int rx, int rz) {
+        if (layoutRevision == UrbanRevision.LAYOUT_DISTRICTS) {
+            return planDistricts(seed, rx, rz);
+        }
         if (layoutRevision != UrbanRevision.LAYOUT_STREET_NETWORK) {
             throw new IllegalArgumentException("layout revision " + layoutRevision
                     + " has no city plan");
@@ -228,7 +251,10 @@ public final class CityPlanner {
 
     private static final class Builder {
         final long seed;
+        /** Hash revision of the street lattice and subdivisions: layout two in every layout. */
         final int rev;
+        /** The layout revision the plan records: two, or nine for the six districts. */
+        final int layout;
         final int rx;
         final int rz;
         final int ox;
@@ -238,6 +264,9 @@ public final class CityPlanner {
         boolean starterRules;
         final int[] northSouth = new int[3];
         final int[] eastWest = new int[3];
+        /** Band parts of every column and row, kept for the district overlays. */
+        final int[] northSouthParts = new int[StreetNetwork.REGION_SIZE];
+        final int[] eastWestParts = new int[StreetNetwork.REGION_SIZE];
         final byte[] surface = new byte[StreetNetwork.REGION_SIZE * StreetNetwork.REGION_SIZE];
         final byte[] parcelIndex = new byte[surface.length];
         final List<SuperblockPlan> superblocks = new ArrayList<>();
@@ -249,15 +278,26 @@ public final class CityPlanner {
         int fallbacks;
 
         Builder(long seed, int rev, int rx, int rz) {
+            this(seed, rev, rx, rz, districtOf(seed, rev, rx, rz), rev);
+        }
+
+        Builder(long seed, int rev, int rx, int rz, UrbanDistrict district, int layout) {
             this.seed = seed;
             this.rev = rev;
+            this.layout = layout;
             this.rx = rx;
             this.rz = rz;
             this.ox = StreetNetwork.regionOrigin(rx);
             this.oz = StreetNetwork.regionOrigin(rz);
-            this.district = districtOf(seed, rev, rx, rz);
+            this.district = district;
             this.starter = rx == 0 && rz == 0;
             Arrays.fill(parcelIndex, (byte) DistrictPlan.NO_PARCEL);
+        }
+
+        /** True for the four districts layout nine adds, which plan by their own rules. */
+        boolean newDistrict() {
+            return layout == UrbanRevision.LAYOUT_DISTRICTS && district != UrbanDistrict.RESIDENTIAL
+                    && district != UrbanDistrict.COMMERCIAL;
         }
 
         DistrictPlan build() {
@@ -303,16 +343,17 @@ public final class CityPlanner {
                 Entrance door = refuge.entrances().get(1);
                 anchor = new int[]{door.outsideX(), door.outsideZ()};
             }
-            return new DistrictPlan(seed, rev, rx, rz, district, northSouth, eastWest, superblocks,
-                    parcels, trees, surface, parcelIndex, refuge, anchor, conflicts, fallbacks);
+            byte[] overlay = layout == UrbanRevision.LAYOUT_DISTRICTS
+                    ? new DistrictOverlays(seed, rx, rz, district, surface, parcelIndex, northSouthParts,
+                            eastWestParts, superblocks).plan() : null;
+            return new DistrictPlan(seed, layout, rx, rz, district, northSouth, eastWest, superblocks,
+                    parcels, trees, surface, parcelIndex, refuge, anchor, conflicts, fallbacks, overlay);
         }
 
         // ---- streets ------------------------------------------------------
 
         void stampStreets() {
             int size = StreetNetwork.REGION_SIZE;
-            int[] northSouthParts = new int[size];
-            int[] eastWestParts = new int[size];
             for (int l = 0; l < size; l++) {
                 northSouthParts[l] = StreetNetwork.bandPart(seed, rev, true, ox + l, rz);
                 eastWestParts[l] = StreetNetwork.bandPart(seed, rev, false, oz + l, rx);
@@ -339,6 +380,9 @@ public final class CityPlanner {
                     free.add(s);
                 }
             }
+            if (newDistrict()) {
+                return districtKinds(free);
+            }
             if (district == UrbanDistrict.COMMERCIAL) {
                 Arrays.fill(kinds, Kind.SHOP_ROW);
                 for (int n = 0; n < COMMERCIAL_HOUSING_BLOCKS; n++) {
@@ -360,6 +404,78 @@ public final class CityPlanner {
                 kinds[STARTER_BLOCK] = Kind.COURTYARD_HOUSING;
             }
             return kinds;
+        }
+
+        /**
+         * Superblocks of the four districts layout nine adds (never the starter region):
+         * <ul>
+         *   <li>industrial: depot rows (two rows of deep lots back to back along a service road),
+         *       two or three blocks of workers' housing and one or two fenced yards;</li>
+         *   <li>flooded: low courtyard housing around one or two canal basins, sometimes a shop
+         *       row;</li>
+         *   <li>civic: courtyard blocks for schools, clinics and security posts, four rows of
+         *       offices and clinics, a fenced square and sometimes a park;</li>
+         *   <li>quarantine: cordoned courtyard housing, three rows of field clinics and posts and
+         *       usually a fenced square.</li>
+         * </ul>
+         */
+        Kind[] districtKinds(List<Integer> free) {
+            Kind[] kinds = new Kind[StreetNetwork.SUPERBLOCKS_PER_SIDE * StreetNetwork.SUPERBLOCKS_PER_SIDE];
+            switch (district) {
+                case INDUSTRIAL -> {
+                    Arrays.fill(kinds, Kind.SHOP_ROW);
+                    int housing = 2 + (districtRoll(0) < 0.5 ? 1 : 0);
+                    for (int n = 0; n < housing; n++) {
+                        kinds[districtTake(free, n)] = Kind.COURTYARD_HOUSING;
+                    }
+                    kinds[districtTake(free, 10)] = Kind.YARD;
+                    if (districtRoll(1) < 0.4) {
+                        kinds[districtTake(free, 11)] = Kind.YARD;
+                    }
+                }
+                case FLOODED -> {
+                    Arrays.fill(kinds, Kind.COURTYARD_HOUSING);
+                    kinds[districtTake(free, 10)] = Kind.CANAL;
+                    if (districtRoll(1) < 0.4) {
+                        kinds[districtTake(free, 11)] = Kind.CANAL;
+                    }
+                    if (districtRoll(2) < 0.3) {
+                        kinds[districtTake(free, 12)] = Kind.SHOP_ROW;
+                    }
+                }
+                case CIVIC -> {
+                    Arrays.fill(kinds, Kind.COURTYARD_HOUSING);
+                    for (int n = 0; n < 4; n++) {
+                        kinds[districtTake(free, n)] = Kind.SHOP_ROW;
+                    }
+                    kinds[districtTake(free, 10)] = Kind.PLAZA;
+                    if (districtRoll(1) < 0.4) {
+                        kinds[districtTake(free, 11)] = Kind.PARK;
+                    }
+                }
+                case QUARANTINE -> {
+                    Arrays.fill(kinds, Kind.COURTYARD_HOUSING);
+                    for (int n = 0; n < 3; n++) {
+                        kinds[districtTake(free, n)] = Kind.SHOP_ROW;
+                    }
+                    if (districtRoll(1) < 0.6) {
+                        kinds[districtTake(free, 10)] = Kind.PLAZA;
+                    }
+                }
+                case RESIDENTIAL, COMMERCIAL -> throw new IllegalStateException(district + " keeps layout two");
+            }
+            return kinds;
+        }
+
+        /** A layout-nine draw for this region's district decisions. */
+        double districtRoll(long key) {
+            return UrbanHash.unit(seed, layout, UrbanSalts.DISTRICT_KINDS, rx, rz, key);
+        }
+
+        int districtTake(List<Integer> free, int attempt) {
+            int pick = UrbanHash.range(0, free.size() - 1, seed, layout, UrbanSalts.DISTRICT_KINDS, rx, rz,
+                    100 + attempt);
+            return free.remove(pick);
         }
 
         /** Removes and returns one deterministic pick from the remaining superblocks. */
@@ -392,7 +508,7 @@ public final class CityPlanner {
             Rect open = switch (kind) {
                 case COURTYARD_HOUSING -> layoutCourtyard(index, bounds);
                 case SHOP_ROW -> layoutShopRow(index, bounds);
-                case PARK, PLAZA -> null;
+                case PARK, PLAZA, CANAL, YARD -> null;
             };
             if (open == null && (kind == Kind.COURTYARD_HOUSING || kind == Kind.SHOP_ROW)) {
                 // Finite fallback (rule A10): no subdivision fitted, so the block stays open.
@@ -405,6 +521,12 @@ public final class CityPlanner {
             } else if (kind == Kind.PLAZA) {
                 open = bounds;
                 layoutPlaza(bounds);
+            } else if (kind == Kind.CANAL) {
+                open = bounds;
+                openSpaces.add(new Area(bounds, UrbanSurface.CANAL));
+            } else if (kind == Kind.YARD) {
+                open = bounds;
+                openSpaces.add(new Area(bounds, UrbanSurface.YARD));
             }
             superblocks.add(new SuperblockPlan(index, i, j, kind, bounds, open));
         }
@@ -563,7 +685,40 @@ public final class CityPlanner {
 
         // ---- uses, storeys and entrances -------------------------------------
 
+        /**
+         * Uses of the four layout-nine districts. Shop and depot rows hold the specialist lots:
+         * industrial depot lots are service reservations (warehouses) apart from one in four
+         * commercial lots; elsewhere shop rows are commercial. Courtyard corners become shops
+         * at a district's own rate, and outside the industrial district one more parcel is the
+         * region's service reservation, as in layout two.
+         */
+        void districtUses() {
+            double cornerShare = switch (district) {
+                case CIVIC -> 0.3;
+                case QUARANTINE -> 0.1;
+                default -> 0.2;
+            };
+            List<Draft> candidates = new ArrayList<>();
+            for (Draft draft : drafts) {
+                double roll = UrbanHash.unit(seed, layout, UrbanSalts.DISTRICT_USES, rx, rz, draft.index());
+                if (superblockKind(draft.superblock) == Kind.SHOP_ROW) {
+                    draft.use = district == UrbanDistrict.INDUSTRIAL && roll >= 0.25 ? Use.SERVICE : Use.COMMERCIAL;
+                } else if (draft.slot <= SLOT_SOUTH_EAST && roll < cornerShare) {
+                    draft.use = Use.COMMERCIAL;
+                }
+                candidates.add(draft);
+            }
+            if (district != UrbanDistrict.INDUSTRIAL && !candidates.isEmpty()) {
+                candidates.get(UrbanHash.range(0, candidates.size() - 1, seed, layout, UrbanSalts.DISTRICT_USES,
+                        rx, rz, 1000)).use = Use.SERVICE;
+            }
+        }
+
         void assignUses() {
+            if (newDistrict()) {
+                districtUses();
+                return;
+            }
             double cornerShare = district == UrbanDistrict.COMMERCIAL
                     ? COMMERCIAL_CORNER_SHOP_SHARE : RESIDENTIAL_CORNER_SHOP_SHARE;
             List<Draft> serviceCandidates = new ArrayList<>();
@@ -643,6 +798,20 @@ public final class CityPlanner {
             if (starterRules && starter && draft.superblock == STARTER_BLOCK
                     && draft.use == Use.RESIDENTIAL) { return 3; }
             long key = draft.index();
+            if (newDistrict()) {
+                // Flooded and industrial blocks stay low; civic and quarantine rows rise to five.
+                int[] range = switch (draft.use) {
+                    case RESIDENTIAL -> district == UrbanDistrict.CIVIC || district == UrbanDistrict.QUARANTINE
+                            ? new int[]{2, 5} : new int[]{2, 4};
+                    case COMMERCIAL -> switch (district) {
+                        case CIVIC -> new int[]{2, 5};
+                        case FLOODED -> new int[]{1, 2};
+                        default -> new int[]{1, 3};
+                    };
+                    case SERVICE, REFUGE -> new int[]{1, 2};
+                };
+                return UrbanHash.range(range[0], range[1], seed, layout, UrbanSalts.DISTRICT_STOREYS, rx, rz, key);
+            }
             boolean downtown = district == UrbanDistrict.COMMERCIAL;
             return switch (draft.use) {
                 case RESIDENTIAL -> pick(downtown ? 3 : 2, 5, UrbanSalts.STOREYS, key);
@@ -720,15 +889,18 @@ public final class CityPlanner {
                                 DistrictPlan.NO_PARCEL);
                     }
                 }
-            } else if (open.surface() == UrbanSurface.PARK) {
+            } else if (open.surface() == UrbanSurface.PARK || open.surface() == UrbanSurface.CANAL) {
+                // A canal basin has the park's cross and central square, as causeways over water.
+                boolean canal = open.surface() == UrbanSurface.CANAL;
                 int cx = (r.x0() + r.x1() + 1) / 2;
                 int cz = (r.z0() + r.z1() + 1) / 2;
                 for (int z = r.z0(); z <= r.z1(); z++) {
                     for (int x = r.x0(); x <= r.x1(); x++) {
                         boolean path = x == cx - 1 || x == cx || z == cz - 1 || z == cz
                                 || (Math.abs(x - cx + 0.5) < 3 && Math.abs(z - cz + 0.5) < 3);
-                        claim(x, z, path ? UrbanSurface.PARK_PATH : UrbanSurface.PARK,
-                                DistrictPlan.NO_PARCEL);
+                        UrbanSurface kind = canal ? (path ? UrbanSurface.BRIDGE : UrbanSurface.CANAL)
+                                : (path ? UrbanSurface.PARK_PATH : UrbanSurface.PARK);
+                        claim(x, z, kind, DistrictPlan.NO_PARCEL);
                     }
                 }
             } else {

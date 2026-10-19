@@ -73,6 +73,25 @@ public final class UrbanSalts {
     /** Encounter catalogue two: which unguarded specialist buildings hold a resident threat. */
     public static final long CIVIC_ENCOUNTERS = 0x5643_4956_454e_434fL;
 
+    // Layout revision 9 (milestone 13): six districts. Street lattice and subdivision keep the
+    // layout-two inputs above; only district decisions use these.
+    /** The open draw of a region's district identity. */
+    public static final long DISTRICT_MAP = 0x5644_4d41_505f_4c39L;
+    /** Which regions near the spawn carry the guaranteed commercial and specialist districts. */
+    public static final long DISTRICT_ANCHORS = 0x5644_414e_4348_4f52L;
+    /** Superblock kinds of the industrial, flooded, civic and quarantine districts. */
+    public static final long DISTRICT_KINDS = 0x5644_4b49_4e44_5321L;
+    /** Parcel uses of those districts. */
+    public static final long DISTRICT_USES = 0x5644_5553_4553_5f21L;
+    /** Storey envelopes of those districts. */
+    public static final long DISTRICT_STOREYS = 0x5644_5354_4f52_4559L;
+    /** Patches of contaminated ground and overgrowth (two-by-two cells). */
+    public static final long OVERLAY_PATCH = 0x564f_5650_4154_4348L;
+    /** Which lawn cells grow tall grass or a bush. */
+    public static final long OVERLAY_PLANT = 0x564f_5650_4c41_4e54L;
+    /** Where powder kegs were left in an industrial yard. */
+    public static final long OVERLAY_KEG = 0x564f_564b_4547_5321L;
+
     private UrbanSalts() {
     }
 }

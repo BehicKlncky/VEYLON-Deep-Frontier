@@ -40,6 +40,10 @@ public final class UrbanSurfaceMaterials {
             case LOT_EDGE -> BlockType.STONE;
             case ENTRANCE -> BlockType.PLANK;
             case STAIR_CORE -> BlockType.RUIN_STONE;
+            // Layout revision 9 only; layout 2 never plans them, so generator 5 is unchanged.
+            case CANAL -> BlockType.WATER;
+            case BRIDGE -> BlockType.STONE_BRICK;
+            case YARD -> BlockType.GRAVEL;
             // A finished plan has no void; fill it solid rather than leave a hole.
             case VOID -> FILL;
         };

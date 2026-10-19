@@ -59,9 +59,18 @@ public enum UrbanSurface {
      * The flat street datum without a plan: every column of layout revision 1,
      * and any column beyond the range urban ids can name.
      */
-    DATUM(18, false, false, true, false);
+    DATUM(18, false, false, true, false),
+    /**
+     * Open water of a flooded district's canal basin (layout revision 9): a two-deep channel
+     * below the datum. Swimmable, so it is not a reserved route and nobody needs it.
+     */
+    CANAL(19, false, false, false, false),
+    /** A causeway across a canal basin at the street datum, joining its four streets. */
+    BRIDGE(20, false, true, true, false),
+    /** The paved open yard of an industrial superblock (layout revision 9). */
+    YARD(21, false, false, true, false);
 
-    private static final UrbanSurface[] BY_CODE = new UrbanSurface[19];
+    private static final UrbanSurface[] BY_CODE = new UrbanSurface[22];
 
     static {
         for (UrbanSurface surface : values()) {

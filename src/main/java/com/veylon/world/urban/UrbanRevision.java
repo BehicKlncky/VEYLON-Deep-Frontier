@@ -63,6 +63,11 @@ public final class UrbanRevision {
     public static final int BUILDING_TEMPLATE_CIVIC = 5;
     /** Layout of {@link World#GEN_URBAN_CIVIC}: layout seven plus template five. */
     public static final int LAYOUT_CIVIC = 8;
+    /**
+     * Six districts (milestone 13): {@link DistrictMap} identities, district superblocks and
+     * uses, and the {@link UrbanOverlay} raster, on the unchanged layout-two street lattice.
+     */
+    public static final int LAYOUT_DISTRICTS = 9;
 
     /** Content revision every new urban world records. */
     public static final int CURRENT_CONTENT = 3;

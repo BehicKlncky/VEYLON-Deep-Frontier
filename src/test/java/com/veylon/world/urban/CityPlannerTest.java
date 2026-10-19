@@ -214,7 +214,9 @@ class CityPlannerTest {
                 }
             }
         }
-        assertEquals(EnumSet.allOf(SuperblockPlan.Kind.class), kinds, "every superblock kind appears");
+        // Canals and yards belong to layout nine's districts (DistrictPlannerTest).
+        assertEquals(EnumSet.of(SuperblockPlan.Kind.COURTYARD_HOUSING, SuperblockPlan.Kind.SHOP_ROW,
+                SuperblockPlan.Kind.PARK, SuperblockPlan.Kind.PLAZA), kinds, "every layout-two kind appears");
     }
 
     @Test
