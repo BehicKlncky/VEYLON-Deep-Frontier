@@ -6,10 +6,10 @@ This is the running record for the 26-package urban-survival roadmap. The pack i
 
 | Item | Value |
 | --- | --- |
-| Last completed package | **11 — Playable vertical slice gate** (2026-10-13; final build and commits 2026-10-14). The generated starter neighbourhood supports the scavenge, risk and return loop through the production input seam. It passes on six frozen seeds in both modes headless, and on seed `20260731` natively in both modes. Save, load, revisit and chunk-order checks pass. Four blockers were fixed. Human-only checks are deferred by D-80. |
-| Source revision | 11: `0318966`, `01c42ec`, `2f63652` blocker fixes → `51578ad` frame step → `1e60097` F-close fix → `51c5a9c` slice runner → `406803b` slice gate test. Records follow separately. |
-| Default new world | Legacy (`World.DEFAULT_NEW_WORLD_GENERATOR = GEN_CAVE_IDENTITIES`), unchanged until 26 passes. Isolated `VEYLON_GENERATOR=urban-dev` creates generator 10 (`GEN_URBAN_ENCOUNTERS`, layout 7 / template 4 / content 3, encounter catalogue 1). Generators 1–9 stay loadable with their original geometry and no new encounters. |
-| Next package | **12 — Commercial and civic buildings, NOT STARTED.** The 11 gate is met, so expansion may proceed. Keep `UrbanSliceRouteTest` and the frozen slice seeds as the starter-loop regression gate. The D-97 tuning findings belong to 13, 19, 21, 22 and 23. |
+| Last completed package | **12 — Commercial and civic buildings** (2026-10-14 to 2026-10-16; final native reruns and records 2026-10-18 to 2026-10-19). Generator 11 adds grocers, clinics, schools, office blocks, security posts and warehouses with real, connected, validated interiors, secured stock behind forcible locks, damaged, picked-clean and partially occupied variants, signs and lobby guards. Earlier generators and the slice neighbourhood are unchanged. Native catalogue walks pass in both modes. Human-only checks are deferred by D-80. |
+| Source revision | 12: `8d87857` pins → `880602f` skeleton programs → `7046b3b` sign block → `82e5594` catalogue plans → `6e635d5` generator 11 → `e8dd714` route driver → `b82fa31` catalogue walk → `76dd7d3` slice on generator 11 → `a3a091e` entrance routing fix. Records follow separately. |
+| Default new world | Legacy (`World.DEFAULT_NEW_WORLD_GENERATOR = GEN_CAVE_IDENTITIES`), unchanged until 26 passes. Isolated `VEYLON_GENERATOR=urban-dev` creates generator 11 (`GEN_URBAN_CIVIC`, layout 8 / template 5 / content 3, encounter catalogue 2). Generators 1–10 stay loadable with their original geometry and encounters. |
+| Next package | **13 — Urban biome differentiation, NOT STARTED.** Keep `UrbanSliceRouteTest` (generators 10 and 11) and `UrbanCatalogueQaSceneTest` as regression gates. District rules decide which families appear where, under a new generator. |
 | Human testing schedule | Owner instruction (2026-10-11, D-80): consolidated human playtesting/listening after milestone 22. Through 22, run automated and scripted native validation and record human-only checks as deferred; do not request interim human walks. |
 | Commits | Separate `feat`, `test`, `docs` and `chore` commits on `feature/urban-survival`; see the reconstruction ledger below. `main` stays at `923345f`. Original combined commit retained at `backup/urban-m01-m04-before-split`. No merge, push, tag or publication. |
 
@@ -30,7 +30,7 @@ The status vocabulary is NOT STARTED, IN PROGRESS, PARTIAL, BLOCKED or COMPLETE.
 | 09 | Infected threats and encounters | 08 | Appended `NpcArchetype.VEILBOUND`, `ai/InfectedAI`, humanoid models/anatomy, `engine/InfectedSounds`, `UrbanEncounterDirector`, `EncounterAnchors`, `urban.population`, `RuntimeBudgetSnapshot` | Infected notice the player fairly, pursue in a fixture, attack through the damage gates, react to fire and die cleanly. Defeated state survives save, load and reactivation. Caps and sanctuary hold. Creative twin. Natives in a street and a ground-floor apartment. | **COMPLETE** (2026-10-12; human-only validation deferred by D-80) |
 | 10 | Indoor navigation and perception | 09, 04–06 | `ai/Pathfinder`, `PortalGraph`, `PathBudget`, `NavigationCache`, `IndoorNavigation`; `combat/WorldNoise`; AI and lifecycle guards | Multi-floor pursuit through doors and stairs, losing sight, searching and giving up. Door edits change routes. A shared measured budget. No roof or ground confusion and no void pathing. A native pursuit and escape. | **COMPLETE** (2026-10-12; human-only validation deferred by D-80) |
 | 11 | Playable vertical slice gate | 02–10 | Integration: `UrbanQaScenes`, `AutomatedRunDriver` urban route, integration tests | The DESIGN §14 slice holds headless and native with normal controls; save, revisit, no refill and no resurrection; Creative twins. Regression seeds frozen. Memory per explored area recorded (§4.3). | **COMPLETE** (2026-10-13; human-only validation deferred by D-80) |
-| 12 | Commercial and civic buildings | 11 | `BuildingTemplates` catalog (6 archetypes), `LootTables` | Every family has connected interiors with reachable containers and exits across the family matrix. Earlier urban layouts and legacy fingerprints are unchanged. | NOT STARTED |
+| 12 | Commercial and civic buildings | 11 | `BuildingTemplates` catalog (6 archetypes), `LootTables` | Every family has connected interiors with reachable containers and exits across the family matrix. Earlier urban layouts and legacy fingerprints are unchanged. | **COMPLETE** (2026-10-16; human-only validation deferred by D-80) |
 | 13 | Urban biome differentiation | 12, 03 | New `DistrictRules`, overlays, district-to-climate mapping (D-08) | Six distinct districts change player choices. Seams connect. Basics never depend on rare districts. Overlays keep accessibility. Legacy biome consumers are unchanged. | NOT STARTED |
 | 14 | Basements, transit and rooftop routes | 13, 05–06, 10 | Basement, transit and roof planners; hidden entrances; portals; `urban.discovery` | Street → basement → service passage → street and street → fire escape → roof → exit work without clipping or traps. Underground joins agree across borders. Secrets are discoverable through real clues. | NOT STARTED |
 | 15 | Alien ecology and urban wildlife | 14, 09–10 | Alien kind (appended `BodyFamily`), growth-node state, wildlife anchors | Infected, alien and wildlife behaviour are distinct. The alien has a tell and a counter. Caps, deaths and revisits hold. No edible hostile meat. Creative gates. | NOT STARTED |
@@ -1225,6 +1225,162 @@ was performed.
   families under a new generator. Keep the slice route and its frozen seeds as
   the regression gate for the starter loop, and keep the ordinary default at
   generator 3.
+
+## Milestone 12 — commercial and civic buildings (2026-10-14 to 2026-10-16)
+
+**Status: COMPLETE.** Every family generates real connected interiors with
+reachable containers and exits, under a new generator that leaves every earlier
+urban layout and legacy fingerprint unchanged. Human-only validation remains
+deferred by D-80. Decisions D-98–D-106.
+
+### Start state
+
+- Branch `feature/urban-survival` at `daadff0`, clean tree; the 11 gate met.
+- Read the full revised base (`build/urban-survival-roadmap-revision/00_BASE_KNOWLEDGE.md`),
+  the prompt, `AGENTS.md`, `docs/COMMIT_WORKFLOW.md` and these records.
+- Throwaway probes measured the parcel supply per region (about 10–20
+  commercial parcels in a residential region, about 50 downtown, one service
+  parcel, mostly shallow residential strips) before the catalogue was sized.
+- Generators 8–10 had only relative pins. Their absolute fingerprints were
+  recorded first, from an untouched `daadff0` worktree, and committed before any
+  shared code changed.
+
+### Catalogue and behaviour
+
+- **Generator 11 / layout 8 / template 5 (D-98).** Six families: grocer or
+  convenience store, clinic or pharmacy, school, office block, security post and
+  warehouse with workshop. `CivicCatalogue` places one school, one security post
+  and one warehouse per region and turns commercial parcels into grocers,
+  clinics and offices. The starter superblock and every walk-up are exactly the
+  template-4 plans, so the slice neighbourhood is unchanged. `urban-dev` creates
+  generator 11; the ordinary default stays generator 3.
+- **Reuse (D-99).** The walk-up builder now takes a `FloorProgram`; the
+  refactor reproduces revision one exactly. Each family runs that skeleton with
+  its own program, then `CivicTemplates` overlays fittings, desks, counters,
+  racks, a secured room, a facade and a painted `SIGN` (block id 82, D-103),
+  then the frozen stair shapes.
+- **Rooms.** Shop floors, stockroom and cold store; dispensary, treatment rooms,
+  washroom, utility and records; staff office, classrooms and canteen; work
+  floors, utility and break rooms; armoury, squad and interview rooms, evidence
+  and equipment stores and bunks; workshop and rack halls. Upper floors use the
+  same switchback core. Schools and offices may have a basement.
+- **Access costs (D-100).** Dispensary medicine is behind a hand-forcible
+  wooden lock and armoury ammunition behind a metal lock that needs a pry tool,
+  both loud, with concrete walls and bars. `AccessibilityValidator` proves the
+  lock is the only way in and that forcing it opens entry and exit routes.
+  Clinics lock a rear staff door and security posts a sally port, never together
+  with the street door.
+- **Variants (D-101).** Damaged, picked clean (forced secured door, empty stock)
+  and partially occupied (held street floor and basement, upper storeys
+  abandoned; `BuildingPlan.survivorOwned` is the single ownership rule).
+- **Loot and threats (D-102).** New container uses map onto unchanged content-3
+  tables; necessities keep unsecured sources in several families. Encounter
+  catalogue 2 keeps catalogue 1 for walk-ups and adds lobby guards to unheld
+  clinics and security posts and to one in four other specialist buildings.
+- **Diagnostics (D-104).** Repairs and failures name template, revision, family,
+  variant, parcel id, frontage, size and storeys; `BuildingPlanDiagnostics`
+  reports per region (`catalogue`) and per family matrix (`familyMatrix`).
+- **QA (D-105).** `UrbanRouteScene` shares the slice runner's input-seam route
+  machinery. `urban_catalogue` walks one building of every family in both modes.
+- **Review fix (D-106).** A guard by a clinic's locked staff door stalled there;
+  `PortalGraph` now picks the nearest *usable* entrance.
+
+### Changed paths
+
+**Production** (`src/main/java/com/veylon/`):
+
+- New: `world/urban/CivicTemplates.java`, `world/urban/CivicCatalogue.java`,
+  `UrbanRouteScene.java`, `UrbanCatalogueQaScene.java`, `UrbanCataloguePlan.java`.
+- Edited: `world/urban/{BuildingTemplates,BuildingPlan,BuildingPlanner,BuildingFurnishing,
+  AccessibilityValidator,BuildingPlanDiagnostics,LootTables,UrbanRevision,UrbanSalts,
+  UrbanWorldState,UrbanContainers,EncounterAnchors}.java`, `world/World.java`,
+  `world/BlockType.java`, `ai/PortalGraph.java`, `save/{UrbanPopulationSection,
+  UrbanContainersSection}.java`, `gfx/{MaterialRegistry,UrbanTextures}.java`,
+  `engine/AudioManager.java`, `item/CreativePalette.java`, `InteractPromptBuilder.java`,
+  `CrateTransactionSystem.java`, `UrbanSliceQaScene.java`, `UrbanQaScenes.java`,
+  `QaHarness.java` (one label on an existing line, still 1,496).
+
+**Tests** (`src/test/java/com/veylon/`):
+
+- New: `world/urban/CivicCatalogueTest`, `world/UrbanCivicGenerationTest`,
+  `UrbanCivicGameplayTest`, `save/UrbanCivicSaveTest`, `UrbanCatalogueQaSceneTest`.
+- Extended: `world/WorldGeneratorFingerprintTest` (generators 8–11),
+  `ai/IndoorNavigationTest`, `UrbanSliceRouteTest` and `UrbanSliceRun` (generator
+  11), `qa/SerializedEnumOrderTest`, `gfx/UrbanMaterialsTest`.
+- Expectations: `world/urban/{BuildingPlannerTest,BuildingFurnishingTest}` iterate
+  the walk-up families; `UrbanRevisionTest`, `UrbanGeneratorDispatchTest` and
+  `UrbanDevelopmentSelectorTest` name generator 11.
+
+**Documents:** `docs/ARCHITECTURE.md`, `docs/DEVELOPING.md` and the five urban
+records, including [BUILDING_PLANS.md](BUILDING_PLANS.md).
+
+### Compatibility
+
+- Generators 1–10 are unchanged: their absolute pins pass, and every walk-up
+  under generator 11 equals its template-4 plan.
+- New: generator 11, layout 8, template 5, encounter catalogue 2 and block id
+  82. Appended plan enums are metadata, never saved ordinals.
+- Unchanged: the v3 base, every section layout and version, content revision 3
+  and its tables, the default new world.
+- An older build rejects a generator-11 save before replacing its live world;
+  generators 10 and 11 each reject the other's population catalogue. No older
+  binary was run, and there is no downgrade promise.
+
+### Commands and results
+
+Exact commands and outputs are in
+[VALIDATION.md](VALIDATION.md#milestone-12--commercial-and-civic-buildings-2026-10-14-to-2026-10-16).
+In short:
+
+- Each commit was validated against its exact tree (a detached worktree, or a
+  working tree that held only that change).
+- The final portable build passed at `a3a091e` on 2026-10-16: 1,820 tests in
+  200 classes, zero failures or errors, and one existing Windows skip.
+- Native `urban_catalogue` passed in Survival and Creative on seed `20260731`,
+  16 captures each, with zero GL, KHR and native-audio errors: first on
+  2026-10-16, and again on the final source on 2026-10-18.
+- An adversarial review of five dimensions confirmed one defect, fixed in
+  `a3a091e` (D-106), and refuted the other two claims. Its QA-refactor and test
+  reviewers stopped on a usage limit, twice; those two dimensions were reviewed
+  directly on 2026-10-19, without independent skeptics, and found no defect.
+- `graphify update . --no-cluster` on the final code: 8,158 nodes and
+  31,711 edges.
+
+The commits:
+
+| Commit | Subject |
+| --- | --- |
+| `8d87857` | `test(urban): pin generator 8-10 blocks and building plans` |
+| `880602f` | `refactor(urban): let a floor program choose skeleton room functions` |
+| `7046b3b` | `feat(urban): add a painted frontage sign block` |
+| `82e5594` | `feat(urban): plan a commercial and civic building catalogue` |
+| `6e635d5` | `feat(urban): generate the civic catalogue under generator 11` |
+| `e8dd714` | `refactor(qa): share the urban route driver between scenes` |
+| `b82fa31` | `feat(qa): walk every commercial and civic family with ordinary controls` |
+| `76dd7d3` | `test(urban): hold the slice loop on the civic catalogue generator` |
+| `a3a091e` | `fix(navigation): leave and enter buildings by an unlocked entrance` |
+
+These records follow in their own commit. No push, merge, tag or publication
+was performed.
+
+### Limitations and next concrete step
+
+- **Evidence types.** The native walk stages its poses between buildings and a
+  spear and pry tool; inside it uses the production input seam. It is not a
+  human playtest, which D-80 defers until after 22.
+- **Distribution.** Only residential and commercial districts exist, so every
+  region has a school, security post and warehouse; package 13 redistributes
+  families by district under its own generator.
+- **Presentation.** Offices and classrooms share desk islands; signs carry
+  their words in the prompt, not on the board. Both are package 22.
+- **Scale.** Offices stop at five storeys until package 24 measures taller ones.
+- **Balance.** Clinic, armoury and warehouse stock and the guard density are
+  initial values for package 23.
+- **Starter block.** It still has no locked flat (D-97); claims and
+  fortification are 18.
+
+**Next:** package 13, urban biome differentiation: the six districts, with
+district rules deciding which families appear where.
 
 ## Resume rules
 

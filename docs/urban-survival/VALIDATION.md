@@ -1637,3 +1637,276 @@ slice does not depend on order comes from the headless five-order matrix.
 
 D-97 assigns these findings to later packages. Human comfort and listening
 remain deferred until after 22.
+
+
+## Milestone 12 — commercial and civic buildings (2026-10-14 to 2026-10-16)
+
+### Scope and baseline
+
+Baseline: clean `feature/urban-survival` at `daadff0`, the 11 gate met. I read
+the full revised base, the prompt, `AGENTS.md`, the commit workflow and these
+records. Decisions D-98–D-106. JDK: the repository-local Temurin 25.0.4.1.
+
+Unchanged: the v3 base, every section layout and codec version, content
+revision 3 and its tables, serialized enums except the appended `SIGN`, and the
+new-world default (generator 3).
+
+### Probes before the catalogue (throwaway, never committed)
+
+- **Parcel supply** over six seeds and six regions: residential regions hold
+  about 70–88 residential, 7–22 commercial and one service parcel; commercial
+  regions about 48–57 commercial and 14–19 residential. Residential parcels are
+  wide shallow strips (frontage 12–32, depth mostly 12–19); commercial and
+  service parcels reach 28 deep, with storey envelopes 1–8.
+- **Grocer parcel areas** under the final catalogue: about one in ten is under
+  320 cells and is named a convenience store.
+
+### Compatibility pins recorded before shared code changed
+
+Generators 8–10 had only relative pins. On an untouched `daadff0` worktree a
+probe recorded, for seeds `20260731`, `-4242` and `7`:
+
+- the four terrain chunks;
+- every chunk of the refuge and of the first commercial parcel;
+- every building plan fingerprint of regions (0, 0), (−1, −1) and (1, −1).
+
+Generators 9 and 10 share their values (D-83). The extended
+`WorldGeneratorFingerprintTest` passed there (12 tests) and was committed first
+(`8d87857`). Every later commit kept it green.
+
+### Plan evidence
+
+`CivicCatalogueTest`, with `BuildingPlannerTest` and `BuildingFurnishingTest`
+narrowed to the walk-up families:
+
+- **Family matrix.** 1,344 proposals: every family × 8 sizes × 4 frontages ×
+  4 variants × candidate and minimal, at the family's tallest storeys and with
+  a basement where allowed. All pass the production validator with bounded
+  cells and transitions, and are pure. `familyMatrix` over 8 sizes, 2 seeds and
+  every storey count and basement option returns no failing identity.
+- **Region matrix.** All 4,112 parcels of the frozen six seeds × eight regions
+  (including the ±4,096-region pairs) plan within the three-attempt fallback and
+  validate against their district (approaches, neighbours, halo).
+  - Every walk-up equals its template-4 fingerprint.
+  - No specialist building is in the starter superblock.
+  - Each region has exactly one school, one security post and one warehouse.
+  - Families: 2,830 apartments, 6 starter shops, 551 grocers, 226 clinics,
+    355 offices, 48 schools, 48 security posts and 48 warehouses; 4 walk-up
+    repairs.
+- **Secured rooms.**
+  - Removing one bar makes the dispensary or armoury reachable, and the
+    validator reports "SECURED: room is reachable without forcing its lock".
+  - Walling the corridor side reports the forcible door off an ordinary route.
+  - Relabelling the room as storage leaves it "ROOM: unreachable".
+  - Picked-clean buildings have a broken doorway and validate ordinarily.
+- **Loot purpose.** Across three seeds × six families × four variants:
+  - the secured table appears only in secured rooms or survivor-held
+    containers, and the clinic table only in dispensary cabinets;
+  - racks roll the warehouse table, workshops the utility table, grocer
+    shelves the grocer table and grocer stockrooms the pantry table;
+  - unsecured food, treatment and pry-tool sources each span at least three
+    families.
+- **Partial occupation, revisions and diagnostics.**
+  - A held office owns its street floor and basement only, locks its street
+    door, keeps the rear open and has bedrolls.
+  - Revisions 1–4 reject civic families, and revision 5 rejects walk-ups.
+  - A sealed clinic repairs at attempt 2, with the template, family, variant,
+    parcel id and frontage in its repair line.
+- **Pins.** The first building of each family for seeds `20260731`, `-4242` and
+  `7` (18 fingerprints), recorded at introduction.
+
+### Generated-world, gameplay and save evidence
+
+- **`UrbanCivicGenerationTest`.**
+  - Seven complete 16 × 16-chunk regions (each design seed's origin, plus the
+    downtown region (1, −1) of `20260731`) match their proposals in every owned
+    cell. `inspectGenerated` proves every parcel on the actual blocks.
+  - All six families were generated: 468 apartments, 6 shops, 79 grocers,
+    33 clinics, 23 offices, 7 schools, 7 security posts and 7 warehouses.
+    Nothing rolled loot, touched fixture state or recorded an edit.
+  - A seven-order chunk matrix (row, reverse, column, three shuffles, outward
+    spiral) around one building per family, for two seeds, gives identical
+    blocks, heights, lights and plan fingerprints.
+  - The starter superblock's chunks, every walk-up plan and every catalogue-1
+    anchor equal generator 10's on all six seeds.
+- **`UrbanCivicGameplayTest`** (production commands):
+  - F rattles the dispensary. A bare-hand break forces it: both cells broken,
+    one `door-forced` event and a recorded edit. Its cabinet rolls the clinic
+    table (bandages and only dispensary supplies). Save and load keep the door
+    broken and the stock taken.
+  - The armoury refuses a bare hand and gives way to a pickaxe; its locker
+    rolls the secured table. Creative meets the lock, then removes the door
+    silently.
+  - The sign prompt reads its plan, and bars read as security bars. The staff
+    door is locked while the street door opens with F.
+  - A held building's street floor is survivor property and its upper floor
+    abandoned, through a save and load.
+  - A clinic lobby guard activates through production admission and survives a
+    save under catalogue 2.
+- **`UrbanCivicSaveTest`.** Generators 10 and 11 write catalogues 1 and 2 with
+  codec 1. Each rejects the other's without replacing the live world.
+- **`WorldGeneratorFingerprintTest`.** Generator 11's terrain, building chunks
+  and plans are pinned at introduction; generators 1–10 are unchanged.
+- **`IndoorNavigationTest`** (review fix, D-106). Before the fix, the waypoint
+  from beside a clinic's locked staff door was the locked rear approach. After
+  it, a Veilbound there reaches the street through the open street door, and an
+  outsider is routed to the street door.
+- **`UrbanSliceRouteTest`.**
+  - The frozen slice route still passes on generator 10, on all six seeds in
+    both modes.
+  - Extracting `UrbanRouteScene` reproduced milestone 11's recorded Survival
+    ranges exactly: 563–657 blocks, 168–188 route seconds, 268–300 game minutes.
+  - On generator 11 the route passes on all six seeds in Survival (a permanent
+    test) and, in a throwaway probe, in Creative. Some runs now meet a
+    specialist building's guard.
+- **`UrbanCatalogueQaSceneTest`** plays the catalogue walk headlessly in
+  `Game.run` order in both modes and checks the generator guard.
+
+### Native catalogue walk, both modes
+
+Host: Windows 11 Pro 10.0.26200, AMD Ryzen 5 5600X, NVIDIA GeForce RTX 3060 Ti,
+driver 610.88, OpenGL 3.3.0 with KHR_debug; 1280 × 720.
+
+Both modes first ran on 2026-10-16, before the routing fix `a3a091e`
+(`m12-native-<mode>.log`). They were rerun on 2026-10-18 on the final source,
+from fresh directories (`m12-final-native-<mode>.log`):
+
+```powershell
+$env:VEYLON_GENERATOR='urban-dev'; $env:VEYLON_SEED='20260731'
+$env:VEYLON_GAME_MODE='survival'; $env:VEYLON_SCENE='urban_catalogue'
+$env:VEYLON_RESOLUTION='1280x720'; $env:VEYLON_CAPTURE_TAG='m12-final-catalogue-survival'
+.\gradlew.bat run -PveylonDataDir=build/qa/m12-final-catalogue-survival --console=plain
+```
+
+The Creative twin used the same command with `creative` in the mode, tag and
+directory; the 2026-10-16 runs used `m12-catalogue-<mode>` for both. The
+buildings chosen for seed `20260731`:
+
+| Family | Parcel | Variant | Notes |
+| --- | --- | --- | --- |
+| Grocer | `urban:parcel:-1,0:89` | Damaged | "Calder Grocers", two storeys |
+| Clinic | `urban:parcel:0,0:97` | Damaged | "Halvard Clinic & Pharmacy", three storeys |
+| School | `urban:parcel:0,0:105` | Damaged | Three storeys and B1 |
+| Office block | `urban:parcel:0,-1:107` | Intact | Five storeys |
+| Security post | `urban:parcel:0,0:13` | Damaged | Two storeys |
+| Warehouse | `urban:parcel:0,0:49` | Picked clean | Two storeys |
+
+All four runs printed `[urban-catalogue] pass=true`, with the same values
+before and after the fix:
+
+- seven staged poses;
+- the dispensary forced at (45, 41, 199);
+- searched stock `{BANDAGE=2, SPLINT=1, ANTISEPTIC=2, MEDICINE=2}`;
+- highest floor 4;
+- the staff door and the armoury lock refused, each with its prompt;
+- no threat engaged, and full health;
+- 71 route seconds in Survival and 68 in Creative.
+
+Each run wrote 16 captures. The logs held only the usual MEDIUM
+shader-recompile and pixel-transfer notes: zero GL errors, KHR errors or
+native-audio errors. The final runs report `glGetError=0`, 19 KHR messages
+with 0 errors, and `nativeErrors=0` in each mode; Gradle exited 0 after
+1 min 24 s (Survival) and 1 min 16 s (Creative).
+
+Every capture of the 2026-10-16 runs was inspected. Of the final runs, all 16
+Survival captures and the Creative sign, forced dispensary, stock screen,
+upper floors, armoury lock and rack captures were inspected; they show the
+same scenes:
+
+- The sign shows its board, with the prompt `Sign: "Calder Grocers"`.
+- The grocer floor shows produce tables and shelves.
+- The refused staff door and the armoury lock show their prompts.
+- The forced dispensary shows its counter and cabinets beyond a broken doorway,
+  and the stock screen is titled "DISPENSARY CABINET".
+- The treatment room shows its cabinet, the exam bed and barred plaster walls.
+- Classrooms and offices show desk rows on the ground and upper floors.
+- The rack capture looks down an aisle between sheet-metal racks to the
+  workshop lockers and benches; the workbench prompt is "Use workbench".
+- In Creative the dispensary doorway is empty, because a Creative break removes
+  the door.
+
+A first run framed three rooms too closely (one shelf, debris in front of the
+bed, one rack upright). The views were widened and both modes rerun from fresh
+directories.
+
+One climate observation for package 13: the office block stands in the
+downtown region (0, −1), whose climate is still the legacy noise biome. Its
+captures read "Biome / Rocky Highlands" with the air at about 1 °C (−0.5 °C in
+Creative), against Meadow and about 14 °C in the residential regions.
+
+### Review and commands
+
+All Gradle commands used the bundled Temurin 25.0.4.1+1
+(`build/tools/jdk25/jdk-25.0.4.1+1`) and the Windows wrapper. Logs are local
+ignored artifacts under `build/`.
+
+An adversarial review covered five dimensions (plans and validator,
+compatibility and saves, gameplay and runtime, the QA refactor, tests), with
+three independent skeptics per finding:
+
+- **Plans and validator:** no finding.
+- **Compatibility and saves:** one claim, refuted by all three skeptics: a held
+  civic building admits no encounter anywhere inside, by design (D-101).
+- **Gameplay and runtime:** two claims.
+  - Guards were routed to a clinic's locked staff door and stalled there. Its
+    three skeptics stopped on a usage limit, so it was checked directly: a new
+    `IndoorNavigationTest` case failed before the change and passes after it.
+    `a3a091e` fixes it (D-106), and a second pass after the fix refuted it.
+  - The secured-room prompt's "another way in" was refuted: bars and concrete
+    can be broken.
+- **QA refactor and tests:** both reviewers stopped on the same usage limit on
+  2026-10-16, and a rerun stopped on it again on 2026-10-18. On 2026-10-19 the
+  two dimensions were reviewed directly against `a3a091e`, by one reviewer
+  without independent skeptics. No defect was found:
+  - Every line removed from `UrbanSliceQaScene` reappears in `UrbanRouteScene`
+    apart from visibility and the scene tag. The log prefix, failure text,
+    deadline, the forced-door capture order and the first-threat capture are
+    unchanged.
+  - Each staged pose of the catalogue walk releases held keys and clears fight
+    and approach state. Its lock steps assert the door stays shut with a
+    "Locked." prompt, and its search asserts the ledger reveal. The rattle the
+    lock step's comment mentions is asserted by `UrbanCivicGameplayTest`.
+  - The catalogue, generation and save tests end their loops in per-family,
+    per-region and count assertions; none is vacuous.
+  - Two notes for package 13. The walk searches only the regions next to the
+    spawn and requires the civic catalogue. `LootTables.table` maps a civic
+    district's bathroom cabinets and shop shelves to the clinic table, which
+    generator 11 never reaches but a civic district will.
+
+The final portable build ran on 2026-10-16 at `a3a091e`, with only these
+records modified in the working tree: `.\gradlew.bat build --console=plain`
+passed in 11 min with 1,820 tests in 200 classes, zero failures or errors, and
+the existing Windows symlink-privilege skip in `AppPathsTest`
+(`m12-build-final.log`). Production source has not changed since; the
+2026-10-18 native reruns used the same tree.
+
+Each code commit was checked against its exact tree, in the detached worktree
+`build/m12-check` or in a working tree that held only that change, as its
+message records:
+
+| Commit | Tests | Notes |
+| --- | --- | --- |
+| `8d87857` | 12 | Values recorded on an untouched `daadff0` worktree |
+| `880602f` | 39 | Plus Javadoc |
+| `7046b3b` | 38 | Plus Javadoc |
+| `82e5594` | 100 | Plus Javadoc |
+| `6e635d5` | 402 in 75 classes | Plus Javadoc |
+| `e8dd714` | 5 | Reproduced milestone 11's Survival ranges |
+| `b82fa31` | 26 | Plus the first native runs in both modes |
+| `76dd7d3` | 4, then 40 | Code matched `HEAD` apart from its two test files |
+| `a3a091e` | 313 in 53 classes | The new case failed before the change |
+
+`graphify update . --no-cluster` ran once on the final code on 2026-10-18 and
+produced 8,158 nodes and 31,711 edges (`m12-graph-update.log`), with the
+existing Gradle-file extractor warnings. No clustering or semantic extraction
+ran.
+
+### Limits and next gate
+
+- The native walk stages poses between buildings and a starting spear and pry
+  tool. It is scripted evidence, not the human playtest deferred by D-80.
+- Offices and classrooms look alike apart from cabinets and signs (22).
+- Distribution by district (13), final stock and guard pressure (23), taller
+  offices (24) and a locked starter flat (18) belong to later packages.
+
+Next: package 13.

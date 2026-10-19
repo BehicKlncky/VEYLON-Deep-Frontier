@@ -263,13 +263,14 @@ Generator versions form an explicit set (`World.isSupportedGenerator`): 1 legacy
 7 generated furnished apartments and shops (layout 4, template 2), and
 8 the same buildings with shaped stairs (layout 5, template 3), and 9 the starter
 neighbourhood (layout 6, template 4), and 10 adds encounter catalogue 1 on that
-same geometry (layout 7, template 4). The development selector creates 10. New worlds use
+same geometry (layout 7, template 4), and 11 adds the commercial and civic catalogue
+(layout 8, template 5) with encounter catalogue 2. The development selector creates 11. New worlds use
 `World.DEFAULT_NEW_WORLD_GENERATOR` (3, until the urban rollout); a load accepts any
 supported version and rejects the rest, including anything above
 `MAX_SUPPORTED_GENERATOR`, before it replaces the live world. Feature gates name
 their versions (`hasDeepFrontier`, `hasCaveIdentities`, `isUrbanGenerator`) instead
 of comparing with `>=`, so a new generator inherits nothing by accident, and
-`WorldGeneratorFingerprintTest` pins versions 1–7. `ShapedStairGenerationTest`
+`WorldGeneratorFingerprintTest` pins versions 1–11 absolutely. `ShapedStairGenerationTest`
 checks version 8 against frozen version 7 outside stair cells and across chunk orders.
 
 An urban world's layout revision follows from its generator, so it is known
@@ -277,13 +278,13 @@ before bootstrap generates a chunk; a geometry change means a new generator
 version, never a change under an old one (`UrbanRevision`). Its content revision
 (the rolled loot, encounter and trade tables) is saved in `urban.meta`, which
 only urban worlds write. It is optional for older layouts and required for
-generators 9–10. Until that section, or its
+generators 9–11. Until that section, or its
 absent default, has been read, a loading world's content revision cannot be read
 at all. Fresh worlds use content revision 3; revisions 1 and 2 remain supported.
 Revision 1 is the absent-metadata default. The tables and their hash inputs are frozen
-under each revision. Generators 9–10 require content 3. The first encounter
-catalogue is additive and versioned separately in `urban.population`; it does
-not reroll content-3 loot or add encounters to older generators. Compatibility directions:
+under each revision. Generators 9–11 require content 3. Encounter catalogues are
+additive and versioned separately in `urban.population` (1 for generator 10, 2 for
+11); they do not reroll content-3 loot or add encounters to older generators. Compatibility directions:
 
 - this build, a legacy save: unchanged, and no urban state is created;
 - this build, an urban save: the same geometry through its generator, the content
@@ -434,6 +435,37 @@ roof. Covered rooms retain seasons, buffer weather/day-night variation and
 reduce altitude cooling; ground and upper floors no longer become deep caves.
 Generators 1–6 retain their original light/weather/environment behavior. No
 new simulation random stream or persistent indoor state is introduced.
+
+### Commercial and civic catalogue
+
+Generator 11 stamps building template 5. `CivicCatalogue` picks each parcel's
+family from the seed, its district plan and stable parcel ids (its own salts, no
+random stream); the starter superblock and every walk-up are exactly template 4.
+`CivicTemplates` runs the shared walk-up skeleton (`BuildingTemplates.Builder`)
+under a family `FloorProgram`, so halls, walls, the stair core, entrances and
+reservation ids keep the proven geometry, then overlays fittings in lanes, islands
+and racks, a secured room, a frontage `SIGN` and the family facade, and finally
+the frozen stair shapes. `BuildingPlanner.plan(seed, revision, parcel, district)`
+is the revision-five entry point; `UrbanWorldState.buildingAt` supplies the
+parcel's cached district plan.
+
+`AccessibilityValidator` treats a locked door of a secured room (dispensary or
+armoury) as its only entrance: with locks solid the room must be unreachable, the
+door's corridor side must be on an ordinary route, and a forced phase with the
+door broken must reach and leave every reservation inside. Every other lock stays
+solid as before, so older templates validate exactly as they did.
+`BuildingPlan.survivorOwned` is the single ownership rule: whole occupied
+walk-ups, but only the held street floor and basement of a civic building. The
+container ledger, theft and destruction attribution, loot table selection and
+the `urban.containers` plan check all use it. Encounter catalogue 2
+(`EncounterAnchors.catalogue`) keeps catalogue 1 for walk-ups and adds lobby
+guards to clinics and security posts; `urban.population` writes the generator's
+catalogue and rejects the other. Diagnostics (`BuildingPlanner.identity`,
+`BuildingPlanDiagnostics.catalogue` and `familyMatrix`) name a failing template.
+
+Scripted urban QA routes extend `UrbanRouteScene`: a task queue played through the
+production input seam, mouse-look turns, bounded walking that opens doors with F,
+threat handling, forcing and captures. `urban_slice` and `urban_catalogue` use it.
 
 ### Doors, windows and urban fixtures
 

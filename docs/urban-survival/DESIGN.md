@@ -114,7 +114,7 @@ The chunk is 16 × 96 × 16, so y runs 0–95 (**Existing**, B-10). No bedrock b
 | Storeys | slab of storey *n* at 40 + 4*n*; clear 41 + 4*n* … 43 + 4*n* | Pitch 4 = slab + 3 clear cells, matching the existing keep precedent (B-16) and the pathfinder's step headroom (B-65) |
 | Roof | slab at 40 + 4*N* for *N* storeys; at most *N* = 12 (roof slab 88) | Roof access, bulkheads and parapets up to y 93; y 94–95 stay empty |
 
-Initial building families stay at ≤ 5 storeys (apartments) and ≤ 8 (offices) until package 24 has measured dense-city cost. Flooded districts place their standing water deliberately *[13]*. Their overlays must be shown to be stable under the existing `WaterSystem` rules.
+Initial building families stay at ≤ 5 storeys (apartments) and ≤ 8 (offices) until package 24 has measured dense-city cost. The package-12 office blocks stop at five storeys (D-99). Flooded districts place their standing water deliberately *[13]*. Their overlays must be shown to be stable under the existing `WaterSystem` rules.
 
 ### 4.2 Planning hierarchy (D-06)
 
@@ -198,7 +198,7 @@ These are validated by production code *[05]* against real collider and movement
 | A2 | Every generated playable room, container and quest reservation is reachable from an entrance by a route the player collider (0.6 × 1.8, auto-step 1.0) can walk. Where residents or hostiles must reach it, the route must also be followable by `Pathfinder` (B-21, B-65). |
 | A3 | Vertical access between all floors uses switchback stairs with landings and ≥ 3 clear cells above each integer departure cell. Frozen templates 1/2 use full-block steps; template 3 uses two half-height treads per directional cell, with matching collision and reversible swept-clearance proof (owner's native-QA refinement, 2026-10-11; D-69–D-70). Ladders are secondary or alternate routes only (fire escapes, hatches). A ladder-only building is invalid. |
 | A4 | Every reachable room has a route back to an exit. No playable room may require a one-way drop deeper than 3 blocks (B-65 `MAX_DROP`). |
-| A5 | Locked routes need a key or tool obtainable outside the locked area, or an alternate entry. A key is never only behind its own lock. Abandoned property can always be forced with a basic tool, at a noise cost. |
+| A5 | Locked routes need a key or tool obtainable outside the locked area, or an alternate entry. A key is never only behind its own lock. Abandoned property can always be forced with a basic tool, at a noise cost. Package 12 refinement (D-100): a secured dispensary or armoury may be reachable only by forcing its own lock; the validator proves the lock is the only way in, stands on an ordinary route and opens entry and exit routes when forced. |
 | A6 | Ruin variants may remove rooms or floors. Removed rooms carry no containers or quest reservations, and the remaining playable rooms stay connected. |
 | A7 | Windows match floors: window rows sit inside each storey's clear band, never into slabs or solid mass. Facades and entrances match the floor plan. |
 | A8 | A structure with walls and a roof is either a building with interiors or explicitly non-enterable small infrastructure (kiosk ≤ 2 × 2, bus shelter, utility box). Package 05 lists that infrastructure set. |
@@ -232,6 +232,20 @@ human walk in [PROGRESS.md](PROGRESS.md) and [VALIDATION.md](VALIDATION.md).
 The 2026-10-11 native-QA continuation adds generator 8 / template 3 for shaped
 stairs, preserving generator 7 and every room/fixture identity. The owner
 explicitly confirmed the complete normal-input Survival exploration route passed.
+
+**Implemented in 12 (D-98–D-101):** generator 11 / layout 8 adds building
+template 5: grocer or convenience store, clinic or pharmacy, school, office
+block, security post and warehouse with workshop. Each family runs the walk-up
+skeleton under its own room program, then an overlay fits its purpose: shop
+floors and stockrooms; a locked dispensary, treatment rooms and a washroom;
+classrooms, a staff office and a canteen; work floors, utility and break rooms;
+a locked armoury, squad and interview rooms, evidence and equipment stores and
+bunks; rack halls with shelf bays and a workbench. Every family has a painted
+sign, its own facade and deterministic damaged, picked-clean and partially
+occupied variants; schools and offices may have a basement. Each region holds
+one school, one security post and one warehouse; the starter superblock and all
+walk-ups keep template 4. [BUILDING_PLANS.md](BUILDING_PLANS.md) shows one floor
+plan per family.
 
 ## 6. Occupied sites and the player's refuge (D-21, D-22)
 
@@ -309,6 +323,9 @@ consumed once, and hidden movement never changes its position. Veilbound now
 search fresh sound for fourteen seconds and last sight for eighteen; they turn
 at the remembered place and stop on expiry. Creative clears player-derived
 intent. Work/failure/unsupported-entry diagnostics appear in the runtime snapshot.
+Package 12 (D-106) makes entrance choice lock-aware: a body uses the nearest
+entrance whose door is not locked or barred, so a clinic guard follows the player
+out of the street door rather than waiting at the locked staff door.
 
 ## 8. Scavenging economy: scarcity and depletion (D-12, D-13)
 
@@ -347,6 +364,15 @@ Urban policing remains 16/17. Hand salvage refuses insufficient capacity; blast
 and fire intentionally destroy contents. All three retire the original identity
 before replacement can create empty player storage.
 
+**Implemented in 12 (D-100–D-102).** The commercial and civic families map their
+containers onto the unchanged content-3 tables, so no roll changes. Dispensary
+medicine sits behind a hand-forcible wooden lock and armoury ammunition behind a
+metal lock that needs a pry tool, both loud, and every unheld clinic and security
+post keeps a lobby guard (encounter catalogue 2). Held street floors are survivor
+property; their upper storeys are not. Grocers, canteens, break rooms, washrooms,
+treatment rooms, utility rooms and workshops keep food, water, treatment, light and
+pry tools available without forcing anything.
+
 ## 9. Legacy mechanics disposition (D-26)
 
 "Urban-gated" means the urban generator selects a new behaviour while legacy worlds stay byte-identical.
@@ -373,7 +399,7 @@ These are bounded starting scope, not a wish list. Packages may change a number 
 | 09 | 1 infected type; active hostile cap ≤ 12 globally and ≤ 4 per encounter; sanctuary radius 24 around the refuge; no spawn within 16 blocks or in view; activation and deactivation at 96 and 130 blocks, following the settlement precedent (B-37) |
 | 10 | Shared path allowance ≤ 2,000 expansions per fast tick; route cache ≤ 64; portals derived from plans |
 | 11 | One generated starter neighbourhood; 5 frozen regression seeds; a capture list |
-| 12 | 6 archetypes: grocery or convenience store, clinic or pharmacy, school, office block, police or security site, warehouse or workshop |
+| 12 | 6 archetypes: grocery or convenience store, clinic or pharmacy, school, office block, police or security site, warehouse or workshop. **Implemented** (D-98–D-101): 1–2, 1–3, 2–3, 3–5, 1–2 and 1–2 storeys; ≤ 4 containers per room and ≤ 12 per storey; one school and one security post per region |
 | 13 | All 6 districts. For design seeds, residential and commercial within 1 region of spawn and all six within 3 regions (Chebyshev) |
 | 14 | ≤ 1 transit station and ≤ 2 tunnel segments per region; basements in ≥ 50 % of residential buildings; ≥ 1 hidden-refuge reservation per 2 residential regions |
 | 15 | 1 alien organism with growth nodes; ≤ 1 infected variant; ≤ 3 adapted wildlife species |
@@ -414,7 +440,7 @@ Paths are relative to `src/main/java/com/veylon/`. Proposed objects are modest d
 | Stable ids | `UrbanIds`: pack, format and validate (§13) *[02]* | Precedents: `Settlement.packId`, `FactionSystem.settlementStorageId` (B-35) | Inside urban sections |
 | District, street and parcel plans | `CityPlanner` producing `DistrictPlan`, `StreetNetwork` and `ParcelPlan` (pure, region-keyed, LRU-bounded) *[03]* | Pattern: `SettlementPlanner.plan` purity and symmetry; `World.settlementForRegion` cache (B-16) | Derived |
 | Ground, floor and roof queries | `World` urban queries: street level, floor and room at a position, loaded column *[03, 06]* | `World.surfaceHeight` stays legacy and generates chunks as a side effect; there is no loaded-column API (B-18) | Derived |
-| Building, floor and room plans | `BuildingPlan`, `FloorPlan`, `RoomPlan`, `FixtureSlot`; a `BuildingTemplates` catalog keyed by revision *[05]* | Precedent: `settlement/SettlementBuilder.Layout` | Derived, frozen per revision |
+| Building, floor and room plans | `BuildingPlan`, `FloorPlan`, `RoomPlan`, `FixtureSlot`; a `BuildingTemplates` catalog keyed by revision *[05]*; commercial and civic families in `CivicTemplates` and `CivicCatalogue` *[12]* | Precedent: `settlement/SettlementBuilder.Layout` | Derived, frozen per revision |
 | Accessibility | `AccessibilityValidator` *[05]* | `ai/Pathfinder.standable` and `passable`; `entity/PlayerConstants` colliders (B-21, B-65) | Diagnostics only |
 | Generation slices | `UrbanChunkStamper`: chunk-bucketed layout, `Chunk.set` inside the chunk only, bounded per chunk *[03, 06]* | `WorldGenerator.applySettlementSlice` pattern; `World.getOrCreateChunk` finalisation (B-15, B-16) | Derived |
 | Doors, windows, locks, barricades | Appended `BlockType` ids (`world.Fixtures` families) plus the `World.fixtures` side map (`FixtureStates`), keyed by block position (D-48) *[04]* | GATE/GATE_OPEN swap and `World.gateTimers`; `Pathfinder.passable`; `WorldInteractions`; `InteractPromptBuilder` (B-39) | `world.fixtures` (D-49; proposed as `urban.fixtures`) |
@@ -445,15 +471,15 @@ The table is in dependency order: an item may depend only on items above it. Sec
 | # | State | Kind | Owner | Package | Depends on | Persistence; absence default | Reset (new / load / dormancy) | Bound |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | 1 | Generator version `GEN_URBAN` | Persistent | `World` | 02 | — | v3 base int; values above `MAX_SUPPORTED_GENERATOR` rejected | Fixed per `World` | — |
-| 2 | Urban content revision | Persistent | `UrbanRevision` | 02, 07–08 | 1 | `urban.meta`; absent means 1 for older layouts; generators 9–10 require content 3 | New and load | — |
+| 2 | Urban content revision | Persistent | `UrbanRevision` | 02, 07–08 | 1 | `urban.meta`; absent means 1 for older layouts; generators 9–11 require content 3 | New and load | — |
 | 3 | Region, district, street and parcel plans | Derived | `CityPlanner` | 03 | 1, 2 | Not saved | Cache per `World` | ≤ 16 regions |
-| 4 | Building, floor, room and fixture plans | Derived | `BuildingPlanner` / `BuildingPlan` | 05–06, 08 | 3 | Generator 6 selects template 1 / layout 3; 7 furnished template 2 / layout 4; 8 shaped template 3 / layout 5; 9 starter template 4 / layout 6; 10 same geometry plus encounter catalogue 1 / layout 7. Unchanged `urban.meta` v1 validates the layout; plans not serialized | Cache per `World`, discarded on new/load | ≤ 256 buildings; ≤ 73,984 cells/plan |
+| 4 | Building, floor, room and fixture plans | Derived | `BuildingPlanner` / `BuildingPlan` | 05–06, 08 | 3 | Generator 6 selects template 1 / layout 3; 7 furnished template 2 / layout 4; 8 shaped template 3 / layout 5; 9 starter template 4 / layout 6; 10 same geometry plus encounter catalogue 1 / layout 7; 11 the commercial and civic catalogue, template 5 / layout 8, walk-ups unchanged. Unchanged `urban.meta` v1 validates the layout; plans not serialized | Cache per `World`, discarded on new/load | ≤ 256 buildings; ≤ 73,984 cells/plan |
 | 5 | Generated blocks plus edits | Derived plus deltas | Generator and `World` | 03, 06 | 3, 4 | `changedBlocks` (v3 base, last-write log, B-29) | — | 4,000,000 edits |
 | 6 | Fixture state: door or window open, keyed lock or one-sided bar (broken is a recorded block edit); barricade health later | Persistent, touched cells only | `FixtureStates` on `World` | 04, 06 | 4 | `world.fixtures` v1 (D-49); absent follows generated lock defaults, or unlocked for edited/player-placed fixtures; explicit saved unlock overrides the plan | Load replaces; reapplied after structure and recorded edits on chunk generation | ≤ 32,768 cells on write and read |
 | 7 | Container identity, state and owner; authoritative contents | Persistent, touched only | `UrbanContainers` metadata; `World.crateContents` inventory | 07–08 | 2, 4 | `urban.containers` v1; required for content ≥ 2; content-1 absence adopts core contents/empties and edited reservations | Load replaces; never re-rolled | ≤ 32,768 rows/core inventories; 12 slots; 20-byte header + 36 bytes/row metadata |
 | 8 | Search progress; open target and rummage timer | Progress persistent; target/timer transient | Ledger; `CrateTransactionSystem` | 07 | 7 | Progress in `urban.containers`; load closes UI but retains elapsed work (D-72 revises the initial transient proposal) | Load replaces progress; resets target/timer | One active search |
 | 9 | Starter refuge identity and ground-floor respawn anchor; claims later | Persistent | `UrbanWorldState` / `UrbanBootstrap`; `RefugeSystem` later | 08, 18 | 4 | `urban.refuges` v1, required for generators 9–10; absent on older worlds means no claim | New sets starter once; load replaces without replenishing | One starter anchor; ≤ 3 claims in 18 |
-| 10 | Encounter identities, durable injuries/positions and permanent deaths | Persistent | `EntityManager.encounters` / `UrbanEncounterDirector` | 09, 15 | 4 | `urban.population` v1/catalogue 1; required for generator 10, absent on earlier worlds means no encounters | New clears; load replaces; dormancy pauses; no migration or replacement generation | 32,768 rows, 47 bytes/row + 12-byte header |
+| 10 | Encounter identities, durable injuries/positions and permanent deaths | Persistent | `EntityManager.encounters` / `UrbanEncounterDirector` | 09, 15 | 4 | `urban.population` v1 with catalogue 1 (generator 10) or 2 (generator 11, D-102); required for generators 10–11, absent on earlier worlds means no encounters | New clears; load replaces; dormancy pauses; no migration or replacement generation | 32,768 rows, 47 bytes/row + 12-byte header |
 | 11 | Live hostile brain, pain, fire, panic and route intent | Transient | `Npc` / `InfectedAI` | 09 | 10 | Body health/position/yaw remain in frozen core when active, linked by population index; durable torso wounds in population | Re-derived on activation/load; pending strikes forgotten by Creative perception controls | 12 active, two per building; two spawns/slow tick |
 | 12 | Portals, route caches, path budget | Derived and transient | `PortalGraph`, `PathBudget` | 10 | 4, 6 | Not saved | Invalidated by edits and doors | ≤ 64 routes |
 | 13 | District overlays (flood, contamination, growth) | Derived; consequential changes persistent | `DistrictRules` | 13, 15 | 3 | Within `urban.population` or `urban.sites` as decided | — | Capped |
