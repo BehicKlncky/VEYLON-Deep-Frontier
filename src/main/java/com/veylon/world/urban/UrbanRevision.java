@@ -68,6 +68,12 @@ public final class UrbanRevision {
      * uses, and the {@link UrbanOverlay} raster, on the unchanged layout-two street lattice.
      */
     public static final int LAYOUT_DISTRICTS = 9;
+    /**
+     * The district catalogue (milestone 13): which family and variant each parcel of a
+     * six-district plan carries. Its plans are template-four walk-ups and template-five
+     * commercial and civic buildings, so it selects proven geometry rather than adding any.
+     */
+    public static final int BUILDING_TEMPLATE_DISTRICTS = 6;
 
     /** Content revision every new urban world records. */
     public static final int CURRENT_CONTENT = 3;

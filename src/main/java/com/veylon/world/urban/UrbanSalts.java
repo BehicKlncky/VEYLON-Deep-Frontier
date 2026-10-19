@@ -91,6 +91,12 @@ public final class UrbanSalts {
     public static final long OVERLAY_PLANT = 0x564f_5650_4c41_4e54L;
     /** Where powder kegs were left in an industrial yard. */
     public static final long OVERLAY_KEG = 0x564f_564b_4547_5321L;
+    /** Template revision six: which family a commercial lot carries in its district. */
+    public static final long DISTRICT_FAMILY = 0x5644_4641_4d49_4c59L;
+    /** Which residential lots of a district become its schools, posts, clinics and offices. */
+    public static final long DISTRICT_SITE = 0x5644_5349_5445_5321L;
+    /** A district's abandonment variant for its specialist buildings and walk-ups. */
+    public static final long DISTRICT_VARIANT = 0x5644_5641_5249_414eL;
 
     private UrbanSalts() {
     }

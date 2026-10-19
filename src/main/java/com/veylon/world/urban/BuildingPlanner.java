@@ -22,8 +22,8 @@ public final class BuildingPlanner {
      * chooses families from the parcel's district, so it needs {@link #plan(long, int, ParcelPlan, DistrictPlan)}.
      */
     public static Result plan(long seed, int revision, ParcelPlan parcel) {
-        if (revision == UrbanRevision.BUILDING_TEMPLATE_CIVIC) {
-            throw new IllegalArgumentException("template revision five plans a parcel within its district");
+        if (revision == UrbanRevision.BUILDING_TEMPLATE_CIVIC || revision == UrbanRevision.BUILDING_TEMPLATE_DISTRICTS) {
+            throw new IllegalArgumentException("template revision " + revision + " plans a parcel within its district");
         }
         Family family = parcel.use() == ParcelPlan.Use.COMMERCIAL ? Family.SHOP : Family.APARTMENT;
         int storeys = family == Family.SHOP ? Math.min(2, parcel.maxStoreys()) : Math.min(5, parcel.maxStoreys());
@@ -48,12 +48,38 @@ public final class BuildingPlanner {
      * walk-up there is exactly the revision-four plan, starter superblock included.
      */
     public static Result plan(long seed, int revision, ParcelPlan parcel, DistrictPlan district) {
+        if (revision == UrbanRevision.BUILDING_TEMPLATE_DISTRICTS) { return planDistrict(seed, parcel, district); }
         if (revision != UrbanRevision.BUILDING_TEMPLATE_CIVIC) { return plan(seed, revision, parcel); }
         Family family = CivicCatalogue.family(seed, district, parcel);
         if (family.walkUp()) { return plan(seed, UrbanRevision.BUILDING_TEMPLATE_STARTER, parcel); }
         int storeys = CivicTemplates.envelope(family).storeys(parcel);
         BuildingPlan candidate = BuildingTemplates.propose(parcel, revision, family,
                 CivicCatalogue.variant(seed, parcel), storeys, CivicCatalogue.basement(seed, family, parcel), false);
+        return repair(candidate);
+    }
+
+    /**
+     * Revision six, the district catalogue: the family and variant follow the parcel's district
+     * ({@link DistrictCatalogue}); the plan itself comes from template four (walk-ups) or five
+     * (commercial and civic families). A walk-up whose district keeps template four's variant
+     * is exactly the revision-four plan.
+     */
+    private static Result planDistrict(long seed, ParcelPlan parcel, DistrictPlan district) {
+        Family family = DistrictCatalogue.family(seed, district, parcel);
+        if (family.walkUp()) {
+            Variant variant = DistrictCatalogue.walkUpVariant(seed, district, parcel);
+            if (variant == null) { return plan(seed, UrbanRevision.BUILDING_TEMPLATE_STARTER, parcel); }
+            // Template four's storeys and basement, with the district's abandonment variant.
+            int storeys = family == Family.SHOP ? Math.min(2, parcel.maxStoreys()) : Math.min(5, parcel.maxStoreys());
+            boolean basement = family == Family.APARTMENT && UrbanHash.range(0, 1, seed,
+                    UrbanRevision.BUILDING_TEMPLATE_FURNISHED, UrbanSalts.BUILDING_BASEMENT, parcel.id(), 0, 0) == 1;
+            return repair(BuildingTemplates.propose(parcel, UrbanRevision.BUILDING_TEMPLATE_STARTER, family, variant,
+                    storeys, basement, false));
+        }
+        int storeys = CivicTemplates.envelope(family).storeys(parcel);
+        BuildingPlan candidate = BuildingTemplates.propose(parcel, UrbanRevision.BUILDING_TEMPLATE_CIVIC, family,
+                DistrictCatalogue.variant(seed, district, parcel), storeys, CivicCatalogue.basement(seed, family, parcel),
+                false);
         return repair(candidate);
     }
 

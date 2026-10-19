@@ -99,7 +99,16 @@ public final class BuildingPlanDiagnostics {
      * fallback failed. Plans only; no world, chunk or save slot is touched.
      */
     public static String catalogue(long seed, int rx, int rz) {
-        DistrictPlan district = CityPlanner.planStarter(seed, rx, rz);
+        return catalogue(seed, CityPlanner.planStarter(seed, rx, rz), UrbanRevision.BUILDING_TEMPLATE_CIVIC);
+    }
+
+    /** The same report for a layout-nine region under the district catalogue (revision six). */
+    public static String districts(long seed, int rx, int rz) {
+        return catalogue(seed, CityPlanner.planDistricts(seed, rx, rz), UrbanRevision.BUILDING_TEMPLATE_DISTRICTS);
+    }
+
+    private static String catalogue(long seed, DistrictPlan district, int revision) {
+        int rx = district.rx, rz = district.rz;
         StringBuilder out = new StringBuilder();
         Map<String, Integer> templates = new TreeMap<>();
         int repaired = 0, failed = 0;
@@ -107,8 +116,7 @@ public final class BuildingPlanDiagnostics {
                 seed, rx, rz, district.district, district.parcels().size()));
         for (ParcelPlan parcel : district.parcels()) {
             try {
-                BuildingPlanner.Result result = BuildingPlanner.plan(seed, UrbanRevision.BUILDING_TEMPLATE_CIVIC,
-                        parcel, district);
+                BuildingPlanner.Result result = BuildingPlanner.plan(seed, revision, parcel, district);
                 templates.merge(result.plan().family() + "/" + result.plan().template(), 1, Integer::sum);
                 if (result.attempts() > 1) {
                     repaired++;
