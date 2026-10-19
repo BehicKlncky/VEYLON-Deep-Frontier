@@ -215,6 +215,41 @@ class RouteCatalogueTest {
         }
     }
 
+    /**
+     * Inside its own plan, no cell a body reaches from a template-seven building's entrances
+     * stands beside a drop deeper than the safe limit: the stair core's open well is railed, the
+     * parapets have two courses. Route heads lead to outside parts the generated world proves.
+     */
+    @Test
+    void noReachedCellOfATemplateSevenBuildingStandsBesideAnUnguardedDrop() {
+        int checked = 0;
+        for (DistrictPlan district : regions(SEEDS[0]).values()) {
+            Region region = plan(SEEDS[0], district);
+            for (BuildingPlan plan : region.plans().values()) {
+                if (plan.templateRevision() != RouteTemplates.REVISION) { continue; }
+                PlanVolume v = plan.voxels();
+                PlanVolume.Builder open = v.edit();
+                java.util.Set<Vec3i> heads = new java.util.HashSet<>();
+                for (BuildingPlan.Fixture f : plan.fixtures()) {
+                    if (f.kind() == FixtureKind.ROUTE) { heads.add(f.position()); }
+                    if (f.kind() == FixtureKind.DOOR && !f.locked() && f.block() != BlockType.HIDDEN_PANEL) {
+                        for (int h = 0; h < f.height(); h++) {
+                            open.set(f.position().x(), f.position().y() + h, f.position().z(), BlockType.WOOD_DOOR_OPEN);
+                        }
+                    }
+                }
+                RouteProof.Box box = new RouteProof.Box(v.x0, v.minY + 1, v.z0, v.x0 + v.width - 1, v.maxY, v.z0 + v.depth - 1);
+                RouteProof.Result proof = RouteProof.prove(open.build(), box, plan.approaches());
+                // A route head's second cell is the opening's other half, on the parapet line at roof level.
+                List<Vec3i> traps = proof.fallTraps().stream().filter(t -> !heads.contains(t)
+                        && !(t.y() == plan.roofY() + 1 && plan.parcel().onOutline(t.x(), t.z()))).toList();
+                assertTrue(traps.isEmpty(), () -> BuildingPlanner.identity(plan) + " traps " + traps);
+                checked++;
+            }
+        }
+        assertTrue(checked > 300, "buildings checked " + checked);
+    }
+
     @Test
     void connectorsAndFireEscapesAreDeclaredByEveryBuildingTheyTouch() {
         int escapes = 0, connectors = 0, bridges = 0;

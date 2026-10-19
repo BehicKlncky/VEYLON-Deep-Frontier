@@ -1,6 +1,7 @@
 package com.veylon.world.urban;
 
 import com.veylon.util.Vec3i;
+import com.veylon.world.BlockType;
 import com.veylon.world.VoxelAccess;
 import com.veylon.world.VoxelClearance;
 
@@ -166,10 +167,14 @@ public final class RouteProof {
      * True when a body standing here could walk sideways into open air with no floor within the
      * safe drop: both the feet and head cells of the neighbour are open and nothing below the
      * feet, down to {@link VoxelClearance#MAX_DROP} cells, is standable. Water and ladders
-     * break a fall, as they do for the body. Neighbours outside the box are not judged.
+     * break a fall, as they do for the body. Neighbours outside the box are not judged, and
+     * neither is a body standing in a window opening or on top of a guard rail: climbing onto a
+     * sill, or out of one onto a rail, is a deliberate act, never a route.
      */
     static boolean hasFallBeside(VoxelAccess access, Box box, Vec3i p) {
-        if (access.getBlock(p.x(), p.y(), p.z()).isClimbable()) { return false; }
+        BlockType feet = access.getBlock(p.x(), p.y(), p.z());
+        if (feet.isClimbable() || feet == BlockType.WINDOW_OPEN || feet == BlockType.BROKEN_WINDOW
+                || access.getBlock(p.x(), p.y() - 1, p.z()) == BlockType.RAILING) { return false; }
         for (int[] d : DIRS) {
             int x = p.x() + d[0], z = p.z() + d[1], y = p.y();
             if (!box.contains(x, y, z) || !access.isColumnLoaded(x, z)) { continue; }
@@ -223,7 +228,7 @@ public final class RouteProof {
 
     private static VoxelAccess local(VoxelAccess world, int ox, int oz) {
         return new VoxelAccess() {
-            @Override public com.veylon.world.BlockType getBlock(int x, int y, int z) {
+            @Override public BlockType getBlock(int x, int y, int z) {
                 return world.getBlock(x + ox, y, z + oz);
             }
             @Override public boolean isColumnLoaded(int x, int z) { return world.isColumnLoaded(x + ox, z + oz); }

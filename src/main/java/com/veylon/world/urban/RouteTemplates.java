@@ -21,6 +21,8 @@ import java.util.List;
  * four and five survives; it adds:
  *
  * <ul>
+ *   <li>a rail column in the stair core's open well, so no landing or hall cell stands beside a
+ *       drop deeper than the safe limit;</li>
  *   <li>on every roof, a guard rail on the parapet, so the two-course edge is never stepped
  *       over, and a concrete bulkhead around the stairwell with a metal roof door, which keeps
  *       the rain out of the stairs (the volume grows by one cell for its roof slab);</li>
@@ -57,6 +59,7 @@ public final class RouteTemplates {
      */
     public static BuildingPlan apply(BuildingPlan plan, Expect expect, Features features, boolean flooded) {
         Overlay o = new Overlay(plan, expect);
+        o.guardStairwell();
         o.roof(features);
         o.serviceDoors(features);
         if (features.hiddenCellar()) { o.cellar(); }
@@ -93,6 +96,20 @@ public final class RouteTemplates {
 
 
         long roofRoom() { return UrbanIds.room(UrbanIds.floor(plan.id(), plan.storeys()), 0); }
+
+        /**
+         * The switchback leaves skeleton row 6 of its core open from the lowest floor to the roof:
+         * beside every intermediate landing, and beside the hall over a basement stair, a misstep
+         * would fall four to six blocks. A rail column fills that row; no flight or landing uses it.
+         */
+        void guardStairwell() {
+            int bottom = UrbanDatum.slabY(plan.basement() ? -1 : 0) + 1;
+            for (int u = core; u <= core + 3; u++) {
+                for (int y = bottom; y <= roof + 3; y++) {
+                    if (at(u, y, 6) == BlockType.AIR) { put(u, y, 6, BlockType.RAILING); }
+                }
+            }
+        }
 
         // ---- the roof ----------------------------------------------------------------------
 
