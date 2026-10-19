@@ -60,6 +60,7 @@ final class PlayerEnvironmentSystem {
     void mediumTick(float dt) {
         updateShelterAndSmoke(dt);
         game.player.tickToxicFogExposure(game);
+        game.player.tickContaminationExposure(game);
         discoverNearbyPois();
     }
 

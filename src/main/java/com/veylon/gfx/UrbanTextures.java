@@ -52,6 +52,7 @@ final class UrbanTextures {
             case "debris" -> debris(p);
             case "sign_board" -> signBoard(p, variant);
             case "sign_edge" -> planksFlat(p, 0x5a4a36);
+            case "contaminated" -> contaminated(p, variant);
             default -> {
                 return false;
             }
@@ -537,6 +538,25 @@ final class UrbanTextures {
         p.fillFbmBlend(0x6e5a40, 0.7f, 8, 1336 + variant, 0.5f);
         p.blob(5, 5, 1, 0x5a4a3a);
         p.blob(n - 6, 5, 1, 0x5a4a3a);
+        p.grain(0.05f);
+    }
+
+    /**
+     * Contaminated ground (milestone 13): a dark oily crust with sickly yellow-green blooms and
+     * glossy black seeps, so it reads as "do not stand here" against asphalt, ash and grass.
+     */
+    private static void contaminated(Painter p, int variant) {
+        int salt = variant * 61;
+        p.fillFbm(0x2f3426, 0.14f, 6, 1401 + salt);
+        for (int i = 0; i < 14; i++) {
+            int x = p.ri(i * 3 + 1402 + salt), y = p.ri(i * 3 + 1403 + salt);
+            int r = 2 + (int) (p.rf(i + 1404 + salt) * 4);
+            p.blob(x, y, r, p.shade(0x9cb23c, 0.7f + p.rf(i + 1405 + salt) * 0.35f));
+        }
+        for (int i = 0; i < 5; i++) {
+            int x = p.ri(i * 2 + 1406 + salt), y = p.ri(i * 2 + 1407 + salt);
+            p.blob(x, y, 2 + (int) (p.rf(i + 1408 + salt) * 3), 0x15170f);
+        }
         p.grain(0.05f);
     }
 

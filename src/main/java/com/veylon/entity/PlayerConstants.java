@@ -235,6 +235,11 @@ public final class PlayerConstants {
     public static final double TOXIC_FOG_SICKNESS_CHANCE = 0.04;
     public static final float TOXIC_FOG_SICKNESS_SECONDS = 120f;
 
+    /** Per medium tick standing on contaminated ground; worn boots cut it to a quarter. */
+    public static final double CONTAMINATION_SICKNESS_CHANCE = 0.10;
+    public static final double BOOTED_CONTAMINATION_SICKNESS_CHANCE = 0.025;
+    public static final float CONTAMINATION_SICKNESS_SECONDS = 90f;
+
     /**
      * Salt for the player's affliction generator, so its stream stays
      * independent of the fifteen simulation generators seeded from the same

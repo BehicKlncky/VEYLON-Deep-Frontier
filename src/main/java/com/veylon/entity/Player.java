@@ -9,6 +9,7 @@ import com.veylon.simulation.FireConstants;
 import com.veylon.simulation.ShelterSystem;
 import com.veylon.util.MathUtil;
 import com.veylon.world.Biome;
+import com.veylon.world.BlockType;
 import com.veylon.world.World;
 
 import java.util.EnumMap;
@@ -540,6 +541,34 @@ public class Player extends Entity {
         }
         addAffliction(Affliction.SICKNESS, TOXIC_FOG_SICKNESS_SECONDS);
         g.log("The toxic fog claws at your lungs... SICKNESS takes hold.");
+        return true;
+    }
+
+    /**
+     * Rolls for sickness while the player stands on contaminated ground: chemical spills in the
+     * industrial yards and quarantine runoff (milestone 13). Driven from the medium tick beside
+     * the toxic-fog roll and drawing on the same seeded generator, but only on that ground, so
+     * worlds without it consume nothing. Worn boots cut the chance to a quarter; a Creative
+     * body is immune.
+     *
+     * @return true only when this call inflicted sickness
+     */
+    public boolean tickContaminationExposure(Game g) {
+        if (abilities.invulnerable() || dead || !onGround || has(Affliction.SICKNESS)) {
+            return false;
+        }
+        BlockType under = world.getBlock((int) Math.floor(pos.x), (int) Math.floor(pos.y - 0.05f),
+                (int) Math.floor(pos.z));
+        if (under != BlockType.CONTAMINATED_GROUND) {
+            return false;
+        }
+        double chance = equipped(EquipSlot.FEET) != null
+                ? BOOTED_CONTAMINATION_SICKNESS_CHANCE : CONTAMINATION_SICKNESS_CHANCE;
+        if (rng.nextDouble() >= chance) {
+            return false;
+        }
+        addAffliction(Affliction.SICKNESS, CONTAMINATION_SICKNESS_SECONDS);
+        g.log("The contaminated ground seeps through... SICKNESS takes hold. Get off it.");
         return true;
     }
 

@@ -107,7 +107,11 @@ public enum BlockType {
 
     // Milestone 12: a painted frontage board set into the facade above an entrance. Its words
     // come from the building plan, so breaking it salvages nothing and no item places one.
-    SIGN("Painted Sign", Shape.CUBE, true, true, true, 1.5f, ToolKind.AXE, false, null, 0, 0, 0f, 0.66f, 0.58f, 0.40f);
+    SIGN("Painted Sign", Shape.CUBE, true, true, true, 1.5f, ToolKind.AXE, false, null, 0, 0, 0f, 0.66f, 0.58f, 0.40f),
+
+    // Milestone 13: spilled chemicals and quarantine runoff crusted over the ground. Standing on
+    // it risks sickness in Survival; scraping it away by hand leaves a shallow pit and nothing else.
+    CONTAMINATED_GROUND("Contaminated Ground", Shape.CUBE, true, true, false, 1.2f, ToolKind.NONE, false, null, 0, 0, 0f, 0.36f, 0.42f, 0.20f);
 
     /**
      * How a block is meshed. Not persisted: only {@link BlockType} ordinals are

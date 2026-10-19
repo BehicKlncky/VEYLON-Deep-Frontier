@@ -111,6 +111,9 @@ public final class CreativePalette {
         excluded.put(BlockType.SIGN,
                 "a generated frontage board whose words come from its building's plan; a placed"
                         + " copy would name nothing");
+        excluded.put(BlockType.CONTAMINATED_GROUND,
+                "a district hazard crust planned with its yard or quarantine block; no item"
+                        + " carries it, and scraping it away yields nothing");
         EXCLUDED = Collections.unmodifiableMap(excluded);
     }
 

@@ -26,7 +26,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /** R8: each external damage/illness command has a harmful Survival twin. */
 class CreativeHazardsTest {
-    enum Hazard { FIRE, EXPLOSION, ARROW, BULLET, FOOD, DIRTY_WATER, OPEN_WATER, TOXIC_FOG, SLEEP }
+    enum Hazard { FIRE, EXPLOSION, ARROW, BULLET, FOOD, DIRTY_WATER, OPEN_WATER, TOXIC_FOG, SLEEP, CONTAMINATED_GROUND }
 
     @ParameterizedTest
     @EnumSource(Hazard.class)
@@ -91,6 +91,10 @@ class CreativeHazardsTest {
             case TOXIC_FOG -> {
                 game.events.active.add(new EventSystem.ActiveEvent(EventSystem.EventType.TOXIC_FOG, 10000, 1));
                 for (int i = 0; i < 512; i++) game.player.tickToxicFogExposure(game);
+            }
+            case CONTAMINATED_GROUND -> {
+                game.world.setBlock(310, 39, 310, BlockType.CONTAMINATED_GROUND, false);
+                for (int i = 0; i < 512; i++) game.player.tickContaminationExposure(game);
             }
             case SLEEP -> {
                 for (int i = 0; i < 32; i++) {
