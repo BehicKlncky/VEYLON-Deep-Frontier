@@ -43,6 +43,8 @@ final class UrbanQaScenes {
     private final UrbanSliceQaScene slice;
     /** Package 12: one building of each commercial and civic family ({@code urban_catalogue}). */
     private final UrbanCatalogueQaScene catalogue;
+    /** Package 13: a walked district transition and every district by day, night and fog ({@code urban_districts}). */
+    private final UrbanDistrictQaScene districts;
     private final PlayerMovementSystem.Command walk = new PlayerMovementSystem.Command();
     private boolean holding;
     private float holdX;
@@ -76,6 +78,7 @@ final class UrbanQaScenes {
         this.navigation = new UrbanNavigationQaScene(game);
         this.slice = new UrbanSliceQaScene(game);
         this.catalogue = new UrbanCatalogueQaScene(game);
+        this.districts = new UrbanDistrictQaScene(game);
     }
 
     /** Stages one of the urban scenes; inert, with a notice, outside a street-network world. */
@@ -96,6 +99,10 @@ final class UrbanQaScenes {
         }
         if (scene.equals("urban_catalogue")) {
             catalogue.stage(); // a normal session too: only poses between buildings and the kit are staged
+            return;
+        }
+        if (scene.equals("urban_districts")) {
+            districts.stage(); // a normal session: only poses between stops, the clock, weather and spear are staged
             return;
         }
         if (!world.isUrban() || !world.urban.hasCityPlan()) {
@@ -187,6 +194,7 @@ final class UrbanQaScenes {
 
     UrbanSliceQaScene slice() { return slice; }
     UrbanCatalogueQaScene catalogue() { return catalogue; }
+    UrbanDistrictQaScene districts() { return districts; }
 
     /** Per-frame hook, before streaming and rendering; inert unless a scene is staged. */
     void update(double elapsed) {
@@ -207,6 +215,7 @@ final class UrbanQaScenes {
         navigation.update(elapsed);
         slice.update(elapsed);
         catalogue.update(elapsed);
+        districts.update(elapsed);
         if (holding) {
             apply();
         }
