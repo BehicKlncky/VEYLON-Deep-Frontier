@@ -42,8 +42,8 @@ public final class UrbanBuildingStamper {
     private static BlockType surface(UrbanSurface surface) {
         return switch (surface) {
             case ROADWAY -> BlockType.ASPHALT;
-            case SIDEWALK, PASSAGE, PLAZA, DATUM, ENTRANCE -> BlockType.PAVING;
-            case LOT_EDGE, STAIR_CORE -> BlockType.CONCRETE;
+            case SIDEWALK, PASSAGE, PLAZA, DATUM, ENTRANCE, BRIDGE -> BlockType.PAVING;
+            case LOT_EDGE, STAIR_CORE, YARD -> BlockType.CONCRETE;
             default -> UrbanSurfaceMaterials.blockFor(surface);
         };
     }

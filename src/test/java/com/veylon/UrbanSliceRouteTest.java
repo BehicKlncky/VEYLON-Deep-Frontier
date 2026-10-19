@@ -51,6 +51,22 @@ class UrbanSliceRouteTest {
         }
     }
 
+    /**
+     * Generator 12 (milestone 13) keeps that starter superblock under six districts: district
+     * overlays stay out of it and its neighbours are residential or commercial by construction.
+     * The loop must still hold, and the residential starter region now reports its own climate.
+     */
+    @Test
+    void theSliceLoopStillCompletesOnTheSixDistrictGenerator() {
+        for (long seed : SLICE_SEEDS) {
+            UrbanSliceRun run = new UrbanSliceRun(seed, GameMode.SURVIVAL, World.GEN_URBAN_DISTRICTS).play();
+            assertTrue(run.slice().passed(), "seed=" + seed);
+            assertEquals(World.GEN_URBAN_DISTRICTS, run.game.world.generatorVersion);
+            assertTrue(run.game.player.inventory.count(ItemType.IRON_SPEAR) >= 1, "the first upgrade seed=" + seed);
+            assertSame(com.veylon.world.Biome.MEADOW, run.game.player.biome, "reclaimed residential climate");
+        }
+    }
+
     @Test
     void frozenSeedsPlayTheScavengeRiskReturnLoopInSurvivalAndCreative() {
         for (GameMode mode : GameMode.values()) {

@@ -187,8 +187,11 @@ public class WorldGenerator {
             // Exact dispatch: the urban branch shares no terrain, cave, ore,
             // decoration, POI or settlement step with generators 1-3 (D-02).
             // Its layout revision picks the datum or the city plan; soil
-            // moisture still follows the climate biome (D-08).
-            world.urban.stamp(c, biomeAt(baseX + 8, baseZ + 8).moisture);
+            // moisture still follows the climate biome (D-08): the district's own climate in
+            // six-district cities, the frozen noise climate in earlier urban layouts.
+            Biome climate = world.urban.hasDistricts() ? world.biomeAt(baseX + 8, baseZ + 8)
+                    : biomeAt(baseX + 8, baseZ + 8);
+            world.urban.stamp(c, climate.moisture);
             return;
         }
         boolean deep = deep();

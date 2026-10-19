@@ -97,8 +97,13 @@ public final class UrbanWorldState {
     public boolean hasEncounters() {
         return layoutRevision == UrbanRevision.LAYOUT_ENCOUNTERS || hasCivicCatalogue();
     }
-    /** Layout eight: commercial and civic families on the generator-ten starter city. */
-    public boolean hasCivicCatalogue() { return layoutRevision == UrbanRevision.LAYOUT_CIVIC; }
+    /**
+     * Commercial and civic families exist: layout eight on the generator-ten starter city, and
+     * layout nine, whose district catalogue places them by district.
+     */
+    public boolean hasCivicCatalogue() { return layoutRevision == UrbanRevision.LAYOUT_CIVIC || hasDistricts(); }
+    /** Layout nine: six districts with overlays, district climates and encounter catalogue three. */
+    public boolean hasDistricts() { return layoutRevision == UrbanRevision.LAYOUT_DISTRICTS; }
 
     public boolean contentRevisionResolved() {
         return contentRevision != UNRESOLVED;
@@ -150,6 +155,7 @@ public final class UrbanWorldState {
         UrbanChunkStamper.stamp(chunk, district, soilMoisture);
         if (hasGeneratedBuildings()) {
             UrbanBuildingStamper.stamp(chunk, district, this);
+            if (hasDistricts()) { UrbanOverlayStamper.stamp(chunk, district); }
             if (hasStarter() && rx == 0 && rz == 0) { UrbanStarterSite.of(this).stamp(chunk); }
         }
     }
@@ -167,8 +173,10 @@ public final class UrbanWorldState {
             throw new IllegalStateException("layout revision " + layoutRevision + " has no city plan");
         }
         long key = UrbanIds.district(rx, rz);
-        // Generators 6 and 7 explicitly inherit layout-2 city fabric, not new hash inputs.
-        return regionPlans.get(key, ignored -> hasStarter() ? CityPlanner.planStarter(seed, rx, rz)
+        // Generators 6 and 7 explicitly inherit layout-2 city fabric, not new hash inputs;
+        // layout nine keeps that lattice and adds its districts.
+        return regionPlans.get(key, ignored -> hasDistricts() ? CityPlanner.planDistricts(seed, rx, rz)
+                : hasStarter() ? CityPlanner.planStarter(seed, rx, rz)
                 : CityPlanner.plan(seed, UrbanRevision.LAYOUT_STREET_NETWORK, rx, rz));
     }
 

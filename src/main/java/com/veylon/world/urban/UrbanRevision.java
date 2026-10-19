@@ -64,8 +64,9 @@ public final class UrbanRevision {
     /** Layout of {@link World#GEN_URBAN_CIVIC}: layout seven plus template five. */
     public static final int LAYOUT_CIVIC = 8;
     /**
-     * Six districts (milestone 13): {@link DistrictMap} identities, district superblocks and
-     * uses, and the {@link UrbanOverlay} raster, on the unchanged layout-two street lattice.
+     * Layout of {@link World#GEN_URBAN_DISTRICTS}, six districts (milestone 13):
+     * {@link DistrictMap} identities, district superblocks and uses, and the
+     * {@link UrbanOverlay} raster, on the unchanged layout-two street lattice.
      */
     public static final int LAYOUT_DISTRICTS = 9;
     /**
@@ -87,7 +88,7 @@ public final class UrbanRevision {
     public static final int ABSENT_CONTENT = 1;
 
     /** The urban generator the development selector creates: the newest layout. */
-    public static final int DEVELOPMENT_GENERATOR = World.GEN_URBAN_CIVIC;
+    public static final int DEVELOPMENT_GENERATOR = World.GEN_URBAN_DISTRICTS;
 
     private UrbanRevision() {
     }
@@ -107,6 +108,7 @@ public final class UrbanRevision {
             case World.GEN_URBAN_STARTER -> LAYOUT_STARTER;
             case World.GEN_URBAN_ENCOUNTERS -> LAYOUT_ENCOUNTERS;
             case World.GEN_URBAN_CIVIC -> LAYOUT_CIVIC;
+            case World.GEN_URBAN_DISTRICTS -> LAYOUT_DISTRICTS;
             default -> throw new IllegalArgumentException(
                     "generator " + generatorVersion + " is not an urban generator");
         };
@@ -121,6 +123,7 @@ public final class UrbanRevision {
             case World.GEN_URBAN_SHAPED_STAIRS -> BUILDING_TEMPLATE_SHAPED_STAIRS;
             case World.GEN_URBAN_STARTER, World.GEN_URBAN_ENCOUNTERS -> BUILDING_TEMPLATE_STARTER;
             case World.GEN_URBAN_CIVIC -> BUILDING_TEMPLATE_CIVIC;
+            case World.GEN_URBAN_DISTRICTS -> BUILDING_TEMPLATE_DISTRICTS;
             default -> throw new IllegalArgumentException("not an urban generator " + generatorVersion);
         };
     }

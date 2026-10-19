@@ -97,6 +97,8 @@ public final class UrbanSalts {
     public static final long DISTRICT_SITE = 0x5644_5349_5445_5321L;
     /** A district's abandonment variant for its specialist buildings and walk-ups. */
     public static final long DISTRICT_VARIANT = 0x5644_5641_5249_414eL;
+    /** Encounter catalogue three: a region's threat budget and which buildings spend it. */
+    public static final long DISTRICT_THREATS = 0x5644_5448_5245_4154L;
 
     private UrbanSalts() {
     }

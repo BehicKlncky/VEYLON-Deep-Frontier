@@ -45,6 +45,33 @@ class UrbanCatalogueQaSceneTest {
         assertTrue(game.player.inventory.count(ItemType.IRON_PICKAXE) == 1, "nothing was taken or lost");
     }
 
+    /**
+     * The development selector now creates generator 12, whose district catalogue keeps every
+     * family within one region of the spawn (a school in residential regions, a police post
+     * downtown), so the native catalogue walk still finds a building of each.
+     */
+    @Test
+    void theWalkStillVisitsEveryFamilyOnTheSixDistrictGenerator() {
+        Game game = new Game();
+        game.newWorld(20260731, true, World.GEN_URBAN_DISTRICTS, GameMode.SURVIVAL);
+        game.appState = Game.AppState.PLAYING;
+        UrbanQaScenes scenes = new UrbanQaScenes(game);
+        HotkeyRouter router = new HotkeyRouter(game);
+        scenes.stage("urban_catalogue");
+        UrbanCatalogueQaScene walk = scenes.catalogue();
+        double time = 0;
+        while (!walk.reported()) {
+            if (time > UrbanCatalogueQaScene.DEADLINE_SECONDS + 5) { fail("the walk never reported"); }
+            scenes.update(time);
+            if (game.appState != Game.AppState.DEATH && game.appState != Game.AppState.VICTORY) { router.update(); }
+            game.playStep(DT, DT);
+            game.world.ensureChunks((int) game.player.pos.x, (int) game.player.pos.z, game.renderer.renderRadius(), 2);
+            game.input.endFrame();
+            time += DT;
+        }
+        assertTrue(walk.passed());
+    }
+
     @Test
     void theWalkNeedsTheCivicCatalogueGenerator() {
         Game game = new Game();

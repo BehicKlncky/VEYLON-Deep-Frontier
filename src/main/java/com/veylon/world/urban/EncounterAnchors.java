@@ -2,6 +2,10 @@ package com.veylon.world.urban;
 
 import com.veylon.util.Vec3i;
 import com.veylon.world.World;
+import com.veylon.world.urban.BuildingPlan.Family;
+
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 
 /**
@@ -10,6 +14,14 @@ import java.util.List;
  * walk-ups and adds guard reservations to the commercial and civic families: every clinic and
  * security post keeps its lobby occupied (the encounter cost of secured medicine and
  * ammunition), and one in four other specialist buildings keeps its main back room.
+ *
+ * <p>Catalogue three (generator 12, milestone 13) gives every planning region its district's
+ * threat budget ({@link DistrictRules.Profile#threatMin} to {@link DistrictRules.Profile#threatMax}
+ * anchors, DESIGN §4.3), two anchors per building. It spends the budget on unheld buildings
+ * outside the starter superblock: clinics and security posts first, then the rest by a stable
+ * hash. A walk-up gets catalogue one's room, a specialist building catalogue two's. The
+ * starter superblock keeps catalogue one's slots, and they count against the spawn region's
+ * budget. The threat itself is still the Veilbound: alien organisms are milestone 15.
  */
 public final class EncounterAnchors {
     public record Anchor(long id, long building, Vec3i cell, boolean indoor) { }
@@ -17,7 +29,10 @@ public final class EncounterAnchors {
 
     /** The catalogue a world's generator freezes; it is written beside the population codec. */
     public static int catalogue(World world) {
-        return world.urban != null && world.urban.hasCivicCatalogue() ? 2 : 1;
+        if (world.urban == null) {
+            return 1;
+        }
+        return world.urban.hasDistricts() ? 3 : world.urban.hasCivicCatalogue() ? 2 : 1;
     }
 
     public static boolean selected(World world, ParcelPlan parcel) {
@@ -27,12 +42,20 @@ public final class EncounterAnchors {
     }
 
     public static List<Anchor> forParcel(World world, ParcelPlan parcel) {
-        if (catalogue(world) == 2) {
+        int catalogue = catalogue(world);
+        if (catalogue == 3 && !UrbanStarterSite.isNeighbour(parcel)) {
+            return budgeted(world, parcel);
+        }
+        if (catalogue == 2) {
             BuildingPlan plan = world.urban.buildingAt(parcel.x0(), parcel.z0());
             if (!plan.family().walkUp()) { return civic(world, plan); }
         }
         if (!selected(world, parcel)) { return List.of(); }
-        BuildingPlan plan = world.urban.buildingAt(parcel.x0(), parcel.z0());
+        return walkUp(world.urban.buildingAt(parcel.x0(), parcel.z0()));
+    }
+
+    /** Catalogue one's slots: the street approach and the first ground-floor living room or kitchen. */
+    private static List<Anchor> walkUp(BuildingPlan plan) {
         if (plan.variant() == BuildingPlan.Variant.OCCUPIED) { return List.of(); }
         for (var floor : plan.floors()) {
             if (floor.index() != 0) { continue; }
@@ -54,11 +77,19 @@ public final class EncounterAnchors {
      */
     private static List<Anchor> civic(World world, BuildingPlan plan) {
         if (plan.variant() == BuildingPlan.Variant.OCCUPIED) { return List.of(); }
-        boolean guarded = plan.family() == BuildingPlan.Family.CLINIC || plan.family() == BuildingPlan.Family.SECURITY;
+        boolean guarded = guarded(plan.family());
         if (!guarded && UrbanHash.range(0, 3, world.seed, 2, UrbanSalts.CIVIC_ENCOUNTERS, plan.parcel().id(), 0, 0) != 0) {
             return List.of();
         }
-        int roomIndex = guarded ? 0 : 6;
+        return specialist(plan);
+    }
+
+    private static boolean guarded(Family family) {
+        return family == Family.CLINIC || family == Family.SECURITY;
+    }
+
+    private static List<Anchor> specialist(BuildingPlan plan) {
+        int roomIndex = guarded(plan.family()) ? 0 : 6;
         for (var floor : plan.floors()) {
             if (floor.index() != 0) { continue; }
             for (var room : floor.rooms()) {
@@ -68,6 +99,46 @@ public final class EncounterAnchors {
             }
         }
         return List.of();
+    }
+
+    /** Catalogue three: a building inside its region's budget keeps its catalogue-one or -two slots. */
+    private static List<Anchor> budgeted(World world, ParcelPlan parcel) {
+        DistrictPlan district = world.urban.regionPlan(UrbanIds.regionX(parcel.id()), UrbanIds.regionZ(parcel.id()));
+        if (!budget(world.seed, district).contains(parcel.index())) { return List.of(); }
+        BuildingPlan plan = world.urban.buildingAt(parcel.x0(), parcel.z0());
+        if (plan.variant() == BuildingPlan.Variant.OCCUPIED) { return List.of(); }
+        return plan.family().walkUp() ? walkUp(plan) : specialist(plan);
+    }
+
+    /**
+     * The parcel indices catalogue three occupies in a region: half its district's anchor
+     * budget in buildings, less the spawn region's starter slots, chosen among unheld buildings
+     * outside the starter superblock, clinics and security posts first. Pure.
+     */
+    public static List<Integer> budget(long seed, DistrictPlan district) {
+        DistrictRules.Profile rules = DistrictRules.of(district.district);
+        int anchors = UrbanHash.range(rules.threatMin(), rules.threatMax(), seed, UrbanRevision.LAYOUT_DISTRICTS,
+                UrbanSalts.DISTRICT_THREATS, district.rx, district.rz, 0);
+        int buildings = Math.max(1, anchors / 2);
+        List<ParcelPlan> candidates = new ArrayList<>();
+        for (ParcelPlan parcel : district.parcels()) {
+            if (UrbanStarterSite.isNeighbour(parcel)) {
+                if (parcel.use() == ParcelPlan.Use.RESIDENTIAL) { buildings--; }
+                continue;
+            }
+            if (parcel.use() != ParcelPlan.Use.REFUGE
+                    && DistrictCatalogue.expectedVariant(seed, district, parcel) != BuildingPlan.Variant.OCCUPIED) {
+                candidates.add(parcel);
+            }
+        }
+        candidates.sort(Comparator.comparing((ParcelPlan p) -> !guarded(DistrictCatalogue.family(seed, district, p)))
+                .thenComparing(p -> UrbanHash.mix(seed, UrbanRevision.LAYOUT_DISTRICTS, UrbanSalts.DISTRICT_THREATS,
+                        p.id(), 1, 0), Long::compareUnsigned));
+        List<Integer> chosen = new ArrayList<>();
+        for (int i = 0; i < candidates.size() && i < buildings; i++) {
+            chosen.add(candidates.get(i).index());
+        }
+        return chosen;
     }
 
     /** Resolves against the frozen plan, never accepts a merely well-shaped arbitrary id. */

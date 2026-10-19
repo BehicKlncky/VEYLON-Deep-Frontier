@@ -142,6 +142,26 @@ public final class DistrictCatalogue {
         return weights == null || UrbanStarterSite.isNeighbour(parcel) ? null : roll(seed, parcel, weights);
     }
 
+    /**
+     * The variant a parcel's building is planned with, without planning it: what encounter
+     * selection needs for every parcel of a region. The finite repair may still replace a
+     * failing candidate with an intact one, never with a held one.
+     */
+    public static Variant expectedVariant(long seed, DistrictPlan district, ParcelPlan parcel) {
+        Family family = family(seed, district, parcel);
+        if (!family.walkUp()) {
+            return variant(seed, district, parcel);
+        }
+        Variant variant = walkUpVariant(seed, district, parcel);
+        if (variant != null) {
+            return variant;
+        }
+        // Template four's own rule (BuildingPlanner): the starter superblock is intact.
+        return UrbanStarterSite.isNeighbour(parcel) ? Variant.INTACT
+                : Variant.values()[UrbanHash.range(0, 3, seed, UrbanRevision.BUILDING_TEMPLATE_FURNISHED,
+                        UrbanSalts.BUILDING_VARIANT, parcel.id(), 0, 0)];
+    }
+
     /** Intact, damaged, picked clean and occupied percentages; null for template five's own mix. */
     static int[] weights(UrbanDistrict district) {
         return switch (district) {

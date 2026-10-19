@@ -166,6 +166,71 @@ class WorldGeneratorFingerprintTest {
                 + "re-recording:\n  " + String.join("\n  ", moved));
     }
 
+    /**
+     * Generator 12 (layout 9, district catalogue 6), recorded 2026-10-19 when the six districts
+     * were introduced. The shared pins cover the spawn and its first ring, which are residential
+     * and commercial by construction, so the district pin adds, for the first region of every
+     * district within three of the spawn, its surface and overlay rasters, the plans of its
+     * first eight parcels and the blocks of its corner and centre chunks: cordons, canals,
+     * yards, flooding and contamination.
+     */
+    private static final long[] URBAN_DISTRICT_TERRAIN_FINGERPRINTS = {
+            0xb38f62efad5d33bdL, 0x1025d72a34e138d2L, 0xc338c0bee51dd3eeL};
+    private static final long[] URBAN_DISTRICT_BUILDING_FINGERPRINTS = {
+            0xf4e0db26ba2e403eL, 0x988e52440eab6918L, 0x94fc2491802b6884L};
+    private static final long[] URBAN_DISTRICT_PLAN_FINGERPRINTS = {
+            0x9e7f6a4f3e4aa194L, 0x402c2ccdc6a48f23L, 0xd3cbc3142d35c8c7L};
+    private static final long[] URBAN_DISTRICT_SIX_FINGERPRINTS = {
+            0xd6b55a8f44c94298L, 0xcf9913a7cf6145ccL, 0x6560cc9fa6e75e7aL};
+
+    @Test
+    void theSixDistrictsKeepTheirRecordedBlocksPlansAndOverlays() {
+        assertTerrainPinned(World.GEN_URBAN_DISTRICTS, URBAN_DISTRICT_TERRAIN_FINGERPRINTS);
+        List<String> moved = new ArrayList<>();
+        for (int i = 0; i < SEEDS.length; i++) {
+            long blocks = furnishedBuildingFingerprint(SEEDS[i], World.GEN_URBAN_DISTRICTS);
+            long plans = buildingPlanFingerprint(SEEDS[i], World.GEN_URBAN_DISTRICTS);
+            long districts = districtFingerprint(SEEDS[i]);
+            if (blocks != URBAN_DISTRICT_BUILDING_FINGERPRINTS[i] || plans != URBAN_DISTRICT_PLAN_FINGERPRINTS[i]
+                    || districts != URBAN_DISTRICT_SIX_FINGERPRINTS[i]) {
+                moved.add(String.format("seed %d: blocks 0x%016xL, plans 0x%016xL, districts 0x%016xL",
+                        SEEDS[i], blocks, plans, districts));
+            }
+        }
+        assertTrue(moved.isEmpty(), () -> "generator 12 changed; add a generator version instead of "
+                + "re-recording:\n  " + String.join("\n  ", moved));
+    }
+
+    /** The first region of each district near the spawn: rasters, first plans, two chunks. */
+    private static long districtFingerprint(long seed) {
+        World world = new World(seed, World.GEN_URBAN_DISTRICTS);
+        long hash = 0xcbf29ce484222325L;
+        for (com.veylon.world.urban.UrbanDistrict district : com.veylon.world.urban.UrbanDistrict.values()) {
+            DistrictPlan plan = null;
+            for (int rz = -3; rz <= 3 && plan == null; rz++) {
+                for (int rx = -3; rx <= 3 && plan == null; rx++) {
+                    if ((rx != 0 || rz != 0) && com.veylon.world.urban.DistrictMap.districtOf(seed, rx, rz) == district) {
+                        plan = world.urban.regionPlan(rx, rz);
+                    }
+                }
+            }
+            assertTrue(plan != null, district + " near the spawn");
+            hash = mix(hash, plan.rx * 31L + plan.rz);
+            for (int z = plan.originZ(); z < plan.originZ() + com.veylon.world.urban.StreetNetwork.REGION_SIZE; z++) {
+                for (int x = plan.originX(); x < plan.originX() + com.veylon.world.urban.StreetNetwork.REGION_SIZE; x++) {
+                    hash = mix(hash, plan.surfaceAt(x, z).code * 64L + plan.overlayAt(x, z).code);
+                }
+            }
+            for (ParcelPlan parcel : plan.parcels().subList(0, Math.min(8, plan.parcels().size()))) {
+                hash = mix(hash, com.veylon.world.urban.BuildingPlanDiagnostics.fingerprint(
+                        world.urban.buildingAt(parcel.x0(), parcel.z0())));
+            }
+            hash = mix(hash, hashChunk(world.getOrCreateChunk(plan.rx * 16, plan.rz * 16)));
+            hash = mix(hash, hashChunk(world.getOrCreateChunk(plan.rx * 16 + 8, plan.rz * 16 + 8)));
+        }
+        return hash;
+    }
+
     /** Every building plan (geometry, rooms, fixtures, ids) of three regions, in parcel order. */
     private static long buildingPlanFingerprint(long seed, int generatorVersion) {
         World world = new World(seed, generatorVersion);

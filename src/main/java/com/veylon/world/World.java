@@ -65,10 +65,16 @@ public class World implements VoxelAccess {
      * superblock and every walk-up keep generator 10's blocks and ids.
      */
     public static final int GEN_URBAN_CIVIC = 11;
+    /**
+     * Layout 9: six districts with their overlays and climates, buildings from the district
+     * catalogue (template six) and encounter catalogue three. Its starter superblock keeps
+     * generator 10's blocks and ids.
+     */
+    public static final int GEN_URBAN_DISTRICTS = 12;
     /** The generator of every ordinary new world; generator 3 until the urban rollout. */
     public static final int DEFAULT_NEW_WORLD_GENERATOR = GEN_CAVE_IDENTITIES;
     /** The highest generator version a save may name; a load rejects anything above it. */
-    public static final int MAX_SUPPORTED_GENERATOR = GEN_URBAN_CIVIC;
+    public static final int MAX_SUPPORTED_GENERATOR = GEN_URBAN_DISTRICTS;
 
     public final long seed;
     /** Persisted in save v3; legacy (v2) saves always load as {@link #GEN_LEGACY}. */
@@ -168,7 +174,8 @@ public class World implements VoxelAccess {
         return version == GEN_URBAN || version == GEN_URBAN_STREETS
                 || version == GEN_URBAN_PLANS || version == GEN_URBAN_APARTMENTS
                 || version == GEN_URBAN_SHAPED_STAIRS || version == GEN_URBAN_STARTER
-                || version == GEN_URBAN_ENCOUNTERS || version == GEN_URBAN_CIVIC;
+                || version == GEN_URBAN_ENCOUNTERS || version == GEN_URBAN_CIVIC
+                || version == GEN_URBAN_DISTRICTS;
     }
 
     /** Generators 2 and 3: deep caves, underground POIs, cave mouths and settlements. */
@@ -777,7 +784,13 @@ public class World implements VoxelAccess {
     }
 
     public Biome biomeAt(int x, int z) {
-        // Starter climate brought forward from 13; historical cities keep their noise climate.
+        if (urban != null && urban.hasDistricts()) {
+            // Six-district cities: each district maps to one climate biome (D-08).
+            var district = urban.districtAt(x, z);
+            return district == null ? Biome.MEADOW
+                    : com.veylon.world.urban.DistrictRules.of(district).climate();
+        }
+        // Starter climate of generators 9-11; historical cities keep their noise climate.
         if (urban != null && urban.hasStarter() && urban.districtAt(x, z)
                 == com.veylon.world.urban.UrbanDistrict.RESIDENTIAL) { return Biome.MEADOW; }
         return generator.biomeAt(x, z);
