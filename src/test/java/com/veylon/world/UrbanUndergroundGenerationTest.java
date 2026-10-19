@@ -163,13 +163,18 @@ class UrbanUndergroundGenerationTest {
         for (RouteCatalogue.FireEscape f : routes.fireEscapes()) {
             BuildingPlan building = world.urban.buildingAt(f.gap().x(), f.gap().z());
             ParcelPlan p = building.parcel();
-            RouteProof.Box box = new RouteProof.Box(p.x0() - 1, UrbanDatum.STREET_Y, p.z0() - 1,
-                    p.x1() + 1, building.roofY() + 4, p.z1() + 1);
+            // Two rings round the parcel, so the cells beyond the ladder's head are judged too.
+            RouteProof.Box box = new RouteProof.Box(p.x0() - 2, UrbanDatum.STREET_Y, p.z0() - 2,
+                    p.x1() + 2, building.roofY() + 4, p.z1() + 2);
             Vec3i foot = new Vec3i(f.ladderTop().x(), UrbanDatum.STREET_Y + 1, f.ladderTop().z());
-            RouteProof.Result proof = RouteProof.prove(access, box, List.of(foot));
-            assertTrue(proof.roundTrip(roofAnchor(building)), "ladder to roof and back at " + f.gap());
-            assertTrue(building.approaches().stream().anyMatch(proof::roundTrip), "and down the stairs to the street");
-            assertTrue(proof.fallTraps().isEmpty(), "no unguarded edge on a fire-escape roof: " + proof.fallTraps());
+            RouteProof.Result up = RouteProof.prove(access, box, List.of(foot));
+            assertTrue(up.reached(roofAnchor(building)), "up the ladder to the roof at " + f.gap());
+            assertTrue(up.reached(f.ladderTop()) && up.escapes(f.ladderTop()) || up.reached(f.gap()),
+                    "the ladder head joins the gap");
+            RouteProof.Result down = RouteProof.prove(access, box, List.of(roofAnchor(building)));
+            assertTrue(building.approaches().stream().anyMatch(down::reached), "and down the stairs to the street");
+            assertTrue(up.fallTraps().isEmpty(), "no unguarded edge on a fire-escape roof: " + up.fallTraps());
+            assertTrue(down.fallTraps().isEmpty(), "none from the roof either: " + down.fallTraps());
             escapes++;
         }
         assertTrue(escapes > 0);

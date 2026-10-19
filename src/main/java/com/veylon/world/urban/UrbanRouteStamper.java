@@ -14,7 +14,8 @@ import com.veylon.world.Chunk;
  *       cells ({@link TransitNetwork#blockAt}); most chunks touch no band and skip at once.</li>
  *   <li>Outside parts of the region's routes, built only where every building they join
  *       declared its end: a service passage's corridor where both cross halls have their
- *       service doors, a fire escape's ladder where its building opened the parapet gap, and a
+ *       service doors, a fire escape's ladder and the rail cage round its head where its
+ *       building opened the parapet gap, and a
  *       bridge's deck and rails where both roofs opened their parapets.</li>
  * </ul>
  * Work is bounded: 256 columns of at most a dozen cells, plus the region's few dozen routes.
@@ -54,9 +55,17 @@ public final class UrbanRouteStamper {
             }
         }
         for (RouteCatalogue.FireEscape f : routes.fireEscapes()) {
-            Vec3i top = f.ladderTop();
-            if (!inside(chunk, top.x(), top.z()) || !declaresRoute(urban, f.gap())) { continue; }
+            Vec3i top = f.ladderTop(), gap = f.gap();
+            if (!overlaps(chunk, top.x() - 1, top.z() - 1, top.x() + 1, top.z() + 1) || !declaresRoute(urban, gap)) { continue; }
             for (int y = UrbanDatum.STREET_Y + 1; y <= top.y(); y++) { set(chunk, top.x(), y, top.z(), BlockType.LADDER); }
+            // A rail cage round the ladder head: the ladder is climbed up, and a body that steps onto
+            // it from the roof hangs there (the controller has no descent), so its three open sides
+            // are railed two courses high and the only way off is back through the gap.
+            int dx = gap.x() - top.x(), dz = gap.z() - top.z();
+            int[][] sides = {{-dx, -dz}, {dz, dx}, {-dz, -dx}};
+            for (int[] s : sides) {
+                for (int h = 0; h < 2; h++) { set(chunk, top.x() + s[0], top.y() + h, top.z() + s[1], BlockType.RAILING); }
+            }
         }
         for (RouteCatalogue.Connector c : routes.connectors()) {
             if (!c.bridge() || !overlaps(chunk, c.x0(), c.z0() - 1, c.x1(), c.z1() + 1)

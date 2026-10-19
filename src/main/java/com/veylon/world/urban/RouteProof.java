@@ -16,9 +16,12 @@ import java.util.List;
  * <p>Moves are exactly the building validator's: a cardinal step on the level, one block up
  * with three clear cells over the departure cell, or a drop of at most
  * {@link VoxelClearance#MAX_DROP}, each checked by {@link AccessibilityValidator#canMove}
- * against the body's real box. A climbable cell (a rope ladder) adds straight vertical moves
- * to the cells above and below it, as {@code Pathfinder} and the player's climb do. Doors are
- * whatever the access reports; callers open the ones a route may use.
+ * against the body's real box. A climbable cell (a rope ladder) adds a straight move up to
+ * the cell above it, the player's climb (Space, or walking into the wall behind the ladder). It
+ * adds no move down: on a ladder the player's body neither falls nor has a control to descend,
+ * so a body that steps onto a ladder from above hangs there and can only step back. A route a
+ * player walks therefore uses a ladder to go up, never down. Doors are whatever the access
+ * reports; callers open the ones a route may use.
  *
  * <p>A proof floods forward from its entry cells and backward to them, so a cell that is
  * reached but has no way back is seen. {@link Result#fallTraps} lists every reached cell with
@@ -113,12 +116,10 @@ public final class RouteProof {
                 }
             }
             if (access.getBlock(from.x(), from.y(), from.z()).isClimbable()) {
-                for (int dy : new int[]{1, -1}) {
-                    int j = index(box, from.x(), from.y() + dy, from.z());
-                    if (j >= 0 && walk[j] && !VoxelClearance.collides(access, from.x() + .5f, from.y() + dy,
-                            from.z() + .5f, VoxelClearance.BODY_WIDTH, VoxelClearance.BODY_HEIGHT, true)) {
-                        edges[i * 6 + (dy > 0 ? 4 : 5)] = j;
-                    }
+                int j = index(box, from.x(), from.y() + 1, from.z());
+                if (j >= 0 && walk[j] && !VoxelClearance.collides(access, from.x() + .5f, from.y() + 1,
+                        from.z() + .5f, VoxelClearance.BODY_WIDTH, VoxelClearance.BODY_HEIGHT, true)) {
+                    edges[i * 6 + 4] = j;
                 }
             }
         }

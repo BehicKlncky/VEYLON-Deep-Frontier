@@ -205,10 +205,13 @@ class WorldGeneratorFingerprintTest {
      * Generator 13 (milestone 14), recorded 2026-10-19 at introduction: terrain at the pinned
      * chunks (the spawn junction among them), every building plan of three regions under
      * template seven, and the routes: transit segments near the spawn with their stations,
-     * three regions' route catalogues and the chunks of the spawn region's station.
+     * three regions' route catalogues and the chunks of the spawn region's station. Seed 7's
+     * terrain was re-recorded once the same day, when fire-escape ladder heads gained their rail
+     * cage, before any save outside the tests used the generator; it is frozen from milestone
+     * 14's handoff.
      */
     private static final long[] URBAN_UNDERGROUND_TERRAIN_FINGERPRINTS = {
-            0xb9036588174436d2L, 0x80223cc179da0afbL, 0xac9d88062169a757L};
+            0xb9036588174436d2L, 0x80223cc179da0afbL, 0x2aba8a39e5c77757L};
     private static final long[] URBAN_UNDERGROUND_PLAN_FINGERPRINTS = {
             0xb80763b64ac57e1eL, 0x736ab4750d631341L, 0xfe117dbe676a8e66L};
     private static final long[] URBAN_UNDERGROUND_ROUTE_FINGERPRINTS = {
