@@ -264,13 +264,14 @@ Generator versions form an explicit set (`World.isSupportedGenerator`): 1 legacy
 8 the same buildings with shaped stairs (layout 5, template 3), and 9 the starter
 neighbourhood (layout 6, template 4), and 10 adds encounter catalogue 1 on that
 same geometry (layout 7, template 4), and 11 adds the commercial and civic catalogue
-(layout 8, template 5) with encounter catalogue 2. The development selector creates 11. New worlds use
+(layout 8, template 5) with encounter catalogue 2, and 12 plans the six districts with
+their overlays (layout 9, template 6) and encounter catalogue 3. The development selector creates 12. New worlds use
 `World.DEFAULT_NEW_WORLD_GENERATOR` (3, until the urban rollout); a load accepts any
 supported version and rejects the rest, including anything above
 `MAX_SUPPORTED_GENERATOR`, before it replaces the live world. Feature gates name
 their versions (`hasDeepFrontier`, `hasCaveIdentities`, `isUrbanGenerator`) instead
 of comparing with `>=`, so a new generator inherits nothing by accident, and
-`WorldGeneratorFingerprintTest` pins versions 1–11 absolutely. `ShapedStairGenerationTest`
+`WorldGeneratorFingerprintTest` pins versions 1–12 absolutely. `ShapedStairGenerationTest`
 checks version 8 against frozen version 7 outside stair cells and across chunk orders.
 
 An urban world's layout revision follows from its generator, so it is known
@@ -278,13 +279,13 @@ before bootstrap generates a chunk; a geometry change means a new generator
 version, never a change under an old one (`UrbanRevision`). Its content revision
 (the rolled loot, encounter and trade tables) is saved in `urban.meta`, which
 only urban worlds write. It is optional for older layouts and required for
-generators 9–11. Until that section, or its
+generators 9–12. Until that section, or its
 absent default, has been read, a loading world's content revision cannot be read
 at all. Fresh worlds use content revision 3; revisions 1 and 2 remain supported.
 Revision 1 is the absent-metadata default. The tables and their hash inputs are frozen
-under each revision. Generators 9–11 require content 3. Encounter catalogues are
+under each revision. Generators 9–12 require content 3. Encounter catalogues are
 additive and versioned separately in `urban.population` (1 for generator 10, 2 for
-11); they do not reroll content-3 loot or add encounters to older generators. Compatibility directions:
+11, 3 for 12); they do not reroll content-3 loot or add encounters to older generators. Compatibility directions:
 
 - this build, a legacy save: unchanged, and no urban state is created;
 - this build, an urban save: the same geometry through its generator, the content
@@ -463,9 +464,38 @@ guards to clinics and security posts; `urban.population` writes the generator's
 catalogue and rejects the other. Diagnostics (`BuildingPlanner.identity`,
 `BuildingPlanDiagnostics.catalogue` and `familyMatrix`) name a failing template.
 
+### Urban districts
+
+Generator 12 plans layout 9. `DistrictMap.districtOf(seed, rx, rz)` is pure: the
+spawn region is residential, its neighbours residential or commercial, and rings
+two and three always hold an industrial, a flooded, a civic and a quarantine region.
+Residential and commercial regions keep the layout-2 plan exactly; `CityPlanner`
+gives the other four their own superblocks (depot rows and fenced yards, canal
+basins with causeways, a fenced civic square, a cordoned quarantine) on the same
+street lattice, so seams are unchanged. `DistrictOverlays` adds a separate
+per-column raster (`UrbanOverlay`: standing water, duckboards, fences,
+checkpoints, contaminated ground, overgrowth, plants and powder kegs) that keeps two
+cells from every parcel, off walkways, alleys, causeways and the starter
+superblock, with avenues dry and clean. `UrbanOverlayStamper` writes it after
+streets and buildings, chunk by chunk from the plan; `CityPlanDiagnostics` checks it.
+Every water surface is the top of y 41 on a solid bed, so `WaterSystem` never moves it.
+
+`DistrictRules` gives each district one existing climate `Biome`, which
+`World.biomeAt` and chunk soil moisture report, so temperature, weather, fog tint and
+plants follow without new climate code and no biome ordinal changes. It also holds
+a presentation-only fog visibility scale, the threat budget and the arrival line.
+`DistrictCatalogue` (building template 6) picks proven template-4 and template-5
+plans by district. Encounter catalogue 3 spends each region's budget on unheld
+buildings. The player tracks the district underfoot for the HUD and the arrival
+line. `CONTAMINATED_GROUND` and the quarantine-only toxic fog roll sickness on the
+player's existing seeded generator, and only on that ground or inside a quarantine
+district, so other worlds draw nothing new. Overlays add no saved state: player
+edits to them are ordinary block edits.
+
 Scripted urban QA routes extend `UrbanRouteScene`: a task queue played through the
 production input seam, mouse-look turns, bounded walking that opens doors with F,
-threat handling, forcing and captures. `urban_slice` and `urban_catalogue` use it.
+threat handling, forcing and captures. `urban_slice`, `urban_catalogue` and
+`urban_districts` use it.
 
 ### Doors, windows and urban fixtures
 

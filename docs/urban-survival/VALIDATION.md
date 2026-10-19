@@ -1910,3 +1910,167 @@ ran.
   offices (24) and a locked starter flat (18) belong to later packages.
 
 Next: package 13.
+
+## Milestone 13 — urban biome differentiation (2026-10-16 to 2026-10-19)
+
+### Scope and baseline
+
+- Branch `feature/urban-survival` at `6fd26c9` (the 12 records), clean tree.
+  Read the revised base, the prompt, `AGENTS.md`, `docs/COMMIT_WORKFLOW.md` and
+  these records.
+- Generator 12 (layout 9, template 6, encounter catalogue 3) is new; content
+  revision 3, every section layout and codec version and the default new world
+  are unchanged. One block id was appended (`CONTAMINATED_GROUND`, 83).
+- Generators 8–11 already had absolute pins (12). Generator 12 was pinned at
+  introduction, including the first region of every district near the spawn.
+
+### Plan, generation, gameplay and save evidence
+
+Each code commit ran its tests against its exact tree (the detached worktree
+`build/m13-check` with the tree hash compared to the index, or a working tree
+that held only that change). Its message records the classes:
+
+| Commit | Checks on the exact tree | What they prove |
+| --- | --- | --- |
+| `ba84727` | 42 tests, compile and Javadoc; with one unused class beside it, all 160 `world.*` tests in 27 classes | `DistrictPlannerTest`: the district guarantees on 300 seeds, far-field weights, zero diagnostics and mirrored seams on every region within three of the spawn and two far ones for six seeds, layout-2 identity beneath the overlays, flooding, cordons, yards, and mutations that the diagnostics must catch |
+| `3dd0d36` | 63 tests, compile and Javadoc | `ContaminatedGroundTest` and its `CreativeHazardsTest` twin; `SerializedEnumOrderTest`, `UrbanMaterialsTest` (110 of 160 layers), `PlayerOutcomeDeterminismTest`, fingerprints |
+| `f987887` | 46 tests, compile and Javadoc | `DistrictCatalogueTest`: every parcel of one region per district for three seeds validates in its district; each district's mix; at least two unsecured source types for food, water, treatment, light and pry tools in every district; all six families around every design spawn; starter plans unchanged |
+| `8017601` | 102 tests in 19 classes, compile and Javadoc; before staging, 516 tests in 90 classes | `UrbanDistrictGenerationTest`: six complete generated regions, 458 buildings passing the production entry and exit proof among 19,083 overlay cells; flood water and canals unmoved by a full `WaterSystem` run; seven chunk orders at a cordon corner and a canal; budgets and starter slots. `UrbanDistrictSaveTest`: catalogue-3 saves, rejections across generators 10–12, overlay edits that persist. The slice loop on generator 12 for all six seeds; the catalogue walk on generator 12 |
+| `da8ff47` | 126 tests in 13 classes, compile and Javadoc | `UrbanDistrictPresenceTest` (arrival lines on real transitions only, district climates, toxic fog harmless outside and harmful inside the cordon, other worlds unchanged), `EventRollLadderTest`, `PlayerOutcomeDeterminismTest`, HUD and audio tests |
+
+The district tour and the boundary-avenue fix are recorded below.
+
+### Native district tour, both modes
+
+Host: Windows 11 Pro 10.0.26200, AMD Ryzen 5 5600X, NVIDIA GeForce RTX 3060 Ti,
+driver 610.88, OpenGL 3.3.0 with KHR_debug; 1280 × 720.
+
+A first Survival run on 2026-10-19 (`m13-native-survival-first.log`) passed
+but framed four stops poorly: a shop-row alley instead of a plaza, a keg seen
+from beside it, and the civic and quarantine checkpoints at an angle. The tour
+was changed to look through gateways and square-on at checkpoints, and the
+rerun (`m13-native-survival.log`) passed. After a cleanup of the tour planner
+that kept every stop, both modes ran again from fresh directories
+(`m13-final-native-<mode>.log`):
+
+```powershell
+$env:VEYLON_GENERATOR='urban-dev'; $env:VEYLON_SEED='20260731'
+$env:VEYLON_GAME_MODE='survival'; $env:VEYLON_SCENE='urban_districts'
+$env:VEYLON_RESOLUTION='1280x720'; $env:VEYLON_CAPTURE_TAG='m13-final-districts-survival'
+.\gradlew.bat run -PveylonDataDir=build/qa/m13-final-districts-survival --console=plain
+```
+
+The Creative twin used `creative` in the mode, tag and directory. Seed
+`20260731` gives:
+
+| Stop | Stand | Subject | View |
+| --- | --- | --- | --- |
+| Transition | (216, 41, 128) → (296, 41, 128) | — | Residential region (0, 0) to commercial (1, 0), walked with W and mouse look |
+| Residential | (144, 41, 103) | (147, 41, 106) | Tall grass and bushes on a courtyard lawn by a walk-up door |
+| Commercial | (−94, 41, 194) | (−94, 41, 201) | Across a tree-lined plaza from its edge |
+| Industrial | (31, 41, −449) | (31, 41, −439) | Through a fenced yard's gateway at its contaminated patches |
+| Flooded | (−383, 41, −641) | (−383, 41, −638) | A plank duckboard over a flooded street, more water beyond |
+| Civic | (286, 41, 577) | (286, 41, 587) | Through a checkpoint into the fenced, tree-planted square |
+| Quarantine | (−701, 41, −251) | (−701, 41, −256) | Square-on to a cordon checkpoint where a local street crosses, from inside |
+
+Both runs printed `[urban-districts] pass=true` with 15 staged poses, 16
+captures, the arrival line "Entering Commercial Downtown. Downtown: grocers,
+offices and a police post along long, open avenues. More infected, and they see
+you coming.", no threat engaged, full health and 42 route seconds. The wade
+reported `inWater=true` with wetness 1.00 in Survival and 0.00 in Creative,
+where the player stays dry. Every `views` entry named the expected district
+and climate: Meadow for residential, commercial and civic, Dry Scrubland for
+industrial, Wet Marsh for flooded and Rocky Highlands for quarantine. Each log
+reports `glGetError=0`, 20 KHR messages with 0 errors (the usual MEDIUM
+pixel-transfer and shader-recompile notes) and `nativeErrors=0`; Gradle exited
+0 after 44 s in each mode. These runs used the code committed as `6ab1f49`.
+
+After the boundary-avenue fix (`dbd0746`, below), both modes ran once more
+from fresh directories with the tag and directory `m13-head-districts-<mode>`
+(`m13-head-native-<mode>.log`). They passed with the same stops, poses,
+captures, wade, health, route seconds and diagnostics (20 KHR messages, 0
+errors, `nativeErrors=0`), except that the arrival line is now logged at
+12:18 instead of 12:16, once the walk has left the avenue. The Survival
+transition capture shows the line in the log panel under `District /
+Commercial Downtown`.
+
+Inspected captures: from the second Survival run the transition pair, day
+industrial, flooded, civic and quarantine, night flooded and fog quarantine;
+from the final runs Survival day residential and commercial and night
+industrial, and Creative fog flooded. They show:
+
+- `District / <name>` on the Survival HUD in each, and the district on the
+  Creative panel's terrain row.
+- A residential street, then a downtown street with the arrival line logged.
+- Tall grass on the residential lawn; sheet-metal fences with open gateways at
+  the yard and the civic square; dark contaminated patches in the yard; plank
+  duckboards over standing water; the cordon fence beside the quarantine
+  checkpoint.
+- Dark night views that keep the fences and duckboards readable, and fog that
+  closes in at the flooded and quarantine stops.
+
+Two observations, neither a tour failure:
+
+- The HUD's air temperature is lower at noon than at 23:00 in every district
+  (industrial 20.2 °C at 12:38 and 31.8 °C at 23:06; flooded 7.1 °C and
+  18.7 °C). `TimeSystem.tempOffset` has peaked at 02:00 rather than at
+  `WARMEST_HOUR` since the initial commit, in every world. Recorded as owner
+  question P-15 and left unchanged; the district climates are right relative
+  to each other.
+- No inspected quarantine capture shows contaminated ground in frame; the yard
+  captures do. `UrbanDistrictGenerationTest` checks that every planned
+  contamination cell, the quarantine's included, generates as contaminated
+  ground.
+
+### Review and the boundary-avenue fix
+
+A direct review of the shared-code changes (world, generator, events, player,
+environment and HUD) found one defect: the arrival line was logged on every
+crossing of a district boundary. Every district boundary runs down an avenue's
+centre line, so drifting along an avenue between two districts logged an
+arrival each time. The fix keeps the HUD, fog and toxic-fog district exact and
+announces a new district only once the player stands off the boundary avenue
+on its side. `UrbanDistrictPresenceTest` drifts four times across the centre
+line of an avenue between two districts without a line, then steps off on
+each side for exactly one line each. With the fix set aside the new case
+failed at its first drift assertion (`m13-fix-before.log`); with it, Javadoc
+and 74 tests in 10 classes passed (`m13-fix-focused.log`):
+`UrbanDistrictPresenceTest`, `UrbanDistrictQaSceneTest`, `CityPlannerTest`,
+`DistrictPlannerTest`, `UrbanDistrictGenerationTest`, `UrbanSliceRouteTest`,
+`GameLoopIntegrationTest`, `HudQaSceneTest`, `CreativeHazardsTest` and
+`PlayerOutcomeDeterminismTest`. No reviewer subagents were run; the planner,
+overlay, catalogue and encounter code was not re-reviewed line by line and
+rests on its tests and the commits' own checks.
+
+### Commands and portable builds
+
+All Gradle commands used the bundled Temurin 25.0.4.1+1
+(`build/tools/jdk25/jdk-25.0.4.1+1`) and the Windows wrapper. Logs are local
+ignored artifacts under `build/`.
+
+- `.\gradlew.bat build --console=plain` on 2026-10-19 with the tour's code
+  (committed as `6ab1f49`) and only these records edited beside it: passed in
+  9 min 25 s, 1,851 tests in 207 classes, zero failures or errors, and the
+  existing Windows symlink-privilege skip in `AppPathsTest`
+  (`m13-build-final.log`).
+- The same command at `dbd0746`, the final code, with only these records
+  edited: passed in 9 min 24 s, 1,852 tests in 207 classes, zero failures or
+  errors, the same skip (`m13-build-head.log`). Javadoc was up to date from
+  the focused run on that source, where it passed.
+- `UrbanDistrictQaSceneTest` alone after the tour cleanup: 3 tests passed
+  (`m13-step7-iter.log`).
+- `graphify update . --no-cluster` once on the final code: 8,368 nodes and
+  32,739 edges, with the existing `build.gradle` extractor warning
+  (`m13-graph-update.log`). No clustering or semantic extraction ran.
+
+### Limits and next gate
+
+- The tour stages poses between stops, the clock, the weather and a spear. It
+  is scripted evidence, not the human playtest deferred by D-80.
+- Every district's threat is still the Veilbound (D-113); alien organisms and
+  their props are package 15. Map colouring of districts is package 21;
+  district ambience and sound are package 22; stock, budgets and starter-slot
+  density are package 23.
+- Clustering of like districts beyond ring three is left to tuning (D-108).
+
+Next: package 14.

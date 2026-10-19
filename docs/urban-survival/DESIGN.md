@@ -114,7 +114,7 @@ The chunk is 16 × 96 × 16, so y runs 0–95 (**Existing**, B-10). No bedrock b
 | Storeys | slab of storey *n* at 40 + 4*n*; clear 41 + 4*n* … 43 + 4*n* | Pitch 4 = slab + 3 clear cells, matching the existing keep precedent (B-16) and the pathfinder's step headroom (B-65) |
 | Roof | slab at 40 + 4*N* for *N* storeys; at most *N* = 12 (roof slab 88) | Roof access, bulkheads and parapets up to y 93; y 94–95 stay empty |
 
-Initial building families stay at ≤ 5 storeys (apartments) and ≤ 8 (offices) until package 24 has measured dense-city cost. The package-12 office blocks stop at five storeys (D-99). Flooded districts place their standing water deliberately *[13]*. Their overlays must be shown to be stable under the existing `WaterSystem` rules.
+Initial building families stay at ≤ 5 storeys (apartments) and ≤ 8 (offices) until package 24 has measured dense-city cost. The package-12 office blocks stop at five storeys (D-99). Flooded districts place their standing water deliberately *[13]*. Their overlays must be shown to be stable under the existing `WaterSystem` rules. **Implemented in 13 (D-110):** one block of water at y 41 over flooded roadway and courtyard lawns, two in canal basins (bed y 39), so every water surface is the top of y 41 on a solid bed; `WaterSystem` never spreads water above sea level and only drops it into air, and a generated flooded region is unchanged after a full water-system run.
 
 ### 4.2 Planning hierarchy (D-06)
 
@@ -151,6 +151,17 @@ Each identity must change decisions, not just colour. Package 03 defines all six
 | Quarantine and alien growth | Cordoned blocks behind barriers and checkpoints, decontamination posts, growth on facades | Rare medicine and technology, research samples | Contamination, growth nodes, darkness | 6–12 (alien + infected) | Late rare rewards; never required for the first meal, water or treatment |
 
 District climate keeps the existing `Biome`, which has many runtime consumers (B-76; DECISIONS D-08). The district identity is a separate urban layer. Biome ordinals and meanings do not change.
+
+**Implemented in 13 (D-107–D-117), generator 12.** `DistrictMap` gives every region its identity: the spawn region residential, its neighbours residential or commercial (one guaranteed commercial), and an industrial, a flooded, a civic and a quarantine region always within three regions, on every seed. Each district maps to one climate biome, and the HUD names the district. Overlays are a separate raster that keeps two cells from every parcel and leaves avenues dry and clean (D-110). As implemented:
+
+| District | Plan and buildings | Street profile and overlays | Supplies | Climate and visibility | Exposure and hazards | Threat budget | Reason to go |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Reclaimed residential | Layout-2 courtyard housing, park and shop row; walk-ups, corner grocers and clinics, one school per region | Narrow local streets; tall grass and bushes on lawns, grass through the outer sidewalk | Kitchens, bathrooms, wardrobes, grocers (content-3 wardrobe bias) | Meadow; clear | Low; overgrown courtyards give cover | 2–6 anchors (the spawn region is already over budget with its starter slots) | Basics; the refuge |
+| Commercial downtown | Layout-2 shop rows, plazas and four housing blocks; offices, grocers, clinics, one police post | Wide avenues and boulevards, plazas, service alleys; planted medians | Packaged food and shop goods (grocer and shop bias), desks | Meadow; clear | Long open sightlines on avenues and plazas | 6–12 | Food stock, offices, the police post's armoury |
+| Industrial yards | Depot rows of service lots, two or three workers' blocks, one or two fenced yards; warehouses with workshops, canteens, one security post | Service alleys; fenced yards with four gateways, chemical spills and powder kegs | Tools, scrap, pry tools, iron and torches (utility and warehouse bias) | Dry Scrubland: hot, so thirst rises; light haze (0.85) | Open yards, contaminated ground, explosive kegs | 4–10 | Tools and repair stock, kegs as salvage |
+| Flooded neighbourhoods | Low (2–4 storey) courtyard housing around one or two canal basins; walk-ups, grocers, clinics, rarely picked clean | One block of water on every local roadway and courtyard lawn, plank duckboards at crossings, causeways over two-deep canals; avenues stay dry | All tables at −15 % (waterlogged), but few buildings were stripped | Wet Marsh: rain and fog more often; mist (0.7) | Wading soaks the player (wetness 1, cold) and halves walking speed; deep canals | 2–6 | Quiet buildings with intact stock, water to boil |
+| Civic and medical precinct | Courtyard and office rows around a fenced square; clinics, municipal offices, two schools and two security posts | A square fenced with sheet metal, entered through four painted checkpoints | Bathroom cabinets and shop shelves roll the clinic table (content-3 civic bias); secured armouries | Meadow; clear | Guarded lobbies, locked dispensaries and armouries | 4–10, clinics and posts first | Medicine, ammunition |
+| Quarantine | Cordoned courtyard housing, three clinic rows, usually a fenced square; field clinics and checkpoint posts, mostly damaged or stripped, never held | A sheet-metal cordon along shared avenues, open at a checkpoint wherever a local street crosses; contaminated lawns, plaza and roadway patches | Secured tables +10, others −10 (content-3 bias); many dispensaries and armouries | Rocky Highlands: cold; murk (0.6) | Contaminated ground (sickness), toxic fog that only harms here, the densest infected | 6–12 (Veilbound; alien organisms are 15) | Late rare medicine and ammunition; never needed for the first meal, water or treatment |
 
 ### 4.4 Bounded starter area (D-09)
 
@@ -323,6 +334,13 @@ consumed once, and hidden movement never changes its position. Veilbound now
 search fresh sound for fourteen seconds and last sight for eighteen; they turn
 at the remembered place and stop on expiry. Creative clears player-derived
 intent. Work/failure/unsupported-entry diagnostics appear in the runtime snapshot.
+**Implemented in 13 (D-113, D-114).** Encounter catalogue 3 spends each region's
+district threat budget (DESIGN §4.3) on unheld buildings, clinics and security
+posts first; the starter superblock keeps catalogue one's slots. Every
+district's threat is still the Veilbound: the quarantine differs by its budget,
+contaminated ground and the toxic fog, which in generator 12 only harms inside
+a quarantine district. Alien organisms and their props remain package 15.
+
 Package 12 (D-106) makes entrance choice lock-aware: a body uses the nearest
 entrance whose door is not locked or barred, so a clinic guard follows the player
 out of the street door rather than waiting at the locked staff door.

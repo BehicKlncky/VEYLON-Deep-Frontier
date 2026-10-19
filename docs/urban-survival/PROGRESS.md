@@ -6,10 +6,10 @@ This is the running record for the 26-package urban-survival roadmap. The pack i
 
 | Item | Value |
 | --- | --- |
-| Last completed package | **12 — Commercial and civic buildings** (2026-10-14 to 2026-10-16; final native reruns and records 2026-10-18 to 2026-10-19). Generator 11 adds grocers, clinics, schools, office blocks, security posts and warehouses with real, connected, validated interiors, secured stock behind forcible locks, damaged, picked-clean and partially occupied variants, signs and lobby guards. Earlier generators and the slice neighbourhood are unchanged. Native catalogue walks pass in both modes. Human-only checks are deferred by D-80. |
-| Source revision | 12: `8d87857` pins → `880602f` skeleton programs → `7046b3b` sign block → `82e5594` catalogue plans → `6e635d5` generator 11 → `e8dd714` route driver → `b82fa31` catalogue walk → `76dd7d3` slice on generator 11 → `a3a091e` entrance routing fix. Records follow separately. |
-| Default new world | Legacy (`World.DEFAULT_NEW_WORLD_GENERATOR = GEN_CAVE_IDENTITIES`), unchanged until 26 passes. Isolated `VEYLON_GENERATOR=urban-dev` creates generator 11 (`GEN_URBAN_CIVIC`, layout 8 / template 5 / content 3, encounter catalogue 2). Generators 1–10 stay loadable with their original geometry and encounters. |
-| Next package | **13 — Urban biome differentiation, NOT STARTED.** Keep `UrbanSliceRouteTest` (generators 10 and 11) and `UrbanCatalogueQaSceneTest` as regression gates. District rules decide which families appear where, under a new generator. |
+| Last completed package | **13 — Urban biome differentiation** (2026-10-16 to 2026-10-19). Generator 12 plans six districts on the frozen street lattice: reclaimed residential, commercial downtown, industrial yards, flooded neighbourhoods, a civic precinct and a quarantine, each with its own climate, building mix, overlays (water and duckboards, fences and checkpoints, contaminated ground, overgrowth, kegs), threat budget and reason to go. The HUD names the district. Basics stay in the common districts and every building stays connected and validated. Native district tours pass in both modes. Human-only checks are deferred by D-80. |
+| Source revision | 13: `ba84727` district plans → `3dd0d36` contaminated ground → `f987887` district catalogue → `8017601` generator 12 → `da8ff47` district presence → `6ab1f49` district tour → `dbd0746` arrival on leaving the avenue. Records follow separately. |
+| Default new world | Legacy (`World.DEFAULT_NEW_WORLD_GENERATOR = GEN_CAVE_IDENTITIES`), unchanged until 26 passes. Isolated `VEYLON_GENERATOR=urban-dev` creates generator 12 (`GEN_URBAN_DISTRICTS`, layout 9 / template 6 / content 3, encounter catalogue 3). Generators 1–11 stay loadable with their original geometry and encounters. |
+| Next package | **14 — Basements, transit and rooftop routes, NOT STARTED.** Keep `UrbanSliceRouteTest` (generators 10–12), `UrbanCatalogueQaSceneTest` and `UrbanDistrictQaSceneTest` as regression gates. Owner question P-15 (the inverted day/night temperature curve) is open. |
 | Human testing schedule | Owner instruction (2026-10-11, D-80): consolidated human playtesting/listening after milestone 22. Through 22, run automated and scripted native validation and record human-only checks as deferred; do not request interim human walks. |
 | Commits | Separate `feat`, `test`, `docs` and `chore` commits on `feature/urban-survival`; see the reconstruction ledger below. `main` stays at `923345f`. Original combined commit retained at `backup/urban-m01-m04-before-split`. No merge, push, tag or publication. |
 
@@ -31,7 +31,7 @@ The status vocabulary is NOT STARTED, IN PROGRESS, PARTIAL, BLOCKED or COMPLETE.
 | 10 | Indoor navigation and perception | 09, 04–06 | `ai/Pathfinder`, `PortalGraph`, `PathBudget`, `NavigationCache`, `IndoorNavigation`; `combat/WorldNoise`; AI and lifecycle guards | Multi-floor pursuit through doors and stairs, losing sight, searching and giving up. Door edits change routes. A shared measured budget. No roof or ground confusion and no void pathing. A native pursuit and escape. | **COMPLETE** (2026-10-12; human-only validation deferred by D-80) |
 | 11 | Playable vertical slice gate | 02–10 | Integration: `UrbanQaScenes`, `AutomatedRunDriver` urban route, integration tests | The DESIGN §14 slice holds headless and native with normal controls; save, revisit, no refill and no resurrection; Creative twins. Regression seeds frozen. Memory per explored area recorded (§4.3). | **COMPLETE** (2026-10-13; human-only validation deferred by D-80) |
 | 12 | Commercial and civic buildings | 11 | `BuildingTemplates` catalog (6 archetypes), `LootTables` | Every family has connected interiors with reachable containers and exits across the family matrix. Earlier urban layouts and legacy fingerprints are unchanged. | **COMPLETE** (2026-10-16; human-only validation deferred by D-80) |
-| 13 | Urban biome differentiation | 12, 03 | New `DistrictRules`, overlays, district-to-climate mapping (D-08) | Six distinct districts change player choices. Seams connect. Basics never depend on rare districts. Overlays keep accessibility. Legacy biome consumers are unchanged. | NOT STARTED |
+| 13 | Urban biome differentiation | 12, 03 | New `DistrictRules`, overlays, district-to-climate mapping (D-08) | Six distinct districts change player choices. Seams connect. Basics never depend on rare districts. Overlays keep accessibility. Legacy biome consumers are unchanged. | **COMPLETE** (2026-10-19; human-only validation deferred by D-80) |
 | 14 | Basements, transit and rooftop routes | 13, 05–06, 10 | Basement, transit and roof planners; hidden entrances; portals; `urban.discovery` | Street → basement → service passage → street and street → fire escape → roof → exit work without clipping or traps. Underground joins agree across borders. Secrets are discoverable through real clues. | NOT STARTED |
 | 15 | Alien ecology and urban wildlife | 14, 09–10 | Alien kind (appended `BodyFamily`), growth-node state, wildlife anchors | Infected, alien and wildlife behaviour are distinct. The alien has a tell and a counter. Caps, deaths and revisits hold. No edible hostile meat. Creative gates. | NOT STARTED |
 | 16 | Survivor camps and hidden civilians | 15, 06, 14, 10 | Urban site registry over `settlement/Settlement`, `SettlementManager`, `DormantSettlementSimulation` (D-21); `ai/SettledNpcAI`; aid interaction | A generated camp and a secret basement refuge are found through play. Helping or stealing has a consequence. The same people, needs and deaths remain after save and dormancy. | NOT STARTED |
@@ -1381,6 +1381,165 @@ was performed.
 
 **Next:** package 13, urban biome differentiation: the six districts, with
 district rules deciding which families appear where.
+
+## Milestone 13 — urban biome differentiation (2026-10-16 to 2026-10-19)
+
+**Status: COMPLETE.** Generator 12 plans six districts that change what the
+player carries, where they go for each supply and which hazards they meet,
+on the frozen street lattice, with every building still connected and
+validated. Human-only validation remains deferred by D-80. Decisions
+D-107–D-117; owner question P-15.
+
+### Start state
+
+- Branch `feature/urban-survival` at `6fd26c9`, clean tree; the 12 gate met.
+- Read the revised base, the prompt, `AGENTS.md`, `docs/COMMIT_WORKFLOW.md` and
+  these records. The work spanned sessions: plans, block, catalogue, generator
+  and presence were committed on 2026-10-19 and the tour, the review fix and
+  these records followed on the same day.
+
+### Districts and behaviour
+
+- **District map (D-108).** `DistrictMap` is pure: the spawn region is
+  residential, its neighbours residential or commercial with at least one
+  commercial, and rings two and three always hold an industrial, a flooded, a
+  civic and a quarantine region (the quarantine in ring three). Farther regions
+  draw from fixed weights. Basics never depend on a rare district.
+- **Plans (D-109).** Layout 9 keeps the layout-2 street lattice, so
+  residential and commercial regions and the starter superblock are exactly
+  their earlier plans and seams are unchanged. Industrial regions get depot rows
+  and fenced yards, flooded regions low housing around canal basins crossed by
+  causeways, civic regions a fenced square, and the quarantine cordoned
+  housing and clinic rows.
+- **Overlays (D-110).** A separate per-column raster: standing water and
+  duckboards, fences and checkpoints, contaminated ground, overgrowth, plants
+  and powder kegs. It keeps two cells from every parcel, off walkways, alleys,
+  passages, causeways and the starter superblock, and leaves avenues dry and
+  clean. Every water surface lies at one height on a solid bed, so the
+  existing water rules never move it.
+- **Climate and presence (D-111, D-117).** Each district reports one existing
+  `Biome` (no ordinal changes), so temperature, weather, fog tint, ambience and
+  plants follow. The HUD names the district, fog thickens by district for
+  presentation only, and an arrival line says what to expect once the player
+  steps off the boundary avenue.
+- **Buildings and supplies (D-112).** Template 6 picks proven template-4 and
+  template-5 plans by district: warehouses in the yards, clinics, schools,
+  posts and offices in the civic precinct, field clinics and checkpoint posts
+  in the quarantine. Every district keeps at least two unsecured sources of
+  food, water, treatment, light and pry tools.
+- **Threats (D-113).** Encounter catalogue 3 spends each district's DESIGN
+  §4.3 budget on unheld buildings. **Placeholder:** every district's threat is
+  still the Veilbound; alien organisms, growth nodes and alien props are
+  package 15.
+- **Hazards (D-114).** `CONTAMINATED_GROUND` (id 83) sickens a Survival player
+  who stands on it (boots help); the toxic-fog event only sickens inside a
+  quarantine district. Wading in flooded streets soaks and slows the player
+  through the existing water rules.
+- **Persistence (D-115).** No new section: the generator fixes the layout and
+  overlay revision, player edits to overlays are ordinary block edits, and
+  sickness is an existing saved affliction.
+- **QA (D-116).** `VEYLON_SCENE=urban_districts` walks a district transition
+  and samples all six districts by day and four of them again at night and in fog.
+
+How each district changes a decision is in DESIGN §4.3.
+
+### Changed paths
+
+**Production** (`src/main/java/com/veylon/`):
+
+- New: `world/urban/{DistrictMap,DistrictOverlays,DistrictCatalogue,DistrictRules,
+  UrbanOverlay,UrbanOverlayStamper}.java`, `UrbanDistrictQaScene.java`,
+  `UrbanDistrictTourPlan.java`.
+- Edited: `world/urban/{CityPlanner,CityPlanDiagnostics,DistrictPlan,SuperblockPlan,
+  UrbanDistrict,UrbanSurface,UrbanSurfaceMaterials,UrbanRevision,UrbanSalts,
+  BuildingPlanner,BuildingPlanDiagnostics,EncounterAnchors,UrbanBuildingStamper,
+  UrbanWorldState,StreetNetwork}.java`, `world/{World,WorldGenerator,BlockType}.java`,
+  `entity/{Player,PlayerConstants}.java`, `PlayerEnvironmentSystem.java`,
+  `simulation/EventSystem.java`, `gfx/{Environment,MaterialRegistry,UrbanTextures}.java`,
+  `item/CreativePalette.java`, `ui/Hud.java`, `UrbanQaScenes.java`,
+  `QaHarness.java` (one label on an existing line).
+
+**Tests** (`src/test/java/com/veylon/`):
+
+- New: `world/urban/{DistrictPlannerTest,DistrictCatalogueTest}`,
+  `world/UrbanDistrictGenerationTest`, `save/UrbanDistrictSaveTest`,
+  `ContaminatedGroundTest`, `UrbanDistrictPresenceTest`, `UrbanDistrictQaSceneTest`.
+- Extended: `world/WorldGeneratorFingerprintTest` (generator 12),
+  `UrbanSliceRouteTest` (generator 12), `UrbanCatalogueQaSceneTest`
+  (generator 12), `CreativeHazardsTest`, `qa/SerializedEnumOrderTest`,
+  `gfx/UrbanMaterialsTest`.
+- Expectations: `world/urban/{CityPlannerTest,UrbanRevisionTest}`,
+  `world/UrbanGeneratorDispatchTest` and `UrbanDevelopmentSelectorTest` name
+  generator 12.
+
+**Documents:** `docs/ARCHITECTURE.md`, `docs/DEVELOPING.md` and the urban
+DESIGN, DECISIONS, PROGRESS and VALIDATION records.
+
+### Compatibility
+
+- Generators 1–11 are unchanged: their absolute pins pass, catalogues 1 and 2
+  behave as before, and generators 9–11 keep their frozen climates. Legacy
+  biome consumers see the same `Biome` values in every earlier world.
+- New: generator 12, layout 9, template 6, encounter catalogue 3 and block id
+  83 (84 of 128 used; 110 of 160 texture layers). Appended plan enums are
+  metadata, never saved ordinals.
+- Unchanged: the v3 base, every section layout and version, content revision 3
+  and its tables, the default new world (generator 3).
+- An older build rejects a generator-12 save before replacing its live world;
+  generators 10–12 each reject the others' population catalogues. No older
+  binary was run, and there is no downgrade promise.
+- Toxic-fog and legacy roll sequences are unchanged outside generator 12
+  (`EventRollLadderTest`, `PlayerOutcomeDeterminismTest`).
+
+### Commands and results
+
+Exact commands and outputs are in
+[VALIDATION.md](VALIDATION.md#milestone-13--urban-biome-differentiation-2026-10-16-to-2026-10-19).
+In short:
+
+- Each code commit was validated against its exact tree.
+- The final portable build passed at `dbd0746` on 2026-10-19: 1,852 tests in
+  207 classes, zero failures or errors, and one existing Windows skip. The
+  tour's tree (`6ab1f49`) passed its own build with 1,851 tests.
+- Native `urban_districts` passed in Survival and Creative on seed `20260731`, at
+  `6ab1f49` and again at `dbd0746`,
+  16 captures each, with zero GL, KHR and native-audio errors.
+- A direct review of the shared-code changes found one defect, fixed in
+  `dbd0746` (D-117). No reviewer subagents ran.
+- `graphify update . --no-cluster` on the final code (`dbd0746`): 8,368 nodes and
+  32,739 edges, with the existing `build.gradle` extractor warning.
+
+The commits:
+
+| Commit | Subject |
+| --- | --- |
+| `ba84727` | `feat(urban): plan six districts with their overlays under layout nine` |
+| `3dd0d36` | `feat(world): add contaminated ground that sickens a survivor who stands on it` |
+| `f987887` | `feat(urban): choose each district's buildings from the proven catalogues` |
+| `8017601` | `feat(urban): generate the six districts under generator 12` |
+| `da8ff47` | `feat(urban): name the district underfoot and keep toxic fog in the quarantine` |
+| `6ab1f49` | `feat(qa): tour the six districts by day, night and fog` |
+| `dbd0746` | `fix(urban): announce a district once the survivor leaves the boundary avenue` |
+
+These records follow in their own commit. No push, merge, tag or publication
+was performed.
+
+### Limitations and next concrete step
+
+- **Evidence types.** The tour stages poses between stops, the clock, the
+  weather and a spear; it is not the human playtest D-80 defers until after 22.
+- **Threats.** The Veilbound stands in for every district's threat; the
+  quarantine differs by budget, contamination and toxic fog only (package 15).
+- **Presentation.** No district map colouring (21), district ambience or
+  ruined-city props (22).
+- **Balance.** Weights, budgets, loot biases and wading penalties are initial
+  values for 23.
+- **Day/night temperature (P-15).** The existing diurnal curve peaks at 02:00 in
+  every world; left unchanged pending the owner's answer.
+- **Default.** The ordinary new world stays generator 3 until 26.
+
+**Next:** package 14, basements, transit and rooftop routes, on generator 12's
+districts under a new generator.
 
 ## Resume rules
 
