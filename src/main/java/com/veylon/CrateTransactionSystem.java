@@ -108,7 +108,8 @@ final class CrateTransactionSystem {
                 case BATHROOM_CABINET -> "Bathroom cabinet";
                 case WARDROBE -> "Wardrobe";
                 case DRESSER_DESK -> walkUp ? "Dresser" : "Desk drawers";
-                case UTILITY_LOCKER -> "Utility locker";
+                case UTILITY_LOCKER -> plan.building().family() == com.veylon.world.urban.BuildingPlan.Family.TRANSIT
+                        ? "Maintenance locker" : "Utility locker";
                 case SHOP_SHELF -> walkUp ? "Shop shelf" : "Grocery shelf";
                 case STOCKROOM_CRATE -> "Supply cupboard";
                 case MEDICINE_CABINET -> "Dispensary cabinet";

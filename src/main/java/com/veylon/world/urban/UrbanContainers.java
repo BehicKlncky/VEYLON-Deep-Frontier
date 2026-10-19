@@ -80,10 +80,18 @@ public final class UrbanContainers {
         return world.urban != null && world.urban.hasGeneratedBuildings();
     }
 
-    /** Resolves immutable reservations without creating inventories or chunks. */
+    /**
+     * Resolves immutable reservations without creating inventories or chunks. A layout-ten
+     * transit station is searched like a building: its lockers and shelf are reservations of its
+     * plan, under the avenue where no parcel lies.
+     */
     public static Planned planned(World world, Vec3i position) {
         if (!manages(world)) { return null; }
         BuildingPlan building = world.urban.buildingAt(position.x(),position.z());
+        if (building == null) {
+            TransitStation station = world.urban.stationAt(position.x(), position.z());
+            building = station == null ? null : station.plan();
+        }
         if (building == null) { return null; }
         for (var fixture : building.fixtures()) {
             if (fixture.kind() == BuildingPlan.FixtureKind.CONTAINER && fixture.position().equals(position)) {
