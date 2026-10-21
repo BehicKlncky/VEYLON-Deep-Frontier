@@ -2074,3 +2074,156 @@ ignored artifacts under `build/`.
 - Clustering of like districts beyond ring three is left to tuning (D-108).
 
 Next: package 14.
+
+## Milestone 14 — basements, transit and rooftop routes (2026-10-19 to 2026-10-21)
+
+### Scope and baseline
+
+- Branch `feature/urban-survival` at `b7c3e80` (the 13 records), clean tree.
+  Read the revised base, the prompt, `AGENTS.md`, `docs/COMMIT_WORKFLOW.md` and
+  these records.
+- Generator 13 (layout 10, template 7, encounter catalogue 4) is new. Content
+  revision 3, every existing section layout and codec version and the default
+  new world are unchanged. One section is new (`urban.discovery` v1) and three
+  block ids were appended (84–86).
+- Generators 1–12 keep their absolute pins. Generator 13 was pinned at
+  introduction for terrain, plans and routes; its seed-7 terrain pin was
+  re-recorded once, the same day, by `bd8fd6a` (D-118).
+
+### Plan, generation, gameplay and save evidence
+
+Each code commit ran its tests against its exact tree: a detached worktree in
+`build/m14-check` whose tree hash matched the index, or a working tree that
+held only that change. Its message records the classes:
+
+| Commit | Checks on the exact tree | What they prove |
+| --- | --- | --- |
+| `9999bdc` | 50 tests, compile and Javadoc | `UrbanLoosePanelTest`: a wall until slid aside; no route or resident through a closed panel; forcing and salvage; open state across a save and a load. `UrbanMaterialsTest` (camouflage, 114 of 160 layers), `SerializedEnumOrderTest`, `CreativePaletteTest`, fixture tests |
+| `da30934` | 107 tests in 16 classes, Javadoc | `TransitNetworkTest`: one owned segment per region; both sides plan the same segment; mirrored cross-sections; validated stations inside the owner's band and clear of parcels for six seeds; the spawn station; the guarded stair; the proof catching an eight-block drop and a blocked stair; junction union; flooded tracks with dry platforms |
+| `00ee530` | 378 tests in 66 classes, Javadoc | `RouteCatalogueTest` over three seeds and a region of every district: 1,428 buildings validate; the starter superblock matches template 6; apartments always have basements; paired, correctly locked service doors over passages that cut no parcel; a sealed cellar only its panel opens; guarded roofs with bulkheads; 295 fire escapes and 169 connectors (45 bridges), declared by every building they touch |
+| `04ceb6e` | 27 tests, Javadoc | No cell a body reaches from the entrances of any template-7 building, in a region of every district, stands beside an unguarded drop apart from declared route heads |
+| `91d058e` | Full portable build: 1,881 tests in 212 classes, one existing skip | `UrbanUndergroundGenerationTest`: the spawn region's transit cells equal their plan; no parcel's own cells change; every building passes the production entry and exit proof in the generated world, and the spawn station passes its proof there; the route proof walks street → basement → service passage → back, roof to roof over every connector and bridge, and every fire escape, with no unguarded edge; the tunnel is walkable along the whole segment and both halves agree across the region boundary; seven chunk orders at the spawn station and a junction; flood water unmoved. `UrbanUndergroundSaveTest`: a walled-up passage, a dug platform and an opened station door survive a save and a load. The slice loop on generator 13 for all six seeds |
+| `aef00bf` | 507 tests in 90 classes, Javadoc | `UrbanDiscoveryTest` (a station found only by standing in it; a cellar found by its panel, not by walking past; other places named without recording; earlier worlds unchanged), `UrbanDiscoverySaveTest` (round trip, empty and absent sections, six kinds of damage and a foreign section refused with the live world kept), `UrbanUndergroundEnvironmentTest` (stations and tunnels dark, roofed and shallow-underground in sound; a basement sheltered; a roof open; the bulkhead keeping rain off the stair head) |
+| `d59dc02` | 45 tests, Javadoc | `UrbanStationTest`: a station locker resolves to the utility table, opens as a maintenance locker and keeps its contents across a save and a load |
+| `1ddcd8d` | 514 tests in 92 classes, Javadoc | `UrbanStationTest`: every anchor of 25 regions around the spawn for three seeds resolves and stays within its district maximum with the station's share; a Veilbound activates on a station platform and survives a save and a load under catalogue 4. The slice loop on generator 13 for all six seeds |
+| `bd8fd6a` | 43 tests, Javadoc | The fire-escape leg reworked: the ladder leads up to the roof and the stairs down to the street, with no unguarded edge; fingerprints with the re-recorded seed-7 terrain pin; transit, route catalogue, slice and save classes |
+| `38e1f84` | Full portable build: 1,896 tests in 217 classes, one existing skip | `UrbanUndergroundQaSceneTest` plays the tour headlessly in both modes and refuses an older generator |
+| `747932e` | `RuntimeBoundsTest`, 9 tests; then the full portable build: 1,897 tests in 217 classes, one existing skip | `RuntimeBoundsTest`: both route caches, driven past their caps by pure plan queries, stop at 80 together with the snapshot within its hard limits at every step and no chunk generated. With the transit cache's capacity doubled, the case failed at its first hard-limit check (`m14-snap-mutant.log`) |
+
+### Native route tour, both modes
+
+Host: Windows 11 Pro 10.0.26200, AMD Ryzen 5 5600X, NVIDIA GeForce RTX 3060 Ti,
+driver 610.88, OpenGL 3.3.0 with KHR_debug; 1280 × 720.
+
+Walking the tour down a fire escape during the ladder work (2026-10-19) found that the
+controller cannot climb down a rope ladder; that led to `bd8fd6a` (D-123).
+A Survival run on 2026-10-21 (`m14-native-survival.log`, tag
+`m14-underground-survival`) then passed, with two framing faults: the mid-climb
+capture showed only the wall, and the station's tunnel capture was black. The
+tour was changed to look up the ladder while climbing and to place a second
+torch on the track. Both modes then ran from fresh directories
+(`m14-native-s2.log`, `m14-native-c2.log`):
+
+```powershell
+$env:VEYLON_GENERATOR='urban-dev'; $env:VEYLON_SEED='20260731'
+$env:VEYLON_GAME_MODE='survival'; $env:VEYLON_SCENE='urban_underground'
+$env:VEYLON_RESOLUTION='1280x720'; $env:VEYLON_CAPTURE_TAG='m14-underground-survival2'
+.\gradlew.bat run -PveylonDataDir=build/qa/m14-underground-survival2 --console=plain
+```
+
+The Creative twin used `creative` in the mode and `m14-underground-creative2`
+as the tag and directory. Seed `20260731` gives these legs (from the `plan`
+line):
+
+| Leg | Cells | Walked |
+| --- | --- | --- |
+| Service passage | street (14, 41, 56) → basement door (23, 37, 47) → service door (24, 37, 47) → corridor (26, 37, 47) → street (41, 41, 56) | W through both basements and the passage, F at doors |
+| Hidden cellar | hall (42, 37, 45), panel (43, 37, 45), room (44, 37, 45) | F slides the panel aside; W into the cellar |
+| Roof | street (79, 41, 194) → roof (79, 61, 208) → over a bridge → roof (110, 61, 208) | W up the stairs, through the bulkhead door, across the bridge |
+| Fire escape | foot (29, 41, 18) → gap (29, 53, 17) → roof (29, 53, 16) → street (18, 41, 5) | W held against the wall up the ladder, then down by the stairs |
+| Station, 23:00 | street (3, 41, 150) → platform (3, 34, 136) → room (4, 34, 129) → tunnel (1, 33, 121) | W down the stair; torches placed with a right click on the platform and the track |
+| Flooded tunnel | (−452, 33, −1023), Flooded Quarter | Standing in the water |
+
+Both runs printed `[urban-underground] pass=true` with 6 staged poses, 16
+captures, 2 sites discovered (the cellar and the spawn station), no threat
+engaged, full health and 79 route seconds. Each `views` entry named the
+expected place: `Basement`, `Service passage`, `Hidden cellar`, `Rooftop`,
+`Transit station`, `Transit tunnel`, and the bare district on the street. The
+flood leg reported `inWater` with wetness 1.0 in Survival and 0.0 in Creative,
+where the player stays dry. The event log showed "The loose panel slides aside.
+A hidden cellar. Someone has been sheltering here." and "An abandoned transit
+station. …". Each log reports `glGetError=0`, 20 KHR messages with 0 errors (the
+usual MEDIUM pixel-transfer and shader-recompile notes) and `nativeErrors=0`;
+Gradle exited 0 after 1 min 21 s (Survival) and 1 min 22 s (Creative). These
+runs used the tour committed as `38e1f84`, before a Javadoc sentence changed and
+its scene label moved to another line of `QaHarness`'s case list.
+
+Inspected captures, from the final Survival run unless noted:
+
+- `03`: a two-wide brick passage under the courtyard, HUD `Service passage`.
+- `05`: the plaster panel with its seam and the drag-marked debris at its foot;
+  the prompt reads "Slide the loose panel aside (crouch: bar it from this
+  side)". `06` (Creative): inside the cellar, looking back through the open panel at the debris in the hall.
+- `08` (Creative): parapets with guard rails, the bridge's rails and the
+  bulkhead on the next roof.
+- `09`: looking up the rope ladder from halfway, the rail cage at its head
+  against the sky. `10`: from the roof, the parapet gap and the caged ladder
+  head, the courtyard below.
+- `12`: the station stair from the sidewalk at night, closed by rails on three
+  sides. `13`: the platform almost black. `14`: the platform and the service
+  door lit by the placed torch. `15`: the tunnel's walls and track lit
+  by the track torch, darkness beyond.
+- `16`: black apart from the held torch and the prompt "Fill waterskin
+  (untreated water)", with wetness 100 % on the HUD: an unlit flooded tunnel.
+
+Observations, none a tour failure:
+
+- `11` frames the building's brick wall from below rather than the parapet gap.
+  The HUD shows the player back on the street, which is what the leg checks.
+- The held torch does not light terrain (as recorded for package 06); only
+  placed torches do, which is the cost of darkness the tour shows.
+- P-15 is still visible: 9.1 °C on the street at 12:42 and 20.7 °C on the
+  street at 23:02.
+
+### Commands and portable builds
+
+All Gradle commands used the bundled Temurin 25.0.4.1+1
+(`build/tools/jdk25/jdk-25.0.4.1+1`) and the Windows wrapper. Logs are local
+ignored artifacts under `build/`.
+
+- `.\gradlew.bat test --tests "com.veylon.UrbanUndergroundQaSceneTest"` after
+  the tour changes: 3 tests passed, routeSeconds 79 in both modes
+  (`m14-g5.log`).
+- `.\gradlew.bat build --console=plain` on 2026-10-21 with the tour's code:
+  passed in 9 min 52 s, 1,896 tests in 217 classes, zero failures or errors and
+  the existing Windows symlink-privilege skip in `AppPathsTest`
+  (`m14-build-final.log`). The scene label then moved to an existing line of
+  `QaHarness` to keep it at 1,496 lines, and the same command passed again on
+  that tree, committed as `38e1f84`, in 10 min 2 s with the same 1,896 tests,
+  zero failures or errors and the same skip (`m14-build-head.log`).
+- `.\gradlew.bat test --tests "com.veylon.qa.RuntimeBoundsTest"` with the
+  route-cache case: 9 tests passed (`m14-snap-focused.log`); with the transit
+  cache's capacity doubled, the new case failed (`m14-snap-mutant.log`), and
+  the code was restored. Then `.\gradlew.bat build --console=plain` on the final
+  code, committed as `747932e`: passed in 9 min 50 s, 1,897 tests in 217
+  classes, zero failures or errors and the same skip (`m14-build-snap.log`).
+- `graphify update . --no-cluster` once on the final code: 8,745 nodes and
+  34,459 edges, with the existing `build.gradle` extractor warning
+  (`m14-graph-update.log`). No
+  clustering or semantic extraction ran.
+
+### Limits and next gate
+
+- The tour stages poses between legs, the clock, the weather and a kit; it is
+  scripted evidence, not the human playtest deferred by D-80. Low light and
+  flood were walked by the script, not judged by a person.
+- Fire escapes are ascent routes only (D-123).
+- The hidden cellar is an empty reservation for 16; its per-region guarantee
+  is shown on the tested seeds (D-122).
+- Station slots hold the Veilbound (package 15). Map presentation of finds is
+  package 21; underground ambience is package 22; route and flood rates are
+  package 23.
+- No reviewer subagents ran. The commits rest on their own exact-tree checks,
+  the final build and the native tours.
+
+Next: package 15.

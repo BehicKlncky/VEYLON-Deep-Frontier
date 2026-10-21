@@ -41,9 +41,9 @@ runs. All are inert when unset. Everything below is handled by `QaHarness`;
 |---|---|
 | `VEYLON_SEED` | Fixed world seed (a non-numeric value is hashed) |
 | `VEYLON_GAME_MODE=survival\|creative` | Initial mode for automated world runs only; absent means Survival. Invalid values fail explicitly. Ignored for normal title sessions and frontend-only captures. |
-| `VEYLON_GENERATOR=urban-dev` | Development selector: NEW FRONTIER and automated worlds use the newest urban generator (`UrbanRevision.DEVELOPMENT_GENERATOR`, now `World.GEN_URBAN_DISTRICTS`: generator 12, layout 9 / template 6 / content 3, encounter catalogue 3). Absent keeps the ordinary default. Any other value fails, and so does `urban-dev` without an isolated data directory (see below). |
+| `VEYLON_GENERATOR=urban-dev` | Development selector: NEW FRONTIER and automated worlds use the newest urban generator (`UrbanRevision.DEVELOPMENT_GENERATOR`, now `World.GEN_URBAN_UNDERGROUND`: generator 13, layout 10 / template 7 / content 3, encounter catalogue 4). Absent keeps the ordinary default. Any other value fails, and so does `urban-dev` without an isolated data directory (see below). |
 | `VEYLON_SMOKE=<seconds>` | Release smoke gate: save/load, fire, storm, a fortress approach, then a pass/fail report. Throws on failure |
-| `VEYLON_SCENE=<name>` | Stage a deterministic benchmark scene (`day`, `pinefog`, `nightfire`, `ruin`, `toxic`, `ao_shadow`, `phase4`, `ashwolf`, `silhouette30`, `vfx_blood`, `vfx_mining`, `vfx_beacon`, `death_ragdoll_showcase`, `death_ragdoll_sequence`, `dismember_showcase`, `dismember_wall`, `dismember_bomb` (a real scrap bomb thrown into a group of six, one outside the lethal radius; it goes off at 2.4 s), `dismember_species`, `dismember_species_wall` and `dismember_species_close` (every species, a guard and the player's remains blown apart at 1 s; open meadow, a step and a wall, and a close view of the small bodies), `molotov_ground`, `molotov_tree` and `molotov_rain` (a real fire bomb thrown at 0.5 s onto a dry clearing at dusk, beside a round tree that catches, or with rain from 3 s that puts the pool out; shots `0.7,1.2,3,7,11`, `1,4,10,20` and `2,3.5,5`), the burning-body scenes `body_fire_row`, `body_fire_row_night`, `body_fire_close`, `body_fire_out`, `body_fire_blast`, `body_fire_panic`, `body_fire_bird`, `body_fire_rain`, `body_fire_ragdoll` and `body_fire_player` (see "Burning bodies QA" below), `movement`, `inventory`, `ui_cycle`, `held_*`, `creative_flight` with `VEYLON_GAME_MODE=creative`, which flies east at Shift speed and prints a `[flight]` streaming report at 29 s, and the urban scenes `urban_streets`, `urban_intersection`, `urban_seam_walk`, `urban_fixtures`, `urban_fixtures_night`, `urban_apartments`, `urban_apartments_night`, `urban_apartments_lit_night`, `urban_apartments_manual`, `urban_apartments_manual_night`, `urban_loot`, the playable-slice route `urban_slice`, the catalogue walk `urban_catalogue` and the district tour `urban_districts` with `VEYLON_GENERATOR=urban-dev` (see "Urban planning QA" below)) |
+| `VEYLON_SCENE=<name>` | Stage a deterministic benchmark scene (`day`, `pinefog`, `nightfire`, `ruin`, `toxic`, `ao_shadow`, `phase4`, `ashwolf`, `silhouette30`, `vfx_blood`, `vfx_mining`, `vfx_beacon`, `death_ragdoll_showcase`, `death_ragdoll_sequence`, `dismember_showcase`, `dismember_wall`, `dismember_bomb` (a real scrap bomb thrown into a group of six, one outside the lethal radius; it goes off at 2.4 s), `dismember_species`, `dismember_species_wall` and `dismember_species_close` (every species, a guard and the player's remains blown apart at 1 s; open meadow, a step and a wall, and a close view of the small bodies), `molotov_ground`, `molotov_tree` and `molotov_rain` (a real fire bomb thrown at 0.5 s onto a dry clearing at dusk, beside a round tree that catches, or with rain from 3 s that puts the pool out; shots `0.7,1.2,3,7,11`, `1,4,10,20` and `2,3.5,5`), the burning-body scenes `body_fire_row`, `body_fire_row_night`, `body_fire_close`, `body_fire_out`, `body_fire_blast`, `body_fire_panic`, `body_fire_bird`, `body_fire_rain`, `body_fire_ragdoll` and `body_fire_player` (see "Burning bodies QA" below), `movement`, `inventory`, `ui_cycle`, `held_*`, `creative_flight` with `VEYLON_GAME_MODE=creative`, which flies east at Shift speed and prints a `[flight]` streaming report at 29 s, and the urban scenes `urban_streets`, `urban_intersection`, `urban_seam_walk`, `urban_fixtures`, `urban_fixtures_night`, `urban_apartments`, `urban_apartments_night`, `urban_apartments_lit_night`, `urban_apartments_manual`, `urban_apartments_manual_night`, `urban_loot`, the playable-slice route `urban_slice`, the catalogue walk `urban_catalogue`, the district tour `urban_districts` and the route tour `urban_underground` with `VEYLON_GENERATOR=urban-dev` (see "Urban planning QA" below)) |
 | `VEYLON_SHOT="5,10"` | Capture screenshots at those elapsed seconds |
 | `VEYLON_FRONTEND=<name>` | Pin a front-end screen (`options`, `audio`, `loading`, `death`, `victory`, `glyphs`, `newworld`). `newworld-save` shows the replace-save notice without writing a save. `pause` and `gamemode` stage a Survival world with the pause menu or the mode confirmation open; `pause-creative`, `gamemode-creative` and `victory-creative` stage a Creative world; `catalog`, `catalog-tools`, `catalog-search` (query "iron") and `catalog-inventory` open the Creative catalog; `worldcontrols` and `worldcontrols-held` open the Creative world controls, the second with dusk, a frozen clock, a locked storm and paused spawning already applied |
 | `VEYLON_RESOLUTION=1920x1080` | Framebuffer override |
@@ -100,6 +100,7 @@ the spawn column.
 | `urban_starter_manual` | Fresh starter-compatible Survival, normal controls and read-only five-second position/inventory evidence. No pose, weather, clock or supply injection. Walk from the bedroom through the courtyard to an apartment/shop, search with F, take supplies and return. Use a fresh isolated directory, capture the spawn, save with F5 and capture the return. |
 | `urban_slice` | The package-11 slice gate in either mode on a fresh generator-10 world, with its own clock, weather and events. The route forces an interior door and searches a multi-floor apartment that hosts an encounter. It handles an infected, searches the shop, bars the refuge's street door, eats, drinks, crafts the reinforced spear, quick-saves with F5 and quick-loads with F9 over the live world. It then revisits in reverse order. Prints `[urban-slice] pass=true`, three `memory` checkpoints and a timeline, writes 16 labelled captures and closes itself. |
 | `urban_districts` | The package-13 district tour in either mode on a generator-12 world: a walked district transition, then a stop in each of the six districts by day and four of them again at night and in fog, wading into a flooded street. Poses between stops, the clock, the weather and a spear are staged and printed as staged. Prints `[urban-districts] pass=true`, writes 16 labelled captures and closes itself; it refuses to stage on an older generator. |
+| `urban_underground` | The package-14 route tour in either mode on a generator-13 world: street → basement → service passage → the neighbour's basement → street; a loose panel slid aside with F into the hidden cellar; stairs → bulkhead → roof → bridge or connector; a fire escape climbed and the stairs back down; the spawn station at night, lit with two placed torches, and its tunnel; a flooded tunnel waded. Poses between legs, the clock, the weather and a kit of a spear and torches are staged and printed as staged. Prints `[urban-underground] pass=true`, writes 16 labelled captures and closes itself; it refuses to stage on an older generator. |
 | `urban_catalogue` | The package-12 catalogue walk in either mode on a generator-11 or generator-12 world. It visits the nearest building of each commercial and civic family: a damaged grocer, a clinic and a security post that keep their locks, a school and an office block with upper floors, and a warehouse. Moving between buildings is a staged pose at each street door, and the run starts with a staged spear and pry tool; both are printed as staged. Inside it plays through the production input seam: the sign, a shop floor, the clinic's locked staff door, the street door, the dispensary forced by holding the left button and its stock searched with F, a treatment room, ground and upper classrooms and offices, the armoury lock, the squad room, a rack aisle and the workbench. Prints `[urban-catalogue] pass=true`, writes 16 labelled captures and closes itself. |
 
 ```powershell
@@ -116,9 +117,13 @@ refuge and finite starter supplies. Its HUD identifies the refuge. Generator 10
 keeps that geometry/loot and adds catalogue-1 Veilbound encounters. Generator 11
 keeps generator 10's walk-ups and starter superblock and adds the
 commercial and civic catalogue with encounter catalogue 2; its frontage signs read
-through the interaction prompt. Generator 12 (`urban-dev`) plans the six districts
+through the interaction prompt. Generator 12 plans the six districts
 (layout 9) with their overlays, district climates and encounter catalogue 3; its HUD
-names the district underfoot. Map presentation of districts remains package 21.
+names the district underfoot. Generator 13 (`urban-dev`) keeps those districts and
+adds basements, service passages, a hidden cellar per residential region, transit
+tunnels and stations under boundary avenues, and rooftop rails, bulkheads, fire
+escapes and connectors (layout 10, template 7, encounter catalogue 4); its HUD also
+names the route underfoot. Map presentation of districts and finds remains package 21.
 
 For infected acceptance, run `urban_infected_street` and
 `urban_infected_apartment` separately with generator `urban-dev`, seed `20260731`,
@@ -206,9 +211,9 @@ temperature, events, walked blocks and game minutes). The memory lines give
 retained chunks and a post-GC best-effort heap sample; they are host
 measurements, not budgets. `UrbanSliceRouteTest` plays the same scene headlessly
 in `Game.run` order on the frozen slice seeds. This scripted route is not the
-human playtest deferred by D-80. `urban-dev` now creates generator 12, whose starter
+human playtest deferred by D-80. `urban-dev` now creates generator 13, whose starter
 superblock is generator 10's; the frozen headless gate still names generator 10, and
-the same test also plays the loop on generators 11 and 12 for every frozen seed.
+the same test also plays the loop on generators 11, 12 and 13 for every frozen seed.
 
 For the commercial and civic catalogue (package 12), run each mode in a fresh
 directory:
@@ -275,6 +280,42 @@ biome. `UrbanDistrictQaSceneTest` plays the same tour headlessly in both modes. 
 a failing region, `CityPlanDiagnostics` reports overlay placement, cordon
 checkpoints and routes around solid overlays, and `BuildingPlanDiagnostics.districts`
 reports its buildings.
+
+For basements, transit and rooftop routes (package 14), run each mode in a fresh
+directory:
+
+```powershell
+$env:VEYLON_GENERATOR='urban-dev'; $env:VEYLON_SEED='20260731'
+$env:VEYLON_GAME_MODE='survival'; $env:VEYLON_SCENE='urban_underground'
+$env:VEYLON_RESOLUTION='1280x720'; $env:VEYLON_CAPTURE_TAG='m14-underground-survival'
+Remove-Item Env:VEYLON_SHOT -ErrorAction SilentlyContinue
+.\gradlew.bat run -PveylonDataDir=build/qa/m14-underground-survival --console=plain
+```
+
+Repeat with `creative` for the twin. The tour reads its legs from the pure plans
+of the spawn region (unheld buildings only) and prints them as one `plan` line.
+Each leg starts from a staged pose and is then played with W, F, right click and
+mouse look. The panel leg presses F until the panel opens and requires the
+cellar to be recorded as found. The fire-escape leg holds W against the wall
+until the body stands on the roof; the controller has no ladder descent, so the
+tour returns by the stairs. The station leg runs at 23:00, places one torch on
+the platform and one on the track with a right click, and requires the station
+to be recorded as found. The flood leg stands in the nearest flooded district's
+tunnel and requires `inWater`. Every view checks the place the HUD names. The
+frozen capture list is:
+
+`01-street-before-the-basement`, `02-basement-service-door`,
+`03-service-passage`, `04-back-on-the-street`, `05-loose-panel-and-drag-marks`,
+`06-hidden-cellar`, `07-roof-by-the-stairs`, `08-roof-bridge` (or
+`08-roof-connector`), `09-fire-escape-climb`, `10-fire-escape-roof`,
+`11-down-by-the-stairs`, `12-station-stair-at-night`, `13-dark-platform`,
+`14-torchlit-platform`, `15-torchlit-tunnel` and `16-flooded-tunnel`.
+
+Require `[urban-underground] pass=true` and zero GL, KHR and native-audio errors.
+The `views` line pairs each capture with the HUD location line.
+`UrbanUndergroundQaSceneTest` plays the same tour headlessly in both modes. For a
+failing station or route, `TransitValidator` and `RouteProof` report the
+unreached cells and fall traps.
 
 For the generated apartment appearance sequence use an isolated directory and a
 tag such as `m06_scripted_camera_day`. Change the scene to

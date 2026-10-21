@@ -6,10 +6,10 @@ This is the running record for the 26-package urban-survival roadmap. The pack i
 
 | Item | Value |
 | --- | --- |
-| Last completed package | **13 — Urban biome differentiation** (2026-10-16 to 2026-10-19). Generator 12 plans six districts on the frozen street lattice: reclaimed residential, commercial downtown, industrial yards, flooded neighbourhoods, a civic precinct and a quarantine, each with its own climate, building mix, overlays (water and duckboards, fences and checkpoints, contaminated ground, overgrowth, kegs), threat budget and reason to go. The HUD names the district. Basics stay in the common districts and every building stays connected and validated. Native district tours pass in both modes. Human-only checks are deferred by D-80. |
-| Source revision | 13: `ba84727` district plans → `3dd0d36` contaminated ground → `f987887` district catalogue → `8017601` generator 12 → `da8ff47` district presence → `6ab1f49` district tour → `dbd0746` arrival on leaving the avenue. Records follow separately. |
-| Default new world | Legacy (`World.DEFAULT_NEW_WORLD_GENERATOR = GEN_CAVE_IDENTITIES`), unchanged until 26 passes. Isolated `VEYLON_GENERATOR=urban-dev` creates generator 12 (`GEN_URBAN_DISTRICTS`, layout 9 / template 6 / content 3, encounter catalogue 3). Generators 1–11 stay loadable with their original geometry and encounters. |
-| Next package | **14 — Basements, transit and rooftop routes, NOT STARTED.** Keep `UrbanSliceRouteTest` (generators 10–12), `UrbanCatalogueQaSceneTest` and `UrbanDistrictQaSceneTest` as regression gates. Owner question P-15 (the inverted day/night temperature curve) is open. |
+| Last completed package | **14 — Basements, transit and rooftop routes** (2026-10-19 to 2026-10-21). Generator 13 adds basements, service passages, a hidden cellar per residential region (package 16's empty refuge reservation), transit tunnels and stations under boundary avenues, and guarded roofs with fire escapes and connectors to generator 12's districts. Every route is walked with the existing controls and proven free of unguarded drops; fire escapes are climbed up only, as the controller allows. The HUD names the route underfoot, and stations and cellars are recorded only when found. Native route tours pass in both modes. Human-only checks are deferred by D-80. |
+| Source revision | 14: `9999bdc` rails and loose panel → `da30934` transit plans → `00ee530` route catalogue and template 7 → `04ceb6e` stair-well rail → `91d058e` generator 13 → `aef00bf` places and discovery → `d59dc02` station lockers → `1ddcd8d` encounter catalogue 4 → `bd8fd6a` ascent-only ladders → `38e1f84` route tour → `747932e` route caches in the runtime snapshot. Records follow separately. |
+| Default new world | Legacy (`World.DEFAULT_NEW_WORLD_GENERATOR = GEN_CAVE_IDENTITIES`), unchanged until 26 passes. Isolated `VEYLON_GENERATOR=urban-dev` creates generator 13 (`GEN_URBAN_UNDERGROUND`, layout 10 / template 7 / content 3, encounter catalogue 4). Generators 1–12 stay loadable with their original geometry and encounters. |
+| Next package | **15 — Alien ecology and urban wildlife, NOT STARTED.** Keep `UrbanSliceRouteTest` (generators 10–13), `UrbanCatalogueQaSceneTest`, `UrbanDistrictQaSceneTest` and `UrbanUndergroundQaSceneTest` as regression gates. Owner question P-15 (the inverted day/night temperature curve) is open. |
 | Human testing schedule | Owner instruction (2026-10-11, D-80): consolidated human playtesting/listening after milestone 22. Through 22, run automated and scripted native validation and record human-only checks as deferred; do not request interim human walks. |
 | Commits | Separate `feat`, `test`, `docs` and `chore` commits on `feature/urban-survival`; see the reconstruction ledger below. `main` stays at `923345f`. Original combined commit retained at `backup/urban-m01-m04-before-split`. No merge, push, tag or publication. |
 
@@ -32,7 +32,7 @@ The status vocabulary is NOT STARTED, IN PROGRESS, PARTIAL, BLOCKED or COMPLETE.
 | 11 | Playable vertical slice gate | 02–10 | Integration: `UrbanQaScenes`, `AutomatedRunDriver` urban route, integration tests | The DESIGN §14 slice holds headless and native with normal controls; save, revisit, no refill and no resurrection; Creative twins. Regression seeds frozen. Memory per explored area recorded (§4.3). | **COMPLETE** (2026-10-13; human-only validation deferred by D-80) |
 | 12 | Commercial and civic buildings | 11 | `BuildingTemplates` catalog (6 archetypes), `LootTables` | Every family has connected interiors with reachable containers and exits across the family matrix. Earlier urban layouts and legacy fingerprints are unchanged. | **COMPLETE** (2026-10-16; human-only validation deferred by D-80) |
 | 13 | Urban biome differentiation | 12, 03 | New `DistrictRules`, overlays, district-to-climate mapping (D-08) | Six distinct districts change player choices. Seams connect. Basics never depend on rare districts. Overlays keep accessibility. Legacy biome consumers are unchanged. | **COMPLETE** (2026-10-19; human-only validation deferred by D-80) |
-| 14 | Basements, transit and rooftop routes | 13, 05–06, 10 | Basement, transit and roof planners; hidden entrances; portals; `urban.discovery` | Street → basement → service passage → street and street → fire escape → roof → exit work without clipping or traps. Underground joins agree across borders. Secrets are discoverable through real clues. | NOT STARTED |
+| 14 | Basements, transit and rooftop routes | 13, 05–06, 10 | Basement, transit and roof planners; hidden entrances; portals; `urban.discovery` | Street → basement → service passage → street and street → fire escape → roof → exit work without clipping or traps. Underground joins agree across borders. Secrets are discoverable through real clues. | **COMPLETE** (2026-10-21; human-only validation deferred by D-80) |
 | 15 | Alien ecology and urban wildlife | 14, 09–10 | Alien kind (appended `BodyFamily`), growth-node state, wildlife anchors | Infected, alien and wildlife behaviour are distinct. The alien has a tell and a counter. Caps, deaths and revisits hold. No edible hostile meat. Creative gates. | NOT STARTED |
 | 16 | Survivor camps and hidden civilians | 15, 06, 14, 10 | Urban site registry over `settlement/Settlement`, `SettlementManager`, `DormantSettlementSimulation` (D-21); `ai/SettledNpcAI`; aid interaction | A generated camp and a secret basement refuge are found through play. Helping or stealing has a consequence. The same people, needs and deaths remain after save and dormancy. | NOT STARTED |
 | 17 | Guarded strongholds and hostile factions | 16 | `SettlementManager` guards, reputation, theft and counterattacks; urban faction ids | Approach, access rules, entry, trade and exploration. Guards react fairly. A hostile site with an alternative route. State persists without duplicate guards or infinite counterattacks. | NOT STARTED |
@@ -1540,6 +1540,184 @@ was performed.
 
 **Next:** package 14, basements, transit and rooftop routes, on generator 12's
 districts under a new generator.
+
+## Milestone 14 — basements, transit and rooftop routes (2026-10-19 to 2026-10-21)
+
+**Status: COMPLETE.** Generator 13 adds basements, service passages, a hidden
+cellar per residential region, abandoned transit tunnels and stations, and
+guarded roofs with fire escapes and connectors to generator 12's districts. Every
+route is walked with the existing controls and proven free of unguarded drops.
+Human-only validation remains deferred by D-80. Decisions D-118–D-128; owner
+question P-15 is still open.
+
+### Start state
+
+- Branch `feature/urban-survival` at `b7c3e80` (the 13 records), clean tree; the
+  13 gate met.
+- Read the revised base, the prompt, `AGENTS.md`, `docs/COMMIT_WORKFLOW.md` and
+  these records. The work spanned sessions: blocks, transit, routes, generator,
+  discovery, lockers, encounters and the ladder fix were committed on
+  2026-10-19; the tour, the runtime-cache report and these records followed on
+  2026-10-21.
+
+### Routes and behaviour
+
+- **Transit (D-119, D-120).** Tunnels run only under boundary avenues, so they
+  never cut a building. Each segment is a pure function of its name, the seed
+  and its two bordering plans, so neighbours agree in any chunk order and
+  crossing tunnels join. Every region owns one segment: at most one station and
+  two segments per region. A segment exists only with its station: a service
+  room behind a metal door, a platform one step above the track and a guarded
+  stair up to the sidewalk, each proven by `TransitValidator` before it is
+  sited. Rubble mounds slow a tunnel; only its ends can be plugged. Flooded
+  districts' tunnels hold one block of standing water.
+- **Basements and passages (D-121).** Every apartment outside the starter
+  superblock has a first basement. Two-wide service passages join basements
+  under courtyard passages through metal service doors, locked in occupied
+  buildings.
+- **Hidden cellar (D-122).** One apartment per residential region seals a back
+  room behind a loose panel (`HIDDEN_PANEL`). Clues are generated cells:
+  drag-marked debris, the panel's seam and chalk, and a back room with no door.
+  F slides it aside. The room is package 16's refuge reservation and holds no
+  civilians.
+- **Roofs (D-121, D-123).** Parapets carry a guard rail, stairs end in a concrete
+  bulkhead with a metal roof door, and the stair core's open well has a rail.
+  Fire escapes are rope ladders up a rear wall to a parapet gap, caged at the
+  head; connectors open abutting parapets or bridge a courtyard passage. The
+  controller climbs a ladder but has no way down one, so a fire escape is an
+  ascent, and the way down is the stairs.
+- **Supplies and threats (D-120, D-125).** Station service rooms and route roofs
+  hold maintenance lockers on the existing utility table. Encounter catalogue 4
+  gives a region's station two slots inside its district budget, outside the
+  spawn region. Nothing underground is required; there are no resource mines.
+- **Costs.** Tunnels and stations are dark and need a light; flooded tunnels and
+  flooded basements soak and slow through the existing water rules. Every route
+  keeps a stair exit to the street.
+- **Places and discovery (D-124).** The HUD names the route underfoot
+  ("District / Reclaimed Residential / Service passage"); shelter, weather and
+  sound follow it. Stations and cellars are recorded in `urban.discovery` only
+  when observed.
+- **QA (D-127).** `VEYLON_SCENE=urban_underground` walks both acceptance routes,
+  the cellar, a station by night and a flooded tunnel.
+- **Runtime caps (D-128).** The route-catalogue and transit-segment caches are
+  reported and checked by the runtime budget snapshot.
+
+### Changed paths
+
+**Production** (`src/main/java/com/veylon/`):
+
+- New: `world/urban/{TransitNetwork,TransitStation,TransitValidator,RouteProof,
+  RouteCatalogue,RouteTemplates,UrbanRouteStamper,UrbanPlaces,
+  UrbanDiscovery}.java`, `save/UrbanDiscoverySection.java`,
+  `UrbanUndergroundQaScene.java`, `UrbanUndergroundTourPlan.java`.
+- Edited: `world/urban/{AccessibilityValidator,BuildingFurnishing,BuildingPlan,
+  BuildingPlanner,BuildingTemplates,CivicCatalogue,CivicTemplates,
+  EncounterAnchors,PlanVolume,UrbanContainers,UrbanIndoorQueries,UrbanRevision,
+  UrbanSalts,UrbanWorldState}.java`, `world/{World,BlockType,Fixtures,
+  ChunkMesher}.java`, `entity/{Player,UrbanEncounterDirector}.java`,
+  `save/V3ExtensionSections.java`, `gfx/{MaterialRegistry,UrbanTextures}.java`,
+  `engine/AudioManager.java`, `item/CreativePalette.java`,
+  `FixtureActions.java`, `CrateTransactionSystem.java`,
+  `qa/RuntimeBudgetSnapshot.java`, `UrbanQaScenes.java`, `QaHarness.java` (one
+  label on an existing line).
+
+**Tests** (`src/test/java/com/veylon/`):
+
+- New: `world/urban/{TransitNetworkTest,RouteCatalogueTest}`,
+  `world/UrbanUndergroundGenerationTest`,
+  `save/{UrbanUndergroundSaveTest,UrbanDiscoverySaveTest}`,
+  `UrbanLoosePanelTest`, `UrbanDiscoveryTest`,
+  `UrbanUndergroundEnvironmentTest`, `UrbanStationTest`,
+  `UrbanUndergroundQaSceneTest`.
+- Extended: `world/WorldGeneratorFingerprintTest` (generator 13),
+  `UrbanSliceRouteTest` (generator 13), `GameLoopIntegrationTest`,
+  `qa/{SerializedEnumOrderTest,RuntimeBoundsTest}`, `gfx/UrbanMaterialsTest`.
+- Expectations: `world/urban/UrbanRevisionTest`,
+  `world/UrbanGeneratorDispatchTest` and `UrbanDevelopmentSelectorTest` name
+  generator 13.
+
+**Documents:** `docs/ARCHITECTURE.md`, `docs/DEVELOPING.md` and the urban
+DESIGN, DECISIONS, PROGRESS and VALIDATION records.
+
+### Compatibility
+
+- Generators 1–12 are unchanged: their absolute pins pass, catalogues 1–3
+  behave as before (the director's station scan runs only under catalogue 4),
+  and `UrbanPlaces` answers none in every earlier world.
+- New: generator 13, layout 10, template 7, encounter catalogue 4, block ids
+  84–86 (87 of 128 used; 114 of 160 texture layers) and section
+  `urban.discovery` v1. Appended plan enums (`TRANSIT`, four room functions,
+  `FixtureKind.ROUTE`) and `Fixtures.Kind.HIDDEN_PANEL` are metadata, never
+  saved ordinals.
+- Unchanged: the v3 base, every existing section layout and version, content
+  revision 3 and its tables, and the default new world (generator 3).
+- Generator 13's seed-7 terrain pin was re-recorded once on the day it was
+  introduced, before any save outside the tests used it; it is frozen from
+  this handoff (D-118).
+- An older build rejects a generator-13 save before replacing its live world;
+  generators 10–13 each reject the others' population catalogues. No older
+  binary was run, and there is no downgrade promise.
+
+### Commands and results
+
+Exact commands and outputs are in
+[VALIDATION.md](VALIDATION.md#milestone-14--basements-transit-and-rooftop-routes-2026-10-19-to-2026-10-21).
+In short:
+
+- Each code commit was validated against its exact tree.
+- The final portable build passed at `747932e` on 2026-10-21: 1,897 tests in 217
+  classes, zero failures or errors, and the existing Windows skip.
+  The tour's tree (`38e1f84`) passed its own build with 1,896 tests in 217
+  classes.
+- Native `urban_underground` passed in Survival and Creative on seed
+  `20260731`, 16 captures each, with zero GL, KHR and native-audio errors.
+- No reviewer subagents ran. A direct check of the records against the code
+  found the unreported route caches (D-128).
+- `graphify update . --no-cluster` on the final code: 8,745 nodes and 34,459
+  edges, with the existing `build.gradle` extractor warning.
+
+The commits:
+
+| Commit | Subject |
+| --- | --- |
+| `9999bdc` | `feat(world): add guard rails and a loose panel that hides a doorway` |
+| `da30934` | `feat(urban): plan transit tunnels and stations under the boundary avenues` |
+| `00ee530` | `feat(urban): plan basements, a hidden cellar and roof routes as template seven` |
+| `04ceb6e` | `fix(urban): rail the stair core's open well in template seven` |
+| `91d058e` | `feat(urban): generate underground and rooftop routes under generator 13` |
+| `aef00bf` | `feat(urban): name the route underfoot and record found stations and cellars` |
+| `d59dc02` | `feat(urban): stock transit stations with maintenance lockers` |
+| `1ddcd8d` | `feat(urban): keep infected in transit stations with encounter catalogue 4` |
+| `bd8fd6a` | `fix(urban): climb fire escapes up only and cage the ladder head` |
+| `38e1f84` | `feat(qa): tour basements, a hidden cellar, roofs and transit routes` |
+| `747932e` | `fix(urban): check route and transit plan caches in the runtime snapshot` |
+
+These records follow in their own commit. No push, merge, tag or publication
+was performed.
+
+### Limitations and next concrete step
+
+- **Evidence types.** The tour stages poses between legs, the clock, the
+  weather and a kit of a spear and torches; it is not the human playtest D-80
+  defers until after 22. Low light and flood were walked by the script, not
+  judged by a person.
+- **Ladders.** Fire escapes are ascent routes only: the controller has no
+  ladder descent, and none was invented. Residents' pathing still climbs both
+  ways.
+- **Hidden refuge.** The cellar is an empty reservation; its civilians, needs
+  and aid are package 16. The per-region guarantee is shown on the tested
+  seeds only (D-122).
+- **Threats.** Station slots hold the Veilbound (package 15).
+- **Presentation.** No map layer for finds (21); no underground ambience
+  beyond the existing shallow-underground sound (22).
+- **Balance.** Route, presence, plug and flood rates are initial values for 23.
+- **Day/night temperature (P-15).** Still inverted in every world: the tour's
+  HUD read 9.1 °C on the street at 12:42 and 20.7 °C on the street at 23:02.
+  Left unchanged pending the owner's answer.
+- **Default.** The ordinary new world stays generator 3 until 26.
+
+**Next:** package 15, alien ecology and urban wildlife, on generator 13's
+city under a new generator.
 
 ## Resume rules
 

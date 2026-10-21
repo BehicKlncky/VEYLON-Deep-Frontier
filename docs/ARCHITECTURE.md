@@ -265,13 +265,15 @@ Generator versions form an explicit set (`World.isSupportedGenerator`): 1 legacy
 neighbourhood (layout 6, template 4), and 10 adds encounter catalogue 1 on that
 same geometry (layout 7, template 4), and 11 adds the commercial and civic catalogue
 (layout 8, template 5) with encounter catalogue 2, and 12 plans the six districts with
-their overlays (layout 9, template 6) and encounter catalogue 3. The development selector creates 12. New worlds use
+their overlays (layout 9, template 6) and encounter catalogue 3, and 13 adds basements,
+transit and rooftop routes to those districts (layout 10, template 7) with encounter
+catalogue 4. The development selector creates 13. New worlds use
 `World.DEFAULT_NEW_WORLD_GENERATOR` (3, until the urban rollout); a load accepts any
 supported version and rejects the rest, including anything above
 `MAX_SUPPORTED_GENERATOR`, before it replaces the live world. Feature gates name
 their versions (`hasDeepFrontier`, `hasCaveIdentities`, `isUrbanGenerator`) instead
 of comparing with `>=`, so a new generator inherits nothing by accident, and
-`WorldGeneratorFingerprintTest` pins versions 1–12 absolutely. `ShapedStairGenerationTest`
+`WorldGeneratorFingerprintTest` pins versions 1–13 absolutely. `ShapedStairGenerationTest`
 checks version 8 against frozen version 7 outside stair cells and across chunk orders.
 
 An urban world's layout revision follows from its generator, so it is known
@@ -279,13 +281,16 @@ before bootstrap generates a chunk; a geometry change means a new generator
 version, never a change under an old one (`UrbanRevision`). Its content revision
 (the rolled loot, encounter and trade tables) is saved in `urban.meta`, which
 only urban worlds write. It is optional for older layouts and required for
-generators 9–12. Until that section, or its
+generators 9–13. Until that section, or its
 absent default, has been read, a loading world's content revision cannot be read
 at all. Fresh worlds use content revision 3; revisions 1 and 2 remain supported.
 Revision 1 is the absent-metadata default. The tables and their hash inputs are frozen
-under each revision. Generators 9–12 require content 3. Encounter catalogues are
+under each revision. Generators 9–13 require content 3. Encounter catalogues are
 additive and versioned separately in `urban.population` (1 for generator 10, 2 for
-11, 3 for 12); they do not reroll content-3 loot or add encounters to older generators. Compatibility directions:
+11, 3 for 12, 4 for 13); they do not reroll content-3 loot or add encounters to older
+generators. Generator 13 also writes `urban.discovery` v1 (a count capped at 4,096,
+then ascending observed site ids, each checked against the plan); absence means
+nothing found. Compatibility directions:
 
 - this build, a legacy save: unchanged, and no urban state is created;
 - this build, an urban save: the same geometry through its generator, the content
@@ -492,10 +497,35 @@ player's existing seeded generator, and only on that ground or inside a quaranti
 district, so other worlds draw nothing new. Overlays add no saved state: player
 edits to them are ordinary block edits.
 
+### Underground and rooftop routes
+
+Generator 13 plans layout 10: layout 9's districts plus two pure route layers.
+`TransitNetwork` puts tunnels only under boundary avenues, where nothing else is
+built. Each segment of a candidate avenue is a function of its name (axis, line,
+index), the seed and its two bordering plans, so both regions stamp mirror
+halves in any chunk order. Every region owns one segment, and a segment exists
+only with its `TransitStation`. A station is also a `BuildingPlan` of family
+`TRANSIT`, so containers, room location, encounter anchors and the portal graph
+handle it like a building; `TransitValidator` proves it before it is sited.
+`RouteCatalogue` derives a region's service passages, hidden cellar, fire
+escapes and roof connectors from what every plan of a parcel shares, and
+`RouteTemplates` (building template 7) applies them to the district catalogue's
+plans along with roof rails, stair bulkheads and the stair-well rail.
+`UrbanRouteStamper` writes tunnels and the outside parts of routes after streets,
+buildings and overlays, only where every building a route joins declared its end.
+`RouteProof` is the bounded walking proof for anything that is not one building.
+A rope ladder there is climbed up only, as the player's controller allows.
+
+`UrbanPlaces` names the route a body stands in for the HUD, shelter and sound;
+`UrbanDiscovery` records stations and cellars only when the player observes them
+and is saved as `urban.discovery`. The loose panel over a hidden cellar is a
+door kind (`Fixtures.Kind.HIDDEN_PANEL`) that AI never routes through.
+Encounter catalogue 4 adds station slots inside each district's budget.
+
 Scripted urban QA routes extend `UrbanRouteScene`: a task queue played through the
 production input seam, mouse-look turns, bounded walking that opens doors with F,
-threat handling, forcing and captures. `urban_slice`, `urban_catalogue` and
-`urban_districts` use it.
+threat handling, forcing and captures. `urban_slice`, `urban_catalogue`,
+`urban_districts` and `urban_underground` use it.
 
 ### Doors, windows and urban fixtures
 

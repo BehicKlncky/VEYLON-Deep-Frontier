@@ -116,6 +116,13 @@ The chunk is 16 × 96 × 16, so y runs 0–95 (**Existing**, B-10). No bedrock b
 
 Initial building families stay at ≤ 5 storeys (apartments) and ≤ 8 (offices) until package 24 has measured dense-city cost. The package-12 office blocks stop at five storeys (D-99). Flooded districts place their standing water deliberately *[13]*. Their overlays must be shown to be stable under the existing `WaterSystem` rules. **Implemented in 13 (D-110):** one block of water at y 41 over flooded roadway and courtyard lawns, two in canal basins (bed y 39), so every water surface is the top of y 41 on a solid bed; `WaterSystem` never spreads water above sea level and only drops it into air, and a generated flooded region is unchanged after a full water-system run.
 
+**Implemented in 14 (D-118–D-127), generator 13.** The bands are used as planned:
+
+- **Transit (B2 band).** Tunnels lie only under boundary avenues, where nothing else is built: track bed on the y 32 slab, feet at 33, ceiling at the y 36 slab. Each region owns one candidate segment and holds at most one station and two segments. A station's platform stands one step above the track, under a vault clear to y 39, with its stair rising to the avenue sidewalk. A flooded district's tunnels hold one block of water at y 33 on a solid bed.
+- **B1 band.** Every apartment outside the starter superblock has a first basement. Service passages join two basements at y 37 under a courtyard passage. One apartment per residential region seals a back room behind a loose panel as package 16's hidden refuge, empty until then. Flooded districts hold one block of water over the basement floor (y 37).
+- **Roofs.** Parapets carry a guard rail, a concrete bulkhead with a metal door covers the stair, and some roofs carry a fire-escape gap or a connector. Fire escapes are climbed up only, because the controller has no ladder descent (D-123).
+- **Discovery.** Stations and cellars enter `urban.discovery` only when observed (D-124); the HUD names the place underfoot.
+
 ### 4.2 Planning hierarchy (D-06)
 
 | Level | Size (*initial*) | Identity | Notes |
@@ -419,7 +426,7 @@ These are bounded starting scope, not a wish list. Packages may change a number 
 | 11 | One generated starter neighbourhood; 5 frozen regression seeds; a capture list |
 | 12 | 6 archetypes: grocery or convenience store, clinic or pharmacy, school, office block, police or security site, warehouse or workshop. **Implemented** (D-98–D-101): 1–2, 1–3, 2–3, 3–5, 1–2 and 1–2 storeys; ≤ 4 containers per room and ≤ 12 per storey; one school and one security post per region |
 | 13 | All 6 districts. For design seeds, residential and commercial within 1 region of spawn and all six within 3 regions (Chebyshev) |
-| 14 | ≤ 1 transit station and ≤ 2 tunnel segments per region; basements in ≥ 50 % of residential buildings; ≥ 1 hidden-refuge reservation per 2 residential regions |
+| 14 | ≤ 1 transit station and ≤ 2 tunnel segments per region; basements in ≥ 50 % of residential buildings; ≥ 1 hidden-refuge reservation per 2 residential regions. **Implemented** (D-119–D-122): one owned segment per region, so ≤ 1 station and ≤ 2 segments by construction; every apartment outside the starter superblock has a basement; one hidden cellar in every tested residential region (D-122 records the limit of that evidence) |
 | 15 | 1 alien organism with growth nodes; ≤ 1 infected variant; ≤ 3 adapted wildlife species |
 | 16 | Camps of 3–6 residents; hidden groups of 2–5; for design seeds, ≥ 1 of each within 2 regions of spawn |
 | 17 | 1 friendly stronghold (8–16 residents, ≥ 4 guards) and 1 hostile site (4–8), each within 3 regions of spawn on design seeds |
