@@ -8,16 +8,25 @@ import java.util.List;
 public final class NavigationCache {
     public static final int MAX_ROUTES = 64;
     public final PathBudget budget = new PathBudget();
-    private record Key(Vec3i from, Vec3i to) { }
+    /** {@code breach}: a Breacher's route through closed wooden doors, never handed to anyone else. */
+    private record Key(Vec3i from, Vec3i to, boolean breach) { }
     private record Route(List<Vec3i> cells, int x0, int y0, int z0, int x1, int y1, int z1) { }
     private final LinkedHashMap<Key, Route> routes = new LinkedHashMap<>();
 
     List<Vec3i> get(Vec3i from, Vec3i to) {
-        Route route = routes.get(new Key(from, to));
+        return get(from, to, false);
+    }
+
+    List<Vec3i> get(Vec3i from, Vec3i to, boolean breach) {
+        Route route = routes.get(new Key(from, to, breach));
         return route == null ? null : route.cells;
     }
 
     void put(Vec3i from, Vec3i to, List<Vec3i> cells) {
+        put(from, to, cells, false);
+    }
+
+    void put(Vec3i from, Vec3i to, List<Vec3i> cells, boolean breach) {
         int x0 = from.x(), x1 = x0, y0 = from.y(), y1 = y0, z0 = from.z(), z1 = z0;
         for (Vec3i p : cells) {
             x0 = Math.min(x0, p.x()); x1 = Math.max(x1, p.x());
@@ -25,7 +34,7 @@ public final class NavigationCache {
             z0 = Math.min(z0, p.z()); z1 = Math.max(z1, p.z());
         }
         if (routes.size() >= MAX_ROUTES) { routes.remove(routes.keySet().iterator().next()); }
-        routes.put(new Key(from, to), new Route(cells, x0 - 1, y0 - 1, z0 - 1, x1 + 1, y1 + 2, z1 + 1));
+        routes.put(new Key(from, to, breach), new Route(cells, x0 - 1, y0 - 1, z0 - 1, x1 + 1, y1 + 2, z1 + 1));
     }
 
     public boolean valid(List<Vec3i> cells) {

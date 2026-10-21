@@ -125,6 +125,15 @@ public class Npc extends Entity {
     public float strikeWindup = -1f, painTimer;
     public boolean painSound;
     public com.veylon.combat.WorldNoise.NoiseEvent lastHeard;
+    /**
+     * A Breacher's door (urban milestone 15): the bottom cell of the closed wooden door on its
+     * route that it is hammering down, the seconds to its next blow and the blows landed.
+     * Transient intent: a load, a departure or a lost scent forgets it, and the door keeps only
+     * what the blows did, which is nothing until the last one forces it.
+     */
+    public Vec3i breachDoor;
+    public float breachTimer;
+    public int breachBlows;
 
     public Npc(World world, String name) {
         super(world);
@@ -229,7 +238,7 @@ public class Npc extends Entity {
     }
 
     /** Species profile uses the shared humanoid appearance codec, not settlement ownership. */
-    public boolean infected() { return archetype == NpcArchetype.VEILBOUND; }
+    public boolean infected() { return archetype != null && archetype.infected(); }
 
     @Override
     public void hurt(float damage, boolean byPlayer) {

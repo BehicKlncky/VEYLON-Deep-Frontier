@@ -324,16 +324,24 @@ public final class Animator {
         torso.rotX = 0.05f * run;
 
         if (n.infected()) {
-            torso.rotX = n.painTimer > 0 ? -0.18f : 0.22f;
-            m.part("head").rotZ = -0.13f;
+            boolean breacher = n.archetype == com.veylon.settlement.NpcArchetype.BREACHER;
+            torso.rotX = n.painTimer > 0 ? -0.18f : breacher ? 0.34f : 0.22f;
+            m.part("head").rotZ = breacher ? 0f : -0.13f;
+            m.part("head").rotX = breacher ? 0.26f : 0f; // the sealed face hangs, listening
             m.part("arm_l").rotX = swing * 0.3f;
-            m.part("arm_r").rotX = -0.4f;
-            m.part("arm_r").rotZ = -0.16f;
+            m.part("arm_r").rotX = breacher ? -0.12f : -0.4f;
+            m.part("arm_r").rotZ = breacher ? -0.05f : -0.16f;
             if (n.strikeWindup >= 0) {
-                float progress = 1 - n.strikeWindup / com.veylon.ai.InfectedAI.WINDUP;
-                m.part("arm_r").rotX = -0.4f - 1.8f * progress;
+                float windup = breacher ? com.veylon.ai.BreacherAI.WINDUP : com.veylon.ai.InfectedAI.WINDUP;
+                float progress = 1 - n.strikeWindup / windup;
+                m.part("arm_r").rotX = -0.4f - (breacher ? 2.3f : 1.8f) * progress;
                 m.part("arm_l").rotX = -0.3f - 0.7f * progress;
                 torso.rotX = 0.10f + 0.25f * progress;
+            } else if (breacher && n.breachDoor != null) {
+                // The ram climbs between blows and drops on the door with each one.
+                float raise = 1f - Math.max(0f, n.breachTimer) / com.veylon.ai.BreacherAI.BLOW_SECONDS;
+                m.part("arm_r").rotX = -0.3f - 2.2f * raise;
+                torso.rotX = 0.18f + 0.2f * raise;
             }
             if (n.panic.active()) {
                 m.part("arm_l").rotX = -1.4f;
@@ -480,14 +488,19 @@ public final class Animator {
         m.part("warPaint").visible = headhunter;
         m.part("medicSash").visible = a == com.veylon.settlement.NpcArchetype.MEDIC;
         m.part("guardPlate").visible = a == com.veylon.settlement.NpcArchetype.GUARD;
-        boolean infected = a == com.veylon.settlement.NpcArchetype.VEILBOUND;
-        m.part("veilShoulder").visible = infected;
+        boolean infected = a != null && a.infected();
+        boolean breacher = a == com.veylon.settlement.NpcArchetype.BREACHER;
+        m.part("veilShoulder").visible = infected && !breacher;
         m.part("veilRibs").visible = infected;
+        m.part("breacherSeal").visible = breacher;
+        m.part("breacherHump").visible = breacher;
+        m.part("breacherRam").visible = breacher;
         m.part("friendlyBadge").visible &= !infected;
-        m.part("head").color(infected ? 0xa1aa8e : 0xd8ad8a);
-        m.part("torso").color(infected ? 0x666954 : 0x33566e);
-        m.part("vest").color(infected ? 0x777965 : vest);
-        int arms = infected ? 0x929a7d : 0x3d5468, legs = infected ? 0x494e46 : 0x2e3a44;
+        m.part("head").color(breacher ? 0x8f957a : infected ? 0xa1aa8e : 0xd8ad8a);
+        m.part("torso").color(breacher ? 0x55584a : infected ? 0x666954 : 0x33566e);
+        m.part("vest").color(breacher ? 0x63664f : infected ? 0x777965 : vest);
+        int arms = breacher ? 0x7f8668 : infected ? 0x929a7d : 0x3d5468;
+        int legs = breacher ? 0x3f4339 : infected ? 0x494e46 : 0x2e3a44;
         m.part("arm_l").color(arms); m.part("arm_r").color(arms);
         m.part("forearm_l").color(arms); m.part("forearm_r").color(arms);
         m.part("leg_l").color(legs); m.part("leg_r").color(legs);

@@ -16,32 +16,11 @@ public final class InfectedAI {
     private InfectedAI() { }
 
     public static void update(Game g, Npc n, float dt) {
-        n.attackCooldown -= dt;
-        n.repathCooldown -= dt;
-        n.decideTimer -= dt;
-        n.searchTimer = Math.max(0, n.searchTimer - dt);
-        n.lastKnownAge += dt;
-        n.bobPhase += dt * (Math.abs(n.vel.x) + Math.abs(n.vel.z)) * 2.2f;
-        if (n.painSound) {
-            g.audio.playInfected(Cue.PAIN, n.pos.x, n.pos.y, n.pos.z);
-            n.painSound = false;
-        }
-        if (FirePanic.update(g, n, dt)) {
-            n.strikeWindup = -1;
+        if (n.archetype == com.veylon.settlement.NpcArchetype.BREACHER) {
+            BreacherAI.update(g, n, dt);
             return;
         }
-        if (n.painTimer > 0) {
-            n.painTimer -= dt;
-            n.strikeWindup = -1;
-            Steering.stop(n);
-            return;
-        }
-        if (!g.player.isPerceivableByAi() || g.player.dead) {
-            // Visibility controls immediately forget player-derived intent, including a pending strike.
-            n.searchTimer = 0;
-            n.strikeWindup = -1;
-            n.path = null;
-            Steering.stop(n);
+        if (!ready(g, n, dt)) {
             return;
         }
         boolean sight = seesPlayer(g, n);
@@ -102,6 +81,44 @@ public final class InfectedAI {
             n.path = null;
             Steering.stop(n);
         }
+    }
+
+    /**
+     * Timers, the pain cue, fire panic, pain and the visibility controls every infected brain
+     * shares, in that order. False when this tick is spent: the body panics, flinches, or has
+     * just forgotten an imperceptible player, with any pending strike, route or door.
+     */
+    static boolean ready(Game g, Npc n, float dt) {
+        n.attackCooldown -= dt;
+        n.repathCooldown -= dt;
+        n.decideTimer -= dt;
+        n.searchTimer = Math.max(0, n.searchTimer - dt);
+        n.lastKnownAge += dt;
+        n.bobPhase += dt * (Math.abs(n.vel.x) + Math.abs(n.vel.z)) * 2.2f;
+        if (n.painSound) {
+            g.audio.playInfected(Cue.PAIN, n.pos.x, n.pos.y, n.pos.z);
+            n.painSound = false;
+        }
+        if (FirePanic.update(g, n, dt)) {
+            n.strikeWindup = -1;
+            return false;
+        }
+        if (n.painTimer > 0) {
+            n.painTimer -= dt;
+            n.strikeWindup = -1;
+            Steering.stop(n);
+            return false;
+        }
+        if (!g.player.isPerceivableByAi() || g.player.dead) {
+            // Visibility controls immediately forget player-derived intent, including a pending strike.
+            n.searchTimer = 0;
+            n.strikeWindup = -1;
+            n.path = null;
+            n.breachDoor = null;
+            Steering.stop(n);
+            return false;
+        }
+        return true;
     }
 
     public static boolean seesPlayer(Game g, Npc n) {

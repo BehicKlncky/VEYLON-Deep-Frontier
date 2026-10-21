@@ -121,7 +121,7 @@ public class EntityManager {
     private void finishInfectedDeath(Game g, Npc n) {
         if (!reallyDied(n)) { depart(g, n); return; }
         encounters.onDeath(n);
-        g.log("The Veilbound collapses.");
+        g.log("The " + n.archetype.displayName + " collapses.");
         g.audio.playInfected(com.veylon.engine.InfectedSounds.Cue.DEATH, n.pos.x, n.pos.y, n.pos.z);
         if (n.dismemberOnDeath) {
             g.fragments.spawnFromNpc(g, n, g.fragments.deathPose(n),

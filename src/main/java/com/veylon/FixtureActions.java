@@ -352,6 +352,28 @@ public final class FixtureActions {
         return true;
     }
 
+    /**
+     * A Breacher's last blow on a closed wooden door (urban milestone 15): the whole opening
+     * becomes a broken doorway through the same recorded edits as a player's forced entry, and
+     * as loud. A lock or a bar makes no difference to a ram; metal doors hold, and nothing else
+     * is a door to it.
+     *
+     * @param by the body that broke it, so it does not hear its own noise
+     * @return true when the door was forced
+     */
+    public static boolean breacherForces(Game g, Vec3i door, Entity by) {
+        BlockType t = g.world.getBlock(door.x(), door.y(), door.z());
+        if (t != BlockType.WOOD_DOOR) {
+            return false;
+        }
+        replaceOpening(g.world, door, t, Fixtures.Kind.WOOD_DOOR.broken);
+        float x = door.x() + 0.5f, y = door.y() + 1f, z = door.z() + 0.5f;
+        g.audio.playDoorForced(x, y, z);
+        g.particles.blockDust(t, x, y, z, 10);
+        g.noise.emit(g, x, y, z, FORCED_NOISE_RADIUS, FORCED_NOISE, "door-forced", false, by);
+        return true;
+    }
+
     /** Swings residents' doors shut once nobody stands in them. Runs on the fast tick. */
     public static void tickResidentDoors(Game g, float dt) {
         Map<Vec3i, Float> timers = g.world.fixtures.transitTimers();

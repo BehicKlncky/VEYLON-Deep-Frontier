@@ -668,7 +668,8 @@ public class AudioManager {
         if (buffer == infectedBuffers[InfectedSounds.Cue.STRIKE.ordinal()]
                 || buffer == infectedBuffers[InfectedSounds.Cue.NOTICE.ordinal()]
                 || buffer == ecologyBuffers[EcologySounds.Cue.STIR.ordinal()]
-                || buffer == ecologyBuffers[EcologySounds.Cue.LUNGE.ordinal()]) {
+                || buffer == ecologyBuffers[EcologySounds.Cue.LUNGE.ordinal()]
+                || buffer == ecologyBuffers[EcologySounds.Cue.HAMMER.ordinal()]) {
             return VoicePool.Priority.IMPORTANT;
         }
         if (buffer == bMusket || buffer == bPistol || buffer == bHowl || buffer == bGrowl

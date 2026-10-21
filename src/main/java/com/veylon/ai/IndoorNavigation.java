@@ -14,6 +14,16 @@ public final class IndoorNavigation {
 
     /** False only on arrival; blocked/deferred routes wait and retry after a staggered delay. */
     public static boolean moveTo(Game g, Npc n, Vec3i goal, float speed, float arrive) {
+        return moveTo(g, n, goal, speed, arrive, false);
+    }
+
+    /**
+     * As {@link #moveTo(Game, Npc, Vec3i, float, float)}; with {@code breach}, a Breacher (urban
+     * milestone 15) that finds no ordinary route plans through closed wooden doors
+     * ({@link Pathfinder#findBreach}), and stops at a locked or barred one on its route, naming it
+     * in {@link Npc#breachDoor} for its brain to hammer down. It opens unlocked doors as anyone does.
+     */
+    public static boolean moveTo(Game g, Npc n, Vec3i goal, float speed, float arrive, boolean breach) {
         if (n.distSqTo(goal.x() + .5f, goal.y(), goal.z() + .5f) < arrive * arrive
                 && Math.abs(n.pos.y - goal.y()) < .5f) {
             n.path = null; Steering.stop(n);
@@ -33,6 +43,10 @@ public final class IndoorNavigation {
             if (waypoint != null) {
                 n.path = Pathfinder.findSegment(g.world, from.x(), from.y(), from.z(),
                         waypoint.x(), waypoint.y(), waypoint.z(), Pathfinder.DEFAULT_BUDGET);
+                if (n.path == null && breach) {
+                    n.path = Pathfinder.findBreach(g.world, from.x(), from.y(), from.z(),
+                            waypoint.x(), waypoint.y(), waypoint.z(), Pathfinder.DEFAULT_BUDGET);
+                }
             }
             n.pathIndex = 0;
         }
@@ -53,6 +67,17 @@ public final class IndoorNavigation {
             BlockType b = g.world.getBlock(step.x(), y, step.z());
             if (Fixtures.isClosedDoor(b)) { FixtureActions.residentOpens(g, step.x(), y, step.z()); }
             if (b == BlockType.GATE) { g.settlementManager.openGate(g, new Vec3i(step.x(), y, step.z())); }
+        }
+        if (breach) {
+            for (int y = step.y(); y <= step.y() + 1; y++) {
+                // Still closed after the shoulder above: locked or barred. Stop here and break it.
+                if (g.world.getBlock(step.x(), y, step.z()) == BlockType.WOOD_DOOR) {
+                    n.breachDoor = new Vec3i(step.x(), Fixtures.stackBottom(g.world, step.x(), y, step.z(),
+                            Fixtures.Kind.WOOD_DOOR), step.z());
+                    Steering.stop(n);
+                    return true;
+                }
+            }
         }
         if (!safeStride(g, n, step)) {
             n.path = null; Steering.stop(n); return true;

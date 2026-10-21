@@ -146,7 +146,7 @@ class AllLivingEndToEndTest {
             Npc n = g.entities.spawnNpc(g.world, label, x, y, z);
             switch (route) {
                 case INFECTED -> {
-                    n.archetype = NpcArchetype.VEILBOUND;
+                    n.archetype = archetype;
                     n.maxHealth = n.health = n.archetype.maxHealth;
                 }
                 case CAMP_MEMBER -> {
@@ -234,8 +234,8 @@ class AllLivingEndToEndTest {
         bodies.add(new Body("wandering trader", Route.WANDERING_TRADER, null, null, null, null));
         bodies.add(new Body("raider", Route.RAIDER, null, null, null, null));
         for (NpcArchetype a : NpcArchetype.values()) {
-            if (a == NpcArchetype.VEILBOUND) {
-                bodies.add(new Body("Veilbound", Route.INFECTED, null, a, null, null));
+            if (a.infected()) {
+                bodies.add(new Body(a.displayName, Route.INFECTED, null, a, null, null));
                 continue;
             }
             Settlement.Alignment side = sideOf(a);
@@ -805,7 +805,7 @@ class AllLivingEndToEndTest {
         List<Entity> crowd = new ArrayList<>();
         Settlement village = settlement(g, Settlement.Alignment.FRIENDLY);
         NpcArchetype[] archetypes = Arrays.stream(NpcArchetype.values())
-                .filter(a -> a != NpcArchetype.VEILBOUND).toArray(NpcArchetype[]::new);
+                .filter(a -> !a.infected()).toArray(NpcArchetype[]::new);
         for (int i = 0; i < com.veylon.settlement.SettlementManager.MAX_ACTIVE_NPCS; i++) {
             float x = 300.5f + (i % 10) * 4f, z = 305.5f + (i / 10) * 4f;
             Npc n = g.entities.spawnNpc(g.world, "Crowd " + i, x, FEET, z);
@@ -901,7 +901,7 @@ class AllLivingEndToEndTest {
             case RESIDENT -> List.of("You killed " + n.name + "!", "You killed a protected captive",
                     "You search the fallen ", n.name + " has died.", "leader has fallen");
             case WAR_PARTY -> List.of("You search the fallen ");
-            case INFECTED -> List.of("The Veilbound collapses.");
+            case INFECTED -> List.of("The " + b.archetype().displayName + " collapses.");
             case PLAYER -> throw new AssertionError("the player's death is the death screen");
         };
         int total = 0;

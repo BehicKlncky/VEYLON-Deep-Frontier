@@ -125,6 +125,14 @@ public final class NpcModels {
                 .box(0, 0, 0, 0.28f, 0.20f, 0.33f).color(0x8a9172));
         torso.child(new ModelPart("veilRibs").pivot(0.12f, 0.27f, -0.16f)
                 .box(0, 0, 0, 0.17f, 0.30f, 0.045f).color(0xa1a584));
+        // The Breacher (urban milestone 15): membrane sealed over the face, a hump across the
+        // shoulders and the right forearm fused into a ram. Accessories only: the joints stay.
+        head.child(new ModelPart("breacherSeal").pivot(0, 0.15f, -0.13f)
+                .box(0, 0, 0, 0.28f, 0.22f, 0.035f).color(0xb0b394));
+        torso.child(new ModelPart("breacherHump").pivot(0, 0.52f, 0.13f)
+                .box(0, 0, 0, 0.44f, 0.24f, 0.18f).color(0x7d8466));
+        root.find("forearm_r").child(new ModelPart("breacherRam").pivot(0, -0.24f, 0)
+                .box(0, -0.05f, 0, 0.24f, 0.24f, 0.27f).color(0x868c6c));
         return new EntityModel(root);
     }
 }

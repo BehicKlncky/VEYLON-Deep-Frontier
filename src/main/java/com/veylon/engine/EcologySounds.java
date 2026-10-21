@@ -12,10 +12,11 @@ import java.util.function.BiConsumer;
  *   <li>{@link Cue#LUNGE}: the dash, a short rasp and slap.</li>
  *   <li>{@link Cue#PAIN} and {@link Cue#DEATH}: a choked flutter, and a long deflating sigh.</li>
  *   <li>{@link Cue#SMOTHER}: a hiss as a torch goes out under its hood.</li>
+ *   <li>{@link Cue#HAMMER}: a Breacher's fused arm on a door, a dull heavy thud with a crack.</li>
  * </ul>
  */
 public final class EcologySounds {
-    public enum Cue { STIR, LUNGE, PAIN, DEATH, SMOTHER }
+    public enum Cue { STIR, LUNGE, PAIN, DEATH, SMOTHER, HAMMER }
 
     static final long SEED = 0x45434f4c4f475953L;
 
@@ -31,6 +32,7 @@ public final class EcologySounds {
                 case PAIN -> 0.3f;
                 case DEATH -> 1.0f;
                 case SMOTHER -> 0.45f;
+                case HAMMER -> 0.4f;
             };
             float[] out = new float[(int) (ProceduralAudio.RATE * seconds)];
             float low = 0, band = 0;
@@ -62,6 +64,11 @@ public final class EcologySounds {
                     case SMOTHER -> {
                         float hiss = band - low;
                         yield hiss * 0.45f * (1 - f) * (float) Math.min(1.0, f * 20);
+                    }
+                    case HAMMER -> {
+                        float thud = (float) Math.sin(2 * Math.PI * (58 - 20 * f) * t) * (float) Math.exp(-f * 7);
+                        float crack = f < 0.06f ? white * (1 - f / 0.06f) * 0.5f : 0;
+                        yield thud * 0.8f + crack + low * 0.3f * (1 - f);
                     }
                 };
             }

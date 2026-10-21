@@ -70,18 +70,32 @@ public final class Pathfinder {
         return com.veylon.world.VoxelClearance.standable(w, x, y, z);
     }
 
-    private static float moveCost(World w, int x, int y, int z) {
+    private static float moveCost(World w, int x, int y, int z, boolean breach) {
         BlockType feet = w.getBlock(x, y, z);
         if (feet == BlockType.WATER) {
             return 4f;
         }
         BlockType head = w.getBlock(x, y + 1, z);
+        if (breach && (lockedWood(w, x, y, z, feet) || lockedWood(w, x, y + 1, z, head))) {
+            return BREACH_DOOR_COST;
+        }
         if (feet == BlockType.GATE || head == BlockType.GATE
                 || Fixtures.isClosedDoor(feet) || Fixtures.isClosedDoor(head)) {
             return 2.5f;
         }
         return 1f;
     }
+
+    /** A closed wooden door held shut by a lock or a bar: a wall to everyone but a Breacher. */
+    private static boolean lockedWood(World w, int x, int y, int z, BlockType b) {
+        return b == BlockType.WOOD_DOOR && w.fixtureLockAt(x, y, z) != com.veylon.world.FixtureStates.LOCK_NONE;
+    }
+
+    /**
+     * Step cost of a locked or barred wooden door on a Breacher's route: it would rather walk
+     * a little further through an open one than stop to hammer.
+     */
+    public static final float BREACH_DOOR_COST = 8f;
 
     /**
      * Finds a path of standable cells from start to goal, or null. Both ends
@@ -98,29 +112,49 @@ public final class Pathfinder {
         return findBounded(w, sx, sy, sz, tx, ty, tz, budget, true);
     }
 
-    private static List<Vec3i> findBounded(World w, int sx, int sy, int sz,
-                                          int tx, int ty, int tz, int budget, boolean partial) {
+    /**
+     * A Breacher's segment (urban milestone 15): closed wooden doors count as passable whatever
+     * their lock or bar, at {@link #BREACH_DOOR_COST} for a locked one; metal doors, glass and
+     * walls still stop it. Its routes live in their own part of the cache, so no resident is ever
+     * handed a route through a locked door. Same budget, range and connected-prefix rule.
+     */
+    public static List<Vec3i> findBreach(World w, int sx, int sy, int sz,
+                                         int tx, int ty, int tz, int budget) {
         budget = w.navigation.budget.query(Math.min(budget, DEFAULT_BUDGET));
         if (budget <= 0) { return null; }
-        List<Vec3i> result = search(w, sx, sy, sz, tx, ty, tz, budget, partial);
+        List<Vec3i> result = search(w, breachAccess(w), true, sx, sy, sz, tx, ty, tz, budget, true);
         if (result == null) { w.navigation.budget.failed(); }
         return result;
     }
 
-    private static List<Vec3i> search(World w, int sx, int sy, int sz,
-                                    int tx, int ty, int tz, int budget, boolean partial) {
+    private static List<Vec3i> findBounded(World w, int sx, int sy, int sz,
+                                          int tx, int ty, int tz, int budget, boolean partial) {
+        budget = w.navigation.budget.query(Math.min(budget, DEFAULT_BUDGET));
+        if (budget <= 0) { return null; }
+        List<Vec3i> result = search(w, w, false, sx, sy, sz, tx, ty, tz, budget, partial);
+        if (result == null) { w.navigation.budget.failed(); }
+        return result;
+    }
+
+    /**
+     * @param v the voxels passability is judged in: the world itself, or for a Breacher a view
+     *        of it in which closed wooden doors are unlocked
+     */
+    private static List<Vec3i> search(World w, com.veylon.world.VoxelAccess v, boolean breach,
+                                      int sx, int sy, int sz,
+                                      int tx, int ty, int tz, int budget, boolean partial) {
         long dx = (long) tx - sx, dz = (long) tz - sz;
         if (Math.abs(dx) > MAX_RANGE || Math.abs(dz) > MAX_RANGE
                 || dx * dx + dz * dz > MAX_RANGE * MAX_RANGE) {
             return null;
         }
-        sy = snapDown(w, sx, sy, sz);
-        ty = snapDown(w, tx, ty, tz);
+        sy = snapDown(v, sx, sy, sz);
+        ty = snapDown(v, tx, ty, tz);
         if (sy < 0 || ty < 0) {
             return null;
         }
         Vec3i start = new Vec3i(sx, sy, sz), goal = new Vec3i(tx, ty, tz);
-        List<Vec3i> cached = w.navigation.get(start, goal);
+        List<Vec3i> cached = w.navigation.get(start, goal, breach);
         if (cached != null && cached.stream().allMatch(p -> w.isColumnLoaded(p.x(), p.z()))) {
             w.navigation.budget.hit();
             return cached;
@@ -129,10 +163,10 @@ public final class Pathfinder {
         long goalKey = key(tx, ty, tz);
         if (startKey == goalKey) {
             List<Vec3i> route = List.of(goal);
-            w.navigation.put(start, goal, route);
+            w.navigation.put(start, goal, route, breach);
             return route;
         }
-        com.veylon.world.VoxelAccess opened = traversalAccess(w);
+        com.veylon.world.VoxelAccess opened = traversalAccess(v);
 
         PriorityQueue<Node> open = new PriorityQueue<>((a, b) -> Float.compare(a.f, b.f));
         Map<Long, Float> gScore = new HashMap<>();
@@ -155,14 +189,14 @@ public final class Pathfinder {
             if (remaining < nearestDistance) { nearest = cur.key; nearestDistance = remaining; }
             if (cur.key == goalKey) {
                 List<Vec3i> route = reconstruct(parent, cur.key, startKey);
-                if (route != null) { w.navigation.put(start, goal, route); }
+                if (route != null) { w.navigation.put(start, goal, route, breach); }
                 return route;
             }
 
             // Ladder cells allow direct vertical movement.
             if (w.getBlock(cx, cy, cz).isClimbable()) {
-                relax(w, opened, open, gScore, parent, cur, cx, cy + 1, cz, tx, ty, tz, 1.2f);
-                relax(w, opened, open, gScore, parent, cur, cx, cy - 1, cz, tx, ty, tz, 1.2f);
+                relax(w, v, breach, opened, open, gScore, parent, cur, cx, cy + 1, cz, tx, ty, tz, 1.2f);
+                relax(w, v, breach, opened, open, gScore, parent, cur, cx, cy - 1, cz, tx, ty, tz, 1.2f);
             }
 
             for (int[] d : DIRS) {
@@ -171,17 +205,18 @@ public final class Pathfinder {
                     continue;
                 }
                 // Same level, step up 1, or step down up to MAX_DROP.
-                if (standable(w, nx, cy, nz)) {
-                    relax(w, opened, open, gScore, parent, cur, nx, cy, nz, tx, ty, tz, 0f);
-                } else if (standable(w, nx, cy + 1, nz) && passable(w, cx, cy + 2, cz)) {
-                    relax(w, opened, open, gScore, parent, cur, nx, cy + 1, nz, tx, ty, tz, 0.6f);
+                if (com.veylon.world.VoxelClearance.standable(v, nx, cy, nz)) {
+                    relax(w, v, breach, opened, open, gScore, parent, cur, nx, cy, nz, tx, ty, tz, 0f);
+                } else if (com.veylon.world.VoxelClearance.standable(v, nx, cy + 1, nz)
+                        && com.veylon.world.VoxelClearance.passable(v, cx, cy + 2, cz)) {
+                    relax(w, v, breach, opened, open, gScore, parent, cur, nx, cy + 1, nz, tx, ty, tz, 0.6f);
                 } else {
                     for (int drop = 1; drop <= MAX_DROP; drop++) {
-                        if (!passable(w, nx, cy - drop + 1, nz)) {
+                        if (!com.veylon.world.VoxelClearance.passable(v, nx, cy - drop + 1, nz)) {
                             break;
                         }
-                        if (standable(w, nx, cy - drop, nz)) {
-                            relax(w, opened, open, gScore, parent, cur, nx, cy - drop, nz,
+                        if (com.veylon.world.VoxelClearance.standable(v, nx, cy - drop, nz)) {
+                            relax(w, v, breach, opened, open, gScore, parent, cur, nx, cy - drop, nz,
                                     tx, ty, tz, drop * 0.3f);
                             break;
                         }
@@ -193,7 +228,7 @@ public final class Pathfinder {
             List<Vec3i> prefix = reconstruct(parent, nearest, startKey);
             if (prefix != null) {
                 // This is complete to its own endpoint, never cached as a complete route to the original goal.
-                w.navigation.put(start, prefix.getLast(), prefix);
+                w.navigation.put(start, prefix.getLast(), prefix, breach);
                 w.navigation.budget.failed();
                 return prefix;
             }
@@ -201,16 +236,18 @@ public final class Pathfinder {
         return null;
     }
 
-    private static void relax(World w, com.veylon.world.VoxelAccess opened, PriorityQueue<Node> open, Map<Long, Float> gScore,
+    private static void relax(World w, com.veylon.world.VoxelAccess v, boolean breach,
+                              com.veylon.world.VoxelAccess opened, PriorityQueue<Node> open, Map<Long, Float> gScore,
                               Map<Long, Long> parent, Node cur, int nx, int ny, int nz,
                               int tx, int ty, int tz, float extra) {
         int cx = kx(cur.key), cy = ky(cur.key), cz = kz(cur.key);
         if (nx == cx && nz == cz) {
-            if (ny < 1 || ny + 1 >= com.veylon.world.Chunk.SY || !standable(w, nx, ny, nz)) { return; }
+            if (ny < 1 || ny + 1 >= com.veylon.world.Chunk.SY
+                    || !com.veylon.world.VoxelClearance.standable(v, nx, ny, nz)) { return; }
         } else if (!com.veylon.world.urban.AccessibilityValidator.canMove(opened,
                 new Vec3i(cx, cy, cz), new Vec3i(nx, ny, nz))) { return; }
         long nk = key(nx, ny, nz);
-        float ng = cur.g + moveCost(w, nx, ny, nz) + extra;
+        float ng = cur.g + moveCost(w, nx, ny, nz, breach) + extra;
         Float old = gScore.get(nk);
         if (old != null && old <= ng) {
             return;
@@ -244,29 +281,45 @@ public final class Pathfinder {
     }
 
     /** Snaps one cell to footing to tolerate body/step rounding; never guesses another floor. */
-    private static int snapDown(World w, int x, int y, int z) {
+    private static int snapDown(com.veylon.world.VoxelAccess w, int x, int y, int z) {
         if (!w.isColumnLoaded(x, z) || y < 1 || y + 1 >= com.veylon.world.Chunk.SY) { return -1; }
         // A flight/teleport target must never silently become a different floor.
         for (int dy = 0; dy <= 1; dy++) {
-            if (standable(w, x, y - dy, z)) {
+            if (com.veylon.world.VoxelClearance.standable(w, x, y - dy, z)) {
                 return y - dy;
             }
         }
         // Also allow snapping up one (target on a step).
-        return standable(w, x, y + 1, z) ? y + 1 : -1;
+        return com.veylon.world.VoxelClearance.standable(w, x, y + 1, z) ? y + 1 : -1;
     }
 
     /** Planning may open unlocked doors, but cannot erase any other solid or unloaded cell. */
-    static com.veylon.world.VoxelAccess traversalAccess(World w) {
+    static com.veylon.world.VoxelAccess traversalAccess(com.veylon.world.VoxelAccess w) {
         return new com.veylon.world.VoxelAccess() {
             public boolean isColumnLoaded(int x, int z) { return w.isColumnLoaded(x, z); }
             public int fixtureLockAt(int x, int y, int z) { return w.fixtureLockAt(x, y, z); }
             public BlockType getBlock(int x, int y, int z) {
                 if (!w.isColumnLoaded(x, z)) { return BlockType.STONE; }
                 BlockType b = w.getBlock(x, y, z);
-                return (b == BlockType.GATE || Fixtures.isClosedDoor(b)) && passable(w, x, y, z)
-                        ? BlockType.AIR : b;
+                return (b == BlockType.GATE || Fixtures.isClosedDoor(b))
+                        && com.veylon.world.VoxelClearance.passable(w, x, y, z) ? BlockType.AIR : b;
             }
+        };
+    }
+
+    /**
+     * The world as a Breacher plans in it (urban milestone 15): a closed wooden door reads as
+     * unlocked whatever its lock or bar says, because it means to break it. Nothing else changes:
+     * metal doors, glass, walls and unloaded columns stop it as they stop anyone.
+     */
+    static com.veylon.world.VoxelAccess breachAccess(World w) {
+        return new com.veylon.world.VoxelAccess() {
+            public boolean isColumnLoaded(int x, int z) { return w.isColumnLoaded(x, z); }
+            public int fixtureLockAt(int x, int y, int z) {
+                return w.getBlock(x, y, z) == BlockType.WOOD_DOOR ? com.veylon.world.FixtureStates.LOCK_NONE
+                        : w.fixtureLockAt(x, y, z);
+            }
+            public BlockType getBlock(int x, int y, int z) { return w.getBlock(x, y, z); }
         };
     }
 }
