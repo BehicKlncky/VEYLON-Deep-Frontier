@@ -50,6 +50,7 @@ public record RuntimeBudgetSnapshot(
         int panickingBodies,
         int urbanRegionPlans,
         int urbanBuildingPlans,
+        int urbanRoutePlans,
         int fixtureStates,
         int residentDoors,
         int urbanEncounterRecords,
@@ -100,6 +101,7 @@ public record RuntimeBudgetSnapshot(
                 panicking,
                 game.world.urban == null ? 0 : game.world.urban.cachedRegionPlans(),
                 game.world.urban == null ? 0 : game.world.urban.cachedBuildingPlans(),
+                game.world.urban == null ? 0 : game.world.urban.cachedRoutePlans(),
                 game.world.fixtures.size(),
                 game.world.fixtures.transitTimers().size(), game.entities.encounters.size(),
                 game.world.navigation.size(), game.world.navigation.budget.queries(),
@@ -140,6 +142,7 @@ public record RuntimeBudgetSnapshot(
                 && liveRagdolls <= RagdollConstants.MAX_LIVE
                 && urbanRegionPlans <= UrbanWorldState.MAX_REGION_PLANS
                 && urbanBuildingPlans <= UrbanWorldState.MAX_BUILDING_PLANS
+                && urbanRoutePlans <= UrbanWorldState.MAX_ROUTE_PLANS
                 && fixtureStates <= FixtureStates.MAX_ENTRIES
                 && residentDoors <= FixtureStates.MAX_TRANSIT
                 && navigationRoutes <= com.veylon.ai.NavigationCache.MAX_ROUTES
@@ -182,7 +185,8 @@ public record RuntimeBudgetSnapshot(
                 + " ragdolls=" + liveRagdolls
                 + " panicking=" + panickingBodies
                 + " urbanPlans=" + urbanRegionPlans
-                + " buildingPlans=" + urbanBuildingPlans + " encounterRecords=" + urbanEncounterRecords
+                + " buildingPlans=" + urbanBuildingPlans + " routePlans=" + urbanRoutePlans
+                + " encounterRecords=" + urbanEncounterRecords
                 + " fixtures={states=" + fixtureStates + ",residentDoors=" + residentDoors + "}";
     }
 
@@ -213,6 +217,7 @@ public record RuntimeBudgetSnapshot(
                 + " ragdolls=" + RagdollConstants.MAX_LIVE
                 + " urbanPlans=" + UrbanWorldState.MAX_REGION_PLANS
                 + " buildingPlans=" + UrbanWorldState.MAX_BUILDING_PLANS
+                + " routePlans=" + UrbanWorldState.MAX_ROUTE_PLANS
                 + " fixtureStates=" + FixtureStates.MAX_ENTRIES
                 + " residentDoors=" + FixtureStates.MAX_TRANSIT;
     }

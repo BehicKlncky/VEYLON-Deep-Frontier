@@ -46,6 +46,11 @@ public final class UrbanWorldState {
     public static final int MAX_BUILDING_PLANS = 256;
     /** Transit segments of layout ten kept at once; a region reads two, a junction chunk four. */
     public static final int MAX_TRANSIT_SEGMENTS = 64;
+    /**
+     * Route catalogues (one per cached region, at most {@value #MAX_REGION_PLANS}) and transit
+     * segments kept at once, the runtime snapshot's {@code routePlans} cap.
+     */
+    public static final int MAX_ROUTE_PLANS = MAX_REGION_PLANS + MAX_TRANSIT_SEGMENTS;
 
     /** Spawn column of the street-datum placeholder (layout revision 1). */
     static final int PLACEHOLDER_SPAWN_X = 8;
@@ -251,7 +256,10 @@ public final class UrbanWorldState {
         return null;
     }
 
-    /** Route catalogues and transit segments currently cached, for the runtime bounds snapshot. */
+    /**
+     * Route catalogues and transit segments currently cached, for the runtime bounds snapshot;
+     * never above {@value #MAX_ROUTE_PLANS}.
+     */
     public int cachedRoutePlans() {
         return (routeCatalogues == null ? 0 : routeCatalogues.size()) + (transitSegments == null ? 0 : transitSegments.size());
     }

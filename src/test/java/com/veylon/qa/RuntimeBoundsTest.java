@@ -372,6 +372,28 @@ class RuntimeBoundsTest {
     }
 
     @Test
+    void routeCataloguesAndTransitSegmentsStopAtTheirCaps() {
+        Game game = new Game();
+        game.newWorld(20260731, true, World.GEN_URBAN_UNDERGROUND, com.veylon.entity.GameMode.SURVIVAL);
+        var urban = game.world.urban;
+        int chunks = game.world.loadedCount();
+        // Pure queries along one candidate avenue and across a row of regions: more segments and
+        // catalogues than either cache holds, and no chunk generated on the way.
+        for (int i = 0; i < com.veylon.world.urban.UrbanWorldState.MAX_TRANSIT_SEGMENTS + 8; i++) {
+            urban.segment(true, 0, i);
+            if (i < com.veylon.world.urban.UrbanWorldState.MAX_REGION_PLANS + 8) { urban.routes(i, 0); }
+            RuntimeBudgetSnapshot snapshot = RuntimeBudgetSnapshot.capture(game);
+            assertTrue(snapshot.withinHardLimits(), snapshot.occupancySummary());
+        }
+        int cap = com.veylon.world.urban.UrbanWorldState.MAX_ROUTE_PLANS;
+        assertEquals(cap, RuntimeBudgetSnapshot.capture(game).urbanRoutePlans(), "both caches filled and stayed at their caps");
+        assertTrue(RuntimeBudgetSnapshot.hardLimitSummary().contains("routePlans=" + cap));
+        assertTrue(RuntimeBudgetSnapshot.capture(game).occupancySummary().contains("routePlans=" + cap));
+        assertEquals(chunks, game.world.loadedCount());
+        assertTrue(game.world.changedBlocks.isEmpty());
+    }
+
+    @Test
     void residentsOpeningManyDoorsKeepTheirSwingShutTimersBounded() {
         Game game = new Game();
         game.newWorld(20260716L, true, World.GEN_URBAN_STREETS, com.veylon.entity.GameMode.SURVIVAL);
