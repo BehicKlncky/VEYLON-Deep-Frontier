@@ -66,6 +66,8 @@ public final class UrbanWorldState {
     /** Layout ten: each region's route catalogue, beside its plan. */
     private final BoundedPlanCache<Long, RouteCatalogue> routeCatalogues;
     private final BoundedPlanCache<Long, TransitNetwork.Segment> transitSegments;
+    /** Layout eleven: each region's growth sites and wildlife habitats, beside its plan. */
+    private final BoundedPlanCache<Long, EcologySites> ecologySites;
     private int contentRevision = UNRESOLVED;
     /** Persistent sparse state, separate from evictable pure plan caches. */
     public final UrbanContainers containers = new UrbanContainers();
@@ -87,6 +89,7 @@ public final class UrbanWorldState {
         this.buildingPlans = buildingTemplateRevision == 0 ? null : new BoundedPlanCache<>(MAX_BUILDING_PLANS);
         this.routeCatalogues = hasUnderground() ? new BoundedPlanCache<>(MAX_REGION_PLANS) : null;
         this.transitSegments = hasUnderground() ? new BoundedPlanCache<>(MAX_TRANSIT_SEGMENTS) : null;
+        this.ecologySites = hasEcology() ? new BoundedPlanCache<>(MAX_REGION_PLANS) : null;
     }
 
     public int layoutRevision() {
@@ -121,8 +124,13 @@ public final class UrbanWorldState {
      * keeps that city exactly and adds its routes.
      */
     public boolean hasDistricts() { return layoutRevision == UrbanRevision.LAYOUT_DISTRICTS || hasUnderground(); }
-    /** Layout ten: transit under the boundary avenues and template seven's routes (milestone 14). */
-    public boolean hasUnderground() { return layoutRevision == UrbanRevision.LAYOUT_UNDERGROUND; }
+    /**
+     * Transit under the boundary avenues and template seven's routes (milestone 14): layout ten,
+     * and layout eleven, which keeps them exactly.
+     */
+    public boolean hasUnderground() { return layoutRevision == UrbanRevision.LAYOUT_UNDERGROUND || hasEcology(); }
+    /** Layout eleven: growth sites in the quarantine and city wildlife (milestone 15). */
+    public boolean hasEcology() { return layoutRevision == UrbanRevision.LAYOUT_ECOLOGY; }
 
     public boolean contentRevisionResolved() {
         return contentRevision != UNRESOLVED;
@@ -178,6 +186,8 @@ public final class UrbanWorldState {
             if (hasStarter() && rx == 0 && rz == 0) { UrbanStarterSite.of(this).stamp(chunk); }
             // Routes come last: tunnels under the avenues, then what buildings declared outside them.
             if (hasUnderground()) { UrbanRouteStamper.stamp(chunk, district, this); }
+            // Growth last of all: its carpet and node lie over the courtyard and square.
+            if (hasEcology()) { UrbanEcologyStamper.stamp(chunk, ecology(rx, rz)); }
         }
     }
 
@@ -227,6 +237,22 @@ public final class UrbanWorldState {
     public RouteCatalogue routes(int rx, int rz) {
         if (!hasUnderground()) { throw new IllegalStateException("layout " + layoutRevision + " has no routes"); }
         return routeCatalogues.get(UrbanIds.district(rx, rz), ignored -> RouteCatalogue.of(seed, regionPlan(rx, rz)));
+    }
+
+    /**
+     * The growth sites and wildlife habitats of a layout-eleven region, planned once and cached.
+     * Pure, and rebuilt identically after eviction.
+     *
+     * @throws IllegalStateException for a layout without ecology
+     */
+    public EcologySites ecology(int rx, int rz) {
+        if (!hasEcology()) { throw new IllegalStateException("layout " + layoutRevision + " has no ecology"); }
+        return ecologySites.get(UrbanIds.district(rx, rz), ignored -> EcologySites.of(seed, regionPlan(rx, rz)));
+    }
+
+    /** Ecology plans currently cached; never above {@value #MAX_REGION_PLANS}. */
+    public int cachedEcologyPlans() {
+        return ecologySites == null ? 0 : ecologySites.size();
     }
 
     /** One transit segment of layout ten, planned once and cached; absent beyond the planned city. */

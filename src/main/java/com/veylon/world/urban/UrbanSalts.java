@@ -116,6 +116,14 @@ public final class UrbanSalts {
     /** Which apartment of a residential region hides a cellar. */
     public static final long ROUTE_REFUGE = 0x5652_5245_4655_4745L;
 
+    // Layout revision 11 (milestone 15): alien ecology and city wildlife.
+    /** Which courtyards and fenced square of a quarantine region hold a growth site. */
+    public static final long GROWTH_SITE = 0x5647_524f_5754_4853L;
+    /** Where a park's Murkhares and its Glowdeer live. */
+    public static final long WILDLIFE_PARK = 0x5657_494c_4450_4b21L;
+    /** Whether a residential courtyard keeps a Murkhare. */
+    public static final long WILDLIFE_COURTYARD = 0x5657_494c_4443_5921L;
+
     private UrbanSalts() {
     }
 }

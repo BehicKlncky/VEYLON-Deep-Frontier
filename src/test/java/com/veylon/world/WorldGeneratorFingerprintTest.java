@@ -234,6 +234,58 @@ class WorldGeneratorFingerprintTest {
                 + "re-recording:\n  " + String.join("\n  ", moved));
     }
 
+    /**
+     * Generator 14 (milestone 15), recorded 2026-10-21 at introduction: terrain at the pinned
+     * chunks, which show the same city as generator 13 there, and its ecology plans: every growth
+     * site and wildlife slot within three regions of the spawn, and the stamped chunks of the
+     * first growth site.
+     */
+    private static final long[] URBAN_ECOLOGY_TERRAIN_FINGERPRINTS = {
+            0xb9036588174436d2L, 0x80223cc179da0afbL, 0x2aba8a39e5c77757L};
+    private static final long[] URBAN_ECOLOGY_PLAN_FINGERPRINTS = {
+            0xd597caa1a7b79d04L, 0x1c85c2c0ef3d9a1eL, 0xf8e5c6fe62b7addeL};
+
+    @Test
+    void theAlienEcologyKeepsItsRecordedBlocksAndPlans() {
+        List<String> moved = new ArrayList<>();
+        for (int i = 0; i < SEEDS.length; i++) {
+            long terrain = terrainFingerprint(SEEDS[i], World.GEN_URBAN_ECOLOGY);
+            long plans = ecologyPlanFingerprint(SEEDS[i]);
+            if (terrain != URBAN_ECOLOGY_TERRAIN_FINGERPRINTS[i] || plans != URBAN_ECOLOGY_PLAN_FINGERPRINTS[i]) {
+                moved.add(String.format("seed %d: terrain 0x%016xL, plans 0x%016xL", SEEDS[i], terrain, plans));
+            }
+        }
+        assertTrue(moved.isEmpty(), () -> "generator 14 changed; add a generator version instead of "
+                + "re-recording:\n  " + String.join("\n  ", moved));
+    }
+
+    /** Growth sites and wildlife slots near the spawn, and the first site's stamped chunks. */
+    private static long ecologyPlanFingerprint(long seed) {
+        World world = new World(seed, World.GEN_URBAN_ECOLOGY);
+        long hash = 0xcbf29ce484222325L;
+        com.veylon.world.urban.EcologySites.GrowthSite first = null;
+        for (int rz = -3; rz <= 3; rz++) {
+            for (int rx = -3; rx <= 3; rx++) {
+                var eco = world.urban.ecology(rx, rz);
+                for (var site : eco.growthSites()) {
+                    hash = mix(hash, site.toString().hashCode());
+                    if (first == null) { first = site; }
+                }
+                for (var slot : eco.slots()) {
+                    hash = mix(hash, slot.toString().hashCode());
+                }
+            }
+        }
+        assertTrue(first != null, "a growth site near the spawn");
+        for (int dz = -1; dz <= 1; dz++) {
+            for (int dx = -1; dx <= 1; dx++) {
+                hash = mix(hash, hashChunk(world.getOrCreateChunk(Math.floorDiv(first.node().x(), Chunk.SX) + dx,
+                        Math.floorDiv(first.node().z(), Chunk.SZ) + dz)));
+            }
+        }
+        return hash;
+    }
+
     /** Transit segments around the spawn, three route catalogues and the spawn station's chunks. */
     private static long routeFingerprint(long seed) {
         World world = new World(seed, World.GEN_URBAN_UNDERGROUND);

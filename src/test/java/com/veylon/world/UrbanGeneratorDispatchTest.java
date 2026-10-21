@@ -43,7 +43,8 @@ class UrbanGeneratorDispatchTest {
         assertEquals(11, World.GEN_URBAN_CIVIC, "the commercial and civic catalogue (D-98)");
         assertEquals(12, World.GEN_URBAN_DISTRICTS, "the six districts (milestone 13)");
         assertEquals(13, World.GEN_URBAN_UNDERGROUND, "underground and rooftop routes (milestone 14)");
-        assertEquals(World.GEN_URBAN_UNDERGROUND, World.MAX_SUPPORTED_GENERATOR);
+        assertEquals(14, World.GEN_URBAN_ECOLOGY, "alien ecology and city wildlife (milestone 15)");
+        assertEquals(World.GEN_URBAN_ECOLOGY, World.MAX_SUPPORTED_GENERATOR);
         for (int version = -1; version <= World.MAX_SUPPORTED_GENERATOR + 2; version++) {
             boolean known = version >= World.GEN_LEGACY && version <= World.MAX_SUPPORTED_GENERATOR;
             assertEquals(known, World.isSupportedGenerator(version), "supported " + version);
@@ -51,7 +52,8 @@ class UrbanGeneratorDispatchTest {
                             || version == World.GEN_URBAN_PLANS || version == World.GEN_URBAN_APARTMENTS
                             || version == World.GEN_URBAN_SHAPED_STAIRS || version == World.GEN_URBAN_STARTER
                             || version == World.GEN_URBAN_ENCOUNTERS || version == World.GEN_URBAN_CIVIC
-                            || version == World.GEN_URBAN_DISTRICTS || version == World.GEN_URBAN_UNDERGROUND,
+                            || version == World.GEN_URBAN_DISTRICTS || version == World.GEN_URBAN_UNDERGROUND
+                            || version == World.GEN_URBAN_ECOLOGY,
                     World.isUrbanGenerator(version), "urban " + version);
             assertEquals(version == World.GEN_DEEP || version == World.GEN_CAVE_IDENTITIES,
                     World.hasDeepFrontier(version), "deep frontier " + version);

@@ -16,7 +16,9 @@ public final class UrbanPlaces {
     /** A route place; plan metadata, never persisted. */
     public enum Place {
         NONE(""), BASEMENT("Basement"), ROOF("Rooftop"), HIDDEN_CELLAR("Hidden cellar"),
-        SERVICE_PASSAGE("Service passage"), STATION("Transit station"), TUNNEL("Transit tunnel");
+        SERVICE_PASSAGE("Service passage"), STATION("Transit station"), TUNNEL("Transit tunnel"),
+        /** Layout eleven (milestone 15): the ground of a growth node, where a Veilmaw lies folded. */
+        GROWTH("Veil growth");
 
         public final String label;
 
@@ -59,6 +61,10 @@ public final class UrbanPlaces {
                 if (b != null && !b.solid) { return new Observation(Place.TUNNEL, UrbanIds.NONE); }
             }
         }
+        if (world.urban.hasEcology() && y > UrbanDatum.STREET_Y && y <= UrbanDatum.STREET_Y + 4
+                && growthAt(world, rx, rz, x, z) != null) {
+            return new Observation(Place.GROWTH, UrbanIds.NONE);
+        }
         if (y >= RouteCatalogue.SERVICE_Y && y < UrbanDatum.STREET_Y) {
             for (RouteCatalogue.Corridor c : world.urban.routes(rx, rz).corridors()) {
                 if (x >= c.x0() && x <= c.x1() && z >= c.z0() && z <= c.z1()) {
@@ -67,6 +73,18 @@ public final class UrbanPlaces {
             }
         }
         return Observation.NONE;
+    }
+
+    /**
+     * The growth site of a layout-eleven region whose territory holds a column, or null. A
+     * territory lies well inside its region, so only the column's own region is asked.
+     */
+    public static EcologySites.GrowthSite growthAt(World world, int rx, int rz, int x, int z) {
+        for (EcologySites.GrowthSite site : world.urban.ecology(rx, rz).growthSites()) {
+            float dx = x + 0.5f - (site.node().x() + 0.5f), dz = z + 0.5f - (site.node().z() + 0.5f);
+            if (dx * dx + dz * dz <= EcologySites.TERRITORY * EcologySites.TERRITORY) { return site; }
+        }
+        return null;
     }
 
     /**

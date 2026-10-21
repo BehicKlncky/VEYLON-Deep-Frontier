@@ -51,7 +51,7 @@ import com.veylon.world.World;
  */
 public final class VeilmawAI {
     /** Radius of a territory around its node, in blocks. */
-    public static final float TERRITORY = 9f;
+    public static final float TERRITORY = com.veylon.world.urban.EcologySites.TERRITORY;
     public static final float WINDUP = 1.1f;
     public static final float HURT_WINDUP = 0.55f;
     public static final float LUNGE_SPEED = 7f;

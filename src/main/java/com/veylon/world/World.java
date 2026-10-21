@@ -78,10 +78,16 @@ public class World implements VoxelAccess {
      * connectors). Its starter superblock keeps generator 10's blocks and ids.
      */
     public static final int GEN_URBAN_UNDERGROUND = 13;
+    /**
+     * Layout 11 (urban milestone 15): generator 13's city and routes exactly, plus the growth
+     * sites of the quarantine (a node on a membrane carpet in chosen courtyards and fenced
+     * squares) and the habitats of city wildlife.
+     */
+    public static final int GEN_URBAN_ECOLOGY = 14;
     /** The generator of every ordinary new world; generator 3 until the urban rollout. */
     public static final int DEFAULT_NEW_WORLD_GENERATOR = GEN_CAVE_IDENTITIES;
     /** The highest generator version a save may name; a load rejects anything above it. */
-    public static final int MAX_SUPPORTED_GENERATOR = GEN_URBAN_UNDERGROUND;
+    public static final int MAX_SUPPORTED_GENERATOR = GEN_URBAN_ECOLOGY;
 
     public final long seed;
     /** Persisted in save v3; legacy (v2) saves always load as {@link #GEN_LEGACY}. */
@@ -182,7 +188,8 @@ public class World implements VoxelAccess {
                 || version == GEN_URBAN_PLANS || version == GEN_URBAN_APARTMENTS
                 || version == GEN_URBAN_SHAPED_STAIRS || version == GEN_URBAN_STARTER
                 || version == GEN_URBAN_ENCOUNTERS || version == GEN_URBAN_CIVIC
-                || version == GEN_URBAN_DISTRICTS || version == GEN_URBAN_UNDERGROUND;
+                || version == GEN_URBAN_DISTRICTS || version == GEN_URBAN_UNDERGROUND
+                || version == GEN_URBAN_ECOLOGY;
     }
 
     /** Generators 2 and 3: deep caves, underground POIs, cave mouths and settlements. */
