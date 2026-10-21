@@ -121,6 +121,12 @@ public final class CreativePalette {
                 "a generated loose panel whose hidden cellar and discovery come from its building's"
                         + " plan; a placed copy would hide nothing");
         excluded.put(BlockType.HIDDEN_PANEL_OPEN, openHalf);
+        excluded.put(BlockType.GROWTH_NODE,
+                "a generated quarantine growth node that anchors one encounter's territory; a placed"
+                        + " copy would anchor nothing, and breaking one yields a membrane sac, not the node");
+        excluded.put(BlockType.VEIL_MEMBRANE,
+                "the generated membrane floor of a growth territory; no item carries it, and scraping"
+                        + " it away yields nothing");
         EXCLUDED = Collections.unmodifiableMap(excluded);
     }
 

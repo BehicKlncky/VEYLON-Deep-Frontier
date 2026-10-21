@@ -221,6 +221,12 @@ public final class MaterialRegistry {
             register("railing", BlockType.RAILING, "railing_top", "railing", "railing_top", 1, TintMode.NONE, true, 0f, 0.4f);
             register("hidden_panel", BlockType.HIDDEN_PANEL, "plaster", "hidden_panel", "plaster", 2, TintMode.NONE, false, 0f, 0.9f);
             register("hidden_panel_open", BlockType.HIDDEN_PANEL_OPEN, "plaster", "hidden_panel", "plaster", 1, TintMode.NONE, false, 0f, 0.9f);
+            // Milestone 15 alien growth: a node whose veins glow in the dark and the faintly veined
+            // membrane of its territory. The glow is emissive texture, not simulated light.
+            register("growth_node", BlockType.GROWTH_NODE, "growth_node_top", "growth_node", "growth_node_top",
+                    1, TintMode.NONE, false, 0.75f, 0.45f);
+            register("veil_membrane", BlockType.VEIL_MEMBRANE, "veil_membrane", "veil_membrane", "veil_membrane",
+                    2, TintMode.NONE, false, 0.22f, 0.5f);
 
             // Standalone prop tiles used by special shapes (torch flame, campfire, basin water...).
             propTile("torch_head", 1.0f, 0.9f);

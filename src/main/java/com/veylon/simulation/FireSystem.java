@@ -219,7 +219,8 @@ public class FireSystem implements MediumTickSystem {
 
             if (burn.time <= 0) {
                 BlockType result = switch (t) {
-                    case LOG, PLANK, WALL, WORKBENCH, CRATE -> BlockType.ASH;
+                    // Burnt growth (milestone 15) chars in place: the courtyard keeps its floor.
+                    case LOG, PLANK, WALL, WORKBENCH, CRATE, GROWTH_NODE, VEIL_MEMBRANE -> BlockType.ASH;
                     default -> BlockType.AIR;
                 };
                 long urbanOwner = burn.byPlayer && com.veylon.world.Fixtures.isContainer(t)

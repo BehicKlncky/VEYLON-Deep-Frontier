@@ -56,6 +56,9 @@ final class UrbanTextures {
             case "railing" -> railing(p);
             case "railing_top" -> railingTop(p);
             case "hidden_panel" -> hiddenPanel(p, variant);
+            case "growth_node" -> growthNode(p, false);
+            case "growth_node_top" -> growthNode(p, true);
+            case "veil_membrane" -> veilMembrane(p, variant);
             default -> {
                 return false;
             }
@@ -616,6 +619,56 @@ final class UrbanTextures {
             p.dot(x, rail, 0x7a4a2e);
             p.dot(x, n - rail, 0x6e4228);
         }
+    }
+
+    /**
+     * A growth node (milestone 15): a swollen sac of dark violet membrane, wet highlights on its
+     * folds and pale yellow-green veins converging on a pore. The material is emissive, so the
+     * veins glow at night while the dark membrane stays dark: a landmark, never a lamp.
+     */
+    private static void growthNode(Painter p, boolean top) {
+        int n = p.size;
+        p.fillFbm(0x3a2f45, 0.18f, 5, 1501);
+        p.fillFbmBlend(0x56456a, 0.55f, 9, 1502, 0.5f);
+        // Wet folds: soft bright crescents.
+        for (int i = 0; i < 9; i++) {
+            int x = p.ri(i * 3 + 1503), y = p.ri(i * 3 + 1504);
+            p.pebble(x, y, 2 + (int) (p.rf(i + 1505) * 3), p.shade(0x6c5a80, 0.9f + p.rf(i + 1506) * 0.3f));
+        }
+        if (top) {
+            // Seen from above, veins run to a central pore.
+            int c = n / 2;
+            for (int k = 0; k < 7; k++) {
+                double a = k * Math.PI * 2 / 7 + p.rf(k + 1507) * 0.4;
+                int r = n / 2 - 1;
+                p.line(c, c, c + (int) (Math.cos(a) * r), c + (int) (Math.sin(a) * r), 0xcfe88a);
+            }
+            p.blob(c, c, Math.max(2, n / 9), 0x1a1420);
+            p.blob(c, c, Math.max(1, n / 16), 0xe4f6a0);
+        } else {
+            p.veins(0xcfe88a, 0.55f, 1508, 0.9f);
+            // A seam where the sac bulges over the ground.
+            for (int x = 0; x < n; x++) {
+                p.mulAt(x, n - 1, 0.6f);
+                p.mulAt(x, n - 2, 0.75f);
+            }
+        }
+        p.grain(0.04f);
+    }
+
+    /**
+     * The veil membrane carpeting a growth territory (milestone 15): a dull violet-grey skin over
+     * the lawn, ridged where it has crept over old paving, with faint yellow-green capillaries.
+     * Only the capillaries are bright enough for the faint emissive term to pick out at night,
+     * so the territory's edge reads in the dark without lighting anything.
+     */
+    private static void veilMembrane(Painter p, int variant) {
+        int salt = variant * 53;
+        p.fillFbm(0x353040, 0.14f, 6, 1511 + salt);
+        p.fillFbmBlend(0x4a3f58, 0.6f, 8, 1512 + salt, 0.45f);
+        p.cracks(0x231d2a, 0.6f, 1513 + salt, 4);
+        p.veins(0xb8d27a, 0.35f, 1514 + salt, 0.65f);
+        p.grain(0.05f);
     }
 
     /** A rail seen from above: a narrow steel frame, open in the middle. */

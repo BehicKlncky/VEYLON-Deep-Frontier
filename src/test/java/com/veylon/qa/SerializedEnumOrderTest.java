@@ -46,7 +46,9 @@ class SerializedEnumOrderTest {
             // Milestone 13 district hazard ground.
             "CONTAMINATED_GROUND",
             // Milestone 14 guard rails and the loose panel over a hidden cellar, closed and open.
-            "RAILING", "HIDDEN_PANEL", "HIDDEN_PANEL_OPEN");
+            "RAILING", "HIDDEN_PANEL", "HIDDEN_PANEL_OPEN",
+            // Milestone 15 alien growth: a node and its membrane floor.
+            "GROWTH_NODE", "VEIL_MEMBRANE");
 
     private static final List<String> ITEM_TYPE_ORDER = List.of(
             "DIRT", "STONE", "SAND", "GRAVEL", "CLAY", "SNOW", "LOG", "PLANK", "WALL", "STICK",
@@ -75,7 +77,9 @@ class SerializedEnumOrderTest {
             // Urban package 04 salvage and palette forms — appended, never reordered.
             "ASPHALT", "PAVING", "CONCRETE", "BRICK", "PLASTER", "SHEET_METAL", "STAIRS",
             "WOOD_DOOR", "METAL_DOOR", "WINDOW", "SHELF", "CABINET", "LOCKER", "TABLE",
-            "RUBBLE_BLOCK", "DEBRIS_BLOCK");
+            "RUBBLE_BLOCK", "DEBRIS_BLOCK",
+            // Milestone 15 alien ecology.
+            "MEMBRANE_SAC");
 
     private static final List<String> QUEST_TYPE_ORDER = List.of(
             "FETCH", "HUNT_PREDATOR", "INVESTIGATE",

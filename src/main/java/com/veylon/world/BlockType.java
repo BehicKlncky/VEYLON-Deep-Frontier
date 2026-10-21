@@ -119,7 +119,15 @@ public enum BlockType {
     // A loose plaster panel over a cellar doorway. Closed it is named and built like the wall
     // around it; working it with F slides it aside like a door (Fixtures.Kind.HIDDEN_PANEL).
     HIDDEN_PANEL("Plaster Wall", Shape.CUBE, true, true, false, 1.5f, ToolKind.PICKAXE, false, null, 0, 0, 0f, 0.78f, 0.75f, 0.68f),
-    HIDDEN_PANEL_OPEN("Loose Panel (open)", Shape.LEAF, false, false, false, 1.5f, ToolKind.PICKAXE, false, null, 0, 0, 0f, 0.78f, 0.75f, 0.68f);
+    HIDDEN_PANEL_OPEN("Loose Panel (open)", Shape.LEAF, false, false, false, 1.5f, ToolKind.PICKAXE, false, null, 0, 0, 0f, 0.78f, 0.75f, 0.68f),
+
+    // Milestone 15: the quarantine's alien growth. A node anchors one Veilmaw's territory; its
+    // glow is in the texture, not the light simulation, so it never reads as a lamp. A flame
+    // beside it sets it alight, breaking it gives one membrane sac, and either way its organism
+    // withers. The membrane carpet round it is the territory floor: it burns, and scraping it
+    // away by hand leaves nothing.
+    GROWTH_NODE("Growth Node", Shape.CUBE, true, true, true, 2.5f, ToolKind.AXE, false, ItemType.MEMBRANE_SAC, 1, 0, 0f, 0.46f, 0.38f, 0.54f),
+    VEIL_MEMBRANE("Veil Membrane", Shape.CUBE, true, true, true, 0.9f, ToolKind.NONE, false, null, 0, 0, 0f, 0.29f, 0.26f, 0.33f);
 
     /**
      * How a block is meshed. Not persisted: only {@link BlockType} ordinals are

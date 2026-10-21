@@ -757,6 +757,16 @@ public final class IconAtlas {
                 c.line(11, 15, 22, 20, 1, 0xFFB9E7FF);
                 c.rect(12, 17, 16, 22, 0xFFB9E7FF);
             }
+            case MEMBRANE_SAC -> {
+                // A violet sac with pale yellow-green veins and one bright pore.
+                c.circle(16, 18, 11, shade(base, 0.45f));
+                c.circle(15, 17, 9, base);
+                c.circle(19, 12, 3, shade(base, 1.35f));
+                c.line(9, 20, 16, 15, 1, 0xFFCFE88A);
+                c.line(16, 15, 23, 22, 1, 0xFFCFE88A);
+                c.line(16, 15, 15, 26, 1, 0xFFB8D27A);
+                c.circle(16, 15, 2, 0xFFE4F6A0);
+            }
             case SCRAP -> {
                 c.polygon(new int[]{5, 10, 16, 19, 28, 25, 15, 9},
                         new int[]{18, 7, 10, 4, 11, 25, 22, 28}, shade(base, 0.5f));

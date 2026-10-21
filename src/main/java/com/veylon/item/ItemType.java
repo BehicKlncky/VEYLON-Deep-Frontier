@@ -202,7 +202,11 @@ public enum ItemType {
     LOCKER("Metal Locker", p().stack(4).places("LOCKER").weight(9f).color(0.40f, 0.48f, 0.46f)),
     TABLE("Table", p().stack(4).places("TABLE").weight(5f).color(0.58f, 0.44f, 0.28f)),
     RUBBLE_BLOCK("Rubble", p().places("RUBBLE").weight(1.6f).color(0.50f, 0.48f, 0.45f)),
-    DEBRIS_BLOCK("Debris", p().places("DEBRIS").weight(0.3f).color(0.48f, 0.46f, 0.42f));
+    DEBRIS_BLOCK("Debris", p().places("DEBRIS").weight(0.3f).color(0.48f, 0.46f, 0.42f)),
+
+    // ---- Alien ecology (urban package 15; append-only) ----
+    // Taken from a Veilmaw's remains or a broken growth node; worked into a burn salve. Not food.
+    MEMBRANE_SAC("Membrane Sac", p().stack(8).weight(0.3f).color(0.62f, 0.56f, 0.70f));
 
     public final String displayName;
     public final int maxStack;
