@@ -123,6 +123,10 @@ public final class UrbanSalts {
     public static final long WILDLIFE_PARK = 0x5657_494c_4450_4b21L;
     /** Whether a residential courtyard keeps a Murkhare. */
     public static final long WILDLIFE_COURTYARD = 0x5657_494c_4443_5921L;
+    /** Whether a superblock's tallest walk-up keeps a flock of Skitterwings on its roof. */
+    public static final long WILDLIFE_ROOF = 0x5657_494c_4452_4f21L;
+    /** Encounter catalogue five: which budgeted buildings keep a Breacher at their street door. */
+    public static final long BREACHER = 0x5642_5245_4143_4852L;
 
     private UrbanSalts() {
     }

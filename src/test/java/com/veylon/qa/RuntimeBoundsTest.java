@@ -394,6 +394,34 @@ class RuntimeBoundsTest {
     }
 
     @Test
+    void ecologyPlansAndCityCreaturesStopAtTheirCaps() {
+        Game game = new Game();
+        game.newWorld(20260731, true, World.GEN_URBAN_ECOLOGY, com.veylon.entity.GameMode.SURVIVAL);
+        var urban = game.world.urban;
+        int chunks = game.world.loadedCount();
+        // Pure ecology queries across more regions than the cache holds, generating nothing.
+        for (int i = 0; i < com.veylon.world.urban.UrbanWorldState.MAX_REGION_PLANS + 8; i++) {
+            urban.ecology(i, -i);
+            RuntimeBudgetSnapshot snapshot = RuntimeBudgetSnapshot.capture(game);
+            assertTrue(snapshot.withinHardLimits(), snapshot.occupancySummary());
+        }
+        assertEquals(com.veylon.world.urban.UrbanWorldState.MAX_REGION_PLANS,
+                RuntimeBudgetSnapshot.capture(game).urbanEcologyPlans());
+        assertEquals(chunks, game.world.loadedCount());
+        String limits = RuntimeBudgetSnapshot.hardLimitSummary();
+        assertTrue(limits.contains("aliens=" + com.veylon.entity.UrbanEncounterDirector.MAX_ACTIVE_ALIENS));
+        assertTrue(limits.contains("wildlife=" + com.veylon.entity.UrbanEncounterDirector.MAX_ACTIVE_WILDLIFE));
+        // Staged bodies past a cap are reported against it.
+        for (int i = 0; i <= com.veylon.entity.UrbanEncounterDirector.MAX_ACTIVE_ALIENS; i++) {
+            var c = game.entities.spawnCreature(game.world, Creature.CreatureType.VEILMAW, i * 3f, 41, 0);
+            c.encounterId = -1 - i;
+        }
+        RuntimeBudgetSnapshot over = RuntimeBudgetSnapshot.capture(game);
+        assertEquals(com.veylon.entity.UrbanEncounterDirector.MAX_ACTIVE_ALIENS + 1, over.activeAliens());
+        assertFalse(over.withinHardLimits(), "the snapshot sees a breached alien cap");
+    }
+
+    @Test
     void residentsOpeningManyDoorsKeepTheirSwingShutTimersBounded() {
         Game game = new Game();
         game.newWorld(20260716L, true, World.GEN_URBAN_STREETS, com.veylon.entity.GameMode.SURVIVAL);

@@ -81,7 +81,7 @@ public class World implements VoxelAccess {
     /**
      * Layout 11 (urban milestone 15): generator 13's city and routes exactly, plus the growth
      * sites of the quarantine (a node on a membrane carpet in chosen courtyards and fenced
-     * squares) and the habitats of city wildlife.
+     * squares) and encounter catalogue five: the Veilmaw, the Breacher and city wildlife.
      */
     public static final int GEN_URBAN_ECOLOGY = 14;
     /** The generator of every ordinary new world; generator 3 until the urban rollout. */

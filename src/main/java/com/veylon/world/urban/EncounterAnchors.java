@@ -24,7 +24,20 @@ import java.util.List;
  * budget. The threat itself is still the Veilbound: alien organisms are milestone 15.
  */
 public final class EncounterAnchors {
-    public record Anchor(long id, long building, Vec3i cell, boolean indoor) { }
+    /**
+     * One planned body: its stable encounter id, the building (or ecology site) it belongs to, the
+     * cell it appears at, whether that cell is indoors, its species and, for a creature, where it
+     * may go. Catalogues one to four plan only Veilbound, with no habitat.
+     */
+    public record Anchor(long id, long building, Vec3i cell, boolean indoor, UrbanSpecies species, Habitat habitat) {
+        public Anchor(long id, long building, Vec3i cell, boolean indoor) {
+            this(id, building, cell, indoor, UrbanSpecies.VEILBOUND, null);
+        }
+
+        Anchor as(UrbanSpecies other) {
+            return new Anchor(id, building, cell, indoor, other, habitat);
+        }
+    }
     private EncounterAnchors() { }
 
     /** The catalogue a world's generator freezes; it is written beside the population codec. */
@@ -32,7 +45,14 @@ public final class EncounterAnchors {
         if (world.urban == null) {
             return 1;
         }
-        return world.urban.hasUnderground() ? 4 : world.urban.hasDistricts() ? 3 : world.urban.hasCivicCatalogue() ? 2 : 1;
+        return world.urban.hasEcology() ? 5 : world.urban.hasUnderground() ? 4 : world.urban.hasDistricts() ? 3
+                : world.urban.hasCivicCatalogue() ? 2 : 1;
+    }
+
+    /** Catalogues four and five keep a region's station slots; earlier ones have no stations. */
+    public static boolean hasStations(World world) {
+        int catalogue = catalogue(world);
+        return catalogue == 4 || catalogue == 5;
     }
 
     public static boolean selected(World world, ParcelPlan parcel) {
@@ -108,14 +128,29 @@ public final class EncounterAnchors {
     private static List<Anchor> budgeted(World world, ParcelPlan parcel) {
         DistrictPlan district = world.urban.regionPlan(UrbanIds.regionX(parcel.id()), UrbanIds.regionZ(parcel.id()));
         List<Integer> chosen = budget(world.seed, district);
-        if (catalogue(world) == 4 && !forStation(world, district.rx, district.rz).isEmpty() && !chosen.isEmpty()) {
+        if (hasStations(world) && !forStation(world, district.rx, district.rz).isEmpty() && !chosen.isEmpty()) {
             // The station spends one building's share of the district budget first.
             chosen = chosen.subList(0, chosen.size() - 1);
+        }
+        boolean ecology = catalogue(world) == 5;
+        if (ecology && district.district == UrbanDistrict.QUARANTINE && !chosen.isEmpty()) {
+            // Catalogue five: the quarantine's Veilmaws are part of its threat budget, one building's
+            // share (two anchors) for every two growth sites, rounded up, keeping one building.
+            int sites = world.urban.ecology(district.rx, district.rz).growthSites().size();
+            chosen = chosen.subList(0, chosen.size() - Math.min(chosen.size() - 1, (sites + 1) / 2));
         }
         if (!chosen.contains(parcel.index())) { return List.of(); }
         BuildingPlan plan = world.urban.buildingAt(parcel.x0(), parcel.z0());
         if (plan.variant() == BuildingPlan.Variant.OCCUPIED) { return List.of(); }
-        return plan.family().walkUp() ? walkUp(plan) : specialist(plan);
+        List<Anchor> anchors = plan.family().walkUp() ? walkUp(plan) : specialist(plan);
+        if (ecology && breacher(world.seed, district, plan)) {
+            List<Anchor> out = new ArrayList<>();
+            for (Anchor a : anchors) {
+                out.add(a.indoor() ? a : a.as(UrbanSpecies.BREACHER));
+            }
+            return out;
+        }
+        return anchors;
     }
 
     /**
@@ -155,13 +190,72 @@ public final class EncounterAnchors {
      * part of the district's threat budget, which spends one building's share on them first.
      */
     public static List<Anchor> forStation(World world, int rx, int rz) {
-        if (catalogue(world) != 4 || rx == 0 && rz == 0) { return List.of(); }
+        if (!hasStations(world) || rx == 0 && rz == 0) { return List.of(); }
         TransitStation station = ownedStation(world, rx, rz);
         if (station == null) { return List.of(); }
         BuildingPlan plan = station.plan();
         BuildingPlan.Room platform = plan.floors().getFirst().rooms().getFirst();
         return List.of(new Anchor(UrbanIds.encounter(platform.id(), 0), plan.id(), plan.approaches().getFirst(), false),
                 new Anchor(UrbanIds.encounter(platform.id(), 1), plan.id(), platform.anchor(), true));
+    }
+
+    /**
+     * Catalogue five (milestone 15): one in three budgeted buildings of the industrial yards, the
+     * civic precinct and the quarantine keeps a Breacher at its street door instead of a
+     * Veilbound; its indoor slot stays a Veilbound. Never in the starter area, which keeps
+     * catalogue one's slots.
+     */
+    static boolean breacher(long seed, DistrictPlan district, BuildingPlan plan) {
+        return (district.district == UrbanDistrict.INDUSTRIAL || district.district == UrbanDistrict.CIVIC
+                || district.district == UrbanDistrict.QUARANTINE)
+                && UrbanHash.range(0, 2, seed, UrbanRevision.LAYOUT_ECOLOGY, UrbanSalts.BREACHER, plan.id(), 0, 0) == 0;
+    }
+
+    /**
+     * Catalogue five's living slots of one superblock (milestone 15): its growth site's Veilmaw,
+     * its wildlife ({@link EcologySites}) and, for one courtyard block in three outside the
+     * quarantine, a flock of Skitterwings over the roof of its tallest walk-up of three storeys or
+     * more. Every slot belongs to the superblock's ecology site id. Empty under every other
+     * catalogue.
+     */
+    public static List<Anchor> forEcology(World world, int rx, int rz, int superblock) {
+        if (catalogue(world) != 5 || !CityPlanner.isPlannable(rx, rz)) { return List.of(); }
+        DistrictPlan district = world.urban.regionPlan(rx, rz);
+        long site = UrbanIds.building(UrbanIds.parcel(district.districtId,
+                superblock * ParcelPlan.SLOTS_PER_SUPERBLOCK + EcologySites.ID_SLOT), 0);
+        List<Anchor> out = new ArrayList<>();
+        for (EcologySites.Slot s : world.urban.ecology(rx, rz).slots(superblock)) {
+            out.add(new Anchor(s.encounterId(), site, s.cell(), false, s.species(), s.habitat()));
+        }
+        roofFlock(world, district, superblock, site, out);
+        return out;
+    }
+
+    private static void roofFlock(World world, DistrictPlan district, int superblock, long site, List<Anchor> out) {
+        SuperblockPlan sb = district.superblock(superblock);
+        if (sb.kind() != SuperblockPlan.Kind.COURTYARD_HOUSING || district.district == UrbanDistrict.QUARANTINE
+                || district.rx == 0 && district.rz == 0 && superblock == CityPlanner.STARTER_BLOCK
+                || UrbanHash.unit(world.seed, UrbanRevision.LAYOUT_ECOLOGY, UrbanSalts.WILDLIFE_ROOF,
+                district.rx, district.rz, superblock) >= 1.0 / 3) {
+            return;
+        }
+        ParcelPlan tallest = null;
+        for (ParcelPlan p : district.parcels()) {
+            if (p.superblock() == superblock && p.use() == ParcelPlan.Use.RESIDENTIAL
+                    && (tallest == null || p.maxStoreys() > tallest.maxStoreys())) {
+                tallest = p;
+            }
+        }
+        if (tallest == null) { return; }
+        BuildingPlan plan = world.urban.buildingAt(tallest.x0(), tallest.z0());
+        if (plan == null || !plan.family().walkUp() || plan.storeys() < 3) { return; }
+        int roof = plan.roofY();
+        int cx = (tallest.x0() + tallest.x1()) / 2, cz = (tallest.z0() + tallest.z1()) / 2;
+        Habitat air = Habitat.area(tallest.x0(), tallest.z0(), tallest.x1(), tallest.z1(), roof + 2, roof + 10);
+        for (int i = 0; i < EcologySites.FLOCK; i++) {
+            out.add(new Anchor(EcologySites.encounterId(district, superblock, EcologySites.ROOM_ROOF, i), site,
+                    new Vec3i(cx - 1 + 2 * i, roof + 5, cz), false, UrbanSpecies.SKITTERWING, air));
+        }
     }
 
     /** The station of the one candidate segment a region owns, or null when that segment is absent. */
@@ -176,6 +270,13 @@ public final class EncounterAnchors {
     /** Resolves against the frozen plan, never accepts a merely well-shaped arbitrary id. */
     public static Anchor resolve(World world, long id) {
         UrbanIds.requireKind(id, UrbanIds.Kind.ENCOUNTER);
+        if (EcologySites.isEcologyId(id)) {
+            int superblock = UrbanIds.parcelIndex(id) / ParcelPlan.SLOTS_PER_SUPERBLOCK;
+            for (Anchor anchor : forEcology(world, UrbanIds.regionX(id), UrbanIds.regionZ(id), superblock)) {
+                if (anchor.id == id) { return anchor; }
+            }
+            throw new IllegalArgumentException("encounter has no planned ecology anchor");
+        }
         if (UrbanIds.floorIndex(id) == -2 && UrbanIds.parcelIndex(id) % ParcelPlan.SLOTS_PER_SUPERBLOCK == TransitStation.ID_SLOT) {
             for (Anchor anchor : forStation(world, UrbanIds.regionX(id), UrbanIds.regionZ(id))) {
                 if (anchor.id == id) { return anchor; }

@@ -54,6 +54,7 @@ public record RuntimeBudgetSnapshot(
         int fixtureStates,
         int residentDoors,
         int urbanEncounterRecords,
+        int urbanEcologyPlans, int activeAliens, int activeWildlife,
         int navigationRoutes, int pathQueries, int pathExpansions, int pathDeferred,
         int pathFailures, int unsupportedEntries, int hearingSamples) {
 
@@ -104,6 +105,8 @@ public record RuntimeBudgetSnapshot(
                 game.world.urban == null ? 0 : game.world.urban.cachedRoutePlans(),
                 game.world.fixtures.size(),
                 game.world.fixtures.transitTimers().size(), game.entities.encounters.size(),
+                game.world.urban == null ? 0 : game.world.urban.cachedEcologyPlans(),
+                game.entities.encounters.activeAliens(game), game.entities.encounters.activeWildlife(game),
                 game.world.navigation.size(), game.world.navigation.budget.queries(),
                 game.world.navigation.budget.expansions(), game.world.navigation.budget.deferred(),
                 game.world.navigation.budget.failures(), game.world.navigation.budget.unsupportedEntries(),
@@ -121,6 +124,9 @@ public record RuntimeBudgetSnapshot(
                 && npcs.legacy() <= SettlementManager.MAX_ACTIVE_LEGACY_NPCS
                 && npcs.infected() <= com.veylon.entity.UrbanEncounterDirector.MAX_ACTIVE
                 && urbanEncounterRecords <= com.veylon.entity.UrbanEncounterDirector.MAX_RECORDS
+                && urbanEcologyPlans <= UrbanWorldState.MAX_REGION_PLANS
+                && activeAliens <= com.veylon.entity.UrbanEncounterDirector.MAX_ACTIVE_ALIENS
+                && activeWildlife <= com.veylon.entity.UrbanEncounterDirector.MAX_ACTIVE_WILDLIFE
                 && liveProjectiles <= ProjectileSystem.MAX_LIVE
                 && stuckArrows <= ProjectileSystem.MAX_STUCK
                 && largestCachedPath <= Pathfinder.MAX_PATH_NODES
@@ -187,6 +193,8 @@ public record RuntimeBudgetSnapshot(
                 + " urbanPlans=" + urbanRegionPlans
                 + " buildingPlans=" + urbanBuildingPlans + " routePlans=" + urbanRoutePlans
                 + " encounterRecords=" + urbanEncounterRecords
+                + " ecologyPlans=" + urbanEcologyPlans + " creatures={aliens=" + activeAliens
+                + ",wildlife=" + activeWildlife + "}"
                 + " fixtures={states=" + fixtureStates + ",residentDoors=" + residentDoors + "}";
     }
 
@@ -194,6 +202,9 @@ public record RuntimeBudgetSnapshot(
         return "npc=" + SettlementManager.MAX_ACTIVE_NPCS
                 + " infected=" + com.veylon.entity.UrbanEncounterDirector.MAX_ACTIVE
                 + " encounterRecords=" + com.veylon.entity.UrbanEncounterDirector.MAX_RECORDS
+                + " aliens=" + com.veylon.entity.UrbanEncounterDirector.MAX_ACTIVE_ALIENS
+                + " wildlife=" + com.veylon.entity.UrbanEncounterDirector.MAX_ACTIVE_WILDLIFE
+                + " ecologyPlans=" + UrbanWorldState.MAX_REGION_PLANS
                 + " resident=" + SettlementManager.MAX_ACTIVE_RESIDENTS
                 + " party=" + SettlementManager.MAX_ACTIVE_WAR_PARTY_NPCS
                 + " projectile=" + ProjectileSystem.MAX_LIVE

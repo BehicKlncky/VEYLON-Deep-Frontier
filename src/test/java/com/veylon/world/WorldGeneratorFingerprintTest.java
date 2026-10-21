@@ -286,6 +286,53 @@ class WorldGeneratorFingerprintTest {
         return hash;
     }
 
+    /**
+     * Encounter catalogue five on generator 14, recorded 2026-10-21 at introduction: every
+     * ecology anchor within three regions of the spawn with the roof flocks, and the species at
+     * every building and station anchor of those regions.
+     */
+    private static final long[] URBAN_ECOLOGY_ANCHOR_FINGERPRINTS = {
+            0x83ce9d04ac7463f3L, 0xd28f84c72a211349L, 0xb33fde24198e00a8L};
+
+    @Test
+    void encounterCatalogueFiveKeepsItsRecordedAnchors() {
+        List<String> moved = new ArrayList<>();
+        for (int i = 0; i < SEEDS.length; i++) {
+            long anchors = ecologyAnchorFingerprint(SEEDS[i]);
+            if (anchors != URBAN_ECOLOGY_ANCHOR_FINGERPRINTS[i]) {
+                moved.add(String.format("seed %d: anchors 0x%016xL", SEEDS[i], anchors));
+            }
+        }
+        assertTrue(moved.isEmpty(), () -> "encounter catalogue 5 changed; add a generator version instead of "
+                + "re-recording:\n  " + String.join("\n  ", moved));
+    }
+
+    /** Ecology anchors with roof flocks, and the species of every building and station anchor, near the spawn. */
+    private static long ecologyAnchorFingerprint(long seed) {
+        World world = new World(seed, World.GEN_URBAN_ECOLOGY);
+        long hash = 0xcbf29ce484222325L;
+        for (int rz = -3; rz <= 3; rz++) {
+            for (int rx = -3; rx <= 3; rx++) {
+                for (int sb = 0; sb < 16; sb++) {
+                    for (var a : com.veylon.world.urban.EncounterAnchors.forEcology(world, rx, rz, sb)) {
+                        hash = mix(hash, a.toString().hashCode());
+                    }
+                }
+                for (ParcelPlan parcel : world.urban.regionPlan(rx, rz).parcels()) {
+                    for (var a : com.veylon.world.urban.EncounterAnchors.forParcel(world, parcel)) {
+                        hash = mix(hash, a.id());
+                        hash = mix(hash, a.species().id.hashCode());
+                    }
+                }
+                for (var a : com.veylon.world.urban.EncounterAnchors.forStation(world, rx, rz)) {
+                    hash = mix(hash, a.id());
+                    hash = mix(hash, a.species().id.hashCode());
+                }
+            }
+        }
+        return hash;
+    }
+
     /** Transit segments around the spawn, three route catalogues and the spawn station's chunks. */
     private static long routeFingerprint(long seed) {
         World world = new World(seed, World.GEN_URBAN_UNDERGROUND);

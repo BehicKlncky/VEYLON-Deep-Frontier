@@ -110,6 +110,11 @@ public class Creature extends Entity {
     /** Flight from the fire on this body; written only by the AI. Transient. */
     public final PanicIntent panic = new PanicIntent();
 
+    /**
+     * Stable generated encounter slot of a city creature (milestone 15); zero for wildlife of the
+     * legacy spawner and staged bodies. Its durable record lives in the encounter ledger.
+     */
+    public long encounterId;
     /** Where a city creature lives; null until its AI or the encounter director assigns one. Transient. */
     public com.veylon.world.urban.Habitat home;
     /**

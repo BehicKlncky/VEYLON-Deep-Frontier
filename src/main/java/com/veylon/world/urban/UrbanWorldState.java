@@ -250,7 +250,7 @@ public final class UrbanWorldState {
         return ecologySites.get(UrbanIds.district(rx, rz), ignored -> EcologySites.of(seed, regionPlan(rx, rz)));
     }
 
-    /** Ecology plans currently cached; never above {@value #MAX_REGION_PLANS}. */
+    /** Ecology plans currently cached, for the runtime bounds snapshot; never above {@value #MAX_REGION_PLANS}. */
     public int cachedEcologyPlans() {
         return ecologySites == null ? 0 : ecologySites.size();
     }

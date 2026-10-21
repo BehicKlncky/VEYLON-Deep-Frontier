@@ -46,6 +46,11 @@ public class EntityManager {
         g.noise.beginTick();
         for (Iterator<Creature> it = creatures.iterator(); it.hasNext(); ) {
             Creature c = it.next();
+            if (c.encounterId != 0 && !c.dead
+                    && !UrbanEncounterDirector.bodyLoaded(g.world, c.pos.x, c.pos.z, c.width * 0.5f)) {
+                // As for the infected below: frozen until the slow director makes it dormant.
+                c.vel.zero(); continue;
+            }
             CreatureAI.update(g, c, dt);
             c.applyPhysics(dt, !c.type.flying);
             updateTrail(c, dt);
@@ -129,12 +134,23 @@ public class EntityManager {
         } else { g.ragdolls.spawn(g, n); }
     }
 
-    /** A save between projectile impact and the next fast tick must commit that death once. */
+    /**
+     * A save between projectile impact and the next fast tick must commit that death once: an
+     * infected body's, and (milestone 15) a managed creature's, with its tombstone and remains.
+     */
     public void flushInfectedDeaths(Game g) {
         for (int i = npcs.size() - 1; i >= 0; i--) {
             Npc n = npcs.get(i);
             if (n.infected() && n.dead) {
                 finishInfectedDeath(g, n); npcs.remove(i); forgetTarget(n);
+            }
+        }
+        for (int i = creatures.size() - 1; i >= 0; i--) {
+            Creature c = creatures.get(i);
+            if (c.encounterId != 0 && c.dead) {
+                onCreatureDied(g, c);
+                creatures.remove(i);
+                if (reallyDied(c)) { forgetTarget(c); } else { depart(g, c); }
             }
         }
     }
@@ -170,6 +186,10 @@ public class EntityManager {
 
     /** An animal leaving the world without dying, as {@link #depart(Game, Npc)} does for a person. */
     public void depart(Game g, Creature c) {
+        if (c.encounterId != 0) {
+            var resident = encounters.resident(c.encounterId);
+            if (resident != null && resident.creature == c && !resident.dead()) { resident.capture(c); resident.creature = null; }
+        }
         g.combustion.clear(c);
         FirePanic.forget(c);
         forgetTarget(c);
@@ -317,6 +337,9 @@ public class EntityManager {
         if (c.lastHitByPlayer) {
             g.onCreatureKilled(c);
         }
+        if (reallyDied(c) && c.encounterId != 0) {
+            encounters.onDeath(c);
+        }
         if (c.type.territorial()) {
             g.audio.playEcology(com.veylon.engine.EcologySounds.Cue.DEATH, c.pos.x, c.pos.y, c.pos.z);
             if (c.lastHitByPlayer) {
@@ -435,7 +458,8 @@ public class EntityManager {
 
         for (int i = creatures.size() - 1; i >= 0; i--) {
             Creature c = creatures.get(i);
-            if (c.distSqTo(px, c.pos.y, pz) > 170 * 170) {
+            // A city creature is the encounter director's, which made it dormant above already.
+            if (c.encounterId == 0 && c.distSqTo(px, c.pos.y, pz) > 170 * 170) {
                 creatures.remove(i);
                 depart(g, c);
             }

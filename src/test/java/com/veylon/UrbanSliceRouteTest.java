@@ -82,6 +82,21 @@ class UrbanSliceRouteTest {
         }
     }
 
+    /**
+     * Generator 14 (milestone 15) keeps generator 13's city and adds growth in the quarantine,
+     * wildlife outside it and Breachers at some street doors; the starter superblock holds none of
+     * them. The development selector now creates it; the loop must still hold.
+     */
+    @Test
+    void theSliceLoopStillCompletesOnTheEcologyGenerator() {
+        for (long seed : SLICE_SEEDS) {
+            UrbanSliceRun run = new UrbanSliceRun(seed, GameMode.SURVIVAL, World.GEN_URBAN_ECOLOGY).play();
+            assertTrue(run.slice().passed(), "seed=" + seed);
+            assertEquals(World.GEN_URBAN_ECOLOGY, run.game.world.generatorVersion);
+            assertTrue(run.game.player.inventory.count(ItemType.IRON_SPEAR) >= 1, "the first upgrade seed=" + seed);
+        }
+    }
+
     @Test
     void frozenSeedsPlayTheScavengeRiskReturnLoopInSurvivalAndCreative() {
         for (GameMode mode : GameMode.values()) {
