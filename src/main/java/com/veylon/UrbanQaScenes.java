@@ -45,6 +45,8 @@ final class UrbanQaScenes {
     private final UrbanCatalogueQaScene catalogue;
     /** Package 13: a walked district transition and every district by day, night and fog ({@code urban_districts}). */
     private final UrbanDistrictQaScene districts;
+    /** Package 14: basements, a hidden cellar, roofs, a fire escape, a station and a flooded tunnel ({@code urban_underground}). */
+    private final UrbanUndergroundQaScene underground;
     private final PlayerMovementSystem.Command walk = new PlayerMovementSystem.Command();
     private boolean holding;
     private float holdX;
@@ -79,6 +81,7 @@ final class UrbanQaScenes {
         this.slice = new UrbanSliceQaScene(game);
         this.catalogue = new UrbanCatalogueQaScene(game);
         this.districts = new UrbanDistrictQaScene(game);
+        this.underground = new UrbanUndergroundQaScene(game);
     }
 
     /** Stages one of the urban scenes; inert, with a notice, outside a street-network world. */
@@ -103,6 +106,10 @@ final class UrbanQaScenes {
         }
         if (scene.equals("urban_districts")) {
             districts.stage(); // a normal session: only poses between stops, the clock, weather and spear are staged
+            return;
+        }
+        if (scene.equals("urban_underground")) {
+            underground.stage(); // a normal session: only poses between legs, the clock and the kit are staged
             return;
         }
         if (!world.isUrban() || !world.urban.hasCityPlan()) {
@@ -195,6 +202,7 @@ final class UrbanQaScenes {
     UrbanSliceQaScene slice() { return slice; }
     UrbanCatalogueQaScene catalogue() { return catalogue; }
     UrbanDistrictQaScene districts() { return districts; }
+    UrbanUndergroundQaScene underground() { return underground; }
 
     /** Per-frame hook, before streaming and rendering; inert unless a scene is staged. */
     void update(double elapsed) {
@@ -216,6 +224,7 @@ final class UrbanQaScenes {
         slice.update(elapsed);
         catalogue.update(elapsed);
         districts.update(elapsed);
+        underground.update(elapsed);
         if (holding) {
             apply();
         }
