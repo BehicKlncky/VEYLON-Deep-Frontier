@@ -170,6 +170,16 @@ District climate keeps the existing `Biome`, which has many runtime consumers (B
 | Civic and medical precinct | Courtyard and office rows around a fenced square; clinics, municipal offices, two schools and two security posts | A square fenced with sheet metal, entered through four painted checkpoints | Bathroom cabinets and shop shelves roll the clinic table (content-3 civic bias); secured armouries | Meadow; clear | Guarded lobbies, locked dispensaries and armouries | 4–10, clinics and posts first | Medicine, ammunition |
 | Quarantine | Cordoned courtyard housing, three clinic rows, usually a fenced square; field clinics and checkpoint posts, mostly damaged or stripped, never held | A sheet-metal cordon along shared avenues, open at a checkpoint wherever a local street crosses; contaminated lawns, plaza and roadway patches | Secured tables +10, others −10 (content-3 bias); many dispensaries and armouries | Rocky Highlands: cold; murk (0.6) | Contaminated ground (sickness), toxic fog that only harms here, the densest infected | 6–12 (Veilbound; alien organisms are 15) | Late rare medicine and ammunition; never needed for the first meal, water or treatment |
 
+**Implemented in 15 (D-130, D-134, D-135), generator 14.** The quarantine grows:
+up to two growth sites per region, each a node, a membrane carpet and a
+Veilmaw, in courtyards and fenced squares; its budget pays for them, one
+building's share for every two sites, rounded up, so its infected and Veilmaws
+together never exceed the district maximum of 12. Breachers
+take the street doors of one budgeted building in three in the industrial
+yards, the civic precinct and the quarantine. Outside the quarantine, parks,
+one residential courtyard in three, canal basins and walk-up roofs keep
+wildlife. No district's basics depend on any of it.
+
 ### 4.4 Bounded starter area (D-09)
 
 The spawn planning region `(0, 0)` is always reclaimed residential. Its eight neighbours are residential or commercial, never quarantine or flooded. The starter area is everything within **96 blocks of walking path** of the refuge door. Package 08 guarantees it through pure starter constraints with a finite fallback, never by repeated whole-world generation or debug gifts (*initial* values):
@@ -352,6 +362,25 @@ Package 12 (D-106) makes entrance choice lock-aware: a body uses the nearest
 entrance whose door is not locked or barred, so a clinic guard follows the player
 out of the street door rather than waiting at the locked staff door.
 
+**Implemented in 15 — alien ecology, a variant and city wildlife (D-129–D-140), generator 14.**
+The roster is small and complete: one alien organism, one infected variant and
+three adapted wildlife species.
+
+| Body | What it does | Tell | Counters | Rewards and risks | Where |
+| --- | --- | --- | --- | --- | --- |
+| **Veilmaw** (alien) | Lies folded beside its growth node and never pursues. Wakes to touch (1.8 blocks), a player in placed light in plain sight, a noise on its ground, or a placed light on its ground. Lunges once at the point it committed to, recoils exposed and walks home; creeps to a light and smothers a torch. Every move is clamped inside a nine-block territory. | 1.1 s: hood rising, veins brightening, a rising call, one warning line | Crouch (no footsteps), darkness, back off during the telegraph, a torch beside the node (it burns and the Veilmaw withers), a light set down as a lure, blows during the recoil | Remains: two membrane sacs, never meat; a node broken with an axe gives one. The strike is 7 physical damage and sometimes the existing sickness | Up to two growth sites per quarantine region, in courtyards and fenced squares |
+| **Breacher** (infected variant) | A blind Veilbound: touch and sound only, with longer hearing. Plans through closed wooden doors and hammers a locked or barred one down in four loud blows; metal doors hold | The hammering, heard by other infected too | Silence (it cannot see a crouched player in plain view), metal doors, distance | Slow, heavy blows (9 damage, 2.4 s apart) through the damage gates; a humanoid corpse | Street doors of one budgeted building in three in industrial, civic and quarantine regions |
+| **Skitterwing, Murkhare, Glowdeer** (wildlife) | The species' own behaviour inside a habitat that leashes every move: birds over parks, canals and walk-up roofs; hares on park lawns and one courtyard in three; a deer in a large park | Prey bolts from a perceivable player | — | Optional, finite hunting: hare and deer meat as before, birds leave nothing, and no animal respawns | Outside the quarantine |
+
+The Veilmaw keeps the guardrails above (no host fungus, no echolocation, no
+certain-death bite) and departs from the pathfinding rule above deliberately:
+it never leaves the open ground of its own courtyard, so it steers in straight
+lines under a hard leash, sees by an occluded voxel ray, hears through the
+shared occluded query, and stops a lunge at a wall. Its sickness and the
+Breacher's blows go through the existing damage and affliction gates, so
+Creative is immune and unseen. Bodies are planned encounter residents
+(catalogue 5) with separate caps: infected 12, alien organisms 4, wildlife 12.
+
 ## 8. Scavenging economy: scarcity and depletion (D-12, D-13)
 
 | Id | Rule |
@@ -427,7 +456,7 @@ These are bounded starting scope, not a wish list. Packages may change a number 
 | 12 | 6 archetypes: grocery or convenience store, clinic or pharmacy, school, office block, police or security site, warehouse or workshop. **Implemented** (D-98–D-101): 1–2, 1–3, 2–3, 3–5, 1–2 and 1–2 storeys; ≤ 4 containers per room and ≤ 12 per storey; one school and one security post per region |
 | 13 | All 6 districts. For design seeds, residential and commercial within 1 region of spawn and all six within 3 regions (Chebyshev) |
 | 14 | ≤ 1 transit station and ≤ 2 tunnel segments per region; basements in ≥ 50 % of residential buildings; ≥ 1 hidden-refuge reservation per 2 residential regions. **Implemented** (D-119–D-122): one owned segment per region, so ≤ 1 station and ≤ 2 segments by construction; every apartment outside the starter superblock has a basement; one hidden cellar in every tested residential region (D-122 records the limit of that evidence) |
-| 15 | 1 alien organism with growth nodes; ≤ 1 infected variant; ≤ 3 adapted wildlife species |
+| 15 | 1 alien organism with growth nodes; ≤ 1 infected variant; ≤ 3 adapted wildlife species. **Implemented** (D-130–D-135): the Veilmaw with ≤ 2 growth sites per quarantine region; the Breacher; Skitterwings, Murkhares and Glowdeer; ≤ 4 active alien organisms and ≤ 12 active wildlife beside the 12 infected |
 | 16 | Camps of 3–6 residents; hidden groups of 2–5; for design seeds, ≥ 1 of each within 2 regions of spawn |
 | 17 | 1 friendly stronghold (8–16 residents, ≥ 4 guards) and 1 hostile site (4–8), each within 3 regions of spawn on design seeds |
 | 18 | ≤ 3 claimed refuges; ≤ 3 barricade kinds; a salvage table for every urban furniture kind |
@@ -504,10 +533,10 @@ The table is in dependency order: an item may depend only on items above it. Sec
 | 7 | Container identity, state and owner; authoritative contents | Persistent, touched only | `UrbanContainers` metadata; `World.crateContents` inventory | 07–08 | 2, 4 | `urban.containers` v1; required for content ≥ 2; content-1 absence adopts core contents/empties and edited reservations | Load replaces; never re-rolled | ≤ 32,768 rows/core inventories; 12 slots; 20-byte header + 36 bytes/row metadata |
 | 8 | Search progress; open target and rummage timer | Progress persistent; target/timer transient | Ledger; `CrateTransactionSystem` | 07 | 7 | Progress in `urban.containers`; load closes UI but retains elapsed work (D-72 revises the initial transient proposal) | Load replaces progress; resets target/timer | One active search |
 | 9 | Starter refuge identity and ground-floor respawn anchor; claims later | Persistent | `UrbanWorldState` / `UrbanBootstrap`; `RefugeSystem` later | 08, 18 | 4 | `urban.refuges` v1, required for generators 9–10; absent on older worlds means no claim | New sets starter once; load replaces without replenishing | One starter anchor; ≤ 3 claims in 18 |
-| 10 | Encounter identities, durable injuries/positions and permanent deaths | Persistent | `EntityManager.encounters` / `UrbanEncounterDirector` | 09, 15 | 4 | `urban.population` v1 with catalogue 1 (generator 10) or 2 (generator 11, D-102); required for generators 10–11, absent on earlier worlds means no encounters | New clears; load replaces; dormancy pauses; no migration or replacement generation | 32,768 rows, 47 bytes/row + 12-byte header |
+| 10 | Encounter identities, durable injuries/positions and permanent deaths | Persistent | `EntityManager.encounters` / `UrbanEncounterDirector` | 09, 15 | 4 | `urban.population` v1 with catalogue 1 (generator 10) or 2 (generator 11, D-102); required for generators 10–11, absent on earlier worlds means no encounters. **15:** codec 2 under catalogue 5 (generator 14) keeps every species: a species id per row and a binding into the NPC or creature list (D-136) | New clears; load replaces; dormancy pauses; no migration or replacement generation | 32,768 rows, 47 bytes/row + 12-byte header |
 | 11 | Live hostile brain, pain, fire, panic and route intent | Transient | `Npc` / `InfectedAI` | 09 | 10 | Body health/position/yaw remain in frozen core when active, linked by population index; durable torso wounds in population | Re-derived on activation/load; pending strikes forgotten by Creative perception controls | 12 active, two per building; two spawns/slow tick |
 | 12 | Portals, route caches, path budget | Derived and transient | `PortalGraph`, `PathBudget` | 10 | 4, 6 | Not saved | Invalidated by edits and doors | ≤ 64 routes |
-| 13 | District overlays (flood, contamination, growth) | Derived; consequential changes persistent | `DistrictRules` | 13, 15 | 3 | Within `urban.population` or `urban.sites` as decided | — | Capped |
+| 13 | District overlays (flood, contamination, growth) | Derived; consequential changes persistent | `DistrictRules` | 13, 15 | 3 | Within `urban.population` or `urban.sites` as decided. **15:** growth is generated blocks plus recorded edits (a burnt node is an ash edit); a Veilmaw whose node is gone is a tombstone in `urban.population` (D-136) | — | Capped |
 | 14 | Discovery: buildings, secrets, rumours | Persistent | `UrbanDiscovery` | 14, 16, 21 | 4 | `urban.discovery`; absent means nothing discovered | Load replaces | Capped |
 | 15 | Sites: residents, health, deaths, trust, stocks, relocation | Persistent | Urban site registry | 16, 17 | 4 | `urban.sites` or settlement extension; absent means plan defaults | Dormant simulation; stable resident slots | NPC caps (B-37) |
 | 16 | Salvage depletion, barricades, upgrades | Persistent | `RefugeSystem`, `FixtureState` | 18 | 4, 6 | `world.fixtures`, `urban.refuges` | Load replaces | Capped |

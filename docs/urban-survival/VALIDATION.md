@@ -2227,3 +2227,171 @@ ignored artifacts under `build/`.
   the final build and the native tours.
 
 Next: package 15.
+
+## Milestone 15 — alien ecology and urban wildlife (2026-10-21 to 2026-10-22)
+
+### Scope and baseline
+
+- Branch `feature/urban-survival` at `9e2d3b0` (the 14 records), clean tree.
+  Read the revised base, the prompt, `AGENTS.md`, `docs/COMMIT_WORKFLOW.md` and
+  these records.
+- Generator 14 (layout 11, template 7, encounter catalogue 5) is new, with
+  `urban.population` codec 2 under catalogue 5. Content revision 3, every
+  section id and the default new world are unchanged. Two block ids (87–88),
+  one item, one creature type and body family, and one archetype were
+  appended.
+- Generators 1–13 keep their absolute pins. Generator 14 was pinned at
+  introduction for terrain, its ecology plans and catalogue 5's anchors
+  (D-129).
+
+### Behaviour, generation, population and save evidence
+
+Each code commit ran its checks against its exact tree in a detached
+worktree (`build/m14-check`) whose tree hash matched the index. Its message
+records the classes:
+
+| Commit | Checks on the exact tree | What they prove |
+| --- | --- | --- |
+| `2855198` | 62 tests in 11 classes, compile and Javadoc | The appended blocks and item hold their ordinals (`SerializedEnumOrderTest`); the materials fit (118 of 160 layers, `UrbanMaterialsTest`); visual ids, the Creative palette and catalogue (both blocks excluded with reasons), Creative building, mode routing and the fire and simulation contracts are unchanged |
+| `1f84c16` | Full portable build: 1,958 tests in 219 classes, one existing skip | `VeilmawBehaviorTest`: a crouched player in the dark crosses its ground unheard; footsteps wake it with a telegraph before the lunge; backing out of reach means no lunge; a lit player in sight wakes it but daylight does not; a torch on its ground lures it and is smothered; a flame beside the node burns it and the Veilmaw withers into harvestable remains; breaking the node gives a sac and withers it; it never leaves its territory; Creative silences its senses and cancels a telegraph aimed at the player; its strike goes through the damage and affliction gates; it heals at its node and goes home badly hurt. `EcologySoundsTest`; the all-living species matrix with the Veilmaw |
+| `2da5df8` | 246 tests in 36 classes, compile and Javadoc | `BreacherBehaviorTest`: blind to a silent player in plain sight but it hears footsteps; it hammers a locked wooden door down with blows the others hear while a Veilbound waits; a locked metal door holds; its blow goes through the damage gates and Creative forgets it at once. Every `ai` test, the infected, fixture, loose-panel, discovery and encounter-population tests, traversal and fixture-state saves, settlement activation, the all-living matrix, the cue banks, enum order and runtime bounds |
+| `83cd7d4` | Full portable build: 1,970 tests in 222 classes, one existing skip | `EcologySitesTest`: growth only in quarantine regions, on open lawn or square two cells clear of every parcel and off every walkway, path and tree bed, the node on its carpet with the fold cell beside it; plans identical in any query order and cache history, and catalogue 4 never resolving an ecology id. `UrbanEcologyGenerationTest`: the node and carpet stamped from the plan in four chunk orders, the courtyard still walked round the node, and generator 13 without growth. The generator-14 terrain and plan pins, dispatch, revision and selector naming generator 14, and every earlier pin |
+| `c8b65ec` | Full portable build: 1,986 tests in 224 classes, one existing skip | `UrbanEcologyPopulationTest`: a growth site admits its Veilmaw folded beside its node with its territory; every kind keeps its own cap and the scan stays bounded; dormancy keeps injuries, death is permanent and nothing replaces it; a Veilmaw whose node is gone withers and never returns, active or not; wildlife keeps to its habitat and hunting it is finite; the Breacher appears from its planned street slot and Creative pauses every kind. `UrbanEcologySaveTest`: every species keeps its injuries, bindings and tombstones across repeated loads; a burnt node keeps its Veilmaw dead whether it burnt while active or before it was seen; malformed version-two data fails the whole load and keeps the live world; earlier catalogues keep version one and reject version two; a version-one row never names a new species. `EcologySitesTest` (wildlife habitats and roof flocks outside the quarantine and starter; Breachers only at street doors; the quarantine budget counting its Veilmaws), `RuntimeBoundsTest` (the ecology plan cache and city creatures stop at their caps), the generator-14 anchor pin, and the slice loop on generator 14 for all six frozen seeds |
+| `76d601b` | 36 tests in 9 classes, compile and Javadoc | `MembraneSalveTest`: two poultices from a sac and a fibre by hand in generator 14, and earlier urban worlds keep their fifteen recipes without it. Every item test, the urban starter progression, treatment and crafting tests |
+| `d02462b` | Full portable build: 1,991 tests in 226 classes, one existing skip | `UrbanEcologyQaSceneTest` plays the tour headlessly in Survival and Creative and refuses an older generator. This tree is the final code; the final native runs below used it |
+
+### Native ecology tour, both modes
+
+Host: Windows 11 Pro 10.0.26200, AMD Ryzen 5 5600X, NVIDIA GeForce RTX 3060 Ti,
+driver 610.88, OpenGL 3.3.0 with KHR_debug; 1280 × 720.
+
+```powershell
+$env:VEYLON_GENERATOR='urban-dev'; $env:VEYLON_SEED='20260731'
+$env:VEYLON_GAME_MODE='survival'; $env:VEYLON_SCENE='urban_ecology'
+$env:VEYLON_RESOLUTION='1280x720'; $env:VEYLON_CAPTURE_TAG='m15-ecology-survival-3'
+.\gradlew.bat run -PveylonDataDir=build/qa/m15-ecology-survival-3 --console=plain
+```
+
+The runs used the same variables from Git Bash. The Creative twin used
+`creative` and the tag and directory `m15-ecology-creative-3`. Seed
+`20260731` gives these legs (from the `plan` line):
+
+| Leg | Cells | Played |
+| --- | --- | --- |
+| First growth site, 11:00 | node (−547, 41, −32), fold cell (−547, 41, −31), carpet of 29 cells; stand (−557, 41, −38); crouch cell (−550, 41, −31); torch floor (−548, 40, −32) | W crouched on a route kept 2.6 blocks from the fold cell; S uncrouched (Survival) or W beside the body (Creative); a right click; F; F5; F9 |
+| Second growth site, 23:00 | node (−673, 41, 220), carpet of 37 cells; lure stand (−663, 41, 217), just beyond the territory; lure floor (−667, 40, 218) | a right click |
+| Park, 10:00 | three Murkhares, a Glowdeer and two Skitterwings; a hare at (67, 41, −152), stand (67, 41, −161) on the park path | W crouched to 4.7 blocks of the hare, then standing (Survival); W to 3 blocks (Creative) |
+| Roof flock | two Skitterwings over a walk-up, (75, 65, 143); its roof (76, 61, 150) | staged pose on the roof |
+| Breacher | street slot (199, 41, −419) in the Industrial Yards; stand (199, 41, −424) | crouched and still |
+
+Both runs printed `[urban-ecology] pass=true` with 5 staged poses, 11 bodies
+admitted through the production gate, 16 captures, no infected engaged, full
+health at the end and two membrane sacs. Survival: `lunged=true struck=0.0`
+(the Veilmaw lunged at the heard step and missed the backing player) in 73
+route seconds; Creative: `lunged=false` in 58. Each log reports
+`glGetError=0`, 19 KHR messages with 0 errors (the usual MEDIUM
+pixel-transfer and shader-recompile notes) and `nativeErrors=0`; Gradle exited
+0 after 1 min 19 s (Survival) and 1 min 5 s (Creative). The `views` lines name
+"District / Quarantine Zone / Veil growth" inside each territory and the bare
+district outside it, "Reclaimed Residential" in the park, "Rooftop" on the
+roof and "Industrial Yards" at the Breacher.
+
+Inspected captures, from the final Survival run unless noted:
+
+- `01`: the node, a purple block veined in pale green, on its dark membrane
+  carpet in a quarantine courtyard, the folded Veilmaw a low shape beside it.
+- `02`: crouched on the membrane three blocks away, HUD "Veil growth", the
+  prompt "Veil membrane: it wakes to footsteps and light"; the body lies flat
+  beside the node, hood down. `03` (Creative): standing beside it; it stays
+  folded.
+- `03`: two thirds through the telegraph, the hood raised with its veins lit,
+  beside the node; the log reads "The membrane ripples: something on it is
+  waking." `04`: recoiling, exposed, 7.2 blocks from the player after its
+  lunge fell short.
+- `05`: the torch beside the node and the node smoking; the Veilmaw, hood up,
+  shying from the fire; the prompt names its fresh tracks.
+- `06`, `07`: the node burnt to ash, smoke over the carpet, and the withered
+  remains beside it ("The Veilmaw convulses and withers with its node").
+- `08`: the remains up close, "Veilmaw remains (nothing left to take)", two
+  membrane sacs in the hotbar and "You cut 2 membrane sacs from the Veilmaw
+  remains." `09`: after F5 and F9, the charred node cell and the torch, "Game
+  loaded." in the log.
+- `10`: the second site at 23:00, the node's veins glowing. `11`: the
+  Veilmaw creeping, hood raised, toward the torch set inside its ground.
+  `12`: the torch gone and the body recoiling, "The Veilmaw smothers the torch
+  under its hood."
+- `13`: the park, the Glowdeer under the trees. `14`: a Murkhare in the grass
+  as it bolts; Creative `14`: a hare grazing beside the unseen player.
+- `15`: a Skitterwing against the sky above the roof's guard rail, HUD
+  "Rooftop". `16`: the Breacher at its street door, face sealed, hump and ram
+  visible, five blocks from the crouched player.
+
+Earlier native runs (`m15-native-survival.log`, `m15-native-creative.log`,
+then `-2`) passed but showed framing faults, each fixed in the tour, not the
+game: the telegraph was captured as it began, before the hood rose, with the
+node partly in front of the body; the hares were lost in tall grass at
+eleven blocks; and the roof flock could not be seen from any street, since
+the walk-up hides its own roof. The tour now captures two thirds through the
+windup from a crouch cell beside the fold cell, creeps up on a hare to just
+outside a crouched player's spook distance before standing, and stands on
+the walk-up's roof.
+
+Observations, none a tour failure:
+
+- The quarantine's air read −2.5 °C at 11:13 (Rocky Highlands; P-15 still
+  inverts the day curve), and the player's breath shows as a white puff.
+- The membrane fire spread to 20–23 cells of carpet before burning out; the
+  harvest waited for the fire near the remains to go out.
+- The Veilmaw leaves the generic creature tracks on its membrane, which the
+  prompt names. Harmless, and left as it is.
+
+### Commands and portable builds
+
+All Gradle commands used the bundled Temurin 25.0.4.1+1
+(`build/tools/jdk25/jdk-25.0.4.1+1`) and the Windows wrapper. Logs are local
+ignored artifacts under `build/`.
+
+- `.\gradlew.bat build --console=plain` on the working tree on 2026-10-21,
+  before the tour's framing changes and the last tests were added: passed in
+  11 min 55 s, 1,986 tests in 224 classes, zero failures or errors and the
+  existing Windows symlink-privilege skip in `AppPathsTest` (`m15-build.log`).
+- `.\gradlew.bat test --tests "com.veylon.UrbanEcologyQaSceneTest"` after each
+  tour change: the first runs found an empty plan (stand sight aimed inside the
+  node block), a Creative route out of the Veilmaw's reach that could not start
+  beside it, a check that ran after the node had burnt out, a hare bolt read at
+  one instant, the smother line withheld from a Creative player (D-138), and
+  no street cell with a view of a roof flock over its walk-up; then 3 tests
+  passed in both modes (`m15-tour2.log` to `m15-tour5.log`).
+- `MembraneSalveTest` and the generator-14 slice loop: 3 tests passed
+  (`m15-focused-salve-slice.log`). `WorldGeneratorFingerprintTest` with the
+  split generator-14 pins: 17 tests passed (`m15-tour5.log`).
+- Each commit's exact-tree checks, in the worktree: `m15-c1-check.log`,
+  `m15-c2-build.log`, `m15-c3-check.log`, `m15-c4-build.log`,
+  `m15-c5-build.log`, `m15-c6-check.log` and `m15-c7-build.log` (the table
+  above).
+- The final code is `d02462b`'s tree. Its exact-tree build passed in 12 min
+  6 s: 1,991 tests in 226 classes, zero failures or errors and the same skip
+  (`m15-c7-build.log`).
+- Native runs: `m15-native-survival.log`, `m15-native-creative.log` and
+  `-2` (framing faults, see above), then `m15-native-survival-3.log` and
+  `m15-native-creative-3.log` (final).
+- `graphify update . --no-cluster` once on the final code: 9,123 nodes and
+  36,226 edges, with the existing `build.gradle` extractor warning
+  (`m15-graph-update.log`). No clustering or semantic extraction ran.
+
+### Limits and next gate
+
+- The tour stages admission through the production gate, poses between legs,
+  the clock, the weather, the fire stream's seed and a kit; it is scripted
+  evidence, not the human playtest deferred by D-80. Whether the telegraph
+  reads in time, the glow at night and the cues were checked by script and
+  captures, not judged by a person.
+- The Veilmaw never pathfinds (D-131). Balance values (strike, sickness roll,
+  windup, lure light, Breacher density, wildlife counts, the salve) are
+  initial values for 23.
+- Map presentation of growth and wildlife is package 21; an ambience bed for
+  growth is 22.
+- No reviewer subagents ran. The commits rest on their exact-tree checks, the
+  final build and the native tours.
+
+Next: package 16.

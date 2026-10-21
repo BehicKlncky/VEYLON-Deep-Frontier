@@ -267,13 +267,15 @@ same geometry (layout 7, template 4), and 11 adds the commercial and civic catal
 (layout 8, template 5) with encounter catalogue 2, and 12 plans the six districts with
 their overlays (layout 9, template 6) and encounter catalogue 3, and 13 adds basements,
 transit and rooftop routes to those districts (layout 10, template 7) with encounter
-catalogue 4. The development selector creates 13. New worlds use
+catalogue 4, and 14 adds the quarantine's growth sites and the city's wildlife
+habitats (layout 11, template 7) with encounter catalogue 5. The development
+selector creates 14. New worlds use
 `World.DEFAULT_NEW_WORLD_GENERATOR` (3, until the urban rollout); a load accepts any
 supported version and rejects the rest, including anything above
 `MAX_SUPPORTED_GENERATOR`, before it replaces the live world. Feature gates name
 their versions (`hasDeepFrontier`, `hasCaveIdentities`, `isUrbanGenerator`) instead
 of comparing with `>=`, so a new generator inherits nothing by accident, and
-`WorldGeneratorFingerprintTest` pins versions 1–13 absolutely. `ShapedStairGenerationTest`
+`WorldGeneratorFingerprintTest` pins versions 1–14 absolutely. `ShapedStairGenerationTest`
 checks version 8 against frozen version 7 outside stair cells and across chunk orders.
 
 An urban world's layout revision follows from its generator, so it is known
@@ -281,14 +283,15 @@ before bootstrap generates a chunk; a geometry change means a new generator
 version, never a change under an old one (`UrbanRevision`). Its content revision
 (the rolled loot, encounter and trade tables) is saved in `urban.meta`, which
 only urban worlds write. It is optional for older layouts and required for
-generators 9–13. Until that section, or its
+generators 9–14. Until that section, or its
 absent default, has been read, a loading world's content revision cannot be read
 at all. Fresh worlds use content revision 3; revisions 1 and 2 remain supported.
 Revision 1 is the absent-metadata default. The tables and their hash inputs are frozen
-under each revision. Generators 9–13 require content 3. Encounter catalogues are
+under each revision. Generators 9–14 require content 3. Encounter catalogues are
 additive and versioned separately in `urban.population` (1 for generator 10, 2 for
-11, 3 for 12, 4 for 13); they do not reroll content-3 loot or add encounters to older
-generators. Generator 13 also writes `urban.discovery` v1 (a count capped at 4,096,
+11, 3 for 12, 4 for 13, 5 for 14, which writes codec 2); they do not reroll content-3
+loot or add encounters to older generators. Generators 13 and 14 also write
+`urban.discovery` v1 (a count capped at 4,096,
 then ascending observed site ids, each checked against the plan); absence means
 nothing found. Compatibility directions:
 
@@ -522,10 +525,31 @@ and is saved as `urban.discovery`. The loose panel over a hidden cellar is a
 door kind (`Fixtures.Kind.HIDDEN_PANEL`) that AI never routes through.
 Encounter catalogue 4 adds station slots inside each district's budget.
 
+### Alien ecology and city wildlife
+
+Generator 14 plans layout 11: layout 10 plus `EcologySites`, a pure per-region
+plan of growth sites (quarantine courtyards and fenced squares only) and
+wildlife habitats (parks, residential courtyards, canal basins).
+`UrbanEcologyStamper` writes each site's `GROWTH_NODE` and `VEIL_MEMBRANE` carpet
+after the routes; wildlife stamps nothing. A `world.urban.Habitat` is where a
+city creature may go: a territory circle round a node, or a rectangle with a
+height band for birds. `CreatureAI` clamps every movement target of a homed
+creature into it. `VeilmawAI` is the alien's territorial brain (senses inside
+its territory, telegraph, one lunge, lure and smother, and withering when its
+node is gone); `BreacherAI` is the blind infected variant that hammers wooden
+doors, planning through them with `Pathfinder.findBreach` in a separate
+`NavigationCache` key space. Encounter catalogue 5 tags each anchor with an
+`UrbanSpecies` (stable string id) and its habitat: ecology slots borrow parcel
+slot 6 of their superblock, and `EncounterAnchors.forEcology` adds roof flocks
+over tall walk-ups. `UrbanEncounterDirector` admits creatures beside infected
+under separate caps (4 alien organisms, 12 wildlife) and tombstones a Veilmaw
+whose node is gone. `urban.population` codec 2 stores the species and binds a
+row to the NPC or creature list.
+
 Scripted urban QA routes extend `UrbanRouteScene`: a task queue played through the
 production input seam, mouse-look turns, bounded walking that opens doors with F,
 threat handling, forcing and captures. `urban_slice`, `urban_catalogue`,
-`urban_districts` and `urban_underground` use it.
+`urban_districts`, `urban_underground` and `urban_ecology` use it.
 
 ### Doors, windows and urban fixtures
 
@@ -724,6 +748,10 @@ pending infected deaths before settling remains. Read waits until `urban.meta`,
 validates planned anchors, duplicates, bounds and one-to-one core bindings, and
 rejects missing/unknown/corrupt required state before publishing. Earlier worlds
 remain encounter-free. Older builds reject generator 10 or the unknown body id.
+Generator 14 writes codec 2: each row names its species' stable id and binds to
+the core NPC list (humanoids) or the creature list (the Veilmaw and wildlife); a
+creature's yaw lives only in the ledger. Codec 1 is unchanged for generators
+10–13, and each generator rejects the other codec.
 
 Transient state is deliberately **not** serialized: an in-flight reload is
 cancelled on load, and bow draw resets. Combat and fire add more of it. An

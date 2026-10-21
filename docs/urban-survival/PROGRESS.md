@@ -6,10 +6,10 @@ This is the running record for the 26-package urban-survival roadmap. The pack i
 
 | Item | Value |
 | --- | --- |
-| Last completed package | **14 — Basements, transit and rooftop routes** (2026-10-19 to 2026-10-21). Generator 13 adds basements, service passages, a hidden cellar per residential region (package 16's empty refuge reservation), transit tunnels and stations under boundary avenues, and guarded roofs with fire escapes and connectors to generator 12's districts. Every route is walked with the existing controls and proven free of unguarded drops; fire escapes are climbed up only, as the controller allows. The HUD names the route underfoot, and stations and cellars are recorded only when found. Native route tours pass in both modes. Human-only checks are deferred by D-80. |
-| Source revision | 14: `9999bdc` rails and loose panel → `da30934` transit plans → `00ee530` route catalogue and template 7 → `04ceb6e` stair-well rail → `91d058e` generator 13 → `aef00bf` places and discovery → `d59dc02` station lockers → `1ddcd8d` encounter catalogue 4 → `bd8fd6a` ascent-only ladders → `38e1f84` route tour → `747932e` route caches in the runtime snapshot. Records follow separately. |
-| Default new world | Legacy (`World.DEFAULT_NEW_WORLD_GENERATOR = GEN_CAVE_IDENTITIES`), unchanged until 26 passes. Isolated `VEYLON_GENERATOR=urban-dev` creates generator 13 (`GEN_URBAN_UNDERGROUND`, layout 10 / template 7 / content 3, encounter catalogue 4). Generators 1–12 stay loadable with their original geometry and encounters. |
-| Next package | **15 — Alien ecology and urban wildlife, NOT STARTED.** Keep `UrbanSliceRouteTest` (generators 10–13), `UrbanCatalogueQaSceneTest`, `UrbanDistrictQaSceneTest` and `UrbanUndergroundQaSceneTest` as regression gates. Owner question P-15 (the inverted day/night temperature curve) is open. |
+| Last completed package | **15 — Alien ecology and urban wildlife** (2026-10-21 to 2026-10-22). Generator 14 grows the quarantine: growth nodes on membrane carpets, each guarded by a Veilmaw, an original territorial ambush organism with a clear telegraph and counters that need no rare gear. One infected variant, the blind door-breaking Breacher, holds some street doors, and three existing wildlife species live in leashed habitats in parks, courtyards, canals and on roofs. Deaths, burnt nodes and caps hold across dormancy, saves and revisits. Native ecology tours pass in both modes. Human-only checks are deferred by D-80. |
+| Source revision | 15: `2855198` growth blocks and sacs → `1f84c16` the Veilmaw → `2da5df8` the Breacher → `83cd7d4` generator 14 → `c8b65ec` encounter catalogue 5 → `76d601b` membrane salve → `d02462b` ecology tour. Records follow separately. |
+| Default new world | Legacy (`World.DEFAULT_NEW_WORLD_GENERATOR = GEN_CAVE_IDENTITIES`), unchanged until 26 passes. Isolated `VEYLON_GENERATOR=urban-dev` creates generator 14 (`GEN_URBAN_ECOLOGY`, layout 11 / template 7 / content 3, encounter catalogue 5). Generators 1–13 stay loadable with their original geometry and encounters. |
+| Next package | **16 — Survivor camps and hidden civilians, NOT STARTED.** Keep `UrbanSliceRouteTest` (generators 10–14), `UrbanCatalogueQaSceneTest`, `UrbanDistrictQaSceneTest`, `UrbanUndergroundQaSceneTest` and `UrbanEcologyQaSceneTest` as regression gates. Owner question P-15 (the inverted day/night temperature curve) is open. |
 | Human testing schedule | Owner instruction (2026-10-11, D-80): consolidated human playtesting/listening after milestone 22. Through 22, run automated and scripted native validation and record human-only checks as deferred; do not request interim human walks. |
 | Commits | Separate `feat`, `test`, `docs` and `chore` commits on `feature/urban-survival`; see the reconstruction ledger below. `main` stays at `923345f`. Original combined commit retained at `backup/urban-m01-m04-before-split`. No merge, push, tag or publication. |
 
@@ -33,7 +33,7 @@ The status vocabulary is NOT STARTED, IN PROGRESS, PARTIAL, BLOCKED or COMPLETE.
 | 12 | Commercial and civic buildings | 11 | `BuildingTemplates` catalog (6 archetypes), `LootTables` | Every family has connected interiors with reachable containers and exits across the family matrix. Earlier urban layouts and legacy fingerprints are unchanged. | **COMPLETE** (2026-10-16; human-only validation deferred by D-80) |
 | 13 | Urban biome differentiation | 12, 03 | New `DistrictRules`, overlays, district-to-climate mapping (D-08) | Six distinct districts change player choices. Seams connect. Basics never depend on rare districts. Overlays keep accessibility. Legacy biome consumers are unchanged. | **COMPLETE** (2026-10-19; human-only validation deferred by D-80) |
 | 14 | Basements, transit and rooftop routes | 13, 05–06, 10 | Basement, transit and roof planners; hidden entrances; portals; `urban.discovery` | Street → basement → service passage → street and street → fire escape → roof → exit work without clipping or traps. Underground joins agree across borders. Secrets are discoverable through real clues. | **COMPLETE** (2026-10-21; human-only validation deferred by D-80) |
-| 15 | Alien ecology and urban wildlife | 14, 09–10 | Alien kind (appended `BodyFamily`), growth-node state, wildlife anchors | Infected, alien and wildlife behaviour are distinct. The alien has a tell and a counter. Caps, deaths and revisits hold. No edible hostile meat. Creative gates. | NOT STARTED |
+| 15 | Alien ecology and urban wildlife | 14, 09–10 | Alien kind (appended `BodyFamily`), growth-node state, wildlife anchors | Infected, alien and wildlife behaviour are distinct. The alien has a tell and a counter. Caps, deaths and revisits hold. No edible hostile meat. Creative gates. | **COMPLETE** (2026-10-22; human-only validation deferred by D-80) |
 | 16 | Survivor camps and hidden civilians | 15, 06, 14, 10 | Urban site registry over `settlement/Settlement`, `SettlementManager`, `DormantSettlementSimulation` (D-21); `ai/SettledNpcAI`; aid interaction | A generated camp and a secret basement refuge are found through play. Helping or stealing has a consequence. The same people, needs and deaths remain after save and dormancy. | NOT STARTED |
 | 17 | Guarded strongholds and hostile factions | 16 | `SettlementManager` guards, reputation, theft and counterattacks; urban faction ids | Approach, access rules, entry, trade and exploration. Guards react fairly. A hostile site with an alternative route. State persists without duplicate guards or infinite counterattacks. | NOT STARTED |
 | 18 | Safehouses, salvage and fortification | 17, 07, 04 | New `RefugeSystem`, `urban.refuges`; salvage in `PlayerBlockActions`; barricades; `SleepSystem` safety | Claim, store, dismantle, barricade from salvage and sleep. Threats attack or route around defences. Claims, salvage and defences persist. Survivor property has consequences. | NOT STARTED |
@@ -1718,6 +1718,182 @@ was performed.
 
 **Next:** package 15, alien ecology and urban wildlife, on generator 13's
 city under a new generator.
+
+## Milestone 15 — alien ecology and urban wildlife (2026-10-21 to 2026-10-22)
+
+**Status: COMPLETE.** Generator 14 grows the quarantine: growth nodes on
+membrane carpets in its courtyards and squares, each guarded by a Veilmaw, an
+original territorial ambush organism with a clear telegraph and counters that
+need no rare gear. One infected variant, the blind door-breaking Breacher,
+holds some street doors, and three existing wildlife species live in parks,
+courtyards, canals and on roofs inside leashed habitats. Deaths, burnt nodes
+and caps hold across dormancy, saves and revisits. Human-only validation
+remains deferred by D-80. Decisions D-129–D-140; owner questions P-01 and P-09
+carry notes; P-15 is still open.
+
+### Start state
+
+- Branch `feature/urban-survival` at `9e2d3b0` (the 14 records), clean tree;
+  the 14 gate met.
+- Read the revised base, the prompt, `AGENTS.md`, `docs/COMMIT_WORKFLOW.md` and
+  these records. The work spanned sessions on 2026-10-21; the commits and
+  these records followed on 2026-10-21 and 2026-10-22.
+
+### Ecology and behaviour
+
+- **Generator 14 (D-129).** Layout 11 is layout 10 plus each region's pure
+  ecology plan; template 7 and content 3 are unchanged; encounter catalogue 5.
+  `urban-dev` now creates it.
+- **Growth sites (D-130).** Up to two per quarantine region, in courtyards and
+  fenced squares: a `GROWTH_NODE` on a `VEIL_MEMBRANE` carpet and the cell where
+  its Veilmaw folds; a nine-block territory. Nodes break with an axe for a
+  membrane sac; node and membrane burn to ash.
+- **The Veilmaw (D-131, D-132).** Folded beside its node, it wakes to touch,
+  placed light on a player in its sight, noise and lights on its ground;
+  telegraphs for 1.1 s; lunges once at a committed point; recoils exposed;
+  walks home. It creeps to a light and smothers a torch, withers when its node
+  burns or breaks, heals at its node and never leaves its territory. Its
+  strike goes through the damage gates and may bring the existing sickness.
+  Counters: crouching, darkness, backing off during the telegraph, a torch
+  beside the node, a light as a lure, and blows during the recoil. Its remains
+  give two membrane sacs and never meat. It joins the all-living matrix
+  (skeleton, twelve fragment pieces, ragdoll, fire, remains), with a hood-fan
+  model whose veins glow by pose and its own procedural cues.
+- **The Breacher (D-133).** A blind Veilbound variant: touch and sound only,
+  longer hearing, slow heavy blows. It plans through closed wooden doors and
+  hammers a locked or barred one down in four loud blows, through the
+  player's forced-entry edits; metal doors hold.
+- **City wildlife (D-134).** Skitterwings, Murkhares and Glowdeer in parks, one
+  residential courtyard in three, canal basins and over tall walk-ups, each
+  leashed to its habitat. Hunting is optional and finite; nothing respawns.
+- **Encounters (D-135).** Catalogue 5 tags anchors with a species and habitat,
+  puts Breachers at street doors in three districts, pays for the quarantine's
+  Veilmaws from its budget and caps infected, alien organisms and wildlife
+  separately (12, 4, 12). A Veilmaw whose node is gone is a tombstone and never
+  appears.
+- **Persistence (D-136).** `urban.population` codec 2 under catalogue 5 stores
+  the species and binds rows to the NPC or creature list; growth state is
+  generated blocks plus recorded edits. No new section.
+- **Treatment and words (D-137, D-138).** A membrane salve (two poultices from
+  a sac and a fibre) in generator 14's recipes; the HUD's "Veil growth" place,
+  prompts that teach the counters, and log lines for the warning, strike,
+  sting, smother, withering and death.
+- **Runtime caps (D-139).** The ecology plan cache (≤ 16) and the active alien
+  and wildlife counts are in the runtime snapshot.
+- **QA (D-140).** `VEYLON_SCENE=urban_ecology` tours both growth sites, a park,
+  a roof flock and a Breacher.
+
+### Changed paths
+
+**Production** (`src/main/java/com/veylon/`):
+
+- New: `ai/{VeilmawAI,BreacherAI}.java`, `engine/EcologySounds.java`,
+  `world/urban/{EcologySites,UrbanEcologyStamper,UrbanSpecies,Habitat}.java`,
+  `UrbanEcologyQaScene.java`, `UrbanEcologyTourPlan.java`.
+- Edited: `world/{BlockType,World}.java`,
+  `world/urban/{EncounterAnchors,UrbanPlaces,UrbanRevision,UrbanSalts,
+  UrbanWorldState}.java`, `entity/{BodyFamily,BodySkeleton,Creature,
+  EntityManager,FragmentAnatomy,Npc,UrbanEncounterDirector}.java`,
+  `ai/{CreatureAI,IndoorNavigation,InfectedAI,NavigationCache,Pathfinder}.java`,
+  `combat/WorldNoise.java`, `engine/{AudioManager,ProceduralAudio}.java`,
+  `gfx/{IconAtlas,MaterialRegistry,UrbanTextures}.java`,
+  `gfx/model/{Animator,CreatureModels,ModelPart,NpcModels}.java`,
+  `item/{CraftingSystem,CreativePalette,ItemType,UrbanCrafting}.java`,
+  `settlement/NpcArchetype.java`, `simulation/FireSystem.java`,
+  `save/UrbanPopulationSection.java`, `qa/RuntimeBudgetSnapshot.java`,
+  `FixtureActions.java`, `InteractPromptBuilder.java`, `WorldInteractions.java`,
+  `SpeciesDismemberQaScene.java`, `UrbanRouteScene.java` (a walk may be kept
+  to allowed cells), `UrbanQaScenes.java`, `QaHarness.java` (one label on an
+  existing line).
+
+**Tests** (`src/test/java/com/veylon/`):
+
+- New: `VeilmawBehaviorTest`, `ai/BreacherBehaviorTest`,
+  `world/urban/EcologySitesTest`, `world/UrbanEcologyGenerationTest`,
+  `UrbanEcologyPopulationTest`, `save/UrbanEcologySaveTest`,
+  `engine/EcologySoundsTest`, `item/MembraneSalveTest`,
+  `UrbanEcologyQaSceneTest`, and the fixtures `EcologyArena` and
+  `EcologyWorldArena`.
+- Extended: `world/WorldGeneratorFingerprintTest` (generator 14),
+  `UrbanSliceRouteTest` (generator 14), `qa/{SerializedEnumOrderTest,
+  RuntimeBoundsTest}`, `AllLivingBlastDeathTest`, `AllLivingEndToEndTest`,
+  `SpeciesDismemberQaSceneTest`, `save/RemainsSectionTest`,
+  `entity/FragmentAnatomyTest`.
+- Expectations: `world/urban/UrbanRevisionTest`,
+  `world/UrbanGeneratorDispatchTest` and `UrbanDevelopmentSelectorTest` name
+  generator 14.
+
+**Documents:** `docs/ARCHITECTURE.md`, `docs/DEVELOPING.md` and the urban
+DESIGN, DECISIONS, PROGRESS and VALIDATION records.
+
+### Compatibility
+
+- Generators 1–13 are unchanged: their absolute pins pass, catalogues 1–4 keep
+  their scan schedule, cap and codec 1, and none of them knows an ecology id,
+  a species other than the Veilbound or the salve.
+- New: generator 14, layout 11, encounter catalogue 5, `urban.population`
+  codec 2, block ids 87–88 (89 of 128 used; 118 of 160 texture layers), item
+  `MEMBRANE_SAC`, `CreatureType`/`BodyFamily` `VEILMAW`, `NpcArchetype.BREACHER`
+  and the Veilmaw's fragment-piece order, all appended and pinned by
+  `SerializedEnumOrderTest`. `CreatureState` values are appended but never saved.
+- Unchanged: the v3 base, every section id, content revision 3 and its tables,
+  template 7, and the default new world (generator 3).
+- An older build rejects a generator-14 save before replacing its live world;
+  no older binary was run, and there is no downgrade promise.
+
+### Commands and results
+
+Exact commands and outputs are in
+[VALIDATION.md](VALIDATION.md#milestone-15--alien-ecology-and-urban-wildlife-2026-10-21-to-2026-10-22).
+In short:
+
+- Each code commit was validated against its exact tree in an isolated
+  worktree.
+- The final portable build passed on `d02462b`'s exact tree on 2026-10-22:
+  1,991 tests in 226 classes, zero failures or errors, and the existing
+  Windows skip.
+- Native `urban_ecology` passed in Survival and Creative on seed `20260731`,
+  16 captures each, with zero GL, KHR and native-audio errors. In Survival the
+  Veilmaw lunged at the heard step and missed the backing player (no damage).
+- No reviewer subagents ran.
+- `graphify update . --no-cluster` on the final code: 9,123 nodes and 36,226
+  edges, with the existing `build.gradle` extractor warning.
+
+The commits:
+
+| Commit | Subject |
+| --- | --- |
+| `2855198` | `feat(world): add growth nodes, veil membrane and membrane sacs` |
+| `1f84c16` | `feat(alien): add the Veilmaw, a territorial ambush organism` |
+| `2da5df8` | `feat(infected): add the Breacher, a blind door-breaking variant` |
+| `83cd7d4` | `feat(urban): grow the quarantine and plan city wildlife under generator 14` |
+| `c8b65ec` | `feat(encounters): admit Veilmaws, Breachers and city wildlife under catalogue 5` |
+| `76d601b` | `feat(crafting): work a membrane salve from Veilmaw sacs in generator 14` |
+| `d02462b` | `feat(qa): tour growth sites, city wildlife and a Breacher` |
+
+These records follow in their own commit. No push, merge, tag or publication
+was performed.
+
+### Limitations and next concrete step
+
+- **Evidence types.** The tour stages admission through the production gate,
+  poses between legs, the clock, the weather, the fire stream's seed and a kit;
+  it is not the human playtest D-80 defers until after 22. The telegraph's
+  readability, the glow at night and the cues were checked by script and
+  captures, not judged by a person.
+- **Veilmaw movement.** It steers in straight lines inside its open territory
+  and never pathfinds (D-131); a territory is open ground by construction.
+- **Balance for 23.** Strike, sickness roll, telegraph and lure values,
+  Breacher density, park and courtyard wildlife counts (a residential region
+  can plan about eleven Murkhares) and the salve are initial values.
+- **Presentation.** No map layer for growth or wildlife (21); no ambience bed
+  for growth (22). Names are provisional (P-01).
+- **Day/night temperature (P-15).** Still inverted in every world; unchanged.
+- **Default.** The ordinary new world stays generator 3 until 26.
+
+**Next:** package 16, survivor camps and hidden civilians, starting from the
+hidden cellar reservation of package 14 on generator 14's city under a new
+generator.
 
 ## Resume rules
 
