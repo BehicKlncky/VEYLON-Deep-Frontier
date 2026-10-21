@@ -58,14 +58,14 @@ class AllLivingBlastDeathTest {
 
     /** Every kind of living body the lethal rule covers. */
     enum Target {
-        DEER, WOLF, BIRD, HARE, THORNHORN, STALKER,
+        DEER, WOLF, BIRD, HARE, THORNHORN, STALKER, VEILMAW,
         CAMP_MEMBER, WANDERING_TRADER, RAIDER,
         VILLAGER, SETTLEMENT_TRADER, CAPTIVE,
         PATROL, BOUNTY_HUNTER, COUNTERATTACKER,
         SURVIVAL_PLAYER;
 
         CreatureType species() {
-            return ordinal() <= STALKER.ordinal() ? CreatureType.values()[ordinal()] : null;
+            return ordinal() <= VEILMAW.ordinal() ? CreatureType.values()[ordinal()] : null;
         }
 
         boolean player() {

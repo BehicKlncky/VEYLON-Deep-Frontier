@@ -317,7 +317,12 @@ public class EntityManager {
         if (c.lastHitByPlayer) {
             g.onCreatureKilled(c);
         }
-        if (c.type == Creature.CreatureType.BIRD) {
+        if (c.type.territorial()) {
+            g.audio.playEcology(com.veylon.engine.EcologySounds.Cue.DEATH, c.pos.x, c.pos.y, c.pos.z);
+            if (c.lastHitByPlayer) {
+                g.log("The " + c.type.displayName + " is down. Cut the membrane sacs from its remains with [F].");
+            }
+        } else if (c.type == Creature.CreatureType.BIRD) {
             // Too small to leave a carcass; it still tumbles before it is gone.
             if (c.lastHitByPlayer) {
                 g.player.inventory.add(ItemType.RAW_MEAT, 1);
@@ -466,6 +471,7 @@ public class EntityManager {
                 case HARE -> hares++;
                 case THORNHORN -> thornhorns++;
                 case STALKER -> stalkers++;
+                case VEILMAW -> { } // only ever a planned urban encounter
             }
         }
         float seasonMul = g.seasons.spawnMul(g.time);

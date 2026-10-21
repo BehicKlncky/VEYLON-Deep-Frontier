@@ -53,7 +53,8 @@ class SpeciesDismemberQaSceneTest {
                     family + " comes apart into its own pieces, once");
         }
         assertTrue(game.entities.creatures.isEmpty() && game.entities.npcs.isEmpty(), "nobody is left standing");
-        assertEquals(5, game.entities.carcasses.size(), "one harvest record per animal that leaves a carcass");
+        assertEquals(java.util.Arrays.stream(CreatureType.values()).filter(CreatureType::leavesCarcass).count(),
+                game.entities.carcasses.size(), "one harvest record per animal that leaves a carcass");
         for (Carcass c : game.entities.carcasses) {
             assertTrue(c.fragmented(), c.type + "'s record is tied to its torso and never drawn as a whole body");
         }

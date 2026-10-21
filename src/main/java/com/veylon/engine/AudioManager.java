@@ -48,10 +48,17 @@ public class AudioManager {
     // Burning bodies (BodyFireSounds).
     private int bBodyCrackle, bBodyFlare, bBodySizzle;
     private final int[] infectedBuffers = new int[InfectedSounds.Cue.values().length];
+    // Milestone 15: the Veilmaw and the Breacher (EcologySounds).
+    private final int[] ecologyBuffers = new int[EcologySounds.Cue.values().length];
 
     /** Positioned gameplay cues; presentation never emits AI noise or changes simulation. */
     public void playInfected(InfectedSounds.Cue cue, float x, float y, float z) {
         if (enabled) { playAt(infectedBuffers[cue.ordinal()], x, y, z, 0.65f, pitchVar(0.08f)); }
+    }
+
+    /** Milestone 15 cues; presentation only, like every other one-shot. */
+    public void playEcology(EcologySounds.Cue cue, float x, float y, float z) {
+        if (enabled) { playAt(ecologyBuffers[cue.ordinal()], x, y, z, 0.7f, pitchVar(0.08f)); }
     }
 
     // Ambience loops.
@@ -659,7 +666,9 @@ public class AudioManager {
     private VoicePool.Priority priority(int buffer, boolean ambience) {
         if (buffer == bExplosion || buffer == bHurt || buffer == bAlarmBell) return VoicePool.Priority.CRITICAL;
         if (buffer == infectedBuffers[InfectedSounds.Cue.STRIKE.ordinal()]
-                || buffer == infectedBuffers[InfectedSounds.Cue.NOTICE.ordinal()]) {
+                || buffer == infectedBuffers[InfectedSounds.Cue.NOTICE.ordinal()]
+                || buffer == ecologyBuffers[EcologySounds.Cue.STIR.ordinal()]
+                || buffer == ecologyBuffers[EcologySounds.Cue.LUNGE.ordinal()]) {
             return VoicePool.Priority.IMPORTANT;
         }
         if (buffer == bMusket || buffer == bPistol || buffer == bHowl || buffer == bGrowl
@@ -748,6 +757,9 @@ public class AudioManager {
         bWindowSlide = bank.get(UrbanFixtureSounds.WINDOW_SLIDE);
         for (InfectedSounds.Cue cue : InfectedSounds.Cue.values()) {
             infectedBuffers[cue.ordinal()] = bank.get(InfectedSounds.key(cue));
+        }
+        for (EcologySounds.Cue cue : EcologySounds.Cue.values()) {
+            ecologyBuffers[cue.ordinal()] = bank.get(EcologySounds.key(cue));
         }
         bBodyCrackle = bank.get(BodyFireSounds.CRACKLE);
         bBodyFlare = bank.get(BodyFireSounds.FLARE);

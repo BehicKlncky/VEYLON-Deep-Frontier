@@ -641,6 +641,7 @@ public final class FragmentAnatomy {
             case HARE -> hare();
             case THORNHORN -> thornhorn();
             case STALKER -> stalker();
+            case VEILMAW -> veilmaw();
         };
     }
 
@@ -747,6 +748,19 @@ public final class FragmentAnatomy {
         Builder b = quadruped(BodyFamily.STALKER, 0.70f, 0.26f, 0.26f, 0.72f, 0.06f)
                 .part("head", "neck", 0, 0.10f, -0.06f, 0, 0, -0.10f, 0.18f, 0.16f, 0.30f)
                 .part("tail", "body", 0, 0.02f, 0.36f, 0, 0, 0.18f, 0.05f, 0.05f, 0.40f)
+                .split("tail", "tail_tip", false);
+        return quadrupedPieces(b).piece("tail", "tail", "tail").piece("tail_tip", "tail_tip", "tail_tip").build();
+    }
+
+    /**
+     * {@code CreatureModels.veilmaw} (urban milestone 15): the quadruped chassis with a hood fan
+     * standing on the neck in place of a skull, and a glow sac behind whose halves fly apart.
+     * The fan's veins and the maw slit ride along with their parts.
+     */
+    private static FragmentAnatomy veilmaw() {
+        Builder b = quadruped(BodyFamily.VEILMAW, 0.95f, 0.70f, 0.20f, 0.30f, 0.07f)
+                .part("head", "neck", 0, 0.08f, -0.06f, 0, 0.20f, -0.03f, 0.78f, 0.42f, 0.05f)
+                .part("tail", "body", 0, 0.06f, 0.46f, 0, 0, 0.14f, 0.28f, 0.16f, 0.28f)
                 .split("tail", "tail_tip", false);
         return quadrupedPieces(b).piece("tail", "tail", "tail").piece("tail_tip", "tail_tip", "tail_tip").build();
     }

@@ -63,6 +63,7 @@ public final class CreatureAI {
             case STALKER -> updateStalker(g, c, dt);
             case WOLF -> updatePredatorCommon(g, c, dt);
             case DEER -> updateDeer(g, c, dt);
+            case VEILMAW -> VeilmawAI.update(g, c, dt);
         }
     }
 

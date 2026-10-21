@@ -455,6 +455,10 @@ final class WorldInteractions {
     }
 
     private void harvestCarcass(Carcass carcass) {
+        if (carcass.type.territorial()) {
+            harvestMembrane(carcass);
+            return;
+        }
         ItemType meatType = carcass.rotten() ? ItemType.SPOILED_MEAT : ItemType.RAW_MEAT;
         if (game.playerHasKnife()) {
             skinCarcass(carcass, meatType);
@@ -468,6 +472,35 @@ final class WorldInteractions {
             game.log("Nothing left worth taking.");
         }
         game.player.scent = Math.min(1f, game.player.scent + HARVEST_SCENT);
+    }
+
+    /**
+     * An alien's remains (urban milestone 15) give their membrane sacs by hand or knife, and
+     * never meat: a hostile body reusing the creature infrastructure is not food. Only what fits
+     * leaves the remains, so a full inventory loses nothing.
+     */
+    private void harvestMembrane(Carcass carcass) {
+        if (carcass.hideLeft <= 0) {
+            game.log("Nothing left worth taking.");
+            return;
+        }
+        int taken = carcass.hideLeft - game.player.inventory.add(carcass.type.hideProduct(), carcass.hideLeft);
+        if (taken <= 0) {
+            game.log("No room for the membrane sacs.");
+            return;
+        }
+        carcass.hideLeft -= taken;
+        game.particles.blood(carcass.pos.x, carcass.pos.y + 0.3f, carcass.pos.z);
+        game.log("You cut " + taken + " membrane sac" + (taken == 1 ? "" : "s") + " from the "
+                + carcass.type.displayName + " remains.");
+        if (carcass.stuckArrows > 0) {
+            ItemType arrowType = carcass.stuckArrowType != null ? carcass.stuckArrowType : ItemType.ARROW;
+            int left = game.player.inventory.add(arrowType, carcass.stuckArrows);
+            if (left < carcass.stuckArrows) {
+                game.log("Recovered " + (carcass.stuckArrows - left) + "x " + arrowType.displayName + ".");
+            }
+            carcass.stuckArrows = left;
+        }
     }
 
     private void skinCarcass(Carcass carcass, ItemType meatType) {

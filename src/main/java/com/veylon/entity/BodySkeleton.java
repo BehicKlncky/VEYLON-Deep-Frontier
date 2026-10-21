@@ -110,6 +110,7 @@ public final class BodySkeleton {
                     0.10f, -0.06f, 0.30f, 0.02f, 0.36f, 0.18f, 0.20f, 0.025f);
             case HARE -> hare();
             case BIRD -> bird();
+            case VEILMAW -> veilmaw();
             default -> rigid(type.width, type.height);
         };
     }
@@ -130,6 +131,28 @@ public final class BodySkeleton {
         s.cone("head", neck, 0, headY, headZ, 0, 0, -headLen,
                 height * 0.26f, RagdollConstants.HEAD_CONE);
         s.tail(y + tailY, tailZ, tailSplit, tailTip, tailRadius);
+        return s;
+    }
+    /**
+     * {@code CreatureModels.veilmaw}: the quadruped chassis, low and broad, whose "head" is a hood
+     * fan standing up from a short neck rather than a skull pointing forward, and a glow sac
+     * behind.
+     */
+    private static BodySkeleton veilmaw() {
+        float len = 0.95f, width = 0.70f, height = 0.20f, leg = 0.30f, legWidth = 0.07f;
+        BodySkeleton s = new BodySkeleton();
+        float y = leg + height * 0.5f;
+        s.body(y, width * 0.5f, height * 0.5f, len * 0.5f);
+        String[] names = {"leg_fl", "leg_fr", "leg_bl", "leg_br"};
+        for (int i = 0; i < 4; i++) {
+            s.limb(names[i], names[i] + "_lower", (i % 2 == 0 ? -1 : 1) * width * 0.32f,
+                    leg, (i < 2 ? -1 : 1) * len * 0.38f, leg * 0.5f, leg * 0.5f,
+                    legWidth * 0.5f, i < 2);
+        }
+        int neck = s.cone("neck", TORSO, 0, y + height * 0.30f, -len * 0.48f,
+                0, 0.08f, -0.06f, height * 0.22f, RagdollConstants.NECK_CONE);
+        s.cone("head", neck, 0, 0.08f, -0.06f, 0, 0.42f, 0, 0.05f, RagdollConstants.HEAD_CONE);
+        s.tail(y + 0.06f, 0.46f, 0.14f, 0.14f, 0.08f);
         return s;
     }
     private static BodySkeleton hare() {

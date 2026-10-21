@@ -78,6 +78,7 @@ final class ProceduralAudio {
         UrbanFixtureSounds.synthesize(new Random(UrbanFixtureSounds.SEED), sink);
         BodyFireSounds.synthesize(new Random(BodyFireSounds.SEED), sink);
         InfectedSounds.synthesize(sink);
+        EcologySounds.synthesize(sink);
     }
 
     // ---- 0.3.0 combat & settlement synthesis ----

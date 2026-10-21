@@ -106,6 +106,13 @@ final class InteractPromptBuilder {
         if (carcass == null) {
             return false;
         }
+        if (carcass.type.territorial()) {
+            // An alien's remains give membrane sacs, by hand or knife, and nothing to eat.
+            game.interactPrompt = carcass.hideLeft > 0
+                    ? "[F] Cut membrane sacs from the " + carcass.type.displayName + " remains"
+                    : carcass.type.displayName + " remains (nothing left to take)";
+            return true;
+        }
         game.interactPrompt = "[F] Harvest " + carcass.type.displayName + " carcass"
                 + (carcass.rotten() ? " (rotting!)" : "")
                 + (game.playerHasKnife() ? "" : " (no knife: scraps only)");
@@ -224,6 +231,9 @@ final class InteractPromptBuilder {
             case CAGE_BARS -> game.interactPrompt = world.isUrban() ? "Security bars over a window"
                     : "Cage bars (mine through to free captives)";
             case SIGN -> game.interactPrompt = signPrompt(targetX, targetZ);
+            // Milestone 15: the growth teaches its own counters.
+            case GROWTH_NODE -> game.interactPrompt = "Growth node: a torch set beside it burns it out";
+            case VEIL_MEMBRANE -> game.interactPrompt = "Veil membrane: it wakes to footsteps and light";
             default -> {
             }
         }

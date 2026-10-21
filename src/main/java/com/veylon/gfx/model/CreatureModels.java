@@ -29,7 +29,34 @@ public final class CreatureModels {
             case HARE -> murkhare();
             case THORNHORN -> thornhorn();
             case STALKER -> gloomstalker();
+            case VEILMAW -> veilmaw();
         };
+    }
+
+    /**
+     * The Veilmaw (urban milestone 15): a low, broad membrane body on four splayed legs, a hood
+     * fan over its maw that lies flat while it waits and stands up, veins lit, when it wakes, and
+     * a glow sac behind. Nothing about it is mammal-shaped: no skull, eyes, ears or fur. The
+     * Animator drives the vein and sac glow, so the telegraph reads as light, not only as pose.
+     */
+    private static EntityModel veilmaw() {
+        ModelPart root = quadruped("maw", 0.95f, 0.70f, 0.20f, 0.30f, 0.07f, 0x3a3244, 0x2a2531);
+        ModelPart neck = root.find("neck");
+        ModelPart head = new ModelPart("head").pivot(0, 0.08f, -0.06f)
+                .box(0, 0.20f, -0.03f, 0.78f, 0.42f, 0.05f).color(0x857a99);
+        for (int s = -1; s <= 1; s += 2) {
+            head.child(new ModelPart(s < 0 ? "vein_l" : "vein_r").pivot(s * 0.17f, 0.20f, -0.06f)
+                    .box(0, 0, 0, 0.04f, 0.34f, 0.012f).color(0xcfe88a).emissive(0.2f));
+        }
+        head.child(new ModelPart("vein_c").pivot(0, 0.12f, -0.06f)
+                .box(0, 0, 0, 0.50f, 0.03f, 0.012f).color(0xcfe88a).emissive(0.2f));
+        neck.child(head);
+        ModelPart body = root.find("body");
+        body.child(new ModelPart("maw").pivot(0, -0.03f, -0.48f)
+                .box(0, 0, 0, 0.42f, 0.06f, 0.04f).color(0x120e16));
+        body.child(new ModelPart("tail").pivot(0, 0.06f, 0.46f)
+                .box(0, 0, 0.14f, 0.28f, 0.16f, 0.28f).color(0x6e5a82).emissive(0.3f).split("tail_tip", false));
+        return new EntityModel(root);
     }
 
     /** Shared quadruped chassis; species then decorate. */

@@ -93,7 +93,8 @@ public class WorldNoise {
         // Loud noises push wildlife: prey bolts, predators investigate.
         if (radius >= 40 && g != null) {
             for (Creature c : g.entities.creatures) {
-                if (c.dead || c.distSqTo(x, y, z) > radius * radius) {
+                // A territorial organism answers only what reaches its own ground (VeilmawAI).
+                if (c.dead || c.type.territorial() || c.distSqTo(x, y, z) > radius * radius) {
                     continue;
                 }
                 if (c.type.predator) {

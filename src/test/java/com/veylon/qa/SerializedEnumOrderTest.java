@@ -102,11 +102,13 @@ class SerializedEnumOrderTest {
 
     /** The base v3 body stores creatures and carcasses by {@code CreatureType.ordinal()}. */
     private static final List<String> CREATURE_TYPE_ORDER = List.of(
-            "DEER", "WOLF", "BIRD", "HARE", "THORNHORN", "STALKER");
+            "DEER", "WOLF", "BIRD", "HARE", "THORNHORN", "STALKER",
+            // Urban milestone 15: the quarantine's alien organism.
+            "VEILMAW");
 
     /** {@code world.remains} stores a piece's body family by ordinal. */
     private static final List<String> BODY_FAMILY_ORDER = List.of(
-            "HUMANOID", "DEER", "WOLF", "BIRD", "HARE", "THORNHORN", "STALKER");
+            "HUMANOID", "DEER", "WOLF", "BIRD", "HARE", "THORNHORN", "STALKER", "VEILMAW");
 
     private static final List<String> QUADRUPED_PIECES = List.of(
             "torso", "head", "upper_leg_fl", "upper_leg_fr", "upper_leg_bl", "upper_leg_br",
@@ -121,7 +123,8 @@ class SerializedEnumOrderTest {
             BodyFamily.BIRD, List.of("torso", "head", "tail", "wing0_l", "wing0_r", "wing1_l", "wing1_r"),
             BodyFamily.HARE, List.of("torso", "head", "leg_fl", "leg_fr", "leg_bl", "leg_br", "tail"),
             BodyFamily.THORNHORN, withTailTip(QUADRUPED_PIECES),
-            BodyFamily.STALKER, withTailTip(QUADRUPED_PIECES)));
+            BodyFamily.STALKER, withTailTip(QUADRUPED_PIECES),
+            BodyFamily.VEILMAW, withTailTip(QUADRUPED_PIECES)));
 
     private static List<String> withTailTip(List<String> pieces) {
         List<String> all = new ArrayList<>(pieces);

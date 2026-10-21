@@ -32,6 +32,10 @@ public final class Animator {
         float phase = c.bobPhase * 3.2f;
         float swing = (float) Math.sin(phase) * run;
         float t = (float) time;
+        if (c.type == Creature.CreatureType.VEILMAW) {
+            poseVeilmaw(m, c, t, run, phase);
+            return;
+        }
 
         ModelPart body = m.part("body");
         ModelPart head = m.part("head");
@@ -117,6 +121,60 @@ public final class Animator {
         if (c.type == Creature.CreatureType.THORNHORN && c.state == Creature.CreatureState.ATTACK) {
             head.rotX = -0.5f + (float) Math.abs(Math.sin(t * 8)) * 0.7f; // horn toss
         }
+    }
+
+    private static final String[] VEILMAW_LEGS = {"leg_fl", "leg_fr", "leg_bl", "leg_br"};
+
+    /**
+     * The Veilmaw (urban milestone 15). Folded, it lies pressed to its membrane with legs splayed
+     * flat, hood laid forward over the maw and veins barely lit, so at a glance it is part of the
+     * growth. The telegraph raises the hood and brightens the veins over the windup, with a
+     * tremor; the lunge pitches it forward with the hood flared back; recoiling and walking home
+     * it stays half raised. The glow is set on every pose because the model is shared.
+     */
+    private static void poseVeilmaw(EntityModel m, Creature c, float t, float run, float phase) {
+        float wake = switch (c.state) {
+            case FOLDED -> 0f;
+            case STIRRING -> c.windup <= 0f ? 1f
+                    : 1f - Math.min(1f, c.windup / com.veylon.ai.VeilmawAI.WINDUP);
+            case RECOILING, RETURNING, CREEPING -> 0.55f;
+            default -> 1f;
+        };
+        float fold = 1f - wake;
+        float swing = (float) Math.sin(phase) * run;
+        float amp = 0.5f + 0.4f * run;
+        for (int i = 0; i < VEILMAW_LEGS.length; i++) {
+            ModelPart leg = m.part(VEILMAW_LEGS[i]);
+            float side = i % 2 == 0 ? -1f : 1f;
+            leg.rotZ = side * 1.25f * fold; // splayed outward, flat to the ground
+            leg.rotX = (i == 0 || i == 3 ? swing : -swing) * amp * Math.max(wake, 0.3f);
+        }
+        ModelPart body = m.part("body");
+        body.poseY = -0.22f * fold + (float) Math.sin(t * 1.6 + c.bobPhase) * 0.01f;
+        body.scale = 1f + (float) Math.sin(t * 1.3 + c.bobPhase) * 0.015f; // the membrane breathes
+        ModelPart neck = m.part("neck");
+        neck.poseY = -0.22f * fold;
+        neck.rotX = -1.40f * fold; // the hood laid flat forward
+        float glow;
+        switch (c.state) {
+            case FOLDED -> glow = 0.10f + 0.04f * (float) Math.sin(t * 1.2 + c.bobPhase);
+            case STIRRING -> {
+                neck.rotZ = (float) Math.sin(t * 22) * 0.04f * wake;
+                glow = 0.25f + 0.75f * wake * (0.75f + 0.25f * (float) Math.sin(t * 16));
+            }
+            case LUNGING -> {
+                body.rotX = -0.16f;
+                neck.rotX = 0.25f;
+                glow = 1f;
+            }
+            case RECOILING -> glow = 0.45f;
+            default -> glow = 0.3f;
+        }
+        m.part("vein_l").emissive = glow;
+        m.part("vein_r").emissive = glow;
+        m.part("vein_c").emissive = glow;
+        m.part("tail").emissive = 0.15f + 0.45f * glow;
+        m.part("tail_tip").emissive = 0.15f + 0.45f * glow;
     }
 
     /**
