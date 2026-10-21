@@ -23,4 +23,13 @@ public final class UrbanCrafting {
             new Recipe("Repair Pry Tool", ItemType.IRON_PICKAXE, 1, Station.WORKBENCH, ItemType.IRON_PICKAXE, 1, ItemType.SCRAP, 2),
             new Recipe("Repair Spear", ItemType.IRON_SPEAR, 1, Station.WORKBENCH, ItemType.IRON_SPEAR, 1, ItemType.SCRAP, 2)
     );
+
+    /**
+     * Generator 14 (urban milestone 15): the fifteen above and a salve worked by hand from a
+     * Veilmaw's membrane sac and fibre, the city's only source of the burn poultice. Earlier urban
+     * worlds keep their fifteen.
+     */
+    public static final List<Recipe> ECOLOGY_RECIPES = java.util.stream.Stream.concat(RECIPES.stream(),
+            java.util.stream.Stream.of(new Recipe("Membrane Salve x2", ItemType.HERBAL_POULTICE, 2, Station.HAND,
+                    ItemType.MEMBRANE_SAC, 1, ItemType.FIBER, 1))).toList();
 }
