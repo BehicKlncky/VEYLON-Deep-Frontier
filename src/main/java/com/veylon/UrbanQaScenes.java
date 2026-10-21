@@ -47,6 +47,8 @@ final class UrbanQaScenes {
     private final UrbanDistrictQaScene districts;
     /** Package 14: basements, a hidden cellar, roofs, a fire escape, a station and a flooded tunnel ({@code urban_underground}). */
     private final UrbanUndergroundQaScene underground;
+    /** Package 15: growth sites and their Veilmaws, park and roof wildlife and a Breacher ({@code urban_ecology}). */
+    private final UrbanEcologyQaScene ecology;
     private final PlayerMovementSystem.Command walk = new PlayerMovementSystem.Command();
     private boolean holding;
     private float holdX;
@@ -82,6 +84,7 @@ final class UrbanQaScenes {
         this.catalogue = new UrbanCatalogueQaScene(game);
         this.districts = new UrbanDistrictQaScene(game);
         this.underground = new UrbanUndergroundQaScene(game);
+        this.ecology = new UrbanEcologyQaScene(game);
     }
 
     /** Stages one of the urban scenes; inert, with a notice, outside a street-network world. */
@@ -110,6 +113,10 @@ final class UrbanQaScenes {
         }
         if (scene.equals("urban_underground")) {
             underground.stage(); // a normal session: only poses between legs, the clock and the kit are staged
+            return;
+        }
+        if (scene.equals("urban_ecology")) {
+            ecology.stage(); // a normal session: admission, poses between legs, the clock, fire seed and kit are staged
             return;
         }
         if (!world.isUrban() || !world.urban.hasCityPlan()) {
@@ -203,6 +210,7 @@ final class UrbanQaScenes {
     UrbanCatalogueQaScene catalogue() { return catalogue; }
     UrbanDistrictQaScene districts() { return districts; }
     UrbanUndergroundQaScene underground() { return underground; }
+    UrbanEcologyQaScene ecology() { return ecology; }
 
     /** Per-frame hook, before streaming and rendering; inert unless a scene is staged. */
     void update(double elapsed) {
@@ -225,6 +233,7 @@ final class UrbanQaScenes {
         catalogue.update(elapsed);
         districts.update(elapsed);
         underground.update(elapsed);
+        ecology.update(elapsed);
         if (holding) {
             apply();
         }

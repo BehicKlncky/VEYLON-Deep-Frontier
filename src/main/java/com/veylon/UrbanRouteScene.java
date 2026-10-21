@@ -18,6 +18,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+import java.util.function.Predicate;
 
 import static org.lwjgl.glfw.GLFW.*;
 
@@ -304,18 +305,24 @@ abstract class UrbanRouteScene {
         @Override boolean threatsInterrupt() { return false; }
     }
 
-    /** Walks a bounded route with W and mouse look, opening closed doors with F on the way. */
+    /**
+     * Walks a bounded route with W and mouse look, opening closed doors with F on the way; a
+     * route may be kept to the cells a predicate allows.
+     */
     protected final class Walk extends Task {
         final Vec3i goal;
+        private final Predicate<Vec3i> allowed;
         private List<Vec3i> path;
         private int index, replans, doorPresses;
         private float stuck, best = Float.MAX_VALUE, doorWait;
 
-        Walk(Vec3i goal) { super("walk " + goal); this.goal = goal; }
+        Walk(Vec3i goal) { this(goal, cell -> true); }
+
+        Walk(Vec3i goal, Predicate<Vec3i> allowed) { super("walk " + goal); this.goal = goal; this.allowed = allowed; }
 
         @Override boolean step(float dt) {
             if (path == null) {
-                path = UrbanSlicePlan.route(game.world, feet(), goal);
+                path = UrbanSlicePlan.route(game.world, feet(), goal, allowed);
                 if (path == null) { throw fail("no walking route from " + feet() + " to " + goal); }
                 index = 0; best = Float.MAX_VALUE; stuck = 0;
             }
