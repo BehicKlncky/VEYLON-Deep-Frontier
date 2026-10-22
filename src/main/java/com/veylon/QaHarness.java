@@ -777,7 +777,7 @@ final class QaHarness {
                  "urban_fixtures_night", "urban_apartments", "urban_apartments_night", "urban_underground", "urban_ecology",
                  "urban_apartments_manual", "urban_apartments_manual_night", "urban_slice", "urban_districts",
                  "urban_apartments_lit_night", "urban_loot", "urban_starter_manual", "urban_catalogue",
-                 "urban_infected_street", "urban_infected_apartment", "urban_navigation" -> urbanScene.stage(normalized);
+                 "urban_infected_street", "urban_infected_apartment", "urban_navigation", "urban_survivors" -> urbanScene.stage(normalized);
             default -> System.out.println("[scene] unknown VEYLON_SCENE '" + scene + "'");
         }
         System.out.println("[scene] applied benchmark scene '" + scene + "'");

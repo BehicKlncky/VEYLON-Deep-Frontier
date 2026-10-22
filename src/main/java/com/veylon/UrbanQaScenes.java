@@ -49,6 +49,8 @@ final class UrbanQaScenes {
     private final UrbanUndergroundQaScene underground;
     /** Package 15: growth sites and their Veilmaws, park and roof wildlife and a Breacher ({@code urban_ecology}). */
     private final UrbanEcologyQaScene ecology;
+    /** Package 16: a survivor camp and a hidden refuge found, helped and revisited ({@code urban_survivors}). */
+    private final UrbanSurvivorQaScene survivors;
     private final PlayerMovementSystem.Command walk = new PlayerMovementSystem.Command();
     private boolean holding;
     private float holdX;
@@ -85,6 +87,7 @@ final class UrbanQaScenes {
         this.districts = new UrbanDistrictQaScene(game);
         this.underground = new UrbanUndergroundQaScene(game);
         this.ecology = new UrbanEcologyQaScene(game);
+        this.survivors = new UrbanSurvivorQaScene(game);
     }
 
     /** Stages one of the urban scenes; inert, with a notice, outside a street-network world. */
@@ -117,6 +120,10 @@ final class UrbanQaScenes {
         }
         if (scene.equals("urban_ecology")) {
             ecology.stage(); // a normal session: admission, poses between legs, the clock, fire seed and kit are staged
+            return;
+        }
+        if (scene.equals("urban_survivors")) {
+            survivors.stage(); // a normal session: only poses between legs, the clock (forward) and the kit are staged
             return;
         }
         if (!world.isUrban() || !world.urban.hasCityPlan()) {
@@ -211,6 +218,7 @@ final class UrbanQaScenes {
     UrbanDistrictQaScene districts() { return districts; }
     UrbanUndergroundQaScene underground() { return underground; }
     UrbanEcologyQaScene ecology() { return ecology; }
+    UrbanSurvivorQaScene survivors() { return survivors; }
 
     /** Per-frame hook, before streaming and rendering; inert unless a scene is staged. */
     void update(double elapsed) {
@@ -234,6 +242,7 @@ final class UrbanQaScenes {
         districts.update(elapsed);
         underground.update(elapsed);
         ecology.update(elapsed);
+        survivors.update(elapsed);
         if (holding) {
             apply();
         }
