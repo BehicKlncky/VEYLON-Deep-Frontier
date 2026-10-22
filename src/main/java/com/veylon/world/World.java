@@ -84,10 +84,16 @@ public class World implements VoxelAccess {
      * squares) and encounter catalogue five: the Veilmaw, the Breacher and city wildlife.
      */
     public static final int GEN_URBAN_ECOLOGY = 14;
+    /**
+     * Layout 12 (urban milestone 16): generator 14's city, routes and ecology exactly, plus each
+     * region's survivor sites: a small camp on the reclaimed ground floor of a held walk-up and
+     * the hidden civilians of the region's sealed cellar. Sites are plan metadata; no block moves.
+     */
+    public static final int GEN_URBAN_SURVIVORS = 15;
     /** The generator of every ordinary new world; generator 3 until the urban rollout. */
     public static final int DEFAULT_NEW_WORLD_GENERATOR = GEN_CAVE_IDENTITIES;
     /** The highest generator version a save may name; a load rejects anything above it. */
-    public static final int MAX_SUPPORTED_GENERATOR = GEN_URBAN_ECOLOGY;
+    public static final int MAX_SUPPORTED_GENERATOR = GEN_URBAN_SURVIVORS;
 
     public final long seed;
     /** Persisted in save v3; legacy (v2) saves always load as {@link #GEN_LEGACY}. */
@@ -189,7 +195,7 @@ public class World implements VoxelAccess {
                 || version == GEN_URBAN_SHAPED_STAIRS || version == GEN_URBAN_STARTER
                 || version == GEN_URBAN_ENCOUNTERS || version == GEN_URBAN_CIVIC
                 || version == GEN_URBAN_DISTRICTS || version == GEN_URBAN_UNDERGROUND
-                || version == GEN_URBAN_ECOLOGY;
+                || version == GEN_URBAN_ECOLOGY || version == GEN_URBAN_SURVIVORS;
     }
 
     /** Generators 2 and 3: deep caves, underground POIs, cave mouths and settlements. */

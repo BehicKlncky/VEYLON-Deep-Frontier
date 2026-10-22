@@ -68,6 +68,8 @@ public final class UrbanWorldState {
     private final BoundedPlanCache<Long, TransitNetwork.Segment> transitSegments;
     /** Layout eleven: each region's growth sites and wildlife habitats, beside its plan. */
     private final BoundedPlanCache<Long, EcologySites> ecologySites;
+    /** Layout twelve: each region's survivor camp and hidden refuge, beside its plan. */
+    private final BoundedPlanCache<Long, SurvivorSites> survivorSites;
     private int contentRevision = UNRESOLVED;
     /** Persistent sparse state, separate from evictable pure plan caches. */
     public final UrbanContainers containers = new UrbanContainers();
@@ -90,6 +92,7 @@ public final class UrbanWorldState {
         this.routeCatalogues = hasUnderground() ? new BoundedPlanCache<>(MAX_REGION_PLANS) : null;
         this.transitSegments = hasUnderground() ? new BoundedPlanCache<>(MAX_TRANSIT_SEGMENTS) : null;
         this.ecologySites = hasEcology() ? new BoundedPlanCache<>(MAX_REGION_PLANS) : null;
+        this.survivorSites = hasSurvivors() ? new BoundedPlanCache<>(MAX_REGION_PLANS) : null;
     }
 
     public int layoutRevision() {
@@ -129,8 +132,13 @@ public final class UrbanWorldState {
      * and layout eleven, which keeps them exactly.
      */
     public boolean hasUnderground() { return layoutRevision == UrbanRevision.LAYOUT_UNDERGROUND || hasEcology(); }
-    /** Layout eleven: growth sites in the quarantine and city wildlife (milestone 15). */
-    public boolean hasEcology() { return layoutRevision == UrbanRevision.LAYOUT_ECOLOGY; }
+    /**
+     * Growth sites in the quarantine and city wildlife (milestone 15): layout eleven, and layout
+     * twelve, which keeps that city exactly.
+     */
+    public boolean hasEcology() { return layoutRevision == UrbanRevision.LAYOUT_ECOLOGY || hasSurvivors(); }
+    /** Layout twelve: survivor camps and the hidden civilians of the sealed cellars (milestone 16). */
+    public boolean hasSurvivors() { return layoutRevision == UrbanRevision.LAYOUT_SURVIVORS; }
 
     public boolean contentRevisionResolved() {
         return contentRevision != UNRESOLVED;
@@ -253,6 +261,22 @@ public final class UrbanWorldState {
     /** Ecology plans currently cached, for the runtime bounds snapshot; never above {@value #MAX_REGION_PLANS}. */
     public int cachedEcologyPlans() {
         return ecologySites == null ? 0 : ecologySites.size();
+    }
+
+    /**
+     * The survivor camp and hidden refuge of a layout-twelve region, planned once and cached.
+     * Pure, and rebuilt identically after eviction; the people's state lives elsewhere.
+     *
+     * @throws IllegalStateException for a layout without survivor sites
+     */
+    public SurvivorSites sites(int rx, int rz) {
+        if (!hasSurvivors()) { throw new IllegalStateException("layout " + layoutRevision + " has no survivor sites"); }
+        return survivorSites.get(UrbanIds.district(rx, rz), ignored -> SurvivorSites.of(seed, regionPlan(rx, rz), this));
+    }
+
+    /** Site plans currently cached, for the runtime bounds snapshot; never above {@value #MAX_REGION_PLANS}. */
+    public int cachedSitePlans() {
+        return survivorSites == null ? 0 : survivorSites.size();
     }
 
     /** One transit segment of layout ten, planned once and cached; absent beyond the planned city. */

@@ -333,6 +333,43 @@ class WorldGeneratorFingerprintTest {
         return hash;
     }
 
+    /**
+     * Generator 15 (milestone 16), recorded 2026-10-22 at introduction. Its terrain is generator
+     * 14's at every pinned chunk, because survivor sites stamp nothing; its own pin is the site
+     * plans: every camp and hidden refuge within three regions of the spawn with its people,
+     * their beds and day cells, the stash, the entry, the safe cell and the lookout post.
+     */
+    private static final long[] URBAN_SURVIVOR_SITE_FINGERPRINTS = {
+            0x234e41006852e24eL, 0x50eebde7ad2b9eb0L, 0x8cc166a6d2d85597L};
+
+    @Test
+    void theSurvivorSitesKeepTheCityAndTheirRecordedPlans() {
+        List<String> moved = new ArrayList<>();
+        for (int i = 0; i < SEEDS.length; i++) {
+            long terrain = terrainFingerprint(SEEDS[i], World.GEN_URBAN_SURVIVORS);
+            long sites = sitePlanFingerprint(SEEDS[i]);
+            if (terrain != URBAN_ECOLOGY_TERRAIN_FINGERPRINTS[i] || sites != URBAN_SURVIVOR_SITE_FINGERPRINTS[i]) {
+                moved.add(String.format("seed %d: terrain 0x%016xL, sites 0x%016xL", SEEDS[i], terrain, sites));
+            }
+        }
+        assertTrue(moved.isEmpty(), () -> "generator 15 changed; add a generator version instead of "
+                + "re-recording:\n  " + String.join("\n  ", moved));
+    }
+
+    /** Every survivor site within three regions of the spawn, as planned. */
+    private static long sitePlanFingerprint(long seed) {
+        World world = new World(seed, World.GEN_URBAN_SURVIVORS);
+        long hash = 0xcbf29ce484222325L;
+        for (int rz = -3; rz <= 3; rz++) {
+            for (int rx = -3; rx <= 3; rx++) {
+                for (var site : world.urban.sites(rx, rz).sites()) {
+                    hash = mix(hash, site.toString().hashCode());
+                }
+            }
+        }
+        return hash;
+    }
+
     /** Transit segments around the spawn, three route catalogues and the spawn station's chunks. */
     private static long routeFingerprint(long seed) {
         World world = new World(seed, World.GEN_URBAN_UNDERGROUND);

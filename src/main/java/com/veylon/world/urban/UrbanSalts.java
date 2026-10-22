@@ -128,6 +128,18 @@ public final class UrbanSalts {
     /** Encounter catalogue five: which budgeted buildings keep a Breacher at their street door. */
     public static final long BREACHER = 0x5642_5245_4143_4852L;
 
+    // Layout revision 12 (milestone 16): survivor camps and hidden civilians.
+    /** Which held walk-up of a region is its survivor camp. */
+    public static final long SITE_CAMP = 0x5653_4954_4543_414dL;
+    /** How many people a camp or a hidden refuge shelters. */
+    public static final long SITE_PEOPLE = 0x5653_4954_4550_504cL;
+    /** A resident's name. */
+    public static final long SITE_NAME = 0x5653_4954_454e_414dL;
+    /** A camp trader's two standing offers. */
+    public static final long SITE_TRADE = 0x5653_4954_4554_5244L;
+    /** What a site's stash holds when its people are first met. */
+    public static final long SITE_STASH = 0x5653_4954_4553_5448L;
+
     private UrbanSalts() {
     }
 }
