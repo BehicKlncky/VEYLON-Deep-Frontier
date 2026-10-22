@@ -51,6 +51,11 @@ final class UrbanQaScenes {
     private final UrbanEcologyQaScene ecology;
     /** Package 16: a survivor camp and a hidden refuge found, helped and revisited ({@code urban_survivors}). */
     private final UrbanSurvivorQaScene survivors;
+    /**
+     * Package 17: a guarded stronghold entered as a visitor, a restricted room, a threat at its
+     * gate and a raider yard avoided ({@code urban_strongholds}).
+     */
+    private final UrbanStrongholdQaScene strongholds;
     private final PlayerMovementSystem.Command walk = new PlayerMovementSystem.Command();
     private boolean holding;
     private float holdX;
@@ -88,6 +93,7 @@ final class UrbanQaScenes {
         this.underground = new UrbanUndergroundQaScene(game);
         this.ecology = new UrbanEcologyQaScene(game);
         this.survivors = new UrbanSurvivorQaScene(game);
+        this.strongholds = new UrbanStrongholdQaScene(game);
     }
 
     /** Stages one of the urban scenes; inert, with a notice, outside a street-network world. */
@@ -124,6 +130,10 @@ final class UrbanQaScenes {
         }
         if (scene.equals("urban_survivors")) {
             survivors.stage(); // a normal session: only poses between legs, the clock (forward) and the kit are staged
+            return;
+        }
+        if (scene.equals("urban_strongholds")) {
+            strongholds.stage(); // a normal session: poses between legs, the clock (forward), one infected and the kit are staged
             return;
         }
         if (!world.isUrban() || !world.urban.hasCityPlan()) {
@@ -219,6 +229,7 @@ final class UrbanQaScenes {
     UrbanUndergroundQaScene underground() { return underground; }
     UrbanEcologyQaScene ecology() { return ecology; }
     UrbanSurvivorQaScene survivors() { return survivors; }
+    UrbanStrongholdQaScene strongholds() { return strongholds; }
 
     /** Per-frame hook, before streaming and rendering; inert unless a scene is staged. */
     void update(double elapsed) {
@@ -243,6 +254,7 @@ final class UrbanQaScenes {
         underground.update(elapsed);
         ecology.update(elapsed);
         survivors.update(elapsed);
+        strongholds.update(elapsed);
         if (holding) {
             apply();
         }
