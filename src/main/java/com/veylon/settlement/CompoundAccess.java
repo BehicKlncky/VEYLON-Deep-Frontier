@@ -9,10 +9,10 @@ import com.veylon.world.urban.CompoundSites.Zone;
 import com.veylon.world.urban.SurvivorSites.Role;
 
 /**
- * Who may be where in a compound, and what follows from what its guards actually perceive (urban
- * milestone 17). Every consequence here starts from a guard's own senses: what it sees with the
- * shared sight test, or a sound it hears; a crime nobody perceived is noticed only as missing
- * stores, and blamed only on someone guards saw inside not long before.
+ * Who may be where in a compound, and what follows from what its people actually perceive (urban
+ * milestone 17). Every consequence here starts from their own senses: what a guard sees with the
+ * shared sight test or hears, and for a theft what any of them sees; a crime nobody perceived is
+ * noticed only as missing stores, and blamed only on someone guards saw inside not long before.
  *
  * <ul>
  *   <li><b>Admission.</b> A stronghold's gatekeeper lets visitors in by day: a visitor's pass
@@ -23,10 +23,10 @@ import com.veylon.world.urban.SurvivorSites.Role;
  *       there again {@value #GRACE} seconds or more later, the visitor loses the pass and is wanted
  *       for {@value #WANTED_HOURS} game hours, and guards drive a wanted player out of the
  *       compound. Anyone seen inside without leave is an intruder: wanted at once.</li>
- *   <li><b>Theft.</b> Taken in a guard's sight, it is caught: the stronghold's trust falls, the
- *       thief is wanted and the alarm goes up. Taken unseen, it is only missing stores, which the
- *       stronghold notices at its next hour; it suspects the player only if a guard saw them
- *       inside within the last {@value #SUSPICION_HOURS} hours.</li>
+ *   <li><b>Theft.</b> Taken in sight of any of the stronghold's people, it is caught: its trust
+ *       falls, the thief is wanted and the alarm goes up. Taken unseen, it is only missing
+ *       stores, which the stronghold notices at its next hour; it suspects the player only if a
+ *       guard saw them inside within the last {@value #SUSPICION_HOURS} hours.</li>
  *   <li><b>Sounds.</b> The player's footsteps, doors and knock where the rules let them be are
  *       everyday life and alarm nobody, unless the stronghold has turned on them or wants them
  *       gone; the same sounds anywhere else, and every other sound, raise its alert as any
