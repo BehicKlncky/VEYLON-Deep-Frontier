@@ -8,7 +8,6 @@ import com.veylon.item.ItemType;
 import com.veylon.settlement.Settlement;
 import com.veylon.settlement.UrbanSite;
 import com.veylon.settlement.UrbanSiteDirector;
-import com.veylon.simulation.WeatherSystem.Weather;
 import com.veylon.util.Vec3i;
 import com.veylon.world.BlockType;
 import com.veylon.world.VoxelClearance;
@@ -19,7 +18,6 @@ import com.veylon.world.urban.UrbanPlaces.Place;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
-import java.util.function.Predicate;
 import java.util.function.Supplier;
 
 import static org.lwjgl.glfw.GLFW.*;
@@ -51,18 +49,16 @@ import static org.lwjgl.glfw.GLFW.*;
  * staged and printed as staged. No block is staged. Exactly sixteen labelled captures. Failures
  * throw.
  */
-final class UrbanSurvivorQaScene extends UrbanRouteScene {
+final class UrbanSurvivorQaScene extends UrbanPeopleScene {
     static final double DEADLINE_SECONDS = 900;
     static final int CAPTURES = 16;
     static final String HEARD = "Somewhere behind the wall, someone is trying very hard to be quiet.";
-    private static final float REACH = 2.2f;
 
     private UrbanSurvivorTourPlan plan;
-    private boolean passed, campFound, traded, befriended, shared, heard, refugeFound, guided, reloaded, dormant,
+    private boolean passed, campFound, befriended, shared, heard, refugeFound, guided, reloaded, dormant,
             bedtime, guestsSeen, emptied, leftToYou;
-    private int poses, captures, residentFrames, wallFrames, strayFrames;
+    private int residentFrames, wallFrames, strayFrames;
     private String wallNote = "", strayNote = "", before = "";
-    private final List<String> views = new ArrayList<>(), deeds = new ArrayList<>();
 
     UrbanSurvivorQaScene(Game game) { super(game); }
 
@@ -72,12 +68,6 @@ final class UrbanSurvivorQaScene extends UrbanRouteScene {
     boolean passed() { return passed; }
     UrbanSurvivorTourPlan plan() { return plan; }
     int residentFrames() { return residentFrames; }
-
-    @Override
-    protected void capture(String label) {
-        captures++;
-        super.capture(label);
-    }
 
     /** Plans the tour on the current generated world and stages the kit; no block is changed. */
     void stage() {
@@ -103,7 +93,8 @@ final class UrbanSurvivorQaScene extends UrbanRouteScene {
         add(new Clock("day", 10 * 60), new PoseYard(), new Wait("stream", 1f),
                 new View("01-camp-rear-door", () -> plan.camp().door(), .9f, null),
                 new Walk(plan.camp().site().entry()), new Arrived(),
-                new Talk("the trader", () -> liveAt(camp, 1)), new Trade(),
+                new Talk("the trader", () -> liveAt(camp, 1)),
+                new Trade("trade with the camp", "03-trader-conversation", "04-a-fair-trade"),
                 new Befriend(), new Leave(),
                 new OpenStore("06-shared-camp-storage", () -> plan.camp().site().stash().getFirst(),
                         () -> plan.camp().site().meals().getFirst(), "shared with you as a friend", false));
@@ -162,10 +153,6 @@ final class UrbanSurvivorQaScene extends UrbanRouteScene {
     private Vec3i nearestLive(long id) {
         Npc n = nearestLiveNpc(id);
         return n == null ? null : cell(n.pos.x, n.pos.y, n.pos.z);
-    }
-
-    private float distanceTo(Npc n) {
-        return (float) Math.hypot(n.pos.x - game.player.pos.x, n.pos.z - game.player.pos.z);
     }
 
     /** Who lives where, how they are and what they hold: compared across the save. */
@@ -230,56 +217,6 @@ final class UrbanSurvivorQaScene extends UrbanRouteScene {
     // ------------------------------------------------------------------
     // Staging
     // ------------------------------------------------------------------
-
-    /** Staged time of day, only ever forward, with clear weather pinned. */
-    private final class Clock extends Task {
-        private final int minutes;
-
-        Clock(String name, int minutes) { super("clock " + name); this.minutes = minutes; }
-
-        @Override boolean step(float dt) {
-            double now = game.time.totalMinutes;
-            double target = Math.floor(now / (24 * 60)) * 24 * 60 + minutes;
-            if (target <= now) { target += 24 * 60; }
-            game.time.totalMinutes = target;
-            game.weather.current = game.weather.next = Weather.CLEAR;
-            game.weather.blend = 1f;
-            game.weather.changeTimer = 4000f;
-            System.out.println("[urban-survivors] staged-clock " + name.substring(6) + " minutes=" + minutes
-                    + " advancedBy=" + Math.round(target - now));
-            return true;
-        }
-
-        @Override boolean threatsInterrupt() { return false; }
-    }
-
-    private void stagePose(Vec3i at, Vec3i facing, float height) {
-        releaseAll();
-        fighting = null;
-        approach = null;
-        game.closeScreens();
-        game.world.ensureChunks(at.x(), at.z(), 4, 10_000);
-        game.player.pos.set(at.x() + .5f, at.y() + .001f, at.z() + .5f);
-        game.player.vel.zero();
-        game.player.onGround = true;
-        look(facing.x() + .5f, facing.y() + height, facing.z() + .5f);
-        poses++;
-        System.out.println("[urban-survivors] staged-pose " + at);
-    }
-
-    /** A staged pose: feet on a leg's first cell, facing along it. */
-    private final class Pose extends Task {
-        private final Vec3i at, facing;
-
-        Pose(Vec3i at, Vec3i facing) { super("pose " + at); this.at = at; this.facing = facing; }
-
-        @Override boolean step(float dt) {
-            stagePose(at, facing, 1f);
-            return true;
-        }
-
-        @Override boolean threatsInterrupt() { return false; }
-    }
 
     /** In the camp's yard, a few steps out from its rear door, facing it. */
     private final class PoseYard extends Task {
@@ -377,109 +314,6 @@ final class UrbanSurvivorQaScene extends UrbanRouteScene {
         }
     }
 
-    /** Walks up to a person until within reach with a clear line, then presses F until they talk. */
-    private final class Talk extends Task {
-        private final Supplier<Npc> who;
-        private Walk walk;
-        private Vec3i to;
-        private float walkAge, wait;
-        private int presses;
-
-        Talk(String name, Supplier<Npc> who) { super("talk to " + name); this.who = who; }
-
-        @Override boolean step(float dt) {
-            Npc n = who.get();
-            if (game.uiMode == Game.UiMode.NPC) {
-                if (game.activeNpc == n && n != null) { return true; }
-                press(GLFW_KEY_ESCAPE); // someone else answered: leave and step closer
-                return false;
-            }
-            if (n == null) {
-                if (age > 20) { throw fail("nobody to " + name); }
-                return false;
-            }
-            if (distanceTo(n) > REACH || Math.abs(n.pos.y - game.player.pos.y) > 1.2f || !game.interactions.clearPathTo(n)) {
-                Vec3i target = cell(n.pos.x, n.pos.y, n.pos.z);
-                walkAge += dt;
-                if (walk == null || walkAge > .75f && !target.equals(to)) {
-                    walk = new Walk(target);
-                    to = target;
-                    walkAge = 0;
-                }
-                if (walk.step(dt)) { walk = null; }
-                return false;
-            }
-            hold(GLFW_KEY_W, false);
-            look(n.pos.x, n.pos.y + 1.3f, n.pos.z);
-            if ((wait += dt) > .4f) {
-                if (++presses > 10) { throw fail("no conversation with " + n.name + ": " + game.interactPrompt); }
-                press(GLFW_KEY_F);
-                wait = 0;
-            }
-            return false;
-        }
-
-        @Override boolean threatsInterrupt() { return game.uiMode == Game.UiMode.NONE; }
-    }
-
-    /** One conversation choice through the screen's own command; checks the answer, may capture. */
-    private final class Say extends Task {
-        private final int choice;
-        private final String label;
-        private final Predicate<String> expected;
-
-        Say(int choice, String label, Predicate<String> expected) {
-            super("say [" + choice + "]"); this.choice = choice; this.label = label; this.expected = expected;
-        }
-
-        @Override boolean step(float dt) {
-            if (game.uiMode != Game.UiMode.NPC || game.activeNpc == null) { throw fail("the conversation closed before " + name); }
-            if (age < .3f) { return false; }
-            if (!game.npcScreen.performSiteChoice(game, game.activeNpc, choice)) { throw fail("choice " + choice + " is not offered"); }
-            String said = game.npcScreen.lastResponse();
-            deeds.add(choice + ":" + said);
-            if (!expected.test(said)) { throw fail("unexpected answer to [" + choice + "]: " + said); }
-            if (label != null) { capture(label); }
-            return true;
-        }
-
-        @Override boolean threatsInterrupt() { return false; }
-    }
-
-    /** A trade with the camp's trader from the camp's own stores; the second offer if the first is out. */
-    private final class Trade extends Task {
-        private int step;
-
-        Trade() { super("trade with the camp"); }
-
-        @Override boolean step(float dt) {
-            if (game.uiMode != Game.UiMode.NPC) { throw fail("the trader's conversation closed"); }
-            if (age < .4f) { return false; }
-            if (step == 0) {
-                var offers = com.veylon.settlement.UrbanSiteDialogue.offers(game, game.activeNpc);
-                if (offers.size() != 2) { throw fail("the trader keeps " + offers.size() + " offers"); }
-                deeds.add("offers=" + offers.get(0).describe() + " | " + offers.get(1).describe());
-                capture("03-trader-conversation");
-                step = 1;
-                return false;
-            }
-            if (age < 1f) { return false; }
-            for (int choice : new int[]{4, 5}) {
-                game.npcScreen.performSiteChoice(game, game.activeNpc, choice);
-                String said = game.npcScreen.lastResponse();
-                deeds.add(choice + ":" + said);
-                if (said.equals("A fair trade.")) {
-                    traded = true;
-                    capture("04-a-fair-trade");
-                    return true;
-                }
-            }
-            throw fail("no trade went through: " + String.join(" | ", deeds));
-        }
-
-        @Override boolean threatsInterrupt() { return false; }
-    }
-
     /** Food and water given into the camp's stores until it counts the player a friend. */
     private final class Befriend extends Task {
         private float wait;
@@ -503,25 +337,6 @@ final class UrbanSurvivorQaScene extends UrbanRouteScene {
             game.npcScreen.performSiteChoice(game, game.activeNpc, 2);
             String said = game.npcScreen.lastResponse();
             if (!said.equals("That helps. We won't forget it.")) { throw fail("the camp refused supplies: " + said); }
-            return false;
-        }
-
-        @Override boolean threatsInterrupt() { return false; }
-    }
-
-    /** Escape until no screen is open. */
-    private final class Leave extends Task {
-        private float wait;
-
-        Leave() { super("leave the screen"); }
-
-        @Override boolean step(float dt) {
-            if (game.uiMode == Game.UiMode.NONE) { return age > .2f; }
-            if ((wait += dt) > .3f) {
-                if (age > 5) { throw fail("the screen would not close: " + game.uiMode); }
-                press(GLFW_KEY_ESCAPE);
-                wait = 0;
-            }
             return false;
         }
 
@@ -726,52 +541,6 @@ final class UrbanSurvivorQaScene extends UrbanRouteScene {
         @Override boolean step(float dt) {
             before = identities();
             System.out.println("[urban-survivors] before-save " + before);
-            return true;
-        }
-
-        @Override boolean threatsInterrupt() { return false; }
-    }
-
-    private final class Save extends Task {
-        private boolean pressed;
-        private Object mark;
-
-        Save() { super("quick-save"); }
-
-        @Override boolean step(float dt) {
-            if (!pressed) {
-                mark = logMark();
-                press(GLFW_KEY_F5);
-                pressed = true;
-                return false;
-            }
-            if (!loggedSince(mark, "Game saved.")) { throw fail("quick-save failed"); }
-            return true;
-        }
-
-        @Override boolean threatsInterrupt() { return false; }
-    }
-
-    private final class Load extends Task {
-        private boolean pressed;
-        private Object mark, world;
-
-        Load() { super("quick-load over the live world"); }
-
-        @Override boolean step(float dt) {
-            if (!pressed) {
-                world = game.world;
-                mark = logMark();
-                press(GLFW_KEY_F9);
-                pressed = true;
-                return false;
-            }
-            if (!loggedSince(mark, "Game loaded.") || game.world == world) {
-                throw fail("quick-load did not replace the live world");
-            }
-            world = null;
-            fighting = null;
-            approach = null;
             return true;
         }
 
@@ -1038,24 +807,6 @@ final class UrbanSurvivorQaScene extends UrbanRouteScene {
     // ------------------------------------------------------------------
     // Helpers
     // ------------------------------------------------------------------
-
-    /** The newest log line, by identity: the log keeps only its latest lines, so indices drift. */
-    private Object logMark() {
-        var all = game.eventLog.all();
-        return all.isEmpty() ? null : all.getLast();
-    }
-
-    /** Lines logged after a mark (all of them when the mark has rolled out or the log was cleared). */
-    private List<String> loggedAfter(Object mark) {
-        var all = game.eventLog.all();
-        int i = all.size();
-        while (i > 0 && all.get(i - 1) != mark) { i--; }
-        return all.subList(i, all.size());
-    }
-
-    private boolean loggedSince(Object mark, String text) {
-        return loggedAfter(mark).stream().anyMatch(l -> l.contains(text));
-    }
 
     boolean survival() { return game.gameMode() == GameMode.SURVIVAL; }
 }
