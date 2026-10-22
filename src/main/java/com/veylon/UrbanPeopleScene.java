@@ -3,9 +3,13 @@ package com.veylon;
 import com.veylon.entity.Npc;
 import com.veylon.simulation.WeatherSystem.Weather;
 import com.veylon.util.Vec3i;
+import com.veylon.world.VoxelClearance;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
+import java.util.Set;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
 
@@ -100,15 +104,21 @@ abstract class UrbanPeopleScene extends UrbanRouteScene {
 
     /**
      * Walks up to a person until within reach with a clear line, then presses F until they talk.
-     * The walk may be kept to the cells a predicate allows.
+     * F works an aimed door before it greets anyone, and greets the nearest person in reach, so F
+     * is pressed only while the prompt names this one; otherwise the player steps to a free cell
+     * beside the person, away from whoever F would greet instead. The walks may be kept to the
+     * cells a predicate allows.
      */
     protected final class Talk extends Task {
+        private static final float BLOCKED_SECONDS = 1.5f;
+        private static final int DETOURS = 6;
         private final Supplier<Npc> who;
         private final Predicate<Vec3i> allowed;
-        private Walk walk;
+        private final Set<Vec3i> tried = new HashSet<>();
+        private Walk walk, aside;
         private Vec3i to;
-        private float walkAge, wait;
-        private int presses;
+        private float walkAge, wait, blocked;
+        private int presses, detours;
 
         Talk(String name, Supplier<Npc> who) { this(name, who, cell -> true); }
 
@@ -127,6 +137,10 @@ abstract class UrbanPeopleScene extends UrbanRouteScene {
                 if (age > 20) { throw fail("nobody to " + name); }
                 return false;
             }
+            if (aside != null) { // stepping round someone in the way
+                if (aside.step(dt)) { aside = null; }
+                return false;
+            }
             if (distanceTo(n) > REACH || Math.abs(n.pos.y - game.player.pos.y) > 1.2f || !game.interactions.clearPathTo(n)) {
                 Vec3i target = cell(n.pos.x, n.pos.y, n.pos.z);
                 walkAge += dt;
@@ -140,10 +154,74 @@ abstract class UrbanPeopleScene extends UrbanRouteScene {
             }
             hold(GLFW_KEY_W, false);
             look(n.pos.x, n.pos.y + 1.3f, n.pos.z);
+            String prompt = game.interactPrompt == null ? "" : game.interactPrompt;
+            if (!prompt.contains(n.name)) {
+                if ((blocked += dt) > BLOCKED_SECONDS) {
+                    blocked = 0;
+                    Npc other = nearestOther(n);
+                    Vec3i free = beside(n, other);
+                    if (free == null || ++detours > DETOURS) {
+                        throw fail("F never reached " + n.name + ": the prompt read '" + prompt + "'"
+                                + (other == null ? "" : String.format(Locale.ROOT, " (%s %.1f, %s %.1f)",
+                                other.name, distanceTo(other), n.name, distanceTo(n))));
+                    }
+                    tried.add(free);
+                    deeds.add("stepped to " + free + " to reach " + n.name + "@" + cell(n.pos.x, n.pos.y, n.pos.z)
+                            + (other == null ? " (the prompt read '" + prompt + "')"
+                            : " past " + other.name + "@" + cell(other.pos.x, other.pos.y, other.pos.z)));
+                    aside = new Walk(free, allowed);
+                }
+                return false;
+            }
+            blocked = 0;
             if ((wait += dt) > .4f) {
                 if (++presses > 10) { throw fail("no conversation with " + n.name + ": " + game.interactPrompt); }
                 press(GLFW_KEY_F);
                 wait = 0;
+            }
+            return false;
+        }
+
+        /**
+         * Whom F would speak to instead of {@code n}: the game's own pick of the nearest person in
+         * reach (3.2 blocks), or null when it is {@code n} and something else outranks them, such
+         * as an aimed door behind them.
+         */
+        private Npc nearestOther(Npc n) {
+            Npc picked = game.nearestNpcForInteraction(3.2f);
+            return picked != null && picked != n ? picked : null;
+        }
+
+        /**
+         * A free standing cell within reach of the person and not tried before, the farther from
+         * {@code other} than from them the better: nobody stands on it and the walks may use it.
+         */
+        private Vec3i beside(Npc n, Npc other) {
+            Vec3i at = cell(n.pos.x, n.pos.y, n.pos.z), best = null;
+            double bestScore = Double.NEGATIVE_INFINITY;
+            for (int dx = -2; dx <= 2; dx++) {
+                for (int dz = -2; dz <= 2; dz++) {
+                    Vec3i c = at.offset(dx, 0, dz);
+                    double toTarget = Math.hypot(c.x() + .5f - n.pos.x, c.z() + .5f - n.pos.z);
+                    if (dx == 0 && dz == 0 || toTarget > REACH - .3f || tried.contains(c) || !allowed.test(c)
+                            || !VoxelClearance.standable(game.world, c.x(), c.y(), c.z()) || occupied(c)) {
+                        continue;
+                    }
+                    double toOther = other == null ? 99 : Math.hypot(c.x() + .5f - other.pos.x, c.z() + .5f - other.pos.z);
+                    double score = toOther - toTarget;
+                    if (score > bestScore) {
+                        bestScore = score;
+                        best = c;
+                    }
+                }
+            }
+            return best;
+        }
+
+        private boolean occupied(Vec3i c) {
+            for (Npc o : game.entities.npcs) {
+                if (!o.dead && Math.hypot(o.pos.x - c.x() - .5f, o.pos.z - c.z() - .5f) < .9f
+                        && Math.abs(o.pos.y - c.y()) < 1.5f) { return true; }
             }
             return false;
         }
