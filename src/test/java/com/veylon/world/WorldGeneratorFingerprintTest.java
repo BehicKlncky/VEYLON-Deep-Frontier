@@ -356,6 +356,80 @@ class WorldGeneratorFingerprintTest {
                 + "re-recording:\n  " + String.join("\n  ", moved));
     }
 
+    /**
+     * Generator 16 (milestone 17), recorded 2026-10-22 at introduction. Its terrain is generator
+     * 14's at every pinned chunk, because no compound lies within a region of the spawn; its own
+     * pins are the compound plans (every claim and compound within three regions of the spawn,
+     * with its people, gate, barricades, posts and stash) and the stamped chunks of the nearest
+     * stronghold's and raider yard's gate lines.
+     */
+    private static final long[] URBAN_COMPOUND_FINGERPRINTS = {
+            0x8bd36bfeca2d66b8L, 0x215cd4c07258f90aL, 0x35f0cd95a186be60L};
+    private static final long[] URBAN_COMPOUND_CHUNK_FINGERPRINTS = {
+            0xefccb539249bc24cL, 0x92dadb31446b4242L, 0xc444381a488ff68aL};
+
+    @Test
+    void theCompoundsKeepTheCityAndTheirRecordedPlans() {
+        List<String> moved = new ArrayList<>();
+        for (int i = 0; i < SEEDS.length; i++) {
+            long terrain = terrainFingerprint(SEEDS[i], World.GEN_URBAN_STRONGHOLDS);
+            long compounds = compoundFingerprint(SEEDS[i]);
+            long chunks = compoundChunkFingerprint(SEEDS[i]);
+            if (terrain != URBAN_ECOLOGY_TERRAIN_FINGERPRINTS[i] || compounds != URBAN_COMPOUND_FINGERPRINTS[i]
+                    || chunks != URBAN_COMPOUND_CHUNK_FINGERPRINTS[i]) {
+                moved.add(String.format("seed %d: terrain 0x%016xL, compounds 0x%016xL, chunks 0x%016xL",
+                        SEEDS[i], terrain, compounds, chunks));
+            }
+        }
+        assertTrue(moved.isEmpty(), () -> "generator 16 changed; add a generator version instead of "
+                + "re-recording:\n  " + String.join("\n  ", moved));
+    }
+
+    /** Every compound claim and plan within three regions of the spawn, with the camps and refuges beside them. */
+    private static long compoundFingerprint(long seed) {
+        World world = new World(seed, World.GEN_URBAN_STRONGHOLDS);
+        long hash = 0xcbf29ce484222325L;
+        for (int rz = -3; rz <= 3; rz++) {
+            for (int rx = -3; rx <= 3; rx++) {
+                var claims = world.urban.routes(rx, rz).claims();
+                hash = mix(hash, String.valueOf(claims.stronghold()).hashCode());
+                hash = mix(hash, String.valueOf(claims.raiders()).hashCode());
+                var sites = world.urban.sites(rx, rz);
+                hash = mix(hash, String.valueOf(sites.camp()).hashCode());
+                hash = mix(hash, String.valueOf(sites.refuge()).hashCode());
+                for (var c : sites.compounds()) { hash = mix(hash, c.toString().hashCode()); }
+            }
+        }
+        return hash;
+    }
+
+    /** The stamped chunks of the nearest stronghold's and raider yard's gates. */
+    private static long compoundChunkFingerprint(long seed) {
+        World world = new World(seed, World.GEN_URBAN_STRONGHOLDS);
+        long hash = 0xcbf29ce484222325L;
+        for (var kind : new com.veylon.world.urban.SurvivorSites.Kind[]{com.veylon.world.urban.SurvivorSites.Kind.STRONGHOLD,
+                com.veylon.world.urban.SurvivorSites.Kind.RAIDERS}) {
+            com.veylon.world.urban.CompoundSites.Compound nearest = null;
+            for (int rz = -3; rz <= 3; rz++) {
+                for (int rx = -3; rx <= 3; rx++) {
+                    for (var c : world.urban.sites(rx, rz).compounds()) {
+                        if (c.kind() == kind && (nearest == null
+                                || c.site().anchor().distSq(0, 41, 0) < nearest.site().anchor().distSq(0, 41, 0))) {
+                            nearest = c;
+                        }
+                    }
+                }
+            }
+            assertTrue(nearest != null, "a " + kind + " lies within three regions of the spawn");
+            for (var line : nearest.barricades()) {
+                var cell = line.cells().get(1);
+                hash = mix(hash, hashChunk(world.getOrCreateChunk(Math.floorDiv(cell.x(), Chunk.SX),
+                        Math.floorDiv(cell.z(), Chunk.SZ))));
+            }
+        }
+        return hash;
+    }
+
     /** Every survivor site within three regions of the spawn, as planned. */
     private static long sitePlanFingerprint(long seed) {
         World world = new World(seed, World.GEN_URBAN_SURVIVORS);

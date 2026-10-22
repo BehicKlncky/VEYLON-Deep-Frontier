@@ -123,6 +123,12 @@ public final class CivicCatalogue {
                 && UrbanHash.range(0, 1, seed, REVISION, UrbanSalts.CIVIC_BASEMENT, parcel.id(), 0, 0) == 1;
     }
 
+    /** An original colony name for a compound's gate sign (milestone 17); presentation only. */
+    static String colonyName(long seed, long id) {
+        return NAMES[UrbanHash.range(0, NAMES.length - 1, seed, UrbanRevision.LAYOUT_STRONGHOLDS, UrbanSalts.COMPOUND_GATE,
+                id, 1, 0)];
+    }
+
     /** The words on a building's frontage sign, or null for a walk-up, which has none. */
     public static String signText(long seed, BuildingPlan plan) {
         if (plan.family().walkUp()) { return null; }

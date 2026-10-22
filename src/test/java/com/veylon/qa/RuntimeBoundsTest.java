@@ -396,21 +396,24 @@ class RuntimeBoundsTest {
 
     @Test
     void survivorSitePlansStopAtTheirCap() {
-        Game game = new Game();
-        game.newWorld(20260731, true, World.GEN_URBAN_SURVIVORS, com.veylon.entity.GameMode.SURVIVAL);
-        var urban = game.world.urban;
-        int chunks = game.world.loadedCount();
-        // Pure site plans across more regions than the cache holds, generating nothing.
-        for (int i = 0; i < com.veylon.world.urban.UrbanWorldState.MAX_REGION_PLANS + 8; i++) {
-            urban.sites(i, -i);
-            RuntimeBudgetSnapshot snapshot = RuntimeBudgetSnapshot.capture(game);
-            assertTrue(snapshot.withinHardLimits(), snapshot.occupancySummary());
+        // Layout thirteen's compounds live in the same site plans, and their claims in the route catalogues.
+        for (int generator : new int[]{World.GEN_URBAN_SURVIVORS, World.GEN_URBAN_STRONGHOLDS}) {
+            Game game = new Game();
+            game.newWorld(20260731, true, generator, com.veylon.entity.GameMode.SURVIVAL);
+            var urban = game.world.urban;
+            int chunks = game.world.loadedCount();
+            // Pure site plans across more regions than the cache holds, generating nothing.
+            for (int i = 0; i < com.veylon.world.urban.UrbanWorldState.MAX_REGION_PLANS + 8; i++) {
+                urban.sites(i, -i);
+                RuntimeBudgetSnapshot snapshot = RuntimeBudgetSnapshot.capture(game);
+                assertTrue(snapshot.withinHardLimits(), snapshot.occupancySummary());
+            }
+            assertEquals(com.veylon.world.urban.UrbanWorldState.MAX_REGION_PLANS,
+                    RuntimeBudgetSnapshot.capture(game).urbanSitePlans());
+            assertEquals(chunks, game.world.loadedCount(), "planning compounds generates no chunk");
+            assertTrue(RuntimeBudgetSnapshot.hardLimitSummary().contains(
+                    "sitePlans=" + com.veylon.world.urban.UrbanWorldState.MAX_REGION_PLANS));
         }
-        assertEquals(com.veylon.world.urban.UrbanWorldState.MAX_REGION_PLANS,
-                RuntimeBudgetSnapshot.capture(game).urbanSitePlans());
-        assertEquals(chunks, game.world.loadedCount());
-        assertTrue(RuntimeBudgetSnapshot.hardLimitSummary().contains(
-                "sitePlans=" + com.veylon.world.urban.UrbanWorldState.MAX_REGION_PLANS));
     }
 
     @Test

@@ -112,6 +112,21 @@ class UrbanSliceRouteTest {
         }
     }
 
+    /**
+     * Generator 16 (milestone 17) keeps generator 15's city and holds guarded compounds in the
+     * civic and industrial regions, never within a region of the spawn. The development selector
+     * now creates it; the loop must still hold.
+     */
+    @Test
+    void theSliceLoopStillCompletesOnTheStrongholdGenerator() {
+        for (long seed : SLICE_SEEDS) {
+            UrbanSliceRun run = new UrbanSliceRun(seed, GameMode.SURVIVAL, World.GEN_URBAN_STRONGHOLDS).play();
+            assertTrue(run.slice().passed(), "seed=" + seed);
+            assertEquals(World.GEN_URBAN_STRONGHOLDS, run.game.world.generatorVersion);
+            assertTrue(run.game.player.inventory.count(ItemType.IRON_SPEAR) >= 1, "the first upgrade seed=" + seed);
+        }
+    }
+
     @Test
     void frozenSeedsPlayTheScavengeRiskReturnLoopInSurvivalAndCreative() {
         for (GameMode mode : GameMode.values()) {

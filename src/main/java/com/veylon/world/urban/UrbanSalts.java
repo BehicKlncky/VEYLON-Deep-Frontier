@@ -140,6 +140,16 @@ public final class UrbanSalts {
     /** What a site's stash holds when its people are first met. */
     public static final long SITE_STASH = 0x5653_4954_4553_5448L;
 
+    // Layout revision 13 (milestone 17): guarded strongholds and a raider yard.
+    /** Which courtyard block of a civic region is held as its stronghold. */
+    public static final long COMPOUND_STRONGHOLD = 0x5643_4d50_5354_524eL;
+    /** Which industrial region beyond the third ring keeps a raider yard, and which depot row. */
+    public static final long COMPOUND_RAIDERS = 0x5643_4d50_5241_4944L;
+    /** Which passage or alley mouth of a compound carries its gate. */
+    public static final long COMPOUND_GATE = 0x5643_4d50_4741_5445L;
+    /** How many people a stronghold or a raider yard holds. */
+    public static final long COMPOUND_PEOPLE = 0x5643_4d50_5045_4f50L;
+
     private UrbanSalts() {
     }
 }

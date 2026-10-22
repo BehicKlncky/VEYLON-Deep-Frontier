@@ -137,8 +137,13 @@ public final class UrbanWorldState {
      * twelve, which keeps that city exactly.
      */
     public boolean hasEcology() { return layoutRevision == UrbanRevision.LAYOUT_ECOLOGY || hasSurvivors(); }
-    /** Layout twelve: survivor camps and the hidden civilians of the sealed cellars (milestone 16). */
-    public boolean hasSurvivors() { return layoutRevision == UrbanRevision.LAYOUT_SURVIVORS; }
+    /**
+     * Survivor camps and the hidden civilians of the sealed cellars (milestone 16): layout twelve,
+     * and layout thirteen, which keeps them and adds the compounds.
+     */
+    public boolean hasSurvivors() { return layoutRevision == UrbanRevision.LAYOUT_SURVIVORS || hasStrongholds(); }
+    /** Layout thirteen: guarded strongholds and a raider yard (milestone 17). */
+    public boolean hasStrongholds() { return layoutRevision == UrbanRevision.LAYOUT_STRONGHOLDS; }
 
     public boolean contentRevisionResolved() {
         return contentRevision != UNRESOLVED;
@@ -194,6 +199,8 @@ public final class UrbanWorldState {
             if (hasStarter() && rx == 0 && rz == 0) { UrbanStarterSite.of(this).stamp(chunk); }
             // Routes come last: tunnels under the avenues, then what buildings declared outside them.
             if (hasUnderground()) { UrbanRouteStamper.stamp(chunk, district, this); }
+            // A compound's barricades and gate close passages and alley mouths no route uses.
+            if (hasStrongholds()) { UrbanCompoundStamper.stamp(chunk, sites(rx, rz)); }
             // Growth last of all: its carpet and node lie over the courtyard and square.
             if (hasEcology()) { UrbanEcologyStamper.stamp(chunk, ecology(rx, rz)); }
         }
@@ -244,7 +251,41 @@ public final class UrbanWorldState {
      */
     public RouteCatalogue routes(int rx, int rz) {
         if (!hasUnderground()) { throw new IllegalStateException("layout " + layoutRevision + " has no routes"); }
-        return routeCatalogues.get(UrbanIds.district(rx, rz), ignored -> RouteCatalogue.of(seed, regionPlan(rx, rz)));
+        return routeCatalogues.get(UrbanIds.district(rx, rz), ignored -> {
+            DistrictPlan plan = regionPlan(rx, rz);
+            return RouteCatalogue.of(seed, plan, hasStrongholds() ? CompoundClaims.of(seed, plan) : CompoundClaims.NONE);
+        });
+    }
+
+    /**
+     * The planned lock of a compound gate leaf (layout thirteen): keyed, as its guards keep it;
+     * {@link com.veylon.world.FixtureStates#LOCK_NONE} for any other cell. Plans only.
+     */
+    public int compoundLockAt(int x, int y, int z) {
+        CompoundSites.Gate gate = gateAt(x, z);
+        return gate != null && gate.leaf(x, y, z) ? com.veylon.world.FixtureStates.LOCK_KEYED
+                : com.veylon.world.FixtureStates.LOCK_NONE;
+    }
+
+    /** The words on a compound's gate sign at a column, or null where none stands. */
+    public String compoundSignAt(int x, int z) {
+        if (!hasStrongholds() || !CityPlanner.isPlannable(StreetNetwork.regionOf(x), StreetNetwork.regionOf(z))) {
+            return null;
+        }
+        for (CompoundSites.Compound c : sites(StreetNetwork.regionOf(x), StreetNetwork.regionOf(z)).compounds()) {
+            if (c.sign().x() == x && c.sign().z() == z) { return c.signText(); }
+        }
+        return null;
+    }
+
+    private CompoundSites.Gate gateAt(int x, int z) {
+        if (!hasStrongholds() || !CityPlanner.isPlannable(StreetNetwork.regionOf(x), StreetNetwork.regionOf(z))) {
+            return null;
+        }
+        for (CompoundSites.Compound c : sites(StreetNetwork.regionOf(x), StreetNetwork.regionOf(z)).compounds()) {
+            if (c.gate().column(x, z)) { return c.gate(); }
+        }
+        return null;
     }
 
     /**

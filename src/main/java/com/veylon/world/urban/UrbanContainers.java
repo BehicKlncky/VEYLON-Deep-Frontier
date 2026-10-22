@@ -155,13 +155,15 @@ public final class UrbanContainers {
     }
 
     /**
-     * Whether survivors own a planned container: a held building's, as always (D-100), and from
-     * layout twelve on a hidden refuge's own storage, which its people live on (milestone 16).
+     * Whether survivors own a planned container: a held building's, as always (D-100), from
+     * layout twelve on a hidden refuge's own storage, which its people live on (milestone 16), and
+     * from layout thirteen every storey of a compound's held buildings (milestone 17).
      */
     public static boolean survivorOwned(World world, Planned plan) {
         if (plan.building.survivorOwned(plan.fixture)) { return true; }
         if (world.urban == null || !world.urban.hasSurvivors()) { return false; }
-        SurvivorSites.Site site = SurvivorSites.resolve(world.urban, plan.building.id());
+        SurvivorSites.Site site = SurvivorSites.owner(world.urban, plan.building.id());
+        if (site != null && site.kind().compound()) { return true; }
         return site != null && site.kind() == SurvivorSites.Kind.REFUGE
                 && UrbanIds.parent(plan.fixture.id()) == site.room();
     }

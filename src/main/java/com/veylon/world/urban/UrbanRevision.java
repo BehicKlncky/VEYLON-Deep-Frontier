@@ -100,6 +100,14 @@ public final class UrbanRevision {
      * is plan metadata over buildings that already exist; it stamps nothing.
      */
     public static final int LAYOUT_SURVIVORS = 12;
+    /**
+     * Layout of {@link World#GEN_URBAN_STRONGHOLDS}, guarded strongholds and a raider yard
+     * (milestone 17): layout twelve, plus each region's {@link CompoundClaims}. A claimed
+     * parcel keeps its family and template-seven plan but is held (or, for a raider yard's back
+     * way, unheld), and {@link UrbanCompoundStamper} closes the compound's passages or alley
+     * mouths with a barricade and a gate.
+     */
+    public static final int LAYOUT_STRONGHOLDS = 13;
 
     /** Content revision every new urban world records. */
     public static final int CURRENT_CONTENT = 3;
@@ -113,7 +121,7 @@ public final class UrbanRevision {
     public static final int ABSENT_CONTENT = 1;
 
     /** The urban generator the development selector creates: the newest layout. */
-    public static final int DEVELOPMENT_GENERATOR = World.GEN_URBAN_SURVIVORS;
+    public static final int DEVELOPMENT_GENERATOR = World.GEN_URBAN_STRONGHOLDS;
 
     private UrbanRevision() {
     }
@@ -137,6 +145,7 @@ public final class UrbanRevision {
             case World.GEN_URBAN_UNDERGROUND -> LAYOUT_UNDERGROUND;
             case World.GEN_URBAN_ECOLOGY -> LAYOUT_ECOLOGY;
             case World.GEN_URBAN_SURVIVORS -> LAYOUT_SURVIVORS;
+            case World.GEN_URBAN_STRONGHOLDS -> LAYOUT_STRONGHOLDS;
             default -> throw new IllegalArgumentException(
                     "generator " + generatorVersion + " is not an urban generator");
         };
@@ -152,7 +161,8 @@ public final class UrbanRevision {
             case World.GEN_URBAN_STARTER, World.GEN_URBAN_ENCOUNTERS -> BUILDING_TEMPLATE_STARTER;
             case World.GEN_URBAN_CIVIC -> BUILDING_TEMPLATE_CIVIC;
             case World.GEN_URBAN_DISTRICTS -> BUILDING_TEMPLATE_DISTRICTS;
-            case World.GEN_URBAN_UNDERGROUND, World.GEN_URBAN_ECOLOGY, World.GEN_URBAN_SURVIVORS -> BUILDING_TEMPLATE_ROUTES;
+            case World.GEN_URBAN_UNDERGROUND, World.GEN_URBAN_ECOLOGY, World.GEN_URBAN_SURVIVORS,
+                 World.GEN_URBAN_STRONGHOLDS -> BUILDING_TEMPLATE_ROUTES;
             default -> throw new IllegalArgumentException("not an urban generator " + generatorVersion);
         };
     }

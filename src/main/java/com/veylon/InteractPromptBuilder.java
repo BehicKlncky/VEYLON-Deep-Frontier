@@ -327,6 +327,8 @@ final class InteractPromptBuilder {
         World world = game.world;
         var plan = world.urban == null ? null : world.urban.buildingAt(x, z);
         String text = plan == null ? null : com.veylon.world.urban.CivicCatalogue.signText(world.seed, plan);
+        // Layout thirteen: a compound's gate sign stands over its gate post, outside every parcel.
+        if (plan == null && world.urban != null) { text = world.urban.compoundSignAt(x, z); }
         return text == null ? "A weathered sign; the paint is unreadable" : "Sign: \"" + text + "\"";
     }
 

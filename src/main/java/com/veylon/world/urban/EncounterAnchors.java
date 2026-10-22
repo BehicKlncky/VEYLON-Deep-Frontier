@@ -127,7 +127,9 @@ public final class EncounterAnchors {
      */
     private static List<Anchor> budgeted(World world, ParcelPlan parcel) {
         DistrictPlan district = world.urban.regionPlan(UrbanIds.regionX(parcel.id()), UrbanIds.regionZ(parcel.id()));
-        List<Integer> chosen = budget(world.seed, district);
+        // Layout thirteen: a compound's claimed parcels are planned held (or a back way unheld).
+        List<Integer> chosen = budget(world.seed, district, world.urban.hasStrongholds()
+                ? world.urban.routes(district.rx, district.rz).claims() : CompoundClaims.NONE);
         if (hasStations(world) && !forStation(world, district.rx, district.rz).isEmpty() && !chosen.isEmpty()) {
             // The station spends one building's share of the district budget first.
             chosen = chosen.subList(0, chosen.size() - 1);
@@ -159,6 +161,14 @@ public final class EncounterAnchors {
      * outside the starter superblock, clinics and security posts first. Pure.
      */
     public static List<Integer> budget(long seed, DistrictPlan district) {
+        return budget(seed, district, CompoundClaims.NONE);
+    }
+
+    /**
+     * As {@link #budget(long, DistrictPlan)}, with layout thirteen's compound claims on each
+     * parcel's variant: a compound's held buildings are never candidates.
+     */
+    public static List<Integer> budget(long seed, DistrictPlan district, CompoundClaims claims) {
         DistrictRules.Profile rules = DistrictRules.of(district.district);
         int anchors = UrbanHash.range(rules.threatMin(), rules.threatMax(), seed, UrbanRevision.LAYOUT_DISTRICTS,
                 UrbanSalts.DISTRICT_THREATS, district.rx, district.rz, 0);
@@ -169,8 +179,8 @@ public final class EncounterAnchors {
                 if (parcel.use() == ParcelPlan.Use.RESIDENTIAL) { buildings--; }
                 continue;
             }
-            if (parcel.use() != ParcelPlan.Use.REFUGE
-                    && DistrictCatalogue.expectedVariant(seed, district, parcel) != BuildingPlan.Variant.OCCUPIED) {
+            if (parcel.use() != ParcelPlan.Use.REFUGE && claims.variant(parcel,
+                    DistrictCatalogue.expectedVariant(seed, district, parcel)) != BuildingPlan.Variant.OCCUPIED) {
                 candidates.add(parcel);
             }
         }

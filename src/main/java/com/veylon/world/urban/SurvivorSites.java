@@ -50,7 +50,11 @@ public final class SurvivorSites {
 
     /** What a site is; the code is what saves store. */
     public enum Kind {
-        CAMP(1, "Survivor camp"), REFUGE(2, "Hidden refuge");
+        CAMP(1, "Survivor camp"), REFUGE(2, "Hidden refuge"),
+        /** Layout thirteen (milestone 17): a held, gated courtyard block. */
+        STRONGHOLD(3, "Guarded stronghold"),
+        /** Layout thirteen: a depot row whose service alley raiders hold. */
+        RAIDERS(4, "Raider yard");
 
         public final int code;
         public final String label;
@@ -58,6 +62,11 @@ public final class SurvivorSites {
         Kind(int code, String label) {
             this.code = code;
             this.label = label;
+        }
+
+        /** A compound of several buildings behind barricades and a gate ({@link CompoundSites}). */
+        public boolean compound() {
+            return this == STRONGHOLD || this == RAIDERS;
         }
 
         public static Kind fromCode(int code) {
@@ -70,7 +79,13 @@ public final class SurvivorSites {
 
     /** A resident's part in the site; the stable archetype id the settlement layer gives the body. */
     public enum Role {
-        LOOKOUT("guard"), TRADER("trader"), MEDIC("medic"), FORAGER("villager"), CIVILIAN("villager");
+        LOOKOUT("guard"), TRADER("trader"), MEDIC("medic"), FORAGER("villager"), CIVILIAN("villager"),
+        /**
+         * Compounds (milestone 17): the guard who keeps a gate and admits visitors, guards on fixed
+         * posts and a guard walking a patrol; a raider yard's boss and its rank and file. Raiders of
+         * every role are the scavenger profile ({@code UrbanSite.archetypeOf}).
+         */
+        GATEKEEPER("guard"), SENTRY("guard"), PATROL("guard"), BOSS("scavenger"), RAIDER("scavenger");
 
         public final String archetypeId;
 
@@ -116,7 +131,13 @@ public final class SurvivorSites {
         public boolean holds(int x, int y, int z) {
             if (!bounds.contains(x, z)) { return false; }
             int feet = feetY();
-            return kind == Kind.CAMP ? y >= feet && y < feet + 2 * UrbanDatum.STOREY_PITCH : y == feet;
+            return switch (kind) {
+                case CAMP -> y >= feet && y < feet + 2 * UrbanDatum.STOREY_PITCH;
+                case REFUGE -> y == feet;
+                // A compound's block, from its first basement to its highest roof; which cells of
+                // it are the compound's own is the compound's to say (CompoundSites.Compound#inside).
+                case STRONGHOLD, RAIDERS -> y > UrbanDatum.slabY(-1) && y <= UrbanDatum.slabY(BuildingTemplates.MAX_STOREYS) + 2;
+            };
         }
 
         /** The resident in a slot, or null. */
@@ -135,10 +156,14 @@ public final class SurvivorSites {
 
     private final Site camp;
     private final Site refuge;
+    private final CompoundSites.Compound stronghold;
+    private final CompoundSites.Compound raiders;
 
-    private SurvivorSites(Site camp, Site refuge) {
+    private SurvivorSites(Site camp, Site refuge, CompoundSites.Compound stronghold, CompoundSites.Compound raiders) {
         this.camp = camp;
         this.refuge = refuge;
+        this.stronghold = stronghold;
+        this.raiders = raiders;
     }
 
     /** The region's camp, or null. */
@@ -147,12 +172,59 @@ public final class SurvivorSites {
     /** The region's hidden refuge, or null. */
     public Site refuge() { return refuge; }
 
-    /** Every site of the region: the camp first, then the refuge. */
+    /** Layout thirteen: the region's guarded stronghold, or null. */
+    public CompoundSites.Compound stronghold() { return stronghold; }
+
+    /** Layout thirteen: the region's raider yard, or null. */
+    public CompoundSites.Compound raiders() { return raiders; }
+
+    /** The region's compounds: the stronghold first, then the raider yard. */
+    public List<CompoundSites.Compound> compounds() {
+        List<CompoundSites.Compound> out = new ArrayList<>(2);
+        if (stronghold != null) { out.add(stronghold); }
+        if (raiders != null) { out.add(raiders); }
+        return out;
+    }
+
+    /** The compound a site id names, or null. */
+    public CompoundSites.Compound compound(long id) {
+        for (CompoundSites.Compound c : compounds()) {
+            if (c.site().id() == id) { return c; }
+        }
+        return null;
+    }
+
+    /** Every site of the region whose people live there: the camp first, then the refuge. */
     public List<Site> sites() {
         List<Site> out = new ArrayList<>(2);
         if (camp != null) { out.add(camp); }
         if (refuge != null) { out.add(refuge); }
         return out;
+    }
+
+    /**
+     * The site that holds a building, or null: the camp or refuge the building is, or a compound
+     * one of whose buildings it is. Its storage is that site's.
+     */
+    public static Site owner(UrbanWorldState state, long building) {
+        Site site = resolve(state, building);
+        if (site != null) { return site; }
+        CompoundSites.Compound compound = compoundOf(state, building);
+        return compound == null ? null : compound.site();
+    }
+
+    /** The compound that holds a building in a layout-thirteen world, or null. */
+    public static CompoundSites.Compound compoundOf(UrbanWorldState state, long building) {
+        if (state == null || !state.hasStrongholds() || !UrbanIds.isValid(building)
+                || UrbanIds.kind(building) != UrbanIds.Kind.BUILDING) {
+            return null;
+        }
+        int rx = UrbanIds.regionX(building), rz = UrbanIds.regionZ(building);
+        if (!CityPlanner.isPlannable(rx, rz)) { return null; }
+        for (CompoundSites.Compound c : state.sites(rx, rz).compounds()) {
+            if (c.members().contains(building)) { return c; }
+        }
+        return null;
     }
 
     /** The site a building id names in a layout-twelve world, or null when it names none. */
@@ -172,10 +244,13 @@ public final class SurvivorSites {
     /** Plans one region. Any district plan outside layout twelve's six districts has no sites. */
     public static SurvivorSites of(long seed, DistrictPlan plan, UrbanWorldState state) {
         if (!state.hasSurvivors() || plan.district == null) {
-            return new SurvivorSites(null, null);
+            return new SurvivorSites(null, null, null, null);
         }
         RouteCatalogue routes = state.routes(plan.rx, plan.rz);
-        return new SurvivorSites(camp(seed, plan, state, routes), refuge(seed, plan, state, routes));
+        CompoundClaims claims = routes.claims();
+        return new SurvivorSites(camp(seed, plan, state, routes), refuge(seed, plan, state, routes),
+                CompoundSites.plan(seed, plan, state, claims.stronghold()),
+                CompoundSites.plan(seed, plan, state, claims.raiders()));
     }
 
     // ---- the camp -------------------------------------------------------------------------
@@ -185,8 +260,9 @@ public final class SurvivorSites {
         List<ParcelPlan> candidates = new ArrayList<>();
         for (ParcelPlan p : plan.parcels()) {
             RouteCatalogue.Expect e = routes.expected(p.index());
+            // Layout thirteen: a compound's buildings are its own, never a camp's.
             if (e == null || p.index() == routes.hiddenCellar() || e.family() != BuildingPlan.Family.APARTMENT
-                    || e.variant() != BuildingPlan.Variant.OCCUPIED) {
+                    || e.variant() != BuildingPlan.Variant.OCCUPIED || routes.claims().claims(p.index())) {
                 continue;
             }
             candidates.add(p);
@@ -338,7 +414,7 @@ public final class SurvivorSites {
     }
 
     /** Every cell a fixture fills, whatever its kind. */
-    private static Set<Vec3i> fixtureCells(BuildingPlan b) {
+    static Set<Vec3i> fixtureCells(BuildingPlan b) {
         Set<Vec3i> out = new HashSet<>();
         for (Fixture f : b.fixtures()) {
             for (int h = 0; h < Math.max(1, f.height()); h++) { out.add(f.position().offset(0, h, 0)); }
@@ -403,7 +479,7 @@ public final class SurvivorSites {
      * no fixture in either cell, no water, and nothing reserved. Camp beds and bedrolls (open
      * furniture) count when {@code beds} allows them.
      */
-    private static List<Vec3i> cells(BuildingPlan b, Room room, int y, Set<Vec3i> reserved, boolean beds) {
+    static List<Vec3i> cells(BuildingPlan b, Room room, int y, Set<Vec3i> reserved, boolean beds) {
         List<Vec3i> out = new ArrayList<>();
         ParcelPlan.Rect r = room.interior();
         for (int z = r.z0(); z <= r.z1(); z++) {
@@ -418,14 +494,14 @@ public final class SurvivorSites {
     }
 
     /** Standable in the plan with no door, window or panel in the feet or head cell, and dry. */
-    private static boolean open(PlanVolume v, Vec3i c) {
+    static boolean open(PlanVolume v, Vec3i c) {
         BlockType feet = v.getBlock(c.x(), c.y(), c.z()), head = v.getBlock(c.x(), c.y() + 1, c.z());
         return VoxelClearance.standable(v, c.x(), c.y(), c.z()) && Fixtures.kindOf(feet) == null
                 && Fixtures.kindOf(head) == null && feet != BlockType.WATER && feet != BlockType.STAIRS;
     }
 
     /** Fixture cells, the cells they are used from, and the lanes beside every door and panel. */
-    private static Set<Vec3i> reserved(BuildingPlan b) {
+    static Set<Vec3i> reserved(BuildingPlan b) {
         Set<Vec3i> out = new HashSet<>();
         for (Fixture f : b.fixtures()) {
             for (int h = 0; h < Math.max(1, f.height()); h++) { out.add(f.position().offset(0, h, 0)); }
@@ -454,33 +530,33 @@ public final class SurvivorSites {
         return out;
     }
 
-    private static List<Vec3i> positions(List<Fixture> fixtures) {
+    static List<Vec3i> positions(List<Fixture> fixtures) {
         return fixtures.stream().map(Fixture::position).toList();
     }
 
-    private static List<Vec3i> targets(List<Fixture> fixtures) {
+    static List<Vec3i> targets(List<Fixture> fixtures) {
         return fixtures.stream().map(Fixture::target).toList();
     }
 
-    private static Floor floor(BuildingPlan b, int index) {
+    static Floor floor(BuildingPlan b, int index) {
         for (Floor f : b.floors()) {
             if (f.index() == index) { return f; }
         }
         return null;
     }
 
-    private static Room room(Floor floor, int index) {
+    static Room room(Floor floor, int index) {
         for (Room r : floor.rooms()) {
             if (UrbanIds.roomIndex(r.id()) == index) { return r; }
         }
         return null;
     }
 
-    private static ParcelPlan.Rect rect(ParcelPlan p) {
+    static ParcelPlan.Rect rect(ParcelPlan p) {
         return new ParcelPlan.Rect(p.x0(), p.z0(), p.x1(), p.z1());
     }
 
-    private static int manhattan(Vec3i a, Vec3i b) {
+    static int manhattan(Vec3i a, Vec3i b) {
         return Math.abs(a.x() - b.x()) + Math.abs(a.z() - b.z());
     }
 
@@ -500,7 +576,7 @@ public final class SurvivorSites {
     }
 
     /** A resident's name: a pure pick from an original list, kept unique inside the site. */
-    private static String name(long seed, long id, Set<String> taken) {
+    static String name(long seed, long id, Set<String> taken) {
         int start = UrbanHash.range(0, NAMES.length - 1, seed, LAYOUT, UrbanSalts.SITE_NAME, id, 0, 0);
         for (int i = 0; i < NAMES.length; i++) {
             String n = NAMES[(start + i) % NAMES.length];

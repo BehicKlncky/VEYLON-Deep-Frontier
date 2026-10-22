@@ -28,12 +28,15 @@ public final class SurvivorStash {
     /** The planned contents of a site's stash container, or null when the container is no site's stash. */
     public static Inventory supplies(World world, BuildingPlan building, BuildingPlan.Fixture fixture) {
         if (world.urban == null || !world.urban.hasSurvivors()) { return null; }
-        SurvivorSites.Site site = SurvivorSites.resolve(world.urban, building.id());
+        SurvivorSites.Site site = SurvivorSites.owner(world.urban, building.id());
         if (site == null) { return null; }
         int index = site.stash().indexOf(fixture.position());
         if (index < 0) { return null; }
         long seed = world.seed, id = fixture.id();
         Inventory out = new Inventory(UrbanContainers.SLOTS);
+        if (site.kind().compound()) {
+            return compound(site, index, seed, id, out);
+        }
         if (site.kind() == SurvivorSites.Kind.CAMP) {
             boolean first = index == 0;
             out.add(ItemType.DRIED_BERRY, roll(seed, id, 0, first ? 5 : 3, first ? 7 : 5));
@@ -52,11 +55,39 @@ public final class SurvivorStash {
         return out.isEmpty() ? null : out;
     }
 
+    /**
+     * A compound's stash (layout thirteen). A stronghold's stores feed a garrison and are foraged
+     * for: its first container holds seven to nine rations, four or five clean waterskins and two
+     * bandages, each other one three to five rations, two or three waterskins and, half the time,
+     * dried meat. A raider yard's are finite, two to four rations and one or two waterskins a
+     * container, with scrap and a bandage in the first.
+     */
+    private static Inventory compound(SurvivorSites.Site site, int index, long seed, long id, Inventory out) {
+        boolean first = index == 0;
+        if (site.kind() == SurvivorSites.Kind.STRONGHOLD) {
+            out.add(ItemType.DRIED_BERRY, roll(seed, id, 4, first ? 7 : 3, first ? 9 : 5));
+            out.add(ItemType.WATERSKIN_CLEAN, roll(seed, id, 5, first ? 4 : 2, first ? 5 : 3));
+            if (first) {
+                out.add(ItemType.BANDAGE, 2);
+            } else if (roll(seed, id, 6, 0, 1) == 1) {
+                out.add(ItemType.DRIED_MEAT, 1);
+            }
+            return out;
+        }
+        out.add(ItemType.DRIED_BERRY, roll(seed, id, 7, 2, 4));
+        out.add(ItemType.WATERSKIN_CLEAN, roll(seed, id, 8, 1, 2));
+        if (first) {
+            out.add(ItemType.SCRAP, roll(seed, id, 9, 2, 4));
+            out.add(ItemType.BANDAGE, 1);
+        }
+        return out;
+    }
+
     /** Whether a cell is one of a layout-twelve site's stash containers. */
     public static boolean isStash(World world, Vec3i position) {
         if (world.urban == null || !world.urban.hasSurvivors()) { return false; }
         BuildingPlan building = world.urban.buildingAt(position.x(), position.z());
-        SurvivorSites.Site site = building == null ? null : SurvivorSites.resolve(world.urban, building.id());
+        SurvivorSites.Site site = building == null ? null : SurvivorSites.owner(world.urban, building.id());
         return site != null && site.stash().contains(position);
     }
 

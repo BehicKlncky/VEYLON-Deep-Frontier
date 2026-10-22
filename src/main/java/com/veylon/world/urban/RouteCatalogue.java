@@ -88,17 +88,19 @@ public final class RouteCatalogue {
     private static final Features NONE = new Features(List.of(), false, List.of(), List.of());
 
     private final DistrictPlan district;
+    private final CompoundClaims claims;
     private final Map<Integer, Expect> expect = new HashMap<>();
     private final List<Corridor> corridors = new ArrayList<>();
     private final List<FireEscape> fireEscapes = new ArrayList<>();
     private final List<Connector> connectors = new ArrayList<>();
     private final int hiddenCellar;
 
-    private RouteCatalogue(long seed, DistrictPlan district) {
+    private RouteCatalogue(long seed, DistrictPlan district, CompoundClaims claims) {
         this.district = district;
+        this.claims = claims;
         for (ParcelPlan parcel : district.parcels()) {
             if (!UrbanStarterSite.isNeighbour(parcel) && parcel.use() != ParcelPlan.Use.REFUGE) {
-                expect.put(parcel.index(), expect(seed, district, parcel));
+                expect.put(parcel.index(), expect(seed, district, parcel, claims));
             }
         }
         for (SuperblockPlan block : district.superblocks()) {
@@ -115,19 +117,37 @@ public final class RouteCatalogue {
 
     /** The catalogue of a six-district region. Pure; callers cache it with the region plan. */
     public static RouteCatalogue of(long seed, DistrictPlan district) {
-        return new RouteCatalogue(seed, district);
+        return new RouteCatalogue(seed, district, CompoundClaims.NONE);
+    }
+
+    /**
+     * Layout thirteen's catalogue (milestone 17): a compound's claimed parcels are planned held, or
+     * for a raider yard's back way unheld, before any route is agreed, so a service door that locks
+     * when its building is held and the plan itself agree.
+     */
+    public static RouteCatalogue of(long seed, DistrictPlan district, CompoundClaims claims) {
+        return new RouteCatalogue(seed, district, claims);
     }
 
     /** The template-seven facts of a non-starter parcel: family, storeys, basement and variant. */
     public static Expect expect(long seed, DistrictPlan district, ParcelPlan parcel) {
+        return expect(seed, district, parcel, CompoundClaims.NONE);
+    }
+
+    /** As {@link #expect(long, DistrictPlan, ParcelPlan)}, with a compound's claim on the variant. */
+    public static Expect expect(long seed, DistrictPlan district, ParcelPlan parcel, CompoundClaims claims) {
         Family family = DistrictCatalogue.family(seed, district, parcel);
         int storeys = family.walkUp() ? Math.min(family == Family.SHOP ? 2 : BuildingTemplates.MAX_STOREYS,
                 parcel.maxStoreys()) : CivicTemplates.envelope(family).storeys(parcel);
         boolean basement = family == Family.APARTMENT || !family.walkUp() && CivicCatalogue.basement(seed, family, parcel);
         boolean alongX = parcel.frontage().dx == 0;
-        return new Expect(parcel, family, storeys, basement, DistrictCatalogue.expectedVariant(seed, district, parcel),
+        return new Expect(parcel, family, storeys, basement,
+                claims.variant(parcel, DistrictCatalogue.expectedVariant(seed, district, parcel)),
                 alongX ? parcel.width() : parcel.depth(), alongX ? parcel.depth() : parcel.width());
     }
+
+    /** The compounds that claim this region's parcels; {@link CompoundClaims#NONE} before layout thirteen. */
+    public CompoundClaims claims() { return claims; }
 
     public List<Corridor> corridors() { return List.copyOf(corridors); }
     public List<FireEscape> fireEscapes() { return List.copyOf(fireEscapes); }
