@@ -118,6 +118,7 @@ public final class SaveSystem {
         Objects.requireNonNull(g, "g");
         Objects.requireNonNull(savePath, "savePath");
         g.entities.flushInfectedDeaths(g);
+        g.entities.flushSiteDeaths(g);
         // Falling bodies are transient and are not written. Freezing them here
         // rather than dropping them is what makes a save taken mid-fall come
         // back as a settled corpse instead of losing one.
@@ -710,6 +711,7 @@ public final class SaveSystem {
             UrbanContainersSection.finishLoad(g);
             UrbanRefugesSection.finishLoad(g);
             UrbanPopulationSection.finishLoad(g);
+            UrbanSitesSection.finishLoad(g);
             g.settlementManager.onWorldLoaded(g);
             return true;
         } catch (IOException ex) {
@@ -730,9 +732,11 @@ public final class SaveSystem {
     // ------------------------------------------------------------------
 
     private static void writeSettlements(DataOutputStream out, Game g) throws IOException {
-        var settlements = g.world.settlements;
+        // Urban survivor sites are written by urban.sites (milestone 16), never by the legacy codec.
+        List<Settlement> settlements = g.world.settlements.values().stream()
+                .filter(s -> !(s instanceof com.veylon.settlement.UrbanSite)).toList();
         out.writeInt(settlements.size());
-        for (Settlement s : settlements.values()) {
+        for (Settlement s : settlements) {
             out.writeInt(s.regionX);
             out.writeInt(s.regionZ);
             out.writeUTF(s.type.name());
@@ -879,8 +883,10 @@ public final class SaveSystem {
             out.writeFloat(entry.getValue());
         }
 
-        out.writeInt(g.world.settlements.size());
-        for (Settlement s : g.world.settlements.values()) {
+        List<Settlement> legacySettlements = g.world.settlements.values().stream()
+                .filter(s -> !(s instanceof com.veylon.settlement.UrbanSite)).toList();
+        out.writeInt(legacySettlements.size());
+        for (Settlement s : legacySettlements) {
             out.writeLong(s.id);
             out.writeBoolean(s.commandNeutralized);
             out.writeBoolean(s.alarmNeutralized);

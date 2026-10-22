@@ -40,6 +40,7 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Long-running release QA for every persistent or high-churn bounded collection. */
@@ -410,6 +411,25 @@ class RuntimeBoundsTest {
         assertEquals(chunks, game.world.loadedCount());
         assertTrue(RuntimeBudgetSnapshot.hardLimitSummary().contains(
                 "sitePlans=" + com.veylon.world.urban.UrbanWorldState.MAX_REGION_PLANS));
+    }
+
+    @Test
+    void survivorSiteRecordsStopAtTheirCap() {
+        Game game = com.veylon.SurvivorWorldArena.session(com.veylon.SurvivorWorldArena.SEED,
+                com.veylon.entity.GameMode.SURVIVAL);
+        var camp = com.veylon.SurvivorWorldArena.nearest(game, com.veylon.world.urban.SurvivorSites.Kind.CAMP);
+        var refuge = com.veylon.SurvivorWorldArena.nearest(game, com.veylon.world.urban.SurvivorSites.Kind.REFUGE);
+        // Stand-in records fill the registry to its cap; the next real site is refused, not added.
+        for (int i = 0; i < com.veylon.settlement.UrbanSiteDirector.MAX_SITES; i++) {
+            game.world.settlements.put(-1L - i, new com.veylon.settlement.UrbanSite(camp));
+        }
+        assertNull(game.settlementManager.urbanSites.register(game, refuge));
+        RuntimeBudgetSnapshot full = RuntimeBudgetSnapshot.capture(game);
+        assertEquals(com.veylon.settlement.UrbanSiteDirector.MAX_SITES, full.urbanSiteRecords());
+        assertTrue(full.withinHardLimits(), full.occupancySummary());
+        game.world.settlements.put(1L, new com.veylon.settlement.UrbanSite(camp));
+        assertFalse(RuntimeBudgetSnapshot.capture(game).withinHardLimits(), "a record past the cap is reported");
+        assertTrue(RuntimeBudgetSnapshot.hardLimitSummary().contains("sites=" + com.veylon.settlement.UrbanSiteDirector.MAX_SITES));
     }
 
     @Test

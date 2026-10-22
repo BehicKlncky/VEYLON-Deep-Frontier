@@ -84,6 +84,8 @@ public class SettlementManager
     public final CounterattackDirector counterattacks = new CounterattackDirector();
     /** Off-screen food, illness, morale and population for dormant settlements. */
     private final DormantSettlementSimulation dormantSim = new DormantSettlementSimulation();
+    /** Survivor camps and hidden refuges of layout twelve (urban milestone 16), beside the legacy settlements. */
+    public final UrbanSiteDirector urbanSites = new UrbanSiteDirector();
 
     /** Admission categories for the single combined NPC budget. */
     public enum NpcCategory {
@@ -120,6 +122,7 @@ public class SettlementManager
         activeTheftPenaltyApplied = false;
         counterattacks.reset();
         dormantSim.reset();
+        urbanSites.reset();
     }
 
     // ------------------------------------------------------------------
@@ -131,6 +134,8 @@ public class SettlementManager
     }
 
     public void addReputation(Game g, String factionId, float delta, String reason) {
+        // Only human factions have standing: hidden civilians belong to none (urban milestone 16).
+        if (!HumanFaction.ALL.contains(factionId)) { return; }
         float now = MathUtil.clamp(reputation(g, factionId) + delta, -100f, 100f);
         g.world.factionReputation.put(factionId, now);
         if (reason != null && Math.abs(delta) >= 2) {
@@ -146,6 +151,7 @@ public class SettlementManager
 
     /** Local settlement reputation; flips neutral settlements at thresholds. */
     public void addLocalReputation(Game g, Settlement s, float delta, String reason) {
+        if (s instanceof UrbanSite site) { UrbanSiteRelations.trust(g, site, delta, reason); return; }
         s.localReputation = MathUtil.clamp(s.localReputation + delta, -100f, 100f);
         if (reason != null && Math.abs(delta) >= 2) {
             g.log(reason);
@@ -165,7 +171,7 @@ public class SettlementManager
 
     /** A completed local trade benefits the actual resident's settlement. */
     public void onTradeCompleted(Game g, Settlement s, ItemType received, int count) {
-        if (s == null || s.hostile() || s.cleared && !s.occupied || count <= 0) {
+        if (s == null || s instanceof UrbanSite || s.hostile() || s.cleared && !s.occupied || count <= 0) {
             return;
         }
         addSupplyStock(s, received, count);
@@ -174,7 +180,7 @@ public class SettlementManager
 
     /** Gifts are credited locally before their smaller faction-wide effect. */
     public void onGiftGiven(Game g, Settlement s, ItemType type, int count) {
-        if (s == null || s.hostile() || s.cleared && !s.occupied || type == null || count <= 0) {
+        if (s == null || s instanceof UrbanSite || s.hostile() || s.cleared && !s.occupied || type == null || count <= 0) {
             return;
         }
         addSupplyStock(s, type, count);
@@ -188,7 +194,7 @@ public class SettlementManager
             return false;
         }
         Settlement s = g.world.settlements.get(resident.settlementId);
-        if (s == null || s.hostile() || s.cleared && !s.occupied || resident.residentIndex < 0
+        if (s == null || s instanceof UrbanSite || s.hostile() || s.cleared && !s.occupied || resident.residentIndex < 0
                 || resident.residentIndex >= s.residents.size()) {
             return false;
         }
@@ -302,6 +308,7 @@ public class SettlementManager
         if (s == null) {
             return;
         }
+        if (s instanceof UrbanSite site) { urbanSites.onAttacked(g, site, n); return; }
         if (n.archetype == NpcArchetype.CAPTIVE) {
             addReputation(g, HumanFaction.FRONTIER, -18,
                     "You harmed a protected captive");
@@ -331,6 +338,7 @@ public class SettlementManager
             r.alive = false;
             r.live = null;
         }
+        if (s instanceof UrbanSite site) { urbanSites.onKilled(g, site, n); return; }
         if (n.archetype == NpcArchetype.CAPTIVE) {
             addReputation(g, HumanFaction.FRONTIER, -35,
                     "You killed a protected captive");
@@ -615,6 +623,7 @@ public class SettlementManager
         // regional settlements. Iterate a stable snapshot so discovery work never
         // mutates the map underneath this tick.
         for (Settlement s : new ArrayList<>(g.world.settlements.values())) {
+            if (s instanceof UrbanSite) { continue; } // 3D activation, discovery and needs: urbanSites below
             double dist = Math.sqrt(s.distSqTo(px, pz));
 
             // Discovery.
@@ -652,6 +661,7 @@ public class SettlementManager
             s.alertLevel = Math.max(0, s.alertLevel - 2.5f * dt);
         }
 
+        urbanSites.slowTick(g, dt);
         tickBountyParties(g, dt);
     }
 
@@ -1415,7 +1425,7 @@ public class SettlementManager
         Settlement best = null;
         double bestD = range * range;
         for (Settlement s : g.world.settlements.values()) {
-            double d = s.distSqTo(x, z);
+            double d = s instanceof UrbanSite ? Double.MAX_VALUE : s.distSqTo(x, z);
             if (d < bestD) {
                 bestD = d;
                 best = s;

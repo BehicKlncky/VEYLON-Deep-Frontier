@@ -68,9 +68,13 @@ final class CrateTransactionSystem {
         this.game = game;
     }
 
-    /** Blast/fire attribution captured from the actual container before removal. */
+    /**
+     * Blast/fire attribution captured from the actual container before removal. A survivor
+     * site's storage answers to its people (urban milestone 16); other held storage keeps D-74.
+     */
     void onSurvivorStorageDestroyed(long ownerId) {
-        if (ownerId != com.veylon.world.urban.UrbanIds.NONE) {
+        if (ownerId != com.veylon.world.urban.UrbanIds.NONE
+                && !game.settlementManager.urbanSites.onStorageWrecked(game, ownerId)) {
             game.settlementManager.addReputation(game,HumanFaction.FREE_SETTLERS,-15,
                     "Destroying survivor storage harms your standing.");
         }
@@ -212,7 +216,9 @@ final class CrateTransactionSystem {
     float searchProgress() { return searching() ? Math.min(1,openEntry.progress / searchDuration) : 1; }
     String storageStatus() {
         if (openEntry == null) { return "Click an item to transfer it."; }
-        String owner = switch (openEntry.owner) {
+        String site = openEntry.owner == UrbanContainers.Owner.SURVIVOR
+                ? game.settlementManager.urbanSites.storageLabel(game, openEntry.ownerId) : null;
+        String owner = site != null ? site : switch (openEntry.owner) {
             case ABANDONED -> "Abandoned property";
             case SURVIVOR -> "Survivor storage: taking supplies is theft";
             case PLAYER -> "Your storage";
@@ -223,7 +229,8 @@ final class CrateTransactionSystem {
 
     /** Hand salvage is one consequential action, including an empty owned cupboard. */
     void onContainerSalvaged(UrbanContainers.Entry entry) {
-        if (entry.owner == UrbanContainers.Owner.SURVIVOR) {
+        if (entry.owner == UrbanContainers.Owner.SURVIVOR
+                && !game.settlementManager.urbanSites.onStorageWrecked(game, entry.ownerId)) {
             game.settlementManager.addReputation(game,HumanFaction.FREE_SETTLERS,-15,
                     "Dismantling survivor storage harms your standing.");
         }
@@ -267,7 +274,10 @@ final class CrateTransactionSystem {
         }
         if (UrbanContainers.manages(game.world)) {
             var entry = game.world.urban.containers.at(cratePos);
-            if (newEvent && entry != null && entry.owner == UrbanContainers.Owner.SURVIVOR) {
+            // A survivor site decides what taking from its people's storage costs (urban
+            // milestone 16); held storage no site lives in keeps the D-74 standing penalty.
+            if (newEvent && entry != null && entry.owner == UrbanContainers.Owner.SURVIVOR
+                    && !game.settlementManager.urbanSites.onStorageTaken(game, entry.ownerId, count)) {
                 game.settlementManager.addReputation(game,HumanFaction.FREE_SETTLERS,
                         -Math.min(CAMP_THEFT_PENALTY_MAX,CAMP_THEFT_PENALTY_BASE+count),
                         "Taking survivor supplies harms your standing.");
@@ -390,6 +400,9 @@ final class CrateTransactionSystem {
             game.audio.playClick();
             if (openEntry != null) {
                 game.world.urban.containers.compact(game.world,openEntry);
+                if (openEntry.owner == UrbanContainers.Owner.SURVIVOR) {
+                    game.settlementManager.urbanSites.onStorageGiven(game, openEntry.ownerId, type, deposited);
+                }
             } else if (game.openCratePos != null) {
                 game.settlementManager.onSuppliesReturned(
                         game, game.openCratePos, type, deposited);

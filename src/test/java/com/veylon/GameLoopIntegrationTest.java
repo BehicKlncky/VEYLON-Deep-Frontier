@@ -164,6 +164,8 @@ class GameLoopIntegrationTest {
         // Dirty every category of cross-world state the reset is meant to clear.
         game.entities.encounters.restored = true;
         game.entities.encounters.lastSpawns = 2;
+        game.settlementManager.urbanSites.restored = true;
+        game.settlementManager.urbanSites.lastSteps = 3;
         game.uiMode = Game.UiMode.INVENTORY;
         game.simPaused = true;
         game.miningProgress = 0.7f;
@@ -217,6 +219,8 @@ class GameLoopIntegrationTest {
         assertFalse(game.entities.encounters.restored);
         assertEquals(0, game.entities.encounters.lastSpawns);
         assertEquals(0, game.entities.encounters.size());
+        assertFalse(game.settlementManager.urbanSites.restored, "survivor sites are per world (milestone 16)");
+        assertEquals(0, game.settlementManager.urbanSites.lastSteps);
         assertEquals("", game.creativeCatalogScreen.query(),
                 "R16: the catalog query does not survive into a new world");
         assertFalse(game.creativeCatalogScreen.inventoryTab() || game.creativeCatalogScreen.searchFocused(),

@@ -126,6 +126,7 @@ public class EntityManager {
     private void finishInfectedDeath(Game g, Npc n) {
         if (!reallyDied(n)) { depart(g, n); return; }
         encounters.onDeath(n);
+        if (n.lastHitByPlayer) { g.settlementManager.urbanSites.onInfectedKilled(g, n); }
         g.log("The " + n.archetype.displayName + " collapses.");
         g.audio.playInfected(com.veylon.engine.InfectedSounds.Cue.DEATH, n.pos.x, n.pos.y, n.pos.z);
         if (n.dismemberOnDeath) {
@@ -152,6 +153,27 @@ public class EntityManager {
                 creatures.remove(i);
                 if (reallyDied(c)) { forgetTarget(c); } else { depart(g, c); }
             }
+        }
+    }
+
+    /**
+     * As {@link #flushInfectedDeaths} for the people of urban survivor sites (milestone 16): a
+     * death between a blow and the next fast tick is committed once before a save, with its
+     * tombstone and body, so the saved list never holds a fallen resident.
+     */
+    public void flushSiteDeaths(Game g) {
+        for (int i = npcs.size() - 1; i >= 0; i--) {
+            Npc n = npcs.get(i);
+            if (!n.dead || com.veylon.settlement.UrbanSiteDirector.siteOf(g.world, n) == null) { continue; }
+            if (n.health <= 0 && !n.hostileToPlayer()) { g.log(n.name + " has died."); }
+            onSettledNpcDied(g, n);
+            if (reallyDied(n) && n.dismemberOnDeath) {
+                g.fragments.spawnFromNpc(g, n, g.fragments.deathPose(n), n.blastX, n.blastY, n.blastZ, n.blastStrength);
+            } else if (reallyDied(n)) {
+                g.ragdolls.spawn(g, n);
+            }
+            npcs.remove(i);
+            if (reallyDied(n)) { forgetTarget(n); } else { depart(g, n); }
         }
     }
 
@@ -317,6 +339,10 @@ public class EntityManager {
                     resident.alive = false;
                 }
                 resident.live = null;
+                if (s instanceof com.veylon.settlement.UrbanSite site) {
+                    resident.health = 0f;
+                    g.settlementManager.urbanSites.onDied(site);
+                }
             }
         }
     }

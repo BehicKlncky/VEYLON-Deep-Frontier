@@ -98,6 +98,22 @@ class UrbanSurfaceSpawnGateTest {
         assertTrue(legacy.events.isActive(EventType.NPC_ILLNESS));
     }
 
+    @Test
+    void campIllnessNeverChoosesASurvivorOfACampOrRefuge() {
+        // Milestone 16: survivor-site people have their own needs, never the legacy camp's illness.
+        Game g = com.veylon.SurvivorWorldArena.session(com.veylon.SurvivorWorldArena.SEED, GameMode.SURVIVAL);
+        var plan = com.veylon.SurvivorWorldArena.nearest(g, com.veylon.world.urban.SurvivorSites.Kind.CAMP);
+        com.veylon.SurvivorWorldArena.standAt(g, plan.entry());
+        com.veylon.SurvivorWorldArena.slowTick(g);
+        var people = com.veylon.SurvivorWorldArena.live(com.veylon.SurvivorWorldArena.site(g, plan));
+        assertFalse(people.isEmpty(), "precondition: the camp's people are here");
+        int logged = g.eventLog.all().size();
+        illness().effect().apply(g.events, g);
+        assertTrue(people.stream().noneMatch(n -> n.sick));
+        assertFalse(g.events.isActive(EventType.NPC_ILLNESS));
+        assertEquals(logged, g.eventLog.all().size(), "no camp-medicine message for a survivor camp");
+    }
+
     private static EventDefinition illness() {
         return EventSystem.definitions().stream()
                 .filter(d -> d.type() == EventType.NPC_ILLNESS).findFirst().orElseThrow();

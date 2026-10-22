@@ -199,6 +199,11 @@ final class PlayerCombatSystem {
         }
         for (Npc n : game.entities.npcs) {
             double d = candidateDist(n, dir);
+            // A survivor-site resident behind a wall is out of reach (urban milestone 16).
+            if (d >= 0 && com.veylon.settlement.UrbanSiteDirector.siteOf(game.world, n) != null
+                    && !game.interactions.clearPathTo(n)) {
+                continue;
+            }
             if (d >= 0 && d < bestD) {
                 bestD = d;
                 best = n;

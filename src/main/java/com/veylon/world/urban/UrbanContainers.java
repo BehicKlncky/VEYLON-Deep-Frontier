@@ -74,7 +74,7 @@ public final class UrbanContainers {
         if (entry!=null) { return entry.owner==Owner.SURVIVOR ? entry.ownerId : UrbanIds.NONE; }
         Planned plan=planned(world,position);
         return plan!=null && !world.urban.containers.entries.containsKey(plan.fixture.id())
-                && plan.building.survivorOwned(plan.fixture) ? plan.building.id() : UrbanIds.NONE;
+                && survivorOwned(world,plan) ? plan.building.id() : UrbanIds.NONE;
     }
     public static boolean manages(World world) {
         return world.urban != null && world.urban.hasGeneratedBuildings();
@@ -114,11 +114,13 @@ public final class UrbanContainers {
         }
         if (entries.containsKey(plan.fixture.id())) { return null; }
         boolean legacy = world.crateContents.containsKey(position);
-        Entry entry = generated(plan,legacy ? State.SEARCHED : State.UNSEARCHED);
+        Entry entry = generated(world,plan,legacy ? State.SEARCHED : State.UNSEARCHED);
         put(entry);
         if (!legacy) {
             Inventory rolled = world.urban.hasStarter() && world.urban.contentRevision() == 3
                     ? UrbanStarterSite.supplies(plan.building, plan.fixture) : null;
+            // Layout twelve: a survivor site's stash holds what its people live on.
+            if (rolled == null) { rolled = SurvivorStash.supplies(world, plan.building, plan.fixture); }
             if (rolled == null) {
                 rolled = LootTables.roll(world.seed,world.urban.contentRevision(),entry.id,plan.table,
                         world.urban.districtAt(position.x(),position.z()),plan.building.variant());
@@ -137,7 +139,7 @@ public final class UrbanContainers {
         boolean newTombstone = plan != null && !entries.containsKey(plan.fixture.id());
         int needed = (newTombstone ? 1 : 0) + (Fixtures.isContainer(replacement) ? 1 : 0);
         if (entries.size() + needed > MAX_ENTRIES) { return false; }
-        if (newTombstone) { prior = generated(plan,State.DESTROYED); put(prior); }
+        if (newTombstone) { prior = generated(world,plan,State.DESTROYED); put(prior); }
         if (prior != null && !prior.state.retired()) {
             prior.state = State.DESTROYED; prior.progress = 0; active.remove(position);
         }
@@ -146,10 +148,22 @@ public final class UrbanContainers {
         return true;
     }
 
-    private Entry generated(Planned plan, State state) {
-        boolean owned = plan.building.survivorOwned(plan.fixture);
+    private Entry generated(World world, Planned plan, State state) {
+        boolean owned = survivorOwned(world, plan);
         return new Entry(plan.fixture.id(),plan.fixture.position(),plan.fixture.block(),
                 owned ? Owner.SURVIVOR : Owner.ABANDONED, owned ? plan.building.id() : UrbanIds.NONE,state,0);
+    }
+
+    /**
+     * Whether survivors own a planned container: a held building's, as always (D-100), and from
+     * layout twelve on a hidden refuge's own storage, which its people live on (milestone 16).
+     */
+    public static boolean survivorOwned(World world, Planned plan) {
+        if (plan.building.survivorOwned(plan.fixture)) { return true; }
+        if (world.urban == null || !world.urban.hasSurvivors()) { return false; }
+        SurvivorSites.Site site = SurvivorSites.resolve(world.urban, plan.building.id());
+        return site != null && site.kind() == SurvivorSites.Kind.REFUGE
+                && UrbanIds.parent(plan.fixture.id()) == site.room();
     }
     private Entry player(Vec3i position, BlockType block) {
         if (entries.size() >= MAX_ENTRIES || nextPlayerId == Long.MIN_VALUE) { return null; }
@@ -187,7 +201,7 @@ public final class UrbanContainers {
             BlockType live=world.getBlock(position.x(),position.y(),position.z());
             if (!Fixtures.isContainer(live)) { throw new IllegalArgumentException("orphan container inventory"); }
             if (plan != null && plan.fixture.block() == live && !entries.containsKey(plan.fixture.id())) {
-                put(generated(plan,State.SEARCHED));
+                put(generated(world,plan,State.SEARCHED));
             } else { player(position,live); }
         }
         for (Entry entry : entries.values()) { if (!entry.state.retired()) { compact(world,entry); } }
@@ -218,7 +232,7 @@ public final class UrbanContainers {
             if (!Fixtures.isContainer(live)) { world.crateContents.remove(position); continue; }
             if (entries.size() >= MAX_ENTRIES) { throw new IllegalArgumentException("too many legacy container inventories"); }
             Planned plan = planned(world,position);
-            if (plan != null && plan.fixture.block() == live) { put(generated(plan,State.SEARCHED)); }
+            if (plan != null && plan.fixture.block() == live) { put(generated(world,plan,State.SEARCHED)); }
             else { player(position,live); }
         }
         for (var edit : world.changedBlocks.entrySet()) {
@@ -227,7 +241,7 @@ public final class UrbanContainers {
             Planned plan=planned(world,position);
             if (plan != null && !entries.containsKey(plan.fixture.id())) {
                 if (entries.size() >= MAX_ENTRIES) { throw new IllegalArgumentException("too many legacy container edits"); }
-                put(generated(plan,State.DESTROYED));
+                put(generated(world,plan,State.DESTROYED));
             }
         }
         prepareSave(world);

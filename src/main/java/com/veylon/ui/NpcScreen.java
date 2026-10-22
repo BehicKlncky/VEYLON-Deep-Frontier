@@ -32,6 +32,12 @@ public class NpcScreen {
         UiRenderer ui = g.ui;
         int w = ui.screenW(), h = ui.screenH();
 
+        com.veylon.settlement.UrbanSite site = com.veylon.settlement.UrbanSiteDirector.siteOf(g.world, n);
+        if (site != null) {
+            updateSite(g, n, site, ui, w, h);
+            return;
+        }
+
         com.veylon.settlement.Settlement home =
                 n.settled() ? g.world.settlements.get(n.settlementId) : null;
         boolean friendly = home != null
@@ -156,6 +162,60 @@ public class NpcScreen {
         } else if (g.input.wasKeyPressed(GLFW_KEY_6)) {
             performAttack(g, n);
         }
+    }
+
+    /**
+     * A conversation with someone of an urban survivor camp or hidden refuge (milestone 16): no
+     * legacy quests or wilderness trades, only what those people deal in.
+     */
+    private void updateSite(Game g, Npc n, com.veylon.settlement.UrbanSite site, UiRenderer ui, int w, int h) {
+        float pw = 600, ph = 360;
+        float x0 = w / 2f - pw / 2f, y0 = h / 2f - ph / 2f;
+        ui.panel(x0, y0, pw, ph);
+        ui.textCentered(w / 2f, y0 + 12, 2f, n.name, 1f, 1f, 0.9f, 1f);
+        ui.textCentered(w / 2f, y0 + 36, 1.3f, n.jobName() + " - " + site.label(), 0.8f, 0.85f, 0.9f, 1f);
+        ui.textCentered(w / 2f, y0 + 54, 1.2f, com.veylon.settlement.UrbanSiteDialogue.status(g, n),
+                0.7f, 0.7f, 0.7f, 1f);
+        float oy = y0 + 86;
+        for (String line : siteOptions(g, n)) {
+            option(ui, x0 + 30, oy, line);
+            oy += 26;
+        }
+        oy += 10;
+        if (!lastResponse.isEmpty()) {
+            ui.textShadow(x0 + 30, oy, 1.4f, '"' + lastResponse + '"', 0.95f, 0.9f, 0.7f, 1f);
+        }
+        ui.textCentered(w / 2f, y0 + ph - 24, 1.2f, "[Esc or F] leave", 0.7f, 0.7f, 0.7f, 1f);
+        for (int key = 1; key <= 9; key++) {
+            if (g.input.wasKeyPressed(GLFW_KEY_0 + key)) {
+                performSiteChoice(g, n, key);
+                break;
+            }
+        }
+    }
+
+    /** The numbered choices a survivor-site conversation offers, as shown. */
+    public java.util.List<String> siteOptions(Game g, Npc n) {
+        ItemStack sel = g.player.selected();
+        return java.util.List.of("[1] Talk", "[2] Give food and water",
+                "[3] Give held item" + (sel != null ? " (" + sel.type.displayName + ")" : " (nothing held)"),
+                "[4] Attack");
+    }
+
+    /**
+     * Gameplay command behind a numbered choice in a survivor-site conversation, shared by the
+     * keys and the tests. Returns false for a number the conversation does not offer.
+     */
+    public boolean performSiteChoice(Game g, Npc n, int choice) {
+        if (n == null || n.dead) { return false; }
+        switch (choice) {
+            case 1 -> lastResponse = com.veylon.settlement.UrbanSiteDialogue.talk(g, n);
+            case 2 -> lastResponse = com.veylon.settlement.UrbanSiteDialogue.giveSupplies(g, n);
+            case 3 -> lastResponse = com.veylon.settlement.UrbanSiteDialogue.giveHeld(g, n);
+            case 4 -> performAttack(g, n);
+            default -> { return false; }
+        }
+        return true;
     }
 
     private void option(UiRenderer ui, float x, float y, String s) {

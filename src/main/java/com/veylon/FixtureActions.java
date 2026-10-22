@@ -222,13 +222,17 @@ public final class FixtureActions {
         return true;
     }
 
-    /** Sliding a loose panel aside for the first time is how its hidden cellar is found. */
+    /**
+     * Sliding a loose panel aside for the first time is how its hidden cellar is found; in a
+     * layout-twelve city, so are the people hiding in it (urban milestone 16).
+     */
     private static void foundCellar(Game g, int x, int y, int z) {
         long cellar = com.veylon.world.urban.UrbanPlaces.cellarBehind(g.world, x, y, z);
         if (cellar != 0 && g.world.urban.discovery.discover(cellar)) {
             g.log("The loose panel slides aside. " + com.veylon.world.urban.UrbanPlaces.discoveryLine(
                     com.veylon.world.urban.UrbanPlaces.Place.HIDDEN_CELLAR));
         }
+        if (cellar != 0) { g.settlementManager.urbanSites.onCellarFound(g, cellar); }
     }
 
     /** Opens or closes every cell of an opening with record = false, keeping the state map in step. */

@@ -95,6 +95,9 @@ final class V3ExtensionSections {
             if (com.veylon.world.urban.UrbanContainers.manages(g.world)) {
                 sections.add(new V3Section(UrbanContainersSection.ID, UrbanContainersSection.write(g)));
             }
+            if (com.veylon.settlement.UrbanSiteDirector.manages(g.world)) {
+                sections.add(new V3Section(UrbanSitesSection.ID, UrbanSitesSection.write(g)));
+            }
             if (UrbanDiscoverySection.present(g)) {
                 sections.add(new V3Section(UrbanDiscoverySection.ID, UrbanDiscoverySection.write(g)));
             }
@@ -213,6 +216,7 @@ final class V3ExtensionSections {
 
     private static V3Section writeReputationActionsSection(Game g) throws IOException {
         List<Settlement> settlements = g.world.settlements.values().stream()
+                .filter(s -> !(s instanceof com.veylon.settlement.UrbanSite))
                 .filter(s -> s.trespassCooldown > 0f || s.restrictedStorageCooldown > 0f)
                 .sorted(Comparator.comparingLong(s -> s.id))
                 .toList();
@@ -298,6 +302,7 @@ final class V3ExtensionSections {
         byte[] remains = null;
         byte[] containers = null;
         byte[] population = null;
+        byte[] sites = null;
         for (int i = 0; i < sectionCount; i++) {
             String id = in.readUTF();
             if (id.isBlank() || !seen.add(id)) {
@@ -346,6 +351,8 @@ final class V3ExtensionSections {
                 UrbanRefugesSection.read(payload, g);
             } else if (UrbanDiscoverySection.ID.equals(id)) {
                 UrbanDiscoverySection.read(payload, g);
+            } else if (UrbanSitesSection.ID.equals(id)) {
+                sites = payload;
             } else if (UrbanPopulationSection.ID.equals(id)) {
                 population = payload;
             }
@@ -355,6 +362,8 @@ final class V3ExtensionSections {
         UrbanMetaSection.finishLoad(g);
         if (containers != null) { UrbanContainersSection.read(containers,g); }
         if (population != null) { UrbanPopulationSection.read(population, g); }
+        // After discovery (a refuge's) and the NPC list (bindings) are in place.
+        if (sites != null) { UrbanSitesSection.read(sites, g); }
         if (restoredLanterns) {
             g.world.refreshLoadedLights();
         }

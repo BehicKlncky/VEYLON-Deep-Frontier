@@ -97,6 +97,21 @@ class UrbanSliceRouteTest {
         }
     }
 
+    /**
+     * Generator 15 (milestone 16) keeps generator 14's city and brings survivor camps and hidden
+     * civilians to life outside the starter superblock; a camp may stand in a neighbouring block,
+     * so its people are on screen during the loop. The loop must still hold.
+     */
+    @Test
+    void theSliceLoopStillCompletesOnTheSurvivorGenerator() {
+        for (long seed : SLICE_SEEDS) {
+            UrbanSliceRun run = new UrbanSliceRun(seed, GameMode.SURVIVAL, World.GEN_URBAN_SURVIVORS).play();
+            assertTrue(run.slice().passed(), "seed=" + seed);
+            assertEquals(World.GEN_URBAN_SURVIVORS, run.game.world.generatorVersion);
+            assertTrue(run.game.player.inventory.count(ItemType.IRON_SPEAR) >= 1, "the first upgrade seed=" + seed);
+        }
+    }
+
     @Test
     void frozenSeedsPlayTheScavengeRiskReturnLoopInSurvivalAndCreative() {
         for (GameMode mode : GameMode.values()) {

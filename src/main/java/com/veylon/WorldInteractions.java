@@ -182,8 +182,18 @@ final class WorldInteractions {
             return clearPathToNpc(npc)
                     ? Game.NpcInteraction.RESCUE_READY : Game.NpcInteraction.RESCUE_BLOCKED;
         }
+        // Survivor-site people (urban milestone 16) are spoken to face to face, never through a
+        // wall: a hidden refuge is found by its panel, not by a voice beside the plaster.
+        if (com.veylon.settlement.UrbanSiteDirector.siteOf(game.world, npc) != null && !clearPathToNpc(npc)) {
+            return Game.NpcInteraction.NONE;
+        }
         return canOpenNpcInteraction(npc)
                 ? Game.NpcInteraction.TALK : Game.NpcInteraction.NONE;
+    }
+
+    /** Whether nothing solid lies between the player's eye and a person's chest. */
+    boolean clearPathTo(Npc npc) {
+        return clearPathToNpc(npc);
     }
 
     /** Ignores closer hostile guards so a reachable prisoner remains selectable. */
