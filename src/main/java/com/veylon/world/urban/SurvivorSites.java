@@ -194,11 +194,12 @@ public final class SurvivorSites {
         return null;
     }
 
-    /** Every site of the region whose people live there: the camp first, then the refuge. */
+    /** Every site of the region: the camp, the refuge, then the stronghold and the raider yard. */
     public List<Site> sites() {
-        List<Site> out = new ArrayList<>(2);
+        List<Site> out = new ArrayList<>(4);
         if (camp != null) { out.add(camp); }
         if (refuge != null) { out.add(refuge); }
+        for (CompoundSites.Compound c : compounds()) { out.add(c.site()); }
         return out;
     }
 

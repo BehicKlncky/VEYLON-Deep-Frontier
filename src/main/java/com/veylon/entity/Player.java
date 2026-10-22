@@ -571,6 +571,8 @@ public class Player extends Entity {
             g.settlementManager.urbanSites.onCellarFound(g, seen.site());
         } else if (seen.place() == UrbanPlaces.Place.CAMP) {
             g.settlementManager.urbanSites.onCampEntered(g, x, y, z);
+        } else if (seen.place() == UrbanPlaces.Place.STRONGHOLD || seen.place() == UrbanPlaces.Place.RAIDER_YARD) {
+            g.settlementManager.urbanSites.onCompoundEntered(g, x, y, z);
         }
     }
 

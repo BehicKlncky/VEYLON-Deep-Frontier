@@ -54,7 +54,9 @@ final class UrbanSiteRelations {
         } else if (s.alignment == Settlement.Alignment.FRIENDLY) {
             g.log(capital(name(s)) + " counts you as a friend now."
                     + (s.camp() ? " Their storage is shared with you, their trader gives a friend's price and"
-                    + " their medic will dress your wounds." : ""));
+                    + " their medic will dress your wounds."
+                    : s.stronghold() ? " Their gate opens for you day and night, their stores are shared with you"
+                    + " and their medic will dress your wounds." : ""));
             g.audio.playQuest();
         } else if (was == Settlement.Alignment.HOSTILE) {
             g.log(capital(name(s)) + " lowers its guard.");
@@ -108,7 +110,7 @@ final class UrbanSiteRelations {
     }
 
     /** Every living one of them who can see the player now knows where the attacker stands. */
-    private static void seeAttacker(Game g, UrbanSite s) {
+    static void seeAttacker(Game g, UrbanSite s) {
         if (g.player == null || !g.player.isPerceivableByAi()) { return; }
         for (Settlement.Resident r : s.residents) {
             if (r.live != null && !r.live.dead) {
@@ -127,6 +129,13 @@ final class UrbanSiteRelations {
         s.owed = Math.min(MAX_OWED, s.owed + Math.max(0, count));
         if (s.grantsAccess()) { return; }
         boolean seen = anyoneSees(g, s);
+        if (s.raiders()) {
+            // Raiders have no standing to lose, and nobody who did not see it knows who took what.
+            alarm(g, s, seen ? 100f : 15f);
+            if (seen) { seeAttacker(g, s); }
+            g.log(seen ? "The raiders saw you take their supplies!" : "You take the raiders' supplies unseen.");
+            return;
+        }
         harm(g, s, Math.min(THEFT_MAX, THEFT_BASE + count), seen ? "They saw you take their supplies!"
                 : "Their stores are short, and they know who took them.");
         frighten(s, s.refuge() ? 15f : 5f);
@@ -139,6 +148,10 @@ final class UrbanSiteRelations {
 
     /** Their storage wrecked by the player's hand, blast or flame. */
     static void wrecked(Game g, UrbanSite s) {
+        if (s.raiders()) {
+            alarm(g, s, anyoneSees(g, s) ? 100f : 25f);
+            return;
+        }
         harm(g, s, WRECKED, "You wrecked their stores!");
         frighten(s, 20f);
         alarm(g, s, 25f);

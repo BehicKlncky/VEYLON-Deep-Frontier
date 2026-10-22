@@ -55,8 +55,8 @@ public final class UrbanSite extends Settlement {
         /** 0 to 100, like hunger. */
         public float thirst;
 
-        Resident(SurvivorSites.Resident plan) {
-            super(plan.name(), archetypeOf(plan.role()));
+        Resident(SurvivorSites.Kind kind, SurvivorSites.Resident plan) {
+            super(plan.name(), archetypeOf(kind, plan.role()));
             this.id = plan.id();
             this.slot = plan.slot();
             this.role = plan.role();
@@ -89,17 +89,32 @@ public final class UrbanSite extends Settlement {
     public int owed;
     /** Presentation only, never saved: the log has told the player they heard these people. */
     public boolean heard;
+    /** Transient (milestone 17): seconds a compound's guard still holds its gate open. */
+    public float gateTimer;
 
     public UrbanSite(SurvivorSites.Site plan) {
         super(plan.id(), UrbanIds.regionX(plan.id()), UrbanIds.regionZ(plan.id()), SettlementType.CAMP, plan.anchor(),
-                plan.kind() == SurvivorSites.Kind.CAMP ? HumanFaction.FREE_SETTLERS : CIVILIANS, Alignment.NEUTRAL);
+                sideOf(plan.kind()), plan.kind() == SurvivorSites.Kind.RAIDERS ? Alignment.HOSTILE : Alignment.NEUTRAL);
         this.plan = plan;
         for (SurvivorSites.Resident r : plan.residents()) {
-            residents.add(new Resident(r));
+            residents.add(new Resident(plan.kind(), r));
         }
-        // Hidden people are wary of anyone who finds them; a camp starts open-minded.
-        localReputation = camp() ? 0f : -10f;
+        // Hidden people are wary of anyone who finds them; a camp and a stronghold start open-minded.
+        localReputation = camp() || stronghold() ? 0f : raiders() ? RAIDER_TRUST : -10f;
         morale = 70f;
+    }
+
+    /** Raiders' view of any stranger: never a friend, whatever is done. */
+    public static final float RAIDER_TRUST = -60f;
+
+    /** The side a site's people are on: legacy Free Settlers for a camp, an urban side otherwise. */
+    static String sideOf(SurvivorSites.Kind kind) {
+        return switch (kind) {
+            case CAMP -> HumanFaction.FREE_SETTLERS;
+            case REFUGE -> CIVILIANS;
+            case STRONGHOLD -> UrbanFactions.WARDENS;
+            case RAIDERS -> UrbanFactions.WRECKERS;
+        };
     }
 
     /** The settlement archetype a planned role plays. */
@@ -107,9 +122,28 @@ public final class UrbanSite extends Settlement {
         return NpcArchetype.byId(role.archetypeId);
     }
 
+    /** As {@link #archetypeOf(SurvivorSites.Role)}; every raider, whatever the role, is the scavenger profile. */
+    public static NpcArchetype archetypeOf(SurvivorSites.Kind kind, SurvivorSites.Role role) {
+        return kind == SurvivorSites.Kind.RAIDERS ? NpcArchetype.SCAVENGER : archetypeOf(role);
+    }
+
     public boolean camp() { return plan.kind() == SurvivorSites.Kind.CAMP; }
 
     public boolean refuge() { return plan.kind() == SurvivorSites.Kind.REFUGE; }
+
+    /** Layout thirteen: a guarded stronghold. */
+    public boolean stronghold() { return plan.kind() == SurvivorSites.Kind.STRONGHOLD; }
+
+    /** Layout thirteen: a raider yard. */
+    public boolean raiders() { return plan.kind() == SurvivorSites.Kind.RAIDERS; }
+
+    /** Either compound kind. */
+    public boolean compound() { return plan.kind().compound(); }
+
+    /** A compound's plan; null for a camp or refuge. */
+    public com.veylon.world.urban.CompoundSites.Compound compoundPlan(UrbanWorldState state) {
+        return compound() ? SurvivorSites.compoundOf(state, plan.id()) : null;
+    }
 
     /** The resident of a planned slot. */
     public Resident resident(int slot) {
@@ -134,9 +168,9 @@ public final class UrbanSite extends Settlement {
         return n;
     }
 
-    /** A camp lets a trusted friend use its storage, as a friendly settlement always has. */
+    /** A camp or a stronghold lets a trusted friend use its storage, as a friendly settlement always has. */
     public boolean grantsAccess() {
-        return camp() && !betrayed && localReputation >= FRIEND_TRUST;
+        return (camp() || stronghold()) && !betrayed && localReputation >= FRIEND_TRUST;
     }
 
     /** Whether the frightened among them hide and refuse to deal. */
@@ -161,10 +195,18 @@ public final class UrbanSite extends Settlement {
         return home(state).anchor();
     }
 
-    /** Re-derives the legacy alignment from trust: a camp may turn hostile, hidden civilians never do. */
+    /**
+     * Re-derives the legacy alignment from trust: a camp or a stronghold may turn hostile, hidden
+     * civilians never do, and raiders always are.
+     */
     public void settleAlignment() {
+        if (raiders()) {
+            localReputation = Math.min(localReputation, RAIDER_TRUST);
+            alignment = Alignment.HOSTILE;
+            return;
+        }
         if (betrayed) { localReputation = Math.min(localReputation, BETRAYED_CAP); }
-        if (camp() && localReputation <= HOSTILE_TRUST) {
+        if ((camp() || stronghold()) && localReputation <= HOSTILE_TRUST) {
             alignment = Alignment.HOSTILE;
         } else if (!betrayed && localReputation >= FRIEND_TRUST) {
             alignment = Alignment.FRIENDLY;
@@ -175,7 +217,8 @@ public final class UrbanSite extends Settlement {
 
     @Override
     public String label() {
-        return plan.kind().label + (camp() && alignment == Alignment.HOSTILE ? " (hostile)"
+        if (raiders()) { return plan.kind().label + (cleared ? " (taken)" : ""); }
+        return plan.kind().label + ((camp() || stronghold()) && alignment == Alignment.HOSTILE ? " (hostile)"
                 : alignment == Alignment.FRIENDLY ? " (friends)" : "");
     }
 }

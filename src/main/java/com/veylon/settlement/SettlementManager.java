@@ -591,6 +591,7 @@ public class SettlementManager
         tickGates(g, dt);
         com.veylon.FixtureActions.tickResidentDoors(g, dt);
         counterattacks.tick(g, dt);
+        urbanSites.fastTick(g, dt);
         tickRestrictedAreas(g, dt);
     }
 

@@ -212,7 +212,7 @@ public class NpcScreen {
             if (!offers.isEmpty()) {
                 out.add("[4] Trade " + offers.get(0).describe());
                 out.add("[5] Trade " + offers.get(1).describe());
-            } else if (site.camp() && role == com.veylon.world.urban.SurvivorSites.Role.MEDIC) {
+            } else if ((site.camp() || site.stronghold()) && role == com.veylon.world.urban.SurvivorSites.Role.MEDIC) {
                 out.add("[4] Ask to have your wounds dressed");
             } else if (site.refuge()) {
                 out.add(com.veylon.settlement.UrbanSiteDialogue.campFor(g, site) == null
@@ -240,7 +240,7 @@ public class NpcScreen {
             case 4 -> {
                 if (trader) {
                     lastResponse = com.veylon.settlement.UrbanSiteDialogue.trade(g, n, 0);
-                } else if (site.camp() && role == com.veylon.world.urban.SurvivorSites.Role.MEDIC) {
+                } else if ((site.camp() || site.stronghold()) && role == com.veylon.world.urban.SurvivorSites.Role.MEDIC) {
                     lastResponse = com.veylon.settlement.UrbanSiteDialogue.treat(g, n);
                 } else if (site.refuge()) {
                     lastResponse = com.veylon.settlement.UrbanSiteDialogue.guide(g, n);

@@ -23,8 +23,9 @@ import java.util.List;
  * when it is gone; someone fed and watered recovers {@value #RECOVERY} an hour. People on the road
  * grow hungry but neither eat nor starve. A camp forages: every {@value #FORAGE_HOURS} hours, with
  * two or more people present, it adds a ration for every three people and refills a waterskin for
- * every two, up to {@value #FOOD_CAP} rations and {@value #WATER_CAP} waterskins. A hidden refuge
- * cannot go out, so what it has is all it has. Fear and alarm fade by the hour; trust that fell
+ * every two, up to {@value #FOOD_CAP} rations and {@value #WATER_CAP} waterskins; a stronghold
+ * (milestone 17) forages the same way up to twice those. A hidden refuge cannot go out, and a
+ * raider yard does not, so what they have is all they have. Fear and alarm fade by the hour; trust that fell
  * drifts back by {@value #TRUST_DRIFT_PER_DAY} a day, never above a betrayal's cap.
  *
  * <p>Simulation starts when the people are first met ({@link UrbanSite#simMinute}), so nobody
@@ -69,10 +70,21 @@ final class UrbanSiteNeeds {
             present += feed(g, guest, site, false);
             fade(guest);
         }
-        if (site.camp() && present >= 2 && hour % FORAGE_HOURS == 0) {
+        // A camp and a stronghold go out for food and water; a raider yard lives on what it holds.
+        if ((site.camp() || site.stronghold()) && present >= 2 && hour % FORAGE_HOURS == 0) {
             forage(g, site, (present + 2) / 3, (present + 1) / 2);
         }
         fade(site);
+    }
+
+    /** Rations a site's foraging stocks up to: a stronghold feeds a garrison. */
+    static int foodCap(UrbanSite site) {
+        return site.stronghold() ? 2 * FOOD_CAP : FOOD_CAP;
+    }
+
+    /** Clean waterskins a site's foraging stocks up to. */
+    static int waterCap(UrbanSite site) {
+        return site.stronghold() ? 2 * WATER_CAP : WATER_CAP;
     }
 
     /** One hour of needs for a site's living people, fed from {@code stash}'s storage; returns how many were present. */
@@ -164,7 +176,14 @@ final class UrbanSiteNeeds {
         if (!g.world.isColumnLoaded(pos.x(), pos.z())) { return false; }
         UrbanContainers.Entry entry = g.world.urban.containers.touch(g.world, pos);
         return entry != null && !entry.state.retired() && entry.owner == UrbanContainers.Owner.SURVIVOR
-                && entry.ownerId == owner.plan.id();
+                && owns(g, owner, entry.ownerId);
+    }
+
+    /** Whether a site owns storage of a building: its own, or for a compound any building it holds. */
+    static boolean owns(Game g, UrbanSite site, long building) {
+        if (building == site.plan.id()) { return true; }
+        com.veylon.world.urban.CompoundSites.Compound c = site.compoundPlan(g.world.urban);
+        return c != null && c.members().contains(building);
     }
 
     static void compact(Game g, Vec3i pos) {
@@ -215,8 +234,8 @@ final class UrbanSiteNeeds {
     /** A camp's foraging: rations, then refilled skins (fresh ones only when no empty is left). */
     private static void forage(Game g, UrbanSite camp, int rations, int skins) {
         int[] have = supplies(g, camp);
-        rations = Math.min(rations, FOOD_CAP - have[0]);
-        skins = Math.min(skins, WATER_CAP - have[1]);
+        rations = Math.min(rations, foodCap(camp) - have[0]);
+        skins = Math.min(skins, waterCap(camp) - have[1]);
         for (Vec3i pos : camp.plan.stash()) {
             if (rations <= 0 && skins <= 0) { break; }
             Inventory inv = inventory(g, camp, pos, true);

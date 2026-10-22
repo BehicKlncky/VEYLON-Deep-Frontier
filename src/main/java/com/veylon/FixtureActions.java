@@ -357,6 +357,49 @@ public final class FixtureActions {
     }
 
     /**
+     * A compound's guard swings a gate leaf (urban milestone 17): open and unlocked to pass or to let
+     * someone through, or shut and locked with the key behind them. The whole opening moves, is heard
+     * as a metal door, and its state is ordinary saved fixture state. Nothing happens to a leaf that
+     * is forced, broken or already as asked, or while a body stands in the opening it would shut.
+     *
+     * @return true when the leaf moved
+     */
+    public static boolean guardSwings(Game g, Vec3i leaf, boolean open) {
+        World w = g.world;
+        BlockType t = w.getBlock(leaf.x(), leaf.y(), leaf.z());
+        Fixtures.Kind kind = Fixtures.kindOf(t);
+        if (kind == null || !kind.door || kind == Fixtures.Kind.HIDDEN_PANEL) {
+            return false;
+        }
+        int bottom = Fixtures.stackBottom(w, leaf.x(), leaf.y(), leaf.z(), kind);
+        int height = Fixtures.stackHeight(w, leaf.x(), bottom, leaf.z(), kind);
+        boolean isOpen = Fixtures.isOpen(t);
+        if (open == isOpen && (open || w.fixtureLockAt(leaf.x(), bottom, leaf.z()) == FixtureStates.LOCK_KEYED)) {
+            return false;
+        }
+        if (!roomFor(w, leaf.x(), bottom, leaf.z(), height)
+                || !open && bodyInOpening(g, leaf.x(), bottom, leaf.z(), height)) {
+            return false;
+        }
+        setOpening(w, leaf.x(), bottom, leaf.z(), height, kind, open, open ? FixtureStates.LOCK_NONE : FixtureStates.LOCK_KEYED);
+        w.fixtures.transitTimers().remove(new Vec3i(leaf.x(), bottom, leaf.z()));
+        float cx = leaf.x() + 0.5f, cy = bottom + 1f, cz = leaf.z() + 0.5f;
+        sound(g, kind, cx, cy, cz, open);
+        g.noise.emit(g, cx, cy, cz, METAL_DOOR_NOISE_RADIUS, METAL_DOOR_NOISE, "door", false, null);
+        return true;
+    }
+
+    /** True while a body stands in the door opening a leaf belongs to. */
+    public static boolean bodyInDoor(Game g, Vec3i leaf) {
+        Fixtures.Kind kind = Fixtures.kindOf(g.world.getBlock(leaf.x(), leaf.y(), leaf.z()));
+        if (kind == null) {
+            return false;
+        }
+        int bottom = Fixtures.stackBottom(g.world, leaf.x(), leaf.y(), leaf.z(), kind);
+        return bodyInOpening(g, leaf.x(), bottom, leaf.z(), Fixtures.stackHeight(g.world, leaf.x(), bottom, leaf.z(), kind));
+    }
+
+    /**
      * A Breacher's last blow on a closed wooden door (urban milestone 15): the whole opening
      * becomes a broken doorway through the same recorded edits as a player's forced entry, and
      * as loud. A lock or a bar makes no difference to a ram; metal doors hold, and nothing else

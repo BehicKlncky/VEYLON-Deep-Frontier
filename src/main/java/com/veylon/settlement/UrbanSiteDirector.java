@@ -104,11 +104,14 @@ public final class UrbanSiteDirector {
         return site;
     }
 
-    /** The site a building id names, registering a planned one; null when it names none. */
+    /**
+     * The site a building id names or holds, registering a planned one; null when none does. Any
+     * of a compound's buildings names the compound, so its storage is the compound's.
+     */
     public UrbanSite site(Game g, long id) {
         UrbanSite s = registered(g.world, id);
         if (s != null || !manages(g.world)) { return s; }
-        SurvivorSites.Site plan = SurvivorSites.resolve(g.world.urban, id);
+        SurvivorSites.Site plan = SurvivorSites.owner(g.world.urban, id);
         return plan == null ? null : register(g, plan);
     }
 
@@ -123,7 +126,7 @@ public final class UrbanSiteDirector {
             syncLive(s);
             if (s.refuge() && !s.discovered && g.world.urban.discovery.discovered(s.plan.room())) {
                 discover(g, s);
-            } else if (s.camp() && !s.discovered && inside(g, s)) {
+            } else if ((s.camp() || s.compound()) && !s.discovered && inside(g, s)) {
                 discover(g, s);
             }
         }
@@ -175,11 +178,28 @@ public final class UrbanSiteDirector {
         return false;
     }
 
-    /** The player's feet stand inside a camp's held storeys. */
+    /** The player's feet stand inside a camp's held storeys, or in a compound or on its porch. */
     private static boolean inside(Game g, UrbanSite s) {
         int x = (int) Math.floor(g.player.pos.x), y = (int) Math.floor(g.player.pos.y + .01f);
         int z = (int) Math.floor(g.player.pos.z);
+        if (s.compound()) {
+            com.veylon.world.urban.CompoundSites.Compound c = s.compoundPlan(g.world.urban);
+            return c != null && c.zoneAt(x, y, z) != com.veylon.world.urban.CompoundSites.Zone.OUTSIDE;
+        }
         return s.plan.holds(x, y, z);
+    }
+
+    // ---- the fast tick -----------------------------------------------------------------------
+
+    /** Gates swung open by a compound's guards shut and lock behind them (milestone 17). */
+    public void fastTick(Game g, float dt) {
+        if (!manages(g.world) || !g.world.urban.hasStrongholds()) { return; }
+        for (Settlement settlement : g.world.settlements.values()) {
+            if (!(settlement instanceof UrbanSite s) || !s.compound()) { continue; }
+            if (s.gateTimer <= 0f && !anyLive(s)) { continue; }
+            com.veylon.world.urban.CompoundSites.Compound c = s.compoundPlan(g.world.urban);
+            if (c != null) { CompoundGate.tick(g, s, c, dt); }
+        }
     }
 
     // ---- needs, in lockstep ----------------------------------------------------------------
@@ -306,7 +326,12 @@ public final class UrbanSiteDirector {
         if (s.simMinute < 0) { s.simMinute = g.time.totalMinutes; }
         g.audio.playDiscover();
         int people = s.present();
-        if (s.camp()) {
+        if (s.stronghold()) {
+            g.log(people > 0 ? "A guarded stronghold: " + count(people) + " hold this block behind a barricade and a gate."
+                    : "A stronghold once held this block. No one is left to guard it.");
+        } else if (s.raiders()) {
+            g.log(people > 0 ? "Raiders hold this yard. Their sentries watch the gate." : "A raider yard, abandoned.");
+        } else if (s.camp()) {
             g.log(people > 0 ? "Survivors hold this building: " + count(people) + (people == 1 ? " keeps" : " keep") + " a camp here."
                     : "Survivors held this building once. No one is left.");
         } else if (s.relocation != UrbanSite.Relocation.HOME) {
@@ -351,9 +376,22 @@ public final class UrbanSiteDirector {
         return UrbanSiteRelocation.guestBed(g, guest, r);
     }
 
-    /** A camp member the player can see from close by makes the camp known. */
+    /** A camp member, or a compound's guard or raider, the player can see from close by makes the site known. */
     public void onResidentSeen(Game g, UrbanSite s) {
-        if (s.camp() && !s.discovered) { discover(g, s); }
+        if ((s.camp() || s.compound()) && !s.discovered) { discover(g, s); }
+    }
+
+    /** The player stepped into a compound's yard or one of its buildings ({@code UrbanPlaces}): it is known. */
+    public void onCompoundEntered(Game g, int x, int y, int z) {
+        if (!manages(g.world) || !g.world.urban.contentRevisionResolved() || !g.world.urban.hasStrongholds()) { return; }
+        int rx = com.veylon.world.urban.StreetNetwork.regionOf(x), rz = com.veylon.world.urban.StreetNetwork.regionOf(z);
+        if (!CityPlanner.isPlannable(rx, rz)) { return; }
+        for (com.veylon.world.urban.CompoundSites.Compound c : g.world.urban.sites(rx, rz).compounds()) {
+            if (c.inside(x, y, z)) {
+                UrbanSite s = register(g, c.site());
+                if (s != null) { discover(g, s); }
+            }
+        }
     }
 
     /** The player stepped onto a camp's held storeys ({@code UrbanPlaces.Place.CAMP}): it is known. */
@@ -438,7 +476,7 @@ public final class UrbanSiteDirector {
     /** Supplies the player put into a site's stash: aid, once anything owed is repaid. */
     public void onStorageGiven(Game g, long owner, ItemType type, int count) {
         UrbanSite s = site(g, owner);
-        if (s == null || abandoned(s) || count <= 0) { return; }
+        if (s == null || abandoned(s) || count <= 0 || s.raiders()) { return; }
         boolean medicine = UrbanSiteDialogue.healing(type);
         boolean ration = UrbanSiteNeeds.ration(type) || type == ItemType.WATERSKIN_CLEAN;
         if (medicine || ration) {
@@ -457,25 +495,29 @@ public final class UrbanSiteDirector {
     /** The storage screen's owner line for a site's storage, or null when no site holds it. */
     public String storageLabel(Game g, long owner) {
         UrbanSite s = registered(g.world, owner);
-        if (s == null && manages(g.world) && SurvivorSites.resolve(g.world.urban, owner) != null) {
+        if (s == null && manages(g.world) && SurvivorSites.owner(g.world.urban, owner) != null) {
             s = site(g, owner);
         }
         if (s == null) { return null; }
         if (abandoned(s)) { return s.refuge() && s.stashReleased ? "Left to you by the people who hid here" : "Left behind"; }
+        if (s.raiders()) { return "The raiders' stores: they will want them back"; }
+        if (s.stronghold()) {
+            return s.grantsAccess() ? "Stronghold stores: shared with you as a friend" : "Stronghold stores: taking supplies is theft";
+        }
         if (s.grantsAccess()) { return "Camp storage: shared with you as a friend"; }
         return s.camp() ? "Camp storage: taking supplies is theft" : "Their last supplies: taking them is theft";
     }
 
-    /** Storage whose people are gone, or left to the player, is nobody's to defend. */
+    /** Storage whose people are gone, left to the player, or taken from raiders is nobody's to defend. */
     private static boolean abandoned(UrbanSite s) {
-        return s.present() == 0 || s.refuge() && s.stashReleased;
+        return s.present() == 0 || s.refuge() && s.stashReleased || s.raiders() && s.cleared;
     }
 
     /** An infected the player put down within sight of a site's people. */
     public void onInfectedKilled(Game g, Npc infected) {
         if (!manages(g.world)) { return; }
         for (UrbanSite s : sites(g.world)) {
-            if (!anyLive(s)) { continue; }
+            if (!anyLive(s) || s.raiders()) { continue; }
             Vec3i a = s.home(g.world.urban).anchor();
             if (infected.distSqTo(a.x() + .5f, a.y(), a.z() + .5f)
                     <= UrbanSiteRelations.DEFEND_RADIUS * UrbanSiteRelations.DEFEND_RADIUS) {

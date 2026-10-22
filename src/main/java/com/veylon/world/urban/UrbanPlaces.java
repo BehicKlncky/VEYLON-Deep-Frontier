@@ -6,7 +6,8 @@ import com.veylon.world.World;
 /**
  * Which of a layout-ten city's routes a body stands in (milestone 14): a basement, a rooftop, a
  * hidden cellar, a service passage, a transit station or a tunnel; from layout twelve also a
- * survivor camp (milestone 16), whose finding its director records. It reads loaded columns and
+ * survivor camp (milestone 16), and from layout thirteen a guarded stronghold or a raider yard
+ * (milestone 17), whose finding the site director records. It reads loaded columns and
  * pure plans only, never creating a chunk, and answers {@link Place#NONE} in every earlier
  * world, so nothing changes there.
  *
@@ -21,7 +22,11 @@ public final class UrbanPlaces {
         /** Layout eleven (milestone 15): the ground of a growth node, where a Veilmaw lies folded. */
         GROWTH("Veil growth"),
         /** Layout twelve (milestone 16): the storeys survivors hold as their camp. */
-        CAMP("Survivor camp");
+        CAMP("Survivor camp"),
+        /** Layout thirteen (milestone 17): a stronghold's yard and buildings, inside its gate. */
+        STRONGHOLD("Guarded stronghold"),
+        /** Layout thirteen: a raider yard's alley and the buildings they hold. */
+        RAIDER_YARD("Raider yard");
 
         public final String label;
 
@@ -57,10 +62,12 @@ public final class UrbanPlaces {
                     return new Observation(Place.CAMP, UrbanIds.NONE);
                 }
             }
-            return Observation.NONE;
+            return compound(world, x, y, z);
         }
         int rx = StreetNetwork.regionOf(x), rz = StreetNetwork.regionOf(z);
         if (!CityPlanner.isPlannable(rx, rz)) { return Observation.NONE; }
+        Observation yard = compound(world, x, y, z);
+        if (yard.place() != Place.NONE) { return yard; }
         if (y >= TransitNetwork.FEET_Y && y < TransitNetwork.CEILING_Y) {
             for (boolean northSouth : new boolean[]{true, false}) {
                 TransitNetwork.Band band = TransitNetwork.band(northSouth, x, z);
@@ -80,6 +87,17 @@ public final class UrbanPlaces {
                     return new Observation(Place.SERVICE_PASSAGE, UrbanIds.NONE);
                 }
             }
+        }
+        return Observation.NONE;
+    }
+
+    /** Layout thirteen: inside a compound's gate, its yard or one of its buildings' storeys. */
+    private static Observation compound(World world, int x, int y, int z) {
+        if (!world.urban.hasStrongholds()) { return Observation.NONE; }
+        int rx = StreetNetwork.regionOf(x), rz = StreetNetwork.regionOf(z);
+        if (!CityPlanner.isPlannable(rx, rz)) { return Observation.NONE; }
+        for (CompoundSites.Compound c : world.urban.sites(rx, rz).compounds()) {
+            if (c.inside(x, y, z)) { return new Observation(c.stronghold() ? Place.STRONGHOLD : Place.RAIDER_YARD, UrbanIds.NONE); }
         }
         return Observation.NONE;
     }

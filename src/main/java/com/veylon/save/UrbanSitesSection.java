@@ -21,12 +21,15 @@ import java.util.Set;
 
 /**
  * urban.sites v1 (urban milestone 16): the people of every survivor camp and hidden refuge the
- * player has come near, and how they stand with the player. Required for generator 15, rejected
- * in any other world.
+ * player has come near, and how they stand with the player. Required for generators 15 and 16,
+ * rejected in any other world. From generator 16 (milestone 17) its rows also hold strongholds and
+ * raider yards (kind codes 3 and 4) in the same layout: a compound records its own discovery like
+ * a camp, never relocates or leaves its stash, and a raider yard is never betrayed, never treats
+ * the player and never trusts above {@link UrbanSite#RAIDER_TRUST}.
  *
  * <p>Header: int version (1), int count (at most {@value UrbanSiteDirector#MAX_SITES}). Then, in
  * ascending id order, one row per registered site: long building id, byte kind code, byte
- * alignment (0 neutral, 1 friendly, 2 hostile), byte flags (1 discovered camp, 2 betrayed,
+ * alignment (0 neutral, 1 friendly, 2 hostile), byte flags (1 discovered camp or compound, 2 betrayed,
  * 4 stash left to the player), float trust, float fear, float alarm, double needs clock (game
  * minutes, -1 before the people were met), byte relocation code, long camp id, double arrival
  * minute, int last treatment day, int items owed, byte residents (the plan's count), and per
@@ -59,7 +62,7 @@ final class UrbanSitesSection {
                 out.writeLong(s.id);
                 out.writeByte(s.plan.kind().code);
                 out.writeByte(alignmentCode(s.alignment));
-                out.writeByte((s.camp() && s.discovered ? DISCOVERED : 0) | (s.betrayed ? BETRAYED : 0)
+                out.writeByte((!s.refuge() && s.discovered ? DISCOVERED : 0) | (s.betrayed ? BETRAYED : 0)
                         | (s.stashReleased ? RELEASED : 0));
                 out.writeFloat(s.localReputation);
                 out.writeFloat(s.fear);
@@ -132,14 +135,17 @@ final class UrbanSitesSection {
                 if (plan == null || kind != plan.kind()) { throw new IOException("no such planned survivor site"); }
                 UrbanSite s = new UrbanSite(plan);
                 int alignment = in.readUnsignedByte(), flags = in.readUnsignedByte();
+                // A camp and a compound record their own discovery; only a refuge's shelf is ever left
+                // to the player; raiders are never anyone's friends, so never betrayed.
                 if (alignment > 2 || (flags & ~(DISCOVERED | BETRAYED | RELEASED)) != 0
-                        || s.refuge() && (flags & DISCOVERED) != 0 || s.camp() && (flags & RELEASED) != 0) {
+                        || s.refuge() && (flags & DISCOVERED) != 0 || !s.refuge() && (flags & RELEASED) != 0
+                        || s.raiders() && (flags & BETRAYED) != 0) {
                     throw new IOException("invalid survivor site alignment or flags");
                 }
                 s.discovered = (flags & DISCOVERED) != 0;
                 s.betrayed = (flags & BETRAYED) != 0;
                 s.stashReleased = (flags & RELEASED) != 0;
-                s.localReputation = bounded(in.readFloat(), -100f, 100f, "trust");
+                s.localReputation = bounded(in.readFloat(), -100f, s.raiders() ? UrbanSite.RAIDER_TRUST : 100f, "trust");
                 s.fear = bounded(in.readFloat(), 0f, 100f, "fear");
                 s.alertLevel = bounded(in.readFloat(), 0f, 100f, "alarm");
                 s.simMinute = in.readDouble();
@@ -149,7 +155,7 @@ final class UrbanSitesSection {
                 UrbanSite.Relocation relocation = UrbanSite.Relocation.fromCode(in.readUnsignedByte());
                 long camp = in.readLong();
                 double arrive = in.readDouble();
-                if (relocation == null || s.camp() && relocation != UrbanSite.Relocation.HOME
+                if (relocation == null || !s.refuge() && relocation != UrbanSite.Relocation.HOME
                         || relocation == UrbanSite.Relocation.HOME && (camp != UrbanIds.NONE || arrive != 0)
                         || relocation != UrbanSite.Relocation.HOME && !plannedCamp(g, camp)
                         || !Double.isFinite(arrive) || arrive < 0
@@ -163,11 +169,11 @@ final class UrbanSitesSection {
                 s.arriveMinute = arrive;
                 s.lastTreatmentDay = in.readInt();
                 s.owed = in.readInt();
-                if (s.lastTreatmentDay < -1 || s.lastTreatmentDay > today || s.refuge() && s.lastTreatmentDay != -1
-                        || s.owed < 0 || s.owed > 9_999) {
+                if (s.lastTreatmentDay < -1 || s.lastTreatmentDay > today
+                        || (s.refuge() || s.raiders()) && s.lastTreatmentDay != -1 || s.owed < 0 || s.owed > 9_999) {
                     throw new IOException("invalid survivor treatment day or debt");
                 }
-                if (s.betrayed && s.localReputation > UrbanSite.BETRAYED_CAP || s.camp() && s.discovered != s.simMinute >= 0) {
+                if (s.betrayed && s.localReputation > UrbanSite.BETRAYED_CAP || !s.refuge() && s.discovered != s.simMinute >= 0) {
                     throw new IOException("survivor trust or clock contradicts its state");
                 }
                 Settlement.Alignment saved = alignmentOf(alignment);

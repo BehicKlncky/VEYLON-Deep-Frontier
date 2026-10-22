@@ -12,6 +12,8 @@ public final class InfectedAI {
     public static final float WINDUP = 0.65f;
     public static final float CADENCE = 1.8f;
     public static final float REACH = 1.55f;
+    /** Layout thirteen: how close a guard fighting a body must be for it to turn on that guard. */
+    static final float ENGAGE = 6f;
 
     private InfectedAI() { }
 
@@ -21,6 +23,8 @@ public final class InfectedAI {
             return;
         }
         if (!ready(g, n, dt)) {
+            // Visibility controls forget the player, never a guard who is fighting this body.
+            if (n.painTimer <= 0 && !n.panic.active()) { fightBack(g, n, dt); }
             return;
         }
         boolean sight = seesPlayer(g, n);
@@ -48,6 +52,10 @@ public final class InfectedAI {
         }
         boolean canStrike = sight && n.distSqTo(g.player) <= REACH * REACH
                 && Math.abs(n.pos.y - g.player.pos.y) < 0.8f;
+        if (n.combatTarget instanceof Npc || !canStrike && n.strikeWindup < 0 && assailant(g, n) != null) {
+            fightBack(g, n, dt);
+            return;
+        }
         if (n.strikeWindup >= 0) {
             Steering.stop(n);
             n.state = Npc.NpcState.ATTACK;
@@ -135,6 +143,71 @@ public final class InfectedAI {
                 && (d2 < 9 || dot > 0.25f * Math.sqrt(dx * dx + dz * dz))
                 && clearSight(g.world, n.pos.x, n.pos.y + 1.4f, n.pos.z,
                 g.player.pos.x, g.player.pos.y + 1.4f, g.player.pos.z);
+    }
+
+    /**
+     * Layout thirteen (milestone 17): a compound's guard or raider who is fighting this body, within
+     * {@value #ENGAGE} blocks and in plain sight; null in every earlier world, where the infected
+     * answer only the player. The body never picks a fight with the living on its own.
+     */
+    static Npc assailant(Game g, Npc n) {
+        if (g.world.urban == null || !g.world.urban.hasStrongholds()) { return null; }
+        Npc best = null;
+        double bestD = ENGAGE * ENGAGE;
+        for (Npc o : g.entities.npcs) {
+            if (o == n || o.dead || o.combatTarget != n || com.veylon.settlement.UrbanSiteDirector.siteOf(g.world, o) == null) {
+                continue;
+            }
+            double d = o.distSqTo(n);
+            if (d <= bestD && Math.abs(o.pos.y - n.pos.y) < 0.8f
+                    && clearSight(g.world, n.pos.x, n.pos.y + 1.4f, n.pos.z, o.pos.x, o.pos.y + 1.2f, o.pos.z)) {
+                best = o;
+                bestD = d;
+            }
+        }
+        return best;
+    }
+
+    /**
+     * Strikes back at an assailant with the same windup, reach, cadence and recheck at impact as a
+     * strike at the player, through the living body's own damage. Clears the target when the fight
+     * is over.
+     */
+    private static void fightBack(Game g, Npc n, float dt) {
+        if (n.strikeWindup >= 0 && n.combatTarget instanceof Npc foe) {
+            Steering.stop(n);
+            n.state = Npc.NpcState.ATTACK;
+            n.strikeWindup -= dt;
+            if (n.strikeWindup > 0) { return; }
+            n.strikeWindup = -1;
+            n.attackCooldown = CADENCE;
+            if (!foe.dead && foe.distSqTo(n) <= REACH * REACH && Math.abs(foe.pos.y - n.pos.y) < 0.8f
+                    && clearSight(g.world, n.pos.x, n.pos.y + 1.4f, n.pos.z, foe.pos.x, foe.pos.y + 1.2f, foe.pos.z)) {
+                foe.hurt(n.archetype.meleeDamage, false);
+                foe.knockback(n.pos.x, n.pos.z, 2f);
+                g.audio.playHit();
+            }
+            n.combatTarget = null;
+            return;
+        }
+        n.combatTarget = null;
+        Npc foe = assailant(g, n);
+        if (foe == null) { return; }
+        n.yaw = (float) Math.toDegrees(Math.atan2(foe.pos.x - n.pos.x, -(foe.pos.z - n.pos.z)));
+        if (foe.distSqTo(n) > REACH * REACH) {
+            // Knocked back out of reach: close on the one hitting it, by a supported route.
+            n.state = Npc.NpcState.GUARD;
+            if (!IndoorNavigation.moveTo(g, n, new Vec3i(cell(foe.pos.x), cell(foe.pos.y + .01f), cell(foe.pos.z)),
+                    n.archetype.speed, REACH * 0.8f)) { Steering.stop(n); }
+            return;
+        }
+        Steering.stop(n);
+        if (n.attackCooldown <= 0 && n.strikeWindup < 0) {
+            n.combatTarget = foe;
+            n.strikeWindup = WINDUP;
+            n.state = Npc.NpcState.ATTACK;
+            g.audio.playInfected(Cue.STRIKE, n.pos.x, n.pos.y, n.pos.z);
+        }
     }
 
     /** Conservative loaded voxel ray, also used by spawn visibility guards. */

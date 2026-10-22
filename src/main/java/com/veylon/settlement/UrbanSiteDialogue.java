@@ -29,6 +29,8 @@ public final class UrbanSiteDialogue {
         int[] stash = UrbanSiteNeeds.supplies(g, s);
         int people = Math.max(1, s.present());
         int pick = (int) Math.floorMod((long) (g.time.totalMinutes / 3) + n.residentIndex, 2L);
+        if (s.raiders()) { return "Walk away while you still can."; }
+        if (s.stronghold()) { return strongholdLine(s, s.resident(n.residentIndex), stash, people, pick); }
         if (s.refuge()) {
             if (s.frightened()) { return "Please... we have nothing. Just go."; }
             if (stash[1] < people) { return pick == 0 ? "We're down to the last of the water." : "Is there any water out there? Any at all?"; }
@@ -50,6 +52,22 @@ public final class UrbanSiteDialogue {
         }
         return pick == 0 ? "We hold this floor. Infected come down the street most nights."
                 : "If you find clean water, we'll trade for it.";
+    }
+
+    /** What a stronghold's people say, by their duty and how the stronghold stands (milestone 17). */
+    private static String strongholdLine(UrbanSite s, UrbanSite.Resident r, int[] stash, int people, int pick) {
+        if (s.hostile()) { return "You've done enough here. Stay away from our gate."; }
+        if (s.frightened()) { return "Not now. Keep your hands where the guards can see them."; }
+        if (r.role == com.veylon.world.urban.SurvivorSites.Role.GATEKEEPER) {
+            return s.grantsAccess() ? "Friend. The gate's yours, day or night; knock and we'll open."
+                    : "This is a ward of the precinct. Visitors come in by day and keep to the yard and the clinic;"
+                    + " the buildings are ours.";
+        }
+        if (stash[1] < people) { return "We're short of clean water. Every skin helps."; }
+        if (stash[0] < people) { return "The stores are running low. Bring food and you'll be thanked for it."; }
+        if (s.grantsAccess()) { return pick == 0 ? "Good to see you. Rest here if you need to." : "You're one of us now, near enough."; }
+        return pick == 0 ? "We hold this block. The barricades keep the dead out of the yard."
+                : "Keep the peace inside the walls and nobody will trouble you.";
     }
 
     /**
@@ -145,7 +163,8 @@ public final class UrbanSiteDialogue {
      */
     public static java.util.List<Offer> offers(Game g, Npc n) {
         UrbanSite s = UrbanSiteDirector.siteOf(g.world, n);
-        if (s == null || !s.camp() || s.resident(n.residentIndex).role != com.veylon.world.urban.SurvivorSites.Role.TRADER) {
+        if (s == null || !(s.camp() || s.stronghold())
+                || s.resident(n.residentIndex).role != com.veylon.world.urban.SurvivorSites.Role.TRADER) {
             return java.util.List.of();
         }
         int first = com.veylon.world.urban.UrbanHash.range(0, OFFERS.length - 1, g.world.seed,
@@ -281,8 +300,8 @@ public final class UrbanSiteDialogue {
     public static String demand(Game g, Npc n) {
         UrbanSite s = UrbanSiteDirector.siteOf(g.world, n);
         if (s == null || n.dead) { return "..."; }
-        if (s.camp()) {
-            UrbanSiteRelations.harm(g, s, THREAT, "You threatened the camp.");
+        if (s.camp() || s.stronghold()) {
+            UrbanSiteRelations.harm(g, s, THREAT, s.camp() ? "You threatened the camp." : "You threatened the stronghold.");
             if (!s.hostile()) {
                 s.localReputation = Math.min(s.localReputation, UrbanSite.HOSTILE_TRUST);
                 UrbanSiteRelations.trust(g, s, 0f, null);
@@ -322,7 +341,8 @@ public final class UrbanSiteDialogue {
     /** A friendly camp's medic sees to the player's wounds, once a game day. */
     public static String treat(Game g, Npc n) {
         UrbanSite s = UrbanSiteDirector.siteOf(g.world, n);
-        if (s == null || n.dead || !s.camp() || s.resident(n.residentIndex).role != com.veylon.world.urban.SurvivorSites.Role.MEDIC) {
+        if (s == null || n.dead || !(s.camp() || s.stronghold())
+                || s.resident(n.residentIndex).role != com.veylon.world.urban.SurvivorSites.Role.MEDIC) {
             return "I'm no medic.";
         }
         if (!s.grantsAccess()) { return "We save our dressings for our own."; }

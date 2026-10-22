@@ -309,7 +309,10 @@ public class EntityManager {
                 g.settlementManager.onSettlementDefended(g, n.partyTargetSettlementId,
                         n.pos.x, n.pos.z);
             }
-            if (n.hostileToPlayer() && n.archetype != null) {
+            // A raider yard's belongings are its finite stash (urban milestone 17), never conjured.
+            if (n.hostileToPlayer() && n.archetype != null
+                    && !(com.veylon.settlement.UrbanSiteDirector.siteOf(g.world, n) instanceof com.veylon.settlement.UrbanSite site
+                    && site.compound())) {
                 switch (n.archetype) {
                     case SCOUT -> g.player.inventory.add(ItemType.ARROW, 2 + rng.nextInt(4));
                     case POWDERMAN -> {

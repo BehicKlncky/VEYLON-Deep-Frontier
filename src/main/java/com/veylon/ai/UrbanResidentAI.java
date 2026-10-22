@@ -34,7 +34,8 @@ import java.util.List;
  *       fight.</li>
  * </ul>
  * A camp member the player can see from within {@value UrbanSiteDirector#DISCOVERY_SIGHT} blocks
- * makes the camp known.
+ * makes the camp known. The people of layout thirteen's compounds keep duty instead
+ * ({@link CompoundResidentAI}).
  */
 public final class UrbanResidentAI {
     public static final float PERCEPTION_INTERVAL = 0.35f;
@@ -48,6 +49,16 @@ public final class UrbanResidentAI {
         UrbanSite s = UrbanSiteDirector.siteOf(g.world, n);
         if (s == null) {
             Steering.stop(n);
+            return;
+        }
+        if (s.compound()) {
+            // A stronghold's guards and a raider yard's people keep duty (milestone 17).
+            com.veylon.world.urban.CompoundSites.Compound c = s.compoundPlan(g.world.urban);
+            if (c != null) {
+                CompoundResidentAI.update(g, n, s, c, dt);
+            } else {
+                Steering.stop(n);
+            }
             return;
         }
         UrbanSite.Resident r = s.resident(n.residentIndex);
@@ -92,6 +103,10 @@ public final class UrbanResidentAI {
 
     /** Where the schedule wants a resident now: bed, day cell or the stash at meals. */
     public static Vec3i scheduledCell(Game g, UrbanSite s, UrbanSite.Resident r) {
+        if (s.compound()) {
+            com.veylon.world.urban.CompoundSites.Compound c = s.compoundPlan(g.world.urban);
+            if (c != null) { return CompoundResidentAI.scheduledCell(g, s, c, r, r.live); }
+        }
         double hour = g.time.hourF();
         if (night(hour)) {
             return r.role == SurvivorSites.Role.LOOKOUT && s.relocation != UrbanSite.Relocation.ARRIVED
