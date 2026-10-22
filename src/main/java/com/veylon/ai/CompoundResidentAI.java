@@ -45,11 +45,6 @@ import java.util.List;
  */
 public final class CompoundResidentAI {
     public static final float LEASH = 18f, THREAT_RANGE = 12f, DWELL = 4f, FORGET = 14f;
-    /**
-     * How far the blows of a guard's fight carry, and how loud: loud enough for the other guards to
-     * come (residents answer more than half), too quiet to draw the infected (who answer 0.6).
-     */
-    static final float FIGHT_NOISE_RADIUS = 14f, FIGHT_NOISE = 0.55f;
     private static final float EYE = 1.55f, REACH = 1.9f;
 
     private CompoundResidentAI() {
@@ -360,8 +355,6 @@ public final class CompoundResidentAI {
                 target.hurt(n.archetype.meleeDamage, false);
                 target.knockback(n.pos.x, n.pos.z, 2.5f);
                 g.audio.playHit();
-                // A fight at a gate is heard down the street, by the living and the dead.
-                g.noise.emit(g, n.pos.x, n.pos.y + 1f, n.pos.z, FIGHT_NOISE_RADIUS, FIGHT_NOISE, "fight", false, n);
             }
             return;
         }

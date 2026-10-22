@@ -358,9 +358,9 @@ public final class FixtureActions {
 
     /**
      * A compound's guard swings a gate leaf (urban milestone 17): open and unlocked to pass or to let
-     * someone through, or shut and locked with the key behind them. The whole opening moves, is heard
-     * as a metal door, and its state is ordinary saved fixture state. Nothing happens to a leaf that
-     * is forced, broken or already as asked, or while a body stands in the opening it would shut.
+     * someone through, or shut and locked with the key behind them. The whole opening moves with a
+     * metal door's sound, and its state is ordinary saved fixture state. Nothing happens to a leaf
+     * that is forced, broken or already as asked, or while a body stands in the opening it would shut.
      *
      * @return true when the leaf moved
      */
@@ -385,7 +385,6 @@ public final class FixtureActions {
         w.fixtures.transitTimers().remove(new Vec3i(leaf.x(), bottom, leaf.z()));
         float cx = leaf.x() + 0.5f, cy = bottom + 1f, cz = leaf.z() + 0.5f;
         sound(g, kind, cx, cy, cz, open);
-        g.noise.emit(g, cx, cy, cz, METAL_DOOR_NOISE_RADIUS, METAL_DOOR_NOISE, "door", false, null);
         return true;
     }
 

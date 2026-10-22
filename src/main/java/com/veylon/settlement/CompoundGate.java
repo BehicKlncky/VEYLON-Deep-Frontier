@@ -37,8 +37,8 @@ public final class CompoundGate {
     }
 
     /**
-     * A guard opens the gate, unlocking it: both leaves swing open with the metal door's sound and
-     * noise. Returns true when it stands open now.
+     * A guard opens the gate, unlocking it: both leaves swing open with the metal door's sound.
+     * Returns true when it stands open now.
      */
     public static boolean openFor(Game g, UrbanSite s, CompoundSites.Compound c, float seconds) {
         if (!g.world.isColumnLoaded(c.gate().first().x(), c.gate().first().z())) { return false; }
