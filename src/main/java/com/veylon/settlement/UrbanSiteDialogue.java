@@ -120,6 +120,221 @@ public final class UrbanSiteDialogue {
         return "We'll put it to use.";
     }
 
+    // ---- trade ---------------------------------------------------------------------------
+
+    /** A camp trader's standing offer: the player gives, the camp gives back from its stores. */
+    public record Offer(ItemType give, int giveCount, ItemType get, int getCount) {
+        public String describe() {
+            return giveCount + " " + give.displayName + " for " + getCount + " " + get.displayName;
+        }
+    }
+
+    /** What a camp wants for what its stash holds: only goods a camp's stash is stocked with are sold. */
+    private static final Offer[] OFFERS = {
+        new Offer(ItemType.SCRAP, 3, ItemType.WATERSKIN_CLEAN, 1),
+        new Offer(ItemType.PLANK, 2, ItemType.DRIED_BERRY, 2),
+        new Offer(ItemType.FIBER, 4, ItemType.BANDAGE, 1),
+        new Offer(ItemType.TORCH, 2, ItemType.DRIED_BERRY, 2),
+        new Offer(ItemType.MEDICINE, 1, ItemType.WATERSKIN_CLEAN, 2),
+        new Offer(ItemType.SCRAP, 4, ItemType.BANDAGE, 1),
+    };
+
+    /**
+     * A camp trader's two standing offers, a pure pick from the site id; a friend gives one less.
+     * Empty for anyone but a camp's trader.
+     */
+    public static java.util.List<Offer> offers(Game g, Npc n) {
+        UrbanSite s = UrbanSiteDirector.siteOf(g.world, n);
+        if (s == null || !s.camp() || s.resident(n.residentIndex).role != com.veylon.world.urban.SurvivorSites.Role.TRADER) {
+            return java.util.List.of();
+        }
+        int first = com.veylon.world.urban.UrbanHash.range(0, OFFERS.length - 1, g.world.seed,
+                com.veylon.world.urban.UrbanRevision.LAYOUT_SURVIVORS, com.veylon.world.urban.UrbanSalts.SITE_TRADE, s.id, 0, 0);
+        int second = (first + 1 + com.veylon.world.urban.UrbanHash.range(0, OFFERS.length - 2, g.world.seed,
+                com.veylon.world.urban.UrbanRevision.LAYOUT_SURVIVORS, com.veylon.world.urban.UrbanSalts.SITE_TRADE, s.id, 1, 0))
+                % OFFERS.length;
+        java.util.List<Offer> out = new java.util.ArrayList<>(2);
+        for (int index : new int[]{first, second}) {
+            Offer o = OFFERS[index];
+            out.add(s.grantsAccess() ? new Offer(o.give(), Math.max(1, o.giveCount() - 1), o.get(), o.getCount()) : o);
+        }
+        return out;
+    }
+
+    /**
+     * One trade with a camp's trader: the player's goods go into the camp's stash, the camp's go
+     * to the player from its own ground-floor storage, all or nothing. Finite by construction:
+     * when the camp is out of something, it is out.
+     */
+    public static String trade(Game g, Npc n, int index) {
+        UrbanSite s = UrbanSiteDirector.siteOf(g.world, n);
+        java.util.List<Offer> offers = offers(g, n);
+        if (s == null || n.dead || index < 0 || index >= offers.size()) { return "I have nothing to trade."; }
+        if (s.hostile()) { return "We want nothing from you."; }
+        if (s.frightened()) { return "Not now. Not with things as they are."; }
+        Offer o = offers.get(index);
+        Inventory inv = g.player.inventory;
+        if (!inv.has(o.give(), o.giveCount())) { return "Bring " + o.giveCount() + " " + o.give().displayName + " and we'll talk."; }
+        java.util.List<com.veylon.util.Vec3i> stores = storesOf(g, s);
+        int have = 0;
+        for (com.veylon.util.Vec3i p : stores) {
+            Inventory store = UrbanSiteNeeds.inventory(g, s, p, false);
+            if (store != null) { have += store.count(o.get()); }
+        }
+        if (have < o.getCount()) { return "We're out of " + o.get().displayName + "."; }
+        // All or nothing: both sides must have room before anything moves.
+        if (fits(inv, o.get(), o.getCount()) < o.getCount()) { return "You can't carry it."; }
+        if (stashRoom(g, s, o.give(), o.giveCount()) < o.giveCount()) { return "We've no room to keep that."; }
+        inv.remove(o.give(), o.giveCount());
+        UrbanSiteNeeds.give(g, s, new ItemStack(o.give(), o.giveCount()));
+        int owed = o.getCount();
+        for (com.veylon.util.Vec3i p : stores) {
+            Inventory store = UrbanSiteNeeds.inventory(g, s, p, false);
+            if (store != null && owed > 0) {
+                owed -= store.remove(o.get(), owed);
+                UrbanSiteNeeds.compact(g, p);
+            }
+        }
+        inv.add(o.get(), o.getCount());
+        g.audio.playClick();
+        g.log("Traded " + o.describe() + ".");
+        UrbanSiteRelations.trust(g, s, 1f, null);
+        return "A fair trade.";
+    }
+
+    /** How many of a fresh stack would fit in an inventory, tried on a copy. */
+    private static int fits(Inventory inv, ItemType type, int count) {
+        Inventory copy = new Inventory(inv.size());
+        for (int i = 0; i < inv.size(); i++) {
+            ItemStack s = inv.get(i);
+            copy.set(i, s == null ? null : s.copy());
+        }
+        return count - copy.add(type, count);
+    }
+
+    /** How many of a stack the site's stash could take, tried on copies in fill order. */
+    private static int stashRoom(Game g, UrbanSite s, ItemType type, int count) {
+        int left = count;
+        for (com.veylon.util.Vec3i p : UrbanSiteNeeds.stashOf(g, s)) {
+            if (left <= 0) { break; }
+            if (!UrbanSiteNeeds.usable(g, UrbanSiteNeeds.stashOwner(g, s), p)) { continue; }
+            Inventory store = g.world.crateContents.get(p);
+            left -= fits(store == null ? new Inventory(com.veylon.world.urban.UrbanContainers.SLOTS) : store, type, left);
+        }
+        return count - left;
+    }
+
+    /** A camp's ground-floor storage, which its trader sells from. */
+    static java.util.List<com.veylon.util.Vec3i> storesOf(Game g, UrbanSite s) {
+        java.util.List<com.veylon.util.Vec3i> out = new java.util.ArrayList<>(s.plan.stash());
+        com.veylon.world.urban.BuildingPlan b = g.world.urban.buildingAt(s.plan.anchor().x(), s.plan.anchor().z());
+        if (b == null) { return out; }
+        for (com.veylon.world.urban.BuildingPlan.Fixture f : b.fixtures()) {
+            if (f.kind() == com.veylon.world.urban.BuildingPlan.FixtureKind.CONTAINER
+                    && com.veylon.world.urban.UrbanIds.floorIndex(f.id()) == s.plan.floor() && !out.contains(f.position())) {
+                out.add(f.position());
+            }
+        }
+        return out;
+    }
+
+    // ---- a safe move, a threat, the medic -------------------------------------------------
+
+    /** The camp hidden civilians would go to: a known, friendly enough camp with room, nearest first. */
+    public static UrbanSite campFor(Game g, UrbanSite refuge) {
+        UrbanSite best = null;
+        double bestD = Double.MAX_VALUE;
+        for (UrbanSite c : UrbanSiteDirector.sites(g.world)) {
+            if (!c.camp() || !c.discovered) { continue; }
+            double d = c.plan.anchor().distSq(refuge.plan.anchor().x(), refuge.plan.anchor().y(), refuge.plan.anchor().z());
+            boolean ok = UrbanSiteRelocation.refusal(g, refuge, c) == null;
+            boolean bestOk = best != null && UrbanSiteRelocation.refusal(g, refuge, best) == null;
+            if (best == null || ok && !bestOk || ok == bestOk && d < bestD) {
+                best = c;
+                bestD = d;
+            }
+        }
+        return best;
+    }
+
+    /** Tells hidden civilians about a camp the player knows: they go if they trust the player and it would have them. */
+    public static String guide(Game g, Npc n) {
+        UrbanSite s = UrbanSiteDirector.siteOf(g.world, n);
+        if (s == null || n.dead || !s.refuge()) { return "..."; }
+        UrbanSite camp = campFor(g, s);
+        String refusal = UrbanSiteRelocation.refusal(g, s, camp);
+        if (refusal != null) { return refusal; }
+        UrbanSiteRelocation.guide(g, s, camp);
+        return "Then we'll go. Not now, not while anyone could follow. Thank you.";
+    }
+
+    /** Items a threatened refuge hands over at most. */
+    public static final int DEMANDED = 6;
+    /** Trust a demand costs. */
+    public static final float THREAT = 40f;
+
+    /**
+     * Demands their supplies. Hidden civilians cannot refuse: they hand over food, water and
+     * medicine, terrified, and never trust the player the same way again if they did before. A
+     * camp refuses and turns on the player.
+     */
+    public static String demand(Game g, Npc n) {
+        UrbanSite s = UrbanSiteDirector.siteOf(g.world, n);
+        if (s == null || n.dead) { return "..."; }
+        if (s.camp()) {
+            UrbanSiteRelations.harm(g, s, THREAT, "You threatened the camp.");
+            if (!s.hostile()) {
+                s.localReputation = Math.min(s.localReputation, UrbanSite.HOSTILE_TRUST);
+                UrbanSiteRelations.trust(g, s, 0f, null);
+            }
+            UrbanSiteRelations.frighten(s, 20f);
+            UrbanSiteRelations.alarm(g, s, 100f);
+            return "You'll have to come through us.";
+        }
+        int handed = 0;
+        for (com.veylon.util.Vec3i p : s.plan.stash()) {
+            Inventory store = UrbanSiteNeeds.inventory(g, s, p, false);
+            if (store == null) { continue; }
+            for (int i = 0; i < store.size() && handed < DEMANDED; i++) {
+                ItemStack st = store.get(i);
+                if (st == null || !(UrbanSiteNeeds.ration(st.type) || st.type == ItemType.WATERSKIN_CLEAN || healing(st.type))) {
+                    continue;
+                }
+                ItemStack part = st.copy();
+                part.count = Math.min(st.count, DEMANDED - handed);
+                int moved = part.count - g.player.inventory.addStack(part);
+                if (moved <= 0) { continue; }
+                store.shrink(i, moved);
+                handed += moved;
+            }
+            UrbanSiteNeeds.compact(g, p);
+        }
+        s.owed = Math.min(UrbanSiteRelations.MAX_OWED, s.owed + handed);
+        UrbanSiteRelations.harm(g, s, THREAT, handed > 0 ? "You frightened them into handing over " + handed + " supplies."
+                : "You threatened them, and they had nothing left to give.");
+        UrbanSiteRelations.frighten(s, 100f);
+        return handed > 0 ? "Take it! Just take it and go..." : "We have nothing! Please!";
+    }
+
+    /** Health a camp medic restores to a friend, once a game day. */
+    public static final float TREATMENT = 25f;
+
+    /** A friendly camp's medic sees to the player's wounds, once a game day. */
+    public static String treat(Game g, Npc n) {
+        UrbanSite s = UrbanSiteDirector.siteOf(g.world, n);
+        if (s == null || n.dead || !s.camp() || s.resident(n.residentIndex).role != com.veylon.world.urban.SurvivorSites.Role.MEDIC) {
+            return "I'm no medic.";
+        }
+        if (!s.grantsAccess()) { return "We save our dressings for our own."; }
+        int today = g.time.day();
+        if (s.lastTreatmentDay == today) { return "I've done what I can for today. Come back tomorrow."; }
+        if (g.player.health >= g.player.maxHealth) { return "You're in one piece. Keep it that way."; }
+        s.lastTreatmentDay = today;
+        g.player.health = Math.min(g.player.maxHealth, g.player.health + TREATMENT);
+        g.log(n.name + " cleans and dresses your wounds.");
+        return "Hold still. There - that will hold.";
+    }
+
     static boolean healing(ItemType type) {
         return type == ItemType.MEDICINE || type == ItemType.BANDAGE || type == ItemType.ANTISEPTIC
                 || type == ItemType.HERBAL_POULTICE;

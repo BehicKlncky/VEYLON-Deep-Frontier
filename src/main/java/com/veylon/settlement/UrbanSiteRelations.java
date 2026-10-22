@@ -52,7 +52,9 @@ final class UrbanSiteRelations {
         if (s.alignment == Settlement.Alignment.HOSTILE) {
             g.log(capital(name(s)) + " turns on you!");
         } else if (s.alignment == Settlement.Alignment.FRIENDLY) {
-            g.log(capital(name(s)) + " counts you as a friend now.");
+            g.log(capital(name(s)) + " counts you as a friend now."
+                    + (s.camp() ? " Their storage is shared with you, their trader gives a friend's price and"
+                    + " their medic will dress your wounds." : ""));
             g.audio.playQuest();
         } else if (was == Settlement.Alignment.HOSTILE) {
             g.log(capital(name(s)) + " lowers its guard.");

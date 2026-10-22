@@ -194,12 +194,34 @@ public class NpcScreen {
         }
     }
 
-    /** The numbered choices a survivor-site conversation offers, as shown. */
+    /**
+     * The numbered choices a survivor-site conversation offers, as shown: talk, aid and a gift
+     * for anyone; then a camp trader's two offers, a camp medic's dressing, or for hidden
+     * civilians the word of a safe camp; then a threat, and an attack.
+     */
     public java.util.List<String> siteOptions(Game g, Npc n) {
+        com.veylon.settlement.UrbanSite site = com.veylon.settlement.UrbanSiteDirector.siteOf(g.world, n);
+        java.util.List<String> out = new java.util.ArrayList<>();
+        out.add("[1] Talk");
+        out.add("[2] Give food and water");
         ItemStack sel = g.player.selected();
-        return java.util.List.of("[1] Talk", "[2] Give food and water",
-                "[3] Give held item" + (sel != null ? " (" + sel.type.displayName + ")" : " (nothing held)"),
-                "[4] Attack");
+        out.add("[3] Give held item" + (sel != null ? " (" + sel.type.displayName + ")" : " (nothing held)"));
+        if (site != null) {
+            var offers = com.veylon.settlement.UrbanSiteDialogue.offers(g, n);
+            var role = site.resident(n.residentIndex).role;
+            if (!offers.isEmpty()) {
+                out.add("[4] Trade " + offers.get(0).describe());
+                out.add("[5] Trade " + offers.get(1).describe());
+            } else if (site.camp() && role == com.veylon.world.urban.SurvivorSites.Role.MEDIC) {
+                out.add("[4] Ask to have your wounds dressed");
+            } else if (site.refuge()) {
+                out.add(com.veylon.settlement.UrbanSiteDialogue.campFor(g, site) == null
+                        ? "[4] Tell them of a safe place (you know none)" : "[4] Tell them about the camp you found");
+            }
+        }
+        out.add("[6] Demand their supplies");
+        out.add("[7] Attack");
+        return out;
     }
 
     /**
@@ -207,12 +229,31 @@ public class NpcScreen {
      * keys and the tests. Returns false for a number the conversation does not offer.
      */
     public boolean performSiteChoice(Game g, Npc n, int choice) {
-        if (n == null || n.dead) { return false; }
+        com.veylon.settlement.UrbanSite site = com.veylon.settlement.UrbanSiteDirector.siteOf(g.world, n);
+        if (n == null || n.dead || site == null) { return false; }
+        boolean trader = !com.veylon.settlement.UrbanSiteDialogue.offers(g, n).isEmpty();
+        var role = site.resident(n.residentIndex).role;
         switch (choice) {
             case 1 -> lastResponse = com.veylon.settlement.UrbanSiteDialogue.talk(g, n);
             case 2 -> lastResponse = com.veylon.settlement.UrbanSiteDialogue.giveSupplies(g, n);
             case 3 -> lastResponse = com.veylon.settlement.UrbanSiteDialogue.giveHeld(g, n);
-            case 4 -> performAttack(g, n);
+            case 4 -> {
+                if (trader) {
+                    lastResponse = com.veylon.settlement.UrbanSiteDialogue.trade(g, n, 0);
+                } else if (site.camp() && role == com.veylon.world.urban.SurvivorSites.Role.MEDIC) {
+                    lastResponse = com.veylon.settlement.UrbanSiteDialogue.treat(g, n);
+                } else if (site.refuge()) {
+                    lastResponse = com.veylon.settlement.UrbanSiteDialogue.guide(g, n);
+                } else {
+                    return false;
+                }
+            }
+            case 5 -> {
+                if (!trader) { return false; }
+                lastResponse = com.veylon.settlement.UrbanSiteDialogue.trade(g, n, 1);
+            }
+            case 6 -> lastResponse = com.veylon.settlement.UrbanSiteDialogue.demand(g, n);
+            case 7 -> performAttack(g, n);
             default -> { return false; }
         }
         return true;

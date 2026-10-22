@@ -147,12 +147,7 @@ final class UrbanSiteNeeds {
      * site's own storage.
      */
     static Inventory inventory(Game g, UrbanSite owner, Vec3i pos, boolean create) {
-        if (!g.world.isColumnLoaded(pos.x(), pos.z())) { return null; }
-        UrbanContainers.Entry entry = g.world.urban.containers.touch(g.world, pos);
-        if (entry == null || entry.state.retired() || entry.owner != UrbanContainers.Owner.SURVIVOR
-                || entry.ownerId != owner.plan.id()) {
-            return null;
-        }
+        if (!usable(g, owner, pos)) { return null; }
         Inventory inventory = g.world.crateContents.get(pos);
         if (inventory == null && create) {
             inventory = new Inventory(UrbanContainers.SLOTS);
@@ -161,7 +156,18 @@ final class UrbanSiteNeeds {
         return inventory;
     }
 
-    private static void compact(Game g, Vec3i pos) {
+    /**
+     * Whether a container is still the site's own storage: loaded, the original furniture, not
+     * destroyed or moved, and owned by the site. Its first use rolls its planned contents.
+     */
+    static boolean usable(Game g, UrbanSite owner, Vec3i pos) {
+        if (!g.world.isColumnLoaded(pos.x(), pos.z())) { return false; }
+        UrbanContainers.Entry entry = g.world.urban.containers.touch(g.world, pos);
+        return entry != null && !entry.state.retired() && entry.owner == UrbanContainers.Owner.SURVIVOR
+                && entry.ownerId == owner.plan.id();
+    }
+
+    static void compact(Game g, Vec3i pos) {
         UrbanContainers.Entry entry = g.world.urban.containers.at(pos);
         if (entry != null) { g.world.urban.containers.compact(g.world, entry); }
     }
