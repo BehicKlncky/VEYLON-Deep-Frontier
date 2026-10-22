@@ -1,5 +1,6 @@
 package com.veylon;
 
+import com.veylon.engine.AudioManager;
 import com.veylon.entity.GameMode;
 import com.veylon.entity.Npc;
 import com.veylon.settlement.Settlement;
@@ -29,8 +30,13 @@ public final class SurvivorWorldArena {
     }
 
     public static Game session(long seed, GameMode mode) {
-        Game g = new Game();
-        g.newWorld(seed, true, World.GEN_URBAN_SURVIVORS, mode);
+        return session(seed, mode, World.GEN_URBAN_SURVIVORS, new AudioManager());
+    }
+
+    /** A session of any generator whose sound requests a probe observes. */
+    public static Game session(long seed, GameMode mode, int generator, AudioManager audio) {
+        Game g = new Game(audio);
+        g.newWorld(seed, true, generator, mode);
         g.appState = Game.AppState.PLAYING;
         return g;
     }

@@ -5,7 +5,8 @@ import com.veylon.world.World;
 
 /**
  * Which of a layout-ten city's routes a body stands in (milestone 14): a basement, a rooftop, a
- * hidden cellar, a service passage, a transit station or a tunnel. It reads loaded columns and
+ * hidden cellar, a service passage, a transit station or a tunnel; from layout twelve also a
+ * survivor camp (milestone 16), whose finding its director records. It reads loaded columns and
  * pure plans only, never creating a chunk, and answers {@link Place#NONE} in every earlier
  * world, so nothing changes there.
  *
@@ -18,7 +19,9 @@ public final class UrbanPlaces {
         NONE(""), BASEMENT("Basement"), ROOF("Rooftop"), HIDDEN_CELLAR("Hidden cellar"),
         SERVICE_PASSAGE("Service passage"), STATION("Transit station"), TUNNEL("Transit tunnel"),
         /** Layout eleven (milestone 15): the ground of a growth node, where a Veilmaw lies folded. */
-        GROWTH("Veil growth");
+        GROWTH("Veil growth"),
+        /** Layout twelve (milestone 16): the storeys survivors hold as their camp. */
+        CAMP("Survivor camp");
 
         public final String label;
 
@@ -48,6 +51,12 @@ public final class UrbanPlaces {
             }
             if (location.floor().index() < 0) { return new Observation(Place.BASEMENT, UrbanIds.NONE); }
             if (location.floor().index() == building.storeys()) { return new Observation(Place.ROOF, UrbanIds.NONE); }
+            if (world.urban.hasSurvivors()) {
+                SurvivorSites.Site camp = world.urban.sites(StreetNetwork.regionOf(x), StreetNetwork.regionOf(z)).camp();
+                if (camp != null && camp.id() == building.id() && camp.holds(x, y, z)) {
+                    return new Observation(Place.CAMP, UrbanIds.NONE);
+                }
+            }
             return Observation.NONE;
         }
         int rx = StreetNetwork.regionOf(x), rz = StreetNetwork.regionOf(z);

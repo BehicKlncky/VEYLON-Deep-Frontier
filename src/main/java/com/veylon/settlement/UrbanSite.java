@@ -87,6 +87,8 @@ public final class UrbanSite extends Settlement {
      * this first and earns nothing, so taking and returning can never farm trust.
      */
     public int owed;
+    /** Presentation only, never saved: the log has told the player they heard these people. */
+    public boolean heard;
 
     public UrbanSite(SurvivorSites.Site plan) {
         super(plan.id(), UrbanIds.regionX(plan.id()), UrbanIds.regionZ(plan.id()), SettlementType.CAMP, plan.anchor(),

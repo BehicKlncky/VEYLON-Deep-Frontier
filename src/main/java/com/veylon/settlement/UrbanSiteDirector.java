@@ -33,6 +33,8 @@ import java.util.PriorityQueue;
  *       loose panel is opened or the player stands in its cellar ({@code UrbanDiscovery}).</li>
  *   <li><b>Needs.</b> Every met site steps hour by hour in order of game minute, active or not
  *       ({@link UrbanSiteNeeds}).</li>
+ *   <li><b>Noise.</b> People hiding in a refuge can be heard through its wall from within
+ *       {@value #NOISE_RADIUS} blocks, unless fear keeps them silent ({@link #listen}).</li>
  * </ul>
  * All of it runs on the main thread inside the slow tick, with bounded work: nine regions' plans
  * to register from, the registered sites, and a step budget.
@@ -41,12 +43,20 @@ public final class UrbanSiteDirector {
     public static final float ACTIVATE = SettlementManager.ACTIVATE_RADIUS, DEACTIVATE = SettlementManager.DEACTIVATE_RADIUS;
     public static final int MAX_SITES = 1_024;
     public static final float DISCOVERY_SIGHT = 24f;
+    /** How near people hiding in a refuge must be for the player to hear them. */
+    public static final float NOISE_RADIUS = 10f;
+    /** Seconds between the small sounds hiding people make. */
+    public static final float NOISE_PERIOD = 9f;
+    private static final com.veylon.engine.SurvivorSounds.Cue[] CUES = com.veylon.engine.SurvivorSounds.Cue.values();
     private static final int[][] REGIONS = {{0, 0}, {-1, 0}, {1, 0}, {0, -1}, {0, 1}, {-1, -1}, {1, -1}, {-1, 1}, {1, 1}};
 
     /** Set when {@code urban.sites} is read; a generator-15 save without it fails to load. */
     public boolean restored;
     /** Diagnostics of the last slow tick. */
     public int lastSteps, lastActivated;
+    /** Presentation: seconds to the next sound from hiding people, and how many were made. */
+    private float noiseTimer = NOISE_PERIOD / 3f;
+    private int noises;
 
     public static boolean manages(World w) {
         return w != null && w.urban != null && w.urban.hasSurvivors();
@@ -66,6 +76,8 @@ public final class UrbanSiteDirector {
     public void reset() {
         restored = false;
         lastSteps = lastActivated = 0;
+        noiseTimer = NOISE_PERIOD / 3f;
+        noises = 0;
     }
 
     /** Every registered site, in id order. */
@@ -295,7 +307,8 @@ public final class UrbanSiteDirector {
         g.audio.playDiscover();
         int people = s.present();
         if (s.camp()) {
-            g.log("Survivors hold this building: " + count(people) + (people == 1 ? " keeps" : " keep") + " a camp here.");
+            g.log(people > 0 ? "Survivors hold this building: " + count(people) + (people == 1 ? " keeps" : " keep") + " a camp here."
+                    : "Survivors held this building once. No one is left.");
         } else if (s.relocation != UrbanSite.Relocation.HOME) {
             g.log("Their bedding is rolled up. Whoever hid here has moved on.");
         } else if (people > 0) {
@@ -341,6 +354,56 @@ public final class UrbanSiteDirector {
     /** A camp member the player can see from close by makes the camp known. */
     public void onResidentSeen(Game g, UrbanSite s) {
         if (s.camp() && !s.discovered) { discover(g, s); }
+    }
+
+    /** The player stepped onto a camp's held storeys ({@code UrbanPlaces.Place.CAMP}): it is known. */
+    public void onCampEntered(Game g, int x, int y, int z) {
+        if (!manages(g.world) || !g.world.urban.contentRevisionResolved()) { return; }
+        com.veylon.world.urban.BuildingPlan b = g.world.urban.buildingAt(x, z);
+        UrbanSite s = b == null ? null : site(g, b.id());
+        if (s != null && s.camp() && s.plan.holds(x, y, z)) { discover(g, s); }
+    }
+
+    /**
+     * Presentation only: people hiding in a refuge make small sounds, a cough, a shuffle or a
+     * whisper, every {@value #NOISE_PERIOD} seconds, played where one of them is, so a player
+     * within {@value #NOISE_RADIUS} blocks hears them through the wall. The frightened hold their
+     * breath, and nobody hides from a player already inside with them. The first sound of a
+     * refuge not yet found is also logged once, for a player without sound. Nothing here changes
+     * the simulation: it reads the sites and writes only its timer, the log and the audio.
+     */
+    public void listen(Game g, float dt) {
+        if (!manages(g.world) || g.player == null || g.player.dead) { return; }
+        noiseTimer -= dt;
+        if (noiseTimer > 0f) { return; }
+        noiseTimer = NOISE_PERIOD;
+        int px = (int) Math.floor(g.player.pos.x), py = (int) Math.floor(g.player.pos.y + .01f);
+        int pz = (int) Math.floor(g.player.pos.z);
+        UrbanSite heard = null;
+        Npc source = null;
+        double best = NOISE_RADIUS * NOISE_RADIUS;
+        for (Settlement settlement : g.world.settlements.values()) {
+            if (!(settlement instanceof UrbanSite s) || !s.refuge() || s.relocation != UrbanSite.Relocation.HOME
+                    || s.frightened() || s.plan.holds(px, py, pz)) {
+                continue;
+            }
+            for (Settlement.Resident r : s.residents) {
+                Npc n = r.live;
+                if (n == null || n.dead) { continue; }
+                double d = n.distSqTo(g.player);
+                if (d < best) {
+                    best = d;
+                    heard = s;
+                    source = n;
+                }
+            }
+        }
+        if (source == null) { return; }
+        g.audio.playSurvivor(CUES[Math.floorMod(noises++, CUES.length)], source.pos.x, source.pos.y + 1.2f, source.pos.z);
+        if (!heard.discovered && !heard.heard) {
+            heard.heard = true;
+            g.log("Somewhere behind the wall, someone is trying very hard to be quiet.");
+        }
     }
 
     // ---- consequences the rest of the game reports -----------------------------------------

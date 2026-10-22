@@ -50,6 +50,8 @@ public class AudioManager {
     private final int[] infectedBuffers = new int[InfectedSounds.Cue.values().length];
     // Milestone 15: the Veilmaw and the Breacher (EcologySounds).
     private final int[] ecologyBuffers = new int[EcologySounds.Cue.values().length];
+    // Milestone 16: people hiding behind a wall (SurvivorSounds).
+    private final int[] survivorBuffers = new int[SurvivorSounds.Cue.values().length];
 
     /** Positioned gameplay cues; presentation never emits AI noise or changes simulation. */
     public void playInfected(InfectedSounds.Cue cue, float x, float y, float z) {
@@ -59,6 +61,11 @@ public class AudioManager {
     /** Milestone 15 cues; presentation only, like every other one-shot. */
     public void playEcology(EcologySounds.Cue cue, float x, float y, float z) {
         if (enabled) { playAt(ecologyBuffers[cue.ordinal()], x, y, z, 0.7f, pitchVar(0.08f)); }
+    }
+
+    /** Milestone 16: a quiet sound of people in hiding, carrying only a short way; presentation only. */
+    public void playSurvivor(SurvivorSounds.Cue cue, float x, float y, float z) {
+        if (enabled) { playAt(survivorBuffers[cue.ordinal()], x, y, z, 0.6f, pitchVar(0.06f), 2f, 18f); }
     }
 
     // Ambience loops.
@@ -761,6 +768,9 @@ public class AudioManager {
         }
         for (EcologySounds.Cue cue : EcologySounds.Cue.values()) {
             ecologyBuffers[cue.ordinal()] = bank.get(EcologySounds.key(cue));
+        }
+        for (SurvivorSounds.Cue cue : SurvivorSounds.Cue.values()) {
+            survivorBuffers[cue.ordinal()] = bank.get(SurvivorSounds.key(cue));
         }
         bBodyCrackle = bank.get(BodyFireSounds.CRACKLE);
         bBodyFlare = bank.get(BodyFireSounds.FLARE);
