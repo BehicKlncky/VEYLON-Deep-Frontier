@@ -43,7 +43,7 @@ runs. All are inert when unset. Everything below is handled by `QaHarness`;
 | `VEYLON_GAME_MODE=survival\|creative` | Initial mode for automated world runs only; absent means Survival. Invalid values fail explicitly. Ignored for normal title sessions and frontend-only captures. |
 | `VEYLON_GENERATOR=urban-dev` | Development selector: NEW FRONTIER and automated worlds use the newest urban generator (`UrbanRevision.DEVELOPMENT_GENERATOR`, now `World.GEN_URBAN_SURVIVORS`: generator 15, layout 12 / template 7 / content 3, encounter catalogue 5). Absent keeps the ordinary default. Any other value fails, and so does `urban-dev` without an isolated data directory (see below). |
 | `VEYLON_SMOKE=<seconds>` | Release smoke gate: save/load, fire, storm, a fortress approach, then a pass/fail report. Throws on failure |
-| `VEYLON_SCENE=<name>` | Stage a deterministic benchmark scene (`day`, `pinefog`, `nightfire`, `ruin`, `toxic`, `ao_shadow`, `phase4`, `ashwolf`, `silhouette30`, `vfx_blood`, `vfx_mining`, `vfx_beacon`, `death_ragdoll_showcase`, `death_ragdoll_sequence`, `dismember_showcase`, `dismember_wall`, `dismember_bomb` (a real scrap bomb thrown into a group of six, one outside the lethal radius; it goes off at 2.4 s), `dismember_species`, `dismember_species_wall` and `dismember_species_close` (every species, a guard and the player's remains blown apart at 1 s; open meadow, a step and a wall, and a close view of the small bodies), `molotov_ground`, `molotov_tree` and `molotov_rain` (a real fire bomb thrown at 0.5 s onto a dry clearing at dusk, beside a round tree that catches, or with rain from 3 s that puts the pool out; shots `0.7,1.2,3,7,11`, `1,4,10,20` and `2,3.5,5`), the burning-body scenes `body_fire_row`, `body_fire_row_night`, `body_fire_close`, `body_fire_out`, `body_fire_blast`, `body_fire_panic`, `body_fire_bird`, `body_fire_rain`, `body_fire_ragdoll` and `body_fire_player` (see "Burning bodies QA" below), `movement`, `inventory`, `ui_cycle`, `held_*`, `creative_flight` with `VEYLON_GAME_MODE=creative`, which flies east at Shift speed and prints a `[flight]` streaming report at 29 s, and the urban scenes `urban_streets`, `urban_intersection`, `urban_seam_walk`, `urban_fixtures`, `urban_fixtures_night`, `urban_apartments`, `urban_apartments_night`, `urban_apartments_lit_night`, `urban_apartments_manual`, `urban_apartments_manual_night`, `urban_loot`, the playable-slice route `urban_slice`, the catalogue walk `urban_catalogue`, the district tour `urban_districts`, the route tour `urban_underground`, the ecology tour `urban_ecology` and the survivor tour `urban_survivors` with `VEYLON_GENERATOR=urban-dev` (see "Urban planning QA" below)) |
+| `VEYLON_SCENE=<name>` | Stage a deterministic benchmark scene (`day`, `pinefog`, `nightfire`, `ruin`, `toxic`, `ao_shadow`, `phase4`, `ashwolf`, `silhouette30`, `vfx_blood`, `vfx_mining`, `vfx_beacon`, `death_ragdoll_showcase`, `death_ragdoll_sequence`, `dismember_showcase`, `dismember_wall`, `dismember_bomb` (a real scrap bomb thrown into a group of six, one outside the lethal radius; it goes off at 2.4 s), `dismember_species`, `dismember_species_wall` and `dismember_species_close` (every species, a guard and the player's remains blown apart at 1 s; open meadow, a step and a wall, and a close view of the small bodies), `molotov_ground`, `molotov_tree` and `molotov_rain` (a real fire bomb thrown at 0.5 s onto a dry clearing at dusk, beside a round tree that catches, or with rain from 3 s that puts the pool out; shots `0.7,1.2,3,7,11`, `1,4,10,20` and `2,3.5,5`), the burning-body scenes `body_fire_row`, `body_fire_row_night`, `body_fire_close`, `body_fire_out`, `body_fire_blast`, `body_fire_panic`, `body_fire_bird`, `body_fire_rain`, `body_fire_ragdoll` and `body_fire_player` (see "Burning bodies QA" below), `movement`, `inventory`, `ui_cycle`, `held_*`, `creative_flight` with `VEYLON_GAME_MODE=creative`, which flies east at Shift speed and prints a `[flight]` streaming report at 29 s, and the urban scenes `urban_streets`, `urban_intersection`, `urban_seam_walk`, `urban_fixtures`, `urban_fixtures_night`, `urban_apartments`, `urban_apartments_night`, `urban_apartments_lit_night`, `urban_apartments_manual`, `urban_apartments_manual_night`, `urban_loot`, the playable-slice route `urban_slice`, the catalogue walk `urban_catalogue`, the district tour `urban_districts`, the route tour `urban_underground`, the ecology tour `urban_ecology`, the survivor tour `urban_survivors` and the stronghold tour `urban_strongholds` with `VEYLON_GENERATOR=urban-dev` (see "Urban planning QA" below)) |
 | `VEYLON_SHOT="5,10"` | Capture screenshots at those elapsed seconds |
 | `VEYLON_FRONTEND=<name>` | Pin a front-end screen (`options`, `audio`, `loading`, `death`, `victory`, `glyphs`, `newworld`). `newworld-save` shows the replace-save notice without writing a save. `pause` and `gamemode` stage a Survival world with the pause menu or the mode confirmation open; `pause-creative`, `gamemode-creative` and `victory-creative` stage a Creative world; `catalog`, `catalog-tools`, `catalog-search` (query "iron") and `catalog-inventory` open the Creative catalog; `worldcontrols` and `worldcontrols-held` open the Creative world controls, the second with dusk, a frozen clock, a locked storm and paused spawning already applied |
 | `VEYLON_RESOLUTION=1920x1080` | Framebuffer override |
@@ -103,6 +103,7 @@ the spawn column.
 | `urban_underground` | The package-14 route tour in either mode on a generator-13 world: street → basement → service passage → the neighbour's basement → street; a loose panel slid aside with F into the hidden cellar; stairs → bulkhead → roof → bridge or connector; a fire escape climbed and the stairs back down; the spawn station at night, lit with two placed torches, and its tunnel; a flooded tunnel waded. Poses between legs, the clock, the weather and a kit of a spear and torches are staged and printed as staged. Prints `[urban-underground] pass=true`, writes 16 labelled captures and closes itself; it refuses to stage on an older generator. |
 | `urban_ecology` | The package-15 ecology tour in either mode on a generator-14 world: by day the nearest growth site, crouched onto its membrane without waking the Veilmaw, then (Survival) one step back that wakes it, its telegraph and the lunge the backing player escapes, or (Creative) the unseen player beside it; a torch beside the node that burns it, the withered Veilmaw's membrane sacs cut with F, and F5/F9 keeping it dead; at night the second site's glow and a torch set inside its ground that the Veilmaw creeps to and smothers; a park's animals bolting inside the park and a roof flock; a Breacher blind to a crouched observer. Bodies are admitted through the production gate from a staged observer pose; that admission, poses between legs, the clock, the weather, the fire seed and a kit of a spear and torches are staged and printed as staged. Prints `[urban-ecology] pass=true`, writes 16 labelled captures and closes itself; it refuses to stage on an older generator. |
 | `urban_survivors` | The package-16 survivor tour in either mode on a generator-15 world: by day the camp nearest the spawn, entered by its rear door, a trade with its trader, food and water until the camp counts the player a friend, and its shared storage; the hidden refuge nearest the spawn, from its street door to the basement hall where its people are heard before anything is found, the loose panel slid aside with F, supplies until the civilians trust the player, and word of the camp, which they agree to move to; F5 and F9 with every person, need, debt and plan compared; a street far from both until both go dormant; the camp at night with everyone at their beds and the post, one sleeper seen by a torch placed with a right click; the next morning the civilians in the spare beds upstairs; and the empty refuge, whose shelf is left to the player. Every frame every survivor on screen must stand clear of solid blocks and inside its home. Conversation choices use the conversation screen's command and the shelf item the storage screen's transfer command; poses between legs, the forward-only clock, the weather and a kit of a spear, food, water, trade goods and torches are staged and printed as staged. Prints `[urban-survivors] pass=true`, writes 16 labelled captures and closes itself; it refuses to stage on an older generator. |
+| `urban_strongholds` | The package-17 stronghold tour in either mode on a generator-16 world: by day the guarded stronghold nearest the spawn, its sign and gate, the gatekeeper's rules, leave to come in as a visitor, the gate opened and shut and locked behind the player, the yard, a trade with its trader and the clinic's medic; a barracks door off the yard where a guard warns the visitor out (in Creative nobody perceives the player), and back to the yard with the pass kept; one staged infected met and put down at the gate by the gatekeeper while the player only watches; the raider yard nearest the spawn, entered through its back way's street door and crept down crouched to the unlocked rear door, unnoticed; F5 and F9 with every compound's memories, people and stores compared; a street far from both until both go dormant; and the stronghold at night, its people back once each with the watch at the gate and a stranger's knock answered through the shut gate (unheard in Creative). Every frame every compound person on screen must stand clear of solid blocks and inside their compound or its porch, or a guard within its leash. Conversation choices use the conversation screen's command; poses between legs, the forward-only clock, the weather, the infected and a kit of a spear, trade goods, food and water are staged and printed as staged. Prints `[urban-strongholds] pass=true`, writes 16 labelled captures and closes itself; it refuses to stage on an older generator. |
 | `urban_catalogue` | The package-12 catalogue walk in either mode on a generator-11 or generator-12 world. It visits the nearest building of each commercial and civic family: a damaged grocer, a clinic and a security post that keep their locks, a school and an office block with upper floors, and a warehouse. Moving between buildings is a staged pose at each street door, and the run starts with a staged spear and pry tool; both are printed as staged. Inside it plays through the production input seam: the sign, a shop floor, the clinic's locked staff door, the street door, the dispensary forced by holding the left button and its stock searched with F, a treatment room, ground and upper classrooms and offices, the armoury lock, the squad room, a rack aisle and the workbench. Prints `[urban-catalogue] pass=true`, writes 16 labelled captures and closes itself. |
 
 ```powershell
@@ -405,6 +406,67 @@ GL, KHR and native-audio errors. The `views` line pairs captures with the HUD
 location line or the storage owner line; the `before-save`, `after` and `deeds`
 lines record each site's people, standing and plans and every answer.
 `UrbanSurvivorQaSceneTest` plays the same tour headlessly in both modes.
+
+For guarded strongholds and raider yards (package 17), run each mode in a fresh
+directory:
+
+```powershell
+$env:VEYLON_GENERATOR='urban-dev'; $env:VEYLON_SEED='20260731'
+$env:VEYLON_GAME_MODE='survival'; $env:VEYLON_SCENE='urban_strongholds'
+$env:VEYLON_RESOLUTION='1280x720'; $env:VEYLON_CAPTURE_TAG='m17-strongholds-survival'
+Remove-Item Env:VEYLON_SHOT -ErrorAction SilentlyContinue
+.\gradlew.bat run -PveylonDataDir=build/qa/m17-strongholds-survival --console=plain
+```
+
+Repeat with `creative` for the twin. The tour reads its legs from the pure
+plans of the regions within three of the spawn (the nearest stronghold and
+raider yard, the stronghold's clinic door and the barracks door nearest a
+patrol waypoint, the raider yard's back way, and a sidewalk corner far enough
+from both for dormancy) and prints them as one `plan` line; it waits up to 30
+seconds for a compound's people to wake, since they activate on the ten-second
+slow tick. At 10:00 it reads the sign over the stronghold's gate, asks the
+gatekeeper about the rules and to be let in, and walks through the gate the
+gatekeeper opens; inside, the gate must be shut and locked behind the visitor
+within 15 seconds. Walks inside the compound keep to the cells a visitor may
+use. F is pressed only while the prompt names the person the tour means to
+talk to, since F works an aimed door or window first and greets the nearest
+person in reach; otherwise the tour steps round to a free cell beside them,
+at most six times, and records each step in `deeds`. The survivor tour shares
+this talking step. The tour trades with the trader (the first offer in stock),
+talks to the medic on the clinic's ground floor, then steps just inside the
+barracks door: in Survival it waits at most 90 seconds for "Visitors keep to
+the yard and the clinic. Out of there." and walks back out; in Creative it
+waits for a guard to pass within three blocks in plain sight and requires that
+nobody warns the player. Back in the yard the pass must be kept, nobody may
+want the player gone and trust must be unchanged. From a staged pose on the
+porch it stages one Veilbound on the street, never strikes it, and requires a
+guard to meet it, put it down within 60 seconds and return to the porch, with
+the gate shut and locked throughout. At the raider yard it walks in through
+the back way's street door standing (a crouched F bars a door) and crouches
+for the last 10 blocks to the rear door, which must be an unlocked way into
+the yard, with no raider provoked or hunting and no damage taken. After F5 and
+F9 every compound's trust, fear, pass, wanted and last-sighting minutes, hunt
+cooldown, missing stores, capture, reward and stash count and every person's
+health, hunger and thirst must equal the values before the save. Far away it
+waits for both compounds to go dormant, stages 23:15 and returns to the gate:
+every living person must be back once (nobody twice, nobody dead come back)
+with the watch at the inner post and the gate shut and locked; a knock with
+F must be answered through the gate in Survival and go unheard in Creative,
+the gate staying shut. The frozen capture list is:
+
+`01-the-stronghold-gate`, `02-the-gatekeeper-explains`, `03-let-in-as-a-visitor`,
+`04-inside-the-stronghold`, `05-the-stronghold-trader`, `06-a-fair-trade`,
+`07-the-clinic-medic`, `08-a-visitor-in-the-barracks`, `09-back-in-the-yard`,
+`10-the-gatekeeper-meets-it`, `11-the-street-held`, `12-the-raiders-back-way`,
+`13-the-back-door-into-the-yard`, `14-after-reload`, `15-the-gate-at-night` and
+`16-knocking-at-night`.
+
+Require `[urban-strongholds] pass=true` with `wallFrames=0 strayFrames=0` and zero
+GL, KHR and native-audio errors. The `views` line pairs captures with the sign,
+the HUD location line or the door prompt; the `before-save`, `after` and `deeds`
+lines record each compound's memories, people and stores and every answer.
+`UrbanStrongholdQaSceneTest` plays the same tour headlessly in both modes and
+refuses generator 15.
 
 For the generated apartment appearance sequence use an isolated directory and a
 tag such as `m06_scripted_camera_day`. Change the scene to

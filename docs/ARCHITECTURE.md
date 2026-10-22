@@ -269,14 +269,15 @@ their overlays (layout 9, template 6) and encounter catalogue 3, and 13 adds bas
 transit and rooftop routes to those districts (layout 10, template 7) with encounter
 catalogue 4, and 14 adds the quarantine's growth sites and the city's wildlife
 habitats (layout 11, template 7) with encounter catalogue 5, and 15 adds the
-survivor camps and hidden refuges (layout 12, template 7, catalogue 5). The
-development selector creates 15. New worlds use
+survivor camps and hidden refuges (layout 12, template 7, catalogue 5), and 16
+adds guarded strongholds and raider yards (layout 13, template 7, catalogue 5). The
+development selector creates 16. New worlds use
 `World.DEFAULT_NEW_WORLD_GENERATOR` (3, until the urban rollout); a load accepts any
 supported version and rejects the rest, including anything above
 `MAX_SUPPORTED_GENERATOR`, before it replaces the live world. Feature gates name
 their versions (`hasDeepFrontier`, `hasCaveIdentities`, `isUrbanGenerator`) instead
 of comparing with `>=`, so a new generator inherits nothing by accident, and
-`WorldGeneratorFingerprintTest` pins versions 1–15 absolutely. `ShapedStairGenerationTest`
+`WorldGeneratorFingerprintTest` pins versions 1–16 absolutely. `ShapedStairGenerationTest`
 checks version 8 against frozen version 7 outside stair cells and across chunk orders.
 
 An urban world's layout revision follows from its generator, so it is known
@@ -284,18 +285,19 @@ before bootstrap generates a chunk; a geometry change means a new generator
 version, never a change under an old one (`UrbanRevision`). Its content revision
 (the rolled loot, encounter and trade tables) is saved in `urban.meta`, which
 only urban worlds write. It is optional for older layouts and required for
-generators 9–15. Until that section, or its
+generators 9–16. Until that section, or its
 absent default, has been read, a loading world's content revision cannot be read
 at all. Fresh worlds use content revision 3; revisions 1 and 2 remain supported.
 Revision 1 is the absent-metadata default. The tables and their hash inputs are frozen
-under each revision. Generators 9–15 require content 3. Encounter catalogues are
+under each revision. Generators 9–16 require content 3. Encounter catalogues are
 additive and versioned separately in `urban.population` (1 for generator 10, 2 for
-11, 3 for 12, 4 for 13, 5 for 14 and 15, which write codec 2); they do not reroll
-content-3 loot or add encounters to older generators. Generators 13–15 also write
+11, 3 for 12, 4 for 13, 5 for 14–16, which write codec 2); they do not reroll
+content-3 loot or add encounters to older generators. Generators 13–16 also write
 `urban.discovery` v1 (a count capped at 4,096,
 then ascending observed site ids, each checked against the plan); absence means
-nothing found. Generator 15 also requires `urban.sites` v1, its survivor sites and
-their people. Compatibility directions:
+nothing found. Generators 15 and 16 also require `urban.sites` v1, their survivor
+sites and people, and generator 16 `urban.compounds` v1, what its compounds
+remember. Compatibility directions:
 
 - this build, a legacy save: unchanged, and no urban state is created;
 - this build, an urban save: the same geometry through its generator, the content
@@ -579,10 +581,41 @@ presentation clue that discovers nothing. `urban.sites` v1 holds every registere
 site and its people (D-150 in the urban decisions); it is required for generator
 15 and read after the population, binding active bodies by core NPC index.
 
+### Guarded strongholds and raider yards
+
+Generator 16 plans layout 13: layout 12 plus guarded compounds. `CompoundClaims`, a
+pure function of the seed and the district plan, claims a civic courtyard block for
+a stronghold and an industrial depot row for a raider yard before any building is
+planned, and `RouteCatalogue.of(seed, plan, claims)` plans the claimed parcels held.
+`CompoundSites` then derives each compound from the frozen building plans (the
+gate, barricade lines, porch and yard, posts, patrol, stash, beds and people), and
+`UrbanCompoundStamper` builds its barricades from existing blocks; the gate's keyed
+lock is a plan default read through `World.fixtureLockAt`. `SurvivorSites.sites()`
+lists compounds beside camps and refuges, so the same director registers,
+activates and steps them as `UrbanSite` records of kind `STRONGHOLD` or `RAIDERS`,
+on the urban sides `UrbanFactions.WARDENS` and `WRECKERS`, which never enter the
+base faction map.
+
+`CompoundResidentAI` gives a compound's people their duty: posts and a patrol by
+day, a night watch, travel that passes the gate only through `CompoundGate` (which
+swings, shuts and locks it), sight through `InfectedAI.seesPlayer` and occluded
+hearing, and fights with infected inside a leash, and with the player for raiders or
+a stronghold that has turned on them. `CompoundAccess` holds the rules and what
+follows from what guards perceive: visitor's passes, warnings, intrusion and
+wanted status, everyday sounds, theft by evidence (stores taken unseen are found
+short at the stronghold's hourly step), bounded responses, raider hunts with a
+cooldown, capture and a stronghold's single reward. The director's fast tick runs
+the gate and these timers only while a compound has bodies or a held gate, and
+clears the transient ones on dormancy. `urban.compounds` v1, required for generator
+16 and read after `urban.sites`, holds what each compound remembers.
+
 Scripted urban QA routes extend `UrbanRouteScene`: a task queue played through the
 production input seam, mouse-look turns, bounded walking that opens doors with F,
 threat handling, forcing and captures. `urban_slice`, `urban_catalogue`,
-`urban_districts`, `urban_underground`, `urban_ecology` and `urban_survivors` use it.
+`urban_districts`, `urban_underground`, `urban_ecology`, `urban_survivors` and
+`urban_strongholds` use it; the two that meet people extend `UrbanPeopleScene`,
+which adds the staged clock and poses, walking up to someone and talking,
+conversation choices through the screen's command, a trade and F5 and F9.
 
 ### Doors, windows and urban fixtures
 

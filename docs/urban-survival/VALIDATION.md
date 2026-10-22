@@ -2576,3 +2576,212 @@ ignored artifacts under `build/`.
   native tours and the inspected captures.
 
 Next: package 17.
+
+## Milestone 17 — guarded strongholds and hostile factions (2026-10-22 to 2026-10-23)
+
+### Scope and baseline
+
+- Branch `feature/urban-survival` at `9bc3517` (the 16 records), clean tree.
+  Read the revised base, the prompt, `AGENTS.md`, `docs/COMMIT_WORKFLOW.md` and
+  these records.
+- Generator 16 (layout 13, template 7, content 3, encounter catalogue 5) is new,
+  with the section `urban.compounds` v1 and compound rows (kind codes 3 and 4)
+  in `urban.sites` v1. No block, item, enum ordinal, persisted id, legacy
+  faction or existing section version changed; the default new world is
+  unchanged.
+- Generators 1–15 keep their absolute pins. Generator 16 was pinned at
+  introduction: its terrain equals generator 14's at every shared pinned chunk,
+  and its compound plans and gate-line chunks are pinned on three seeds (D-154).
+
+### Behaviour, persistence and access evidence
+
+Each code commit was checked against its exact tree: the full portable build,
+or, for the comment-only `c2575cd`, compile and Javadoc. The commits were
+built in the main working tree in order; while an earlier commit was checked,
+later work was parked in `git stash` and only record drafts (documents, which
+no build step reads) were otherwise changed. Each message records the
+classes:
+
+| Commit | Checks on the exact tree | What they prove |
+| --- | --- | --- |
+| `90ea27d` | Full portable build: 2,044 tests in 236 classes, one existing skip | `CompoundSitesTest` (9): a stronghold and a raider yard within three regions of the spawn on all six design seeds; every member building held, walls, posts and people on standing cells; camps and encounter budgets kept out of claimed parcels; plans identical in any order; generated stamping in any chunk order; a stronghold walled but for its locked gate; a raider yard entered by its back way with its gate shut. The generator-16 terrain, plan and gate-line pins, the slice loop on generator 16, `RuntimeBoundsTest` and the dispatch, revision and selector expectations, with every earlier pin |
+| `380ade8` | Full portable build: 2,055 tests in 238 classes, one existing skip | `UrbanCompoundPeopleTest` (8): posts kept and the same guards after dormancy; the gatekeeper passing and relocking his gate; the patrol and the night watch; raiders striking a Survival player and never a Creative one; their leash and giving up; guards and an infected fighting at the gate; generator 15 listing no compound. `UrbanCompoundSaveTest` (3): repeated loads and reactivation without duplicates, the raiders' dead and the locked gate, malformed compound rows |
+| `9b360a0` | Full portable build: 2,067 tests in 240 classes, one existing skip | `UrbanCompoundAccessTest` (8 methods, 9 cases): a visitor let in by day, kept to the yard and the clinic, the gate shut and locked behind them, the pass ending at dusk; a barracks warning, then the pass lost and the player wanted without the stronghold turning hostile; an intruder wanted and struck in Survival and unperceived in Creative; theft caught in sight, unseen theft only missing until the hour and blamed only after a recent sighting; forced entry answered by at most three guards (never the gate's two) who return; a friend let in at night by a knock and a stranger turned away; at most two raider hunters, never the boss, once a day, the cooldown surviving a load; a taken yard that stays taken and a single reward. `UrbanCompoundsSectionTest` (3): an exact round trip, a missing section failing the load and keeping the live world, and 14 malformed payloads each failing it |
+| `4ed1957` | Full portable build: 2,068 tests in 240 classes, one existing skip | `UrbanCompoundAccessTest`'s new case: a visitor pacing the yard's inner passage for 30 seconds leaves the alert below 60 and the trader at the pitch (it reached 100 before the fix); the same steps in the barracks, a wanted player's steps and a forced door are not everyday |
+| `64851d5` | Full portable build: 2,068 tests in 240 classes, one existing skip | The compound people, access and save tests unchanged without the two inaudible guard noises (the gate's swing and a guard's blows) |
+| `c2575cd` | `compileJava` and `javadoc` (a comment-only change) | Doclint accepts the corrected `CompoundAccess` documentation; the code is that of the commit before |
+| `44b3e50` | Full portable build: 2,068 tests in 240 classes, one existing skip | `UrbanSurvivorQaSceneTest` plays the milestone-16 tour headlessly in Survival and Creative on the shared `UrbanPeopleScene` and refuses generator 14. The same test run on `c2575cd` in a separate worktree (`build/m14-check`) printed the same 64 tour lines, positions and times included |
+| `cd63d2d` | Full portable build: 2,071 tests in 241 classes, one existing skip | `UrbanStrongholdQaSceneTest` plays the stronghold tour headlessly in Survival and Creative and refuses generator 15. The first native runs on this tree failed (below) |
+| `8a858fc` | Full portable build: 2,071 tests in 241 classes, one existing skip | Both people tours pass headlessly in both modes, the survivor tour printing its same 64 lines; a throwaway probe played the stronghold tour under uneven frame steps nine times, all passing. This tree is the final code; the final native runs below used it |
+
+### Native stronghold tour, both modes
+
+Host: Windows 11 Pro 10.0.26200, AMD Ryzen 5 5600X, NVIDIA GeForce RTX 3060 Ti,
+driver 610.88, OpenGL 3.3.0 with KHR_debug; 1280 × 720.
+
+```powershell
+$env:VEYLON_GENERATOR='urban-dev'; $env:VEYLON_SEED='20260731'
+$env:VEYLON_GAME_MODE='survival'; $env:VEYLON_SCENE='urban_strongholds'
+$env:VEYLON_RESOLUTION='1280x720'; $env:VEYLON_CAPTURE_TAG='m17-strongholds-survival-2'
+.\gradlew.bat run -PveylonDataDir=build/qa/m17-strongholds-survival-2 --console=plain
+```
+
+The runs used the same variables from Git Bash. The Creative twin used
+`creative` and the tag and directory `m17-strongholds-creative-2`. Seed
+`20260731` gives these legs (from the `plan` and `staged-pose` lines):
+
+| Leg | Cells | Played |
+| --- | --- | --- |
+| Stronghold, 10:00 | stronghold `urban:building:1,2:112:0`, "Calder Ward", 9 people: Gideon the gatekeeper, Ronan and Saskia the sentries, Calla the patrol, Oona the trader, Esme the medic, Kaito, Yusra and Bastien; gate leaves (416, 41, 706) and (417, 41, 706) facing north; street (416, 41, 702); sign (418, 43, 706); yard (416, 41, 709) | W with mouse look to the porch; F to talk; the rules and leave to come in through the conversation's command; Esc; W through the open gate |
+| Trade and clinic | the trader's pitch on the courtyard edge; the clinic's courtyard door, inside (396, 41, 732) | F to talk; the trade through the command; Esc; W; F on the clinic door; F to talk, after one step round a window behind the medic |
+| Barracks | door inside (427, 41, 716), yard cell (427, 41, 718); patrol waypoints (398, 41, 718), (433, 41, 718), (433, 41, 747) and (398, 41, 747) | W with F through the door; waiting; W back out |
+| Threat | porch pose (416, 41, 705); one Veilbound staged at (416, 41, 698) | watching only |
+| Raider yard | raiders `urban:building:0,-2:40:0`, 4 of them; back way approach (108, 41, -446); rear door (108, 41, -421) | W and F through the street door standing; left Control for the last 10 blocks; F5, F9 |
+| Away | sidewalk corner (317, 41, 582), at least 170 blocks from both | staged pose, waiting for dormancy |
+| Stronghold, 23:15 | porch (416, 41, 705) | F on the gate leaf |
+
+Both runs printed `[urban-strongholds] pass=true` with 5 staged poses and 16
+captures, `wallFrames=0 strayFrames=0` over 144,934 (Survival) and 156,082
+(Creative) resident-frames, no infected engaged by the player and full
+health, in 129 and 137 route seconds. Their `deeds` lines agree but where the
+modes differ: the gatekeeper's rules ("This is a ward of the precinct.
+Visitors come in by day and keep to the yard and the clinic; the buildings
+are ours."); "In you come. Keep to the yard and the clinic, and be out by
+dark." with a pass until game minute 1,320 (22:00); the offers "1 Medicine for
+2 Waterskin (clean water)" and "2 Plank for 2 Dried Berries", the first traded;
+one step round the window the aim had lined up behind Esme; then in Survival
+"warned at (427, 41, 716) after 30s; nearest guard in sight Calla@1.8", and in
+Creative "unperceived at (427, 41, 716) by Calla@1.9"; the Veilbound met by
+Gideon at (417, 41, 700) (Creative (417, 41, 699)), put down, and Gideon back
+on the porch; at night all 9 people back once with the watch at the gate; and
+the knock "answered through the gate" in Survival (Ronan: "We don't open
+after dark. Come back at first light.") and "the knock went unheard" in
+Creative. After F9 every compound's memories, people and stores matched the
+`before-save` line: the stronghold's trust 1, its pass until 1,320, the last
+sighting inside at minute 740.2 (12:20), Gideon at 39 health from the
+Veilbound's one blow; the raider yard hostile at trust −60 with no cooldown.
+By the `after` line the stronghold, dormant meanwhile, had eaten and foraged on
+the hour (stash 39 to 47 items) and Gideon was back at 45. Each log reports
+`glGetError=0`, 19 KHR messages with 0 errors (the usual MEDIUM pixel-transfer
+notes) and `nativeErrors=0`; Gradle exited 0 after 2 min 12 s (Survival) and
+2 min 20 s (Creative). The `views` lines read the sign "Calder Ward. Visitors
+by day: ask at the gate.", "District / Civic Precinct / Guarded stronghold" in
+the yard and "District / Industrial Yards" at the back way, whose rear door
+prompts "[F] Bar the door from this side" (crouched; Creative: "[F] Lock door
+(Creative)").
+
+Inspected captures, from the final Survival run unless noted:
+
+- `01`: the gate post, its torch on top and the painted sign, "Sign: \"Calder
+  Ward. Visitors by day: ask at the gate.\"". `02`: Gideon, "Guard - Guarded
+  stronghold", with "[4] Ask to be let in" and the rules; the log's "A guarded
+  stronghold: 9 people hold t…". `03`: "In you come…", the choice now "[4] Ask
+  to be let through (you have a visitor's pass)" and "Gideon lets you in as a
+  visitor until dus…" in the log.
+- `04`: inside the gate passage, HUD "Guarded stronghold", the courtyard
+  beyond. `05`: Oona, "Trader - Guarded stronghold", her two offers. `06`: "A
+  fair trade." and "Traded 1 Medicine for 2 Waterskin" in the log. `07`: Esme,
+  "Medic - Guarded stronghold", "[4] Ask to have your wounds dressed",
+  indoors.
+- `08`: the barracks doorway at 12:19, Calla just outside it and her "Visitors
+  keep to the yard and th…" in the log. `09`: back in the yard, looking into
+  the barracks left behind.
+- `10`: Gideon on the street striking the Veilbound. `11`: Gideon back on the
+  porch beside the barricade, "The Veilbound collapses." in the log.
+- `12`: the back way's wooden street door, "District / Industrial Yards".
+  `13`: the hall's metal rear door into the yard, crouched, "Bar the door from
+  this side". `14`: the same after "Game loaded."
+- `15`: the gate post and sign at 23:30, the barricade's sheet metal. `16`:
+  the locked leaf, "Locked. Force it open with a pickaxe (loud) or find another
+  way in", and "Ronan calls through the gate: \"We don…\"" in the log.
+- Creative: the same frames with the Creative panel, but `08` has no warning in
+  the log and `16` no answer.
+
+The first native runs (`m17-native-survival.log`, `m17-native-creative.log`)
+on `cd63d2d` failed in both modes at the trader with "no conversation with
+Oona: [F] Talk to Calla (Guard)": F greets the nearest person within 3.2
+blocks, and on native frame times Calla's round passed the trader's pitch as
+the player reached it, so every F greeted her. Headless runs at a fixed step
+never put her there. `8a858fc` makes the tour press F only when the prompt
+names its person; the final runs then needed one step round a window behind
+the medic and none at the trader.
+
+Observations, none a tour failure:
+
+- An "Ashfall" event darkened the sky from 11:52; the tour pins clear weather
+  only where it stages the clock, and the event is presentation here.
+- The raider yard's stash reads 0 and its people's hunger and thirst 0.0 in
+  both lines: the player never saw a raider or set foot in its porch or yard,
+  so the yard was registered but not discovered, its needs clock had not
+  started (D-146) and its containers had never been rolled.
+- A dormant compound's people keep health and needs, not positions: at night
+  they reappear on their scheduled cells (D-144), the watch at the gate.
+
+### Commands and portable builds
+
+All Gradle commands used the bundled Temurin 25.0.4.1+1
+(`build/tools/jdk25/jdk-25.0.4.1+1`) and the Windows wrapper from Git Bash. Logs
+are local ignored artifacts under `build/`.
+
+- Two throwaway probes surveyed the candidate blocks and rows on the design
+  seeds (`m17-survey.log`, `m17-survey2.log`) and were deleted.
+- Focused runs while building each step, among them the compound classes after
+  each change (`m17-tests1.log` to `m17-tests7.log`; the first failed the
+  generator-16 plan pin after the raider patrol's far waypoint was moved inside
+  the yard, and the pins were recorded again before the first commit), the
+  access tests before and after the everyday-sounds fix (`m17-everyday1.log`:
+  the new case failed with the alert at 100; `m17-everyday2.log`: the compound
+  access, people and save tests passed, and the stronghold tour run with them
+  now reached the raiders' back way, where a crouched F would not open its
+  street door), the survivor tour after the refactor (`m17-refactor-tour.log`: 3
+  passed) and the stronghold tour while it was written (`m17-tour1.log`
+  failed: the medic fled in Survival and the Creative check was stricter than
+  the game's sight rule; `m17-tour2.log`: 3 passed; `m17-tour3.log`: 3 passed
+  after the waits for compounds to wake).
+- The talk fix: both people tours after the change (`m17-talk1.log`: 6
+  passed), and a throwaway probe (deleted) playing the stronghold tour under
+  uneven frame steps of 1/35 to 1/144 second (`m17-jitter1.log`: 7 runs,
+  `m17-jitter2.log`: 1 with positions in the step line, `m17-jitter3.log`: 9
+  runs with both tours, all passing).
+- The survivor tour before the move: the same test on `c2575cd` in the
+  detached check worktree `build/m14-check` (`m17-survivors-before.log`); its
+  64 printed tour lines equal the refactored run's, positions and times
+  included.
+- Each commit's exact-tree check, in commit order: `m17-c1-build.log` to
+  `m17-c9-build.log`, with `m17-c6-javadoc.log` in place of a build for the
+  comment-only commit (the table above). A first run of the noise-removal
+  build, with only the blow noise removed, was stopped part way when the gate
+  swing's noise was found to be inaudible too; the build was run again on the
+  tree that removes both, and its log replaced the first. `CompoundGate`'s
+  comment was corrected while that build ran, keeping its line count;
+  recompiled afterwards (`m17-c5-recompile.log`), its class file hashed
+  identically.
+- The final code is `8a858fc`'s tree. Its exact-tree build passed in 12 min
+  48 s: 2,071 tests in 241 classes, zero failures or errors and the existing
+  Windows symlink-privilege skip in `AppPathsTest` (`m17-c9-build.log`).
+- Native runs: `m17-native-survival.log` and `m17-native-creative.log` (on
+  `cd63d2d`, failed at the trader, see above), then
+  `m17-native-survival-2.log` and `m17-native-creative-2.log` (final), run by
+  a script that refuses an existing QA directory.
+- `graphify update . --no-cluster` once on the final code: 9,991 nodes and
+  40,429 edges, with the existing `build.gradle` extractor warning
+  (`m17-graph-update.log`). No clustering or semantic extraction ran.
+
+### Limits and next gate
+
+- The tour stages poses between legs, a forward-only clock, the weather, one
+  infected and a kit, and makes its conversation choices through the screen's
+  own command; it is scripted evidence, not the human playtest deferred by
+  D-80. Whether guards read as fair, compounds as lived-in and the raider yard
+  as a threat worth avoiding was checked by script, logs and captures, not
+  judged by a person.
+- The tour does not go into the raider yard, fight the raiders or take their
+  stores; hunts, their cooldown and capture rest on the headless tests.
+- Guards answer alarms from inside their wall and never come out to help a
+  gatekeeper fighting on the street. Balance values are initial values for 23.
+  Map presentation is 21, ambience 22, the stronghold's relay component and the
+  guarded-access mission 20.
+- No reviewer subagents ran. The commits rest on their exact-tree builds, the
+  native tours and the inspected captures.
+
+Next: package 18.

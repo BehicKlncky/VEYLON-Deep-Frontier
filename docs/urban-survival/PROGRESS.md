@@ -6,10 +6,10 @@ This is the running record for the 26-package urban-survival roadmap. The pack i
 
 | Item | Value |
 | --- | --- |
-| Last completed package | **16 — Survivor camps and hidden civilians** (2026-10-22). Generator 15 brings people into the city: a camp of three to six on the reclaimed ground floor of a held walk-up in every region outside the quarantine, and two to five hidden civilians in every residential region's sealed cellar. They keep fixed routines on planned cells, live on their real stores hour by hour whether on screen or not, and judge the player by deeds. A refuge is found through its traces, its people's muffled sounds and its loose panel; helping a camp makes it a friend, and helping hidden civilians lets them move to a known camp. People, needs, deaths and standing hold across dormancy, saves and loads. Native survivor tours pass in both modes. Human-only checks are deferred by D-80. |
-| Source revision | 16: `dc1c447` site plans → `660d365` people, needs and standing → `3e82426` conversation → `1e4dfa3` clues and the camp place → `48d9533` survivor tour → `8a15656` sleepers on the floor. Records follow separately. |
-| Default new world | Legacy (`World.DEFAULT_NEW_WORLD_GENERATOR = GEN_CAVE_IDENTITIES`), unchanged until 26 passes. Isolated `VEYLON_GENERATOR=urban-dev` creates generator 15 (`GEN_URBAN_SURVIVORS`, layout 12 / template 7 / content 3, encounter catalogue 5). Generators 1–14 stay loadable with their original geometry and encounters. |
-| Next package | **17 — Guarded strongholds and hostile factions, NOT STARTED.** Keep `UrbanSliceRouteTest` (generators 10–15), `UrbanCatalogueQaSceneTest`, `UrbanDistrictQaSceneTest`, `UrbanUndergroundQaSceneTest`, `UrbanEcologyQaSceneTest` and `UrbanSurvivorQaSceneTest` as regression gates. Owner question P-15 (the inverted day/night temperature curve) is open. |
+| Last completed package | **17 — Guarded strongholds and hostile factions** (2026-10-23). Generator 16 adds guarded compounds: a stronghold of 8–16 in every civic region, walled by its own courtyard buildings, with a metal gate, posts, a trader, a clinic and barracks, and a raider yard of 4–8 in an industrial depot row near the spawn with an unheld back way into it. A visitor is let in by day to the yard and the clinic; guards perceive fairly, warn and then put out a visitor found in their buildings and drive out intruders, theft is judged by evidence, and alarms are answered by at most three guards; raiders hunt with at most two, once a day, and a yard emptied of raiders is taken and rewarded once. Passes, evidence, cooldowns, deaths, standing and capture hold across dormancy, saves and loads without duplicate guards. Native stronghold tours pass in both modes. Human-only checks are deferred by D-80. |
+| Source revision | 17: `90ea27d` compound plans → `380ade8` guards and raiders → `9b360a0` access and consequences → `4ed1957` everyday sounds → `64851d5` inaudible noises removed → `c2575cd` theft witnesses documented → `44b3e50` shared people tasks → `cd63d2d` stronghold tour → `8a858fc` talking past a nearer person. Records follow separately. |
+| Default new world | Legacy (`World.DEFAULT_NEW_WORLD_GENERATOR = GEN_CAVE_IDENTITIES`), unchanged until 26 passes. Isolated `VEYLON_GENERATOR=urban-dev` creates generator 16 (`GEN_URBAN_STRONGHOLDS`, layout 13 / template 7 / content 3, encounter catalogue 5). Generators 1–15 stay loadable with their original geometry and encounters. |
+| Next package | **18 — Safehouses, salvage and fortification, NOT STARTED.** Keep `UrbanSliceRouteTest` (generators 10–16), `UrbanCatalogueQaSceneTest`, `UrbanDistrictQaSceneTest`, `UrbanUndergroundQaSceneTest`, `UrbanEcologyQaSceneTest`, `UrbanSurvivorQaSceneTest` and `UrbanStrongholdQaSceneTest` as regression gates. Owner question P-15 (the inverted day/night temperature curve) is open. |
 | Human testing schedule | Owner instruction (2026-10-11, D-80): consolidated human playtesting/listening after milestone 22. Through 22, run automated and scripted native validation and record human-only checks as deferred; do not request interim human walks. |
 | Commits | Separate `feat`, `test`, `docs` and `chore` commits on `feature/urban-survival`; see the reconstruction ledger below. `main` stays at `923345f`. Original combined commit retained at `backup/urban-m01-m04-before-split`. No merge, push, tag or publication. |
 
@@ -35,7 +35,7 @@ The status vocabulary is NOT STARTED, IN PROGRESS, PARTIAL, BLOCKED or COMPLETE.
 | 14 | Basements, transit and rooftop routes | 13, 05–06, 10 | Basement, transit and roof planners; hidden entrances; portals; `urban.discovery` | Street → basement → service passage → street and street → fire escape → roof → exit work without clipping or traps. Underground joins agree across borders. Secrets are discoverable through real clues. | **COMPLETE** (2026-10-21; human-only validation deferred by D-80) |
 | 15 | Alien ecology and urban wildlife | 14, 09–10 | Alien kind (appended `BodyFamily`), growth-node state, wildlife anchors | Infected, alien and wildlife behaviour are distinct. The alien has a tell and a counter. Caps, deaths and revisits hold. No edible hostile meat. Creative gates. | **COMPLETE** (2026-10-22; human-only validation deferred by D-80) |
 | 16 | Survivor camps and hidden civilians | 15, 06, 14, 10 | Urban site registry over `settlement/Settlement`, `SettlementManager`, `DormantSettlementSimulation` (D-21); `ai/SettledNpcAI`; aid interaction | A generated camp and a secret basement refuge are found through play. Helping or stealing has a consequence. The same people, needs and deaths remain after save and dormancy. | **COMPLETE** (2026-10-22; human-only validation deferred by D-80) |
-| 17 | Guarded strongholds and hostile factions | 16 | `SettlementManager` guards, reputation, theft and counterattacks; urban faction ids | Approach, access rules, entry, trade and exploration. Guards react fairly. A hostile site with an alternative route. State persists without duplicate guards or infinite counterattacks. | NOT STARTED |
+| 17 | Guarded strongholds and hostile factions | 16 | `SettlementManager` guards, reputation, theft and counterattacks; urban faction ids | Approach, access rules, entry, trade and exploration. Guards react fairly. A hostile site with an alternative route. State persists without duplicate guards or infinite counterattacks. | **COMPLETE** (2026-10-23; human-only validation deferred by D-80) |
 | 18 | Safehouses, salvage and fortification | 17, 07, 04 | New `RefugeSystem`, `urban.refuges`; salvage in `PlayerBlockActions`; barricades; `SleepSystem` safety | Claim, store, dismantle, barricade from salvage and sleep. Threats attack or route around defences. Claims, salvage and defences persist. Survivor property has consequences. | NOT STARTED |
 | 19 | Water, power and refuge utilities | 18 | New `UtilitySystem` (`MediumTickSystem`), `urban.utilities`; `simulation/WaterSystem`; light emitters | One water utility and one power source and consumer run from urban supplies, conserve resources, persist, follow the pause and dormancy policy and respect Creative. | NOT STARTED |
 | 20 | Urban missions and long-term purpose | 19, 16–17, 02 | New `UrbanMissions`, `CommsObjective`, `urban.missions`; `ai/Quest`, `ai/FactionSystem` model; `ui/QuestObjectiveView`; victory flow | An integration route advances C1–C5 without trees or ore. A hidden-refuge mission and a guarded-access mission. Failure alternatives. Rewards exactly once. The legacy beacon is intact. | NOT STARTED |
@@ -2083,6 +2083,210 @@ was performed.
 **Next:** package 17, guarded strongholds and hostile factions, building its
 guards, access rules and counterattacks on the urban site director and
 `urban.sites` (D-143, D-150) under a new generator.
+
+## Milestone 17 — guarded strongholds and hostile factions (2026-10-22 to 2026-10-23)
+
+**Status: COMPLETE.** Generator 16 adds guarded compounds to the inhabited
+city: a stronghold of 8–16 people in every civic region, held in a courtyard
+block walled by its own buildings with a metal gate, a barricade, posts, a
+trader, a clinic and barracks; and a raider yard of 4–8 in an industrial depot
+row's service alley within three regions of the spawn, with an unheld back way
+into it. A visitor is let in by day to the yard and the clinic; guards who see
+them in the barracks warn them and then put them out for the day, and drive
+out intruders; theft is judged by what the stronghold's people saw, or by
+stores found short after a guard's recent sighting; and alarms are answered by
+at most three guards. Raiders
+are hostile, send at most two hunters once a day, and a yard whose raiders are
+all dead is taken, which a stronghold rewards once. Passes, wanted status,
+evidence, missing stores, cooldowns, deaths, standing and capture survive
+dormancy, saves and loads without duplicate guards. Native stronghold tours
+pass in both modes. Human-only validation remains deferred by D-80. Decisions
+D-154–D-168; P-11's default is implemented; P-15 is still open.
+
+### Start state
+
+- Branch `feature/urban-survival` at `9bc3517` (the 16 records), clean tree;
+  the 16 gate met.
+- Read the revised base, the prompt, `AGENTS.md`, `docs/COMMIT_WORKFLOW.md` and
+  these records. The work and its commits ran on 2026-10-22 and 2026-10-23 in
+  one session, across context compactions.
+
+### Compounds and behaviour
+
+- **Generator 16 (D-154).** Layout 13 is layout 12 plus each region's guarded
+  compounds; template 7, content 3 and encounter catalogue 5 are unchanged.
+  `urban-dev` now creates it.
+- **Claims and placement (D-155, D-156).** `CompoundClaims` decides which
+  parcels a compound holds before any building is planned, so the route
+  catalogue plans them held: street doors locked, rear doors open inward. A
+  stronghold takes a civic courtyard block with a clinic and an apartment; a
+  raider yard takes the reserved industrial region's depot row near the spawn,
+  and one industrial region in four beyond. Camps and encounters skip claimed
+  parcels.
+- **Ground and people (D-157).** Gate, porch, three-course barricades from
+  existing blocks, yard, posts, patrol, trader's pitch, clinic, stash, beds
+  spread over rooms, and stable people with roles: gatekeeper, sentries,
+  patrols, trader, medic and foragers, or a boss, sentries, a patrol and
+  raiders. The gate's lock is a plan default.
+- **Sides (D-158).** The urban Wardens and Wreckers, site-local, with their own
+  display names; no legacy faction id, name or saved record changed.
+- **Duty and senses (D-159, D-160).** Posts, patrols and night watches; the
+  gate swung, shut and locked by its guards; a knock answered; sight through
+  the shared fair test and occluded hearing; Creative players never perceived;
+  raiders' leash and forgetting; infected fought inside the leash and, in
+  layout 13, striking back at the guard fighting them.
+- **Access (D-161, D-162).** A visitor's pass until 22:00 for the yard and the
+  clinic; friends anywhere at any hour; a warning, then the pass lost and the
+  player wanted for 12 hours; intruders wanted at once; a wanted player driven
+  out while inside. A visitor's own footsteps, doors and knock where they may
+  be raise no alarm.
+- **Theft, responses, hunts and capture (D-163–D-166).** Caught in sight or
+  found short and suspected only with a recent sighting; at most three
+  responders for 30 seconds; at most two raider hunters within 48 blocks for 90
+  seconds, then a 24-hour cooldown; a yard with no living raider taken, its
+  stores nobody's, and one stronghold grateful once.
+- **Persistence (D-167).** Compound rows in `urban.sites` v1, validated per
+  kind, and the new `urban.compounds` v1, required for generator 16; transient
+  warnings, responses and hunts end on load and dormancy.
+- **QA (D-168).** `VEYLON_SCENE=urban_strongholds` tours a stronghold, its
+  restricted barracks and a threat at its gate, avoids a raider yard through
+  its back way, saves and loads, leaves both compounds to go dormant and knocks
+  at the gate at night, with ordinary controls. The survivor and stronghold
+  tours share `UrbanPeopleScene`.
+- **Found by the tour.** A visitor's own footsteps drove a stronghold's alert
+  to 100 in half a minute and sent its trader and medic into hiding (D-162).
+  On native timing the patrol stood nearer than the trader, and F, which greets
+  the nearest person and works an aimed door or window first, greeted her; the
+  shared talk step now presses F only while the prompt names its person and
+  otherwise steps round (`8a858fc`).
+- **Found in review.** The world noises of a guard's blows and gate swings,
+  documented as heard, were below every listener's threshold and heard by
+  nobody; they were removed (the player still hears both). The theft rule's
+  documentation said only guards witness a theft; any of a stronghold's people
+  do, and it now says so.
+
+### Changed paths
+
+**Production** (`src/main/java/com/veylon/`):
+
+- New: `world/urban/{CompoundClaims,CompoundSites,UrbanCompoundStamper}.java`,
+  `settlement/{UrbanFactions,CompoundGate,CompoundAccess}.java`,
+  `ai/CompoundResidentAI.java`, `save/UrbanCompoundsSection.java`,
+  `UrbanPeopleScene.java`, `UrbanStrongholdQaScene.java`,
+  `UrbanStrongholdTourPlan.java`.
+- Edited: `world/World.java`, `world/urban/{UrbanRevision,UrbanWorldState,
+  UrbanSalts,RouteCatalogue,EncounterAnchors,SurvivorSites,SurvivorStash,
+  UrbanContainers,CivicCatalogue,UrbanPlaces}.java`,
+  `settlement/{SettlementManager,UrbanSite,UrbanSiteDirector,UrbanSiteNeeds,
+  UrbanSiteRelations,UrbanSiteDialogue}.java`,
+  `ai/{InfectedAI,UrbanResidentAI}.java`, `entity/{EntityManager,Player}.java`,
+  `save/{SaveSystem,UrbanSitesSection,V3ExtensionSections}.java`,
+  `ui/NpcScreen.java`, `FixtureActions.java`, `InteractPromptBuilder.java`,
+  `UrbanSurvivorQaScene.java` (its shared tasks moved to `UrbanPeopleScene`),
+  `UrbanQaScenes.java`, `QaHarness.java` (one label on an existing line).
+
+**Tests** (`src/test/java/com/veylon/`):
+
+- New: `world/urban/CompoundSitesTest`, `UrbanCompoundPeopleTest`,
+  `save/UrbanCompoundSaveTest`, `UrbanCompoundAccessTest`,
+  `save/UrbanCompoundsSectionTest`, `UrbanStrongholdQaSceneTest`, and the
+  fixture `CompoundWorldArena`.
+- Extended: `world/WorldGeneratorFingerprintTest` (generator 16),
+  `UrbanSliceRouteTest` (generator 16), `qa/RuntimeBoundsTest`,
+  `GameLoopIntegrationTest`.
+- Expectations: `world/urban/UrbanRevisionTest`,
+  `world/UrbanGeneratorDispatchTest` and `UrbanDevelopmentSelectorTest` name
+  generator 16.
+
+**Documents:** `docs/ARCHITECTURE.md`, `docs/DEVELOPING.md` and the urban
+DESIGN, DECISIONS, PROGRESS and VALIDATION records.
+
+### Compatibility
+
+- Generators 1–15 are unchanged: their absolute pins pass; none of them claims
+  a compound, writes `urban.compounds`, names the stronghold or raider-yard
+  place, or lets an infected strike back at a guard. The stronghold's
+  everyday-sounds rule applies only to compounds.
+- New: generator 16, layout 13, the section `urban.compounds` v1 (required for
+  generator 16), compound kind codes 3 and 4 in `urban.sites` v1 rows (accepted
+  only for generator 16), the places "Guarded stronghold" and "Raider yard"
+  (never saved) and the urban side ids `urban.wardens` and `urban.wreckers`
+  (site records only). No block, item, enum ordinal or persisted id was
+  appended, and no legacy faction changed.
+- Unchanged: the v3 base, every existing section id and version, content
+  revision 3, template 7, encounter catalogue 5, the legacy settlement codec,
+  and the default new world (generator 3).
+- An older build rejects a generator-16 save before replacing its live world;
+  no older binary was run, and there is no downgrade promise.
+
+### Commands and results
+
+Exact commands and outputs are in
+[VALIDATION.md](VALIDATION.md#milestone-17--guarded-strongholds-and-hostile-factions-2026-10-22-to-2026-10-23).
+In short:
+
+- Each code commit was validated against its exact tree: the full portable
+  build, or, for the comment-only `c2575cd`, compile and Javadoc with its
+  class file unchanged.
+- The final portable build passed on `8a858fc`'s exact tree on 2026-10-23:
+  2,071 tests in 241 classes, zero failures or errors, and the existing
+  Windows skip.
+- Native `urban_strongholds` passed in Survival and Creative on seed
+  `20260731`, 16 captures each, with no compound person in a wall or out of
+  place and zero GL, KHR and native-audio errors. The first native runs, on
+  the tour's own commit, failed in both modes when the stronghold's patrol
+  stood nearer than the trader and F greeted her; `8a858fc` fixes the tour.
+- `graphify update . --no-cluster` on the final code: 9,991 nodes and
+  40,429 edges, with the existing `build.gradle` extractor warning.
+- No reviewer subagents ran.
+
+The commits:
+
+| Commit | Subject |
+| --- | --- |
+| `90ea27d` | `feat(urban): plan guarded strongholds and a raider yard under generator 16` |
+| `380ade8` | `feat(settlement): man strongholds and raider yards with guards and raiders` |
+| `9b360a0` | `feat(settlement): admit visitors and answer intrusion, theft and raids at compounds` |
+| `4ed1957` | `fix(settlement): keep a stronghold calm at a visitor's own footsteps` |
+| `64851d5` | `refactor(settlement): drop compound guards' noises that nothing can hear` |
+| `c2575cd` | `docs(settlement): say any of a stronghold's people can witness a theft` |
+| `44b3e50` | `refactor(qa): share the survivor tour's people tasks in UrbanPeopleScene` |
+| `cd63d2d` | `feat(qa): tour a guarded stronghold and a raider yard's back way` |
+| `8a858fc` | `fix(qa): press F only when the prompt names the person to talk to` |
+
+These records follow in their own commit. No push, merge, tag or publication
+was performed.
+
+### Limitations and next concrete step
+
+- **Evidence types.** The tour stages poses between legs, a forward-only
+  clock, the weather, one infected and a kit, and makes its conversation
+  choices through the screen's own command; it is not the human playtest D-80
+  defers until after 22. Whether the guards read as fair, the compounds as
+  lived-in and the raider yard as a threat worth avoiding was checked by
+  script, logs and captures, not judged by a person.
+- **Hostile routes.** The tour shows the raider yard's back way and its
+  unlocked rear door but does not go into the yard, fight the raiders or take
+  their stores; the hunts, their cooldown and capture rest on the headless
+  tests (`UrbanCompoundAccessTest`, `UrbanCompoundSaveTest`).
+- **Responses.** Guards answer an alarm from inside their wall and never leave
+  the compound; they do not come out to help a gatekeeper fighting on the
+  street, and a fight makes no sound anyone hears.
+- **Factions.** Wardens and Wreckers are site-local: no standing carries from
+  one stronghold to another, and no faction-wide reputation, war or truce
+  exists. The stronghold's relay component and the guarded-access mission
+  belong to 20.
+- **Balance for 23.** People counts, passes, warning grace, trust costs,
+  responder and hunter counts, the cooldown, the reward and the raiders'
+  stores are initial values.
+- **Presentation.** No map layer for compounds (21); no compound ambience
+  (22); names are provisional (P-01).
+- **Day/night temperature (P-15).** Still inverted in every world; unchanged.
+- **Default.** The ordinary new world stays generator 3 until 26.
+
+**Next:** package 18, safehouses, salvage and fortification, building claims,
+salvage and barricades of the player's own on the refuge and fixture state
+(D-48, D-76) under a new generator.
 
 ## Resume rules
 
