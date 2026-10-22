@@ -6,10 +6,10 @@ This is the running record for the 26-package urban-survival roadmap. The pack i
 
 | Item | Value |
 | --- | --- |
-| Last completed package | **15 — Alien ecology and urban wildlife** (2026-10-21 to 2026-10-22). Generator 14 grows the quarantine: growth nodes on membrane carpets, each guarded by a Veilmaw, an original territorial ambush organism with a clear telegraph and counters that need no rare gear. One infected variant, the blind door-breaking Breacher, holds some street doors, and three existing wildlife species live in leashed habitats in parks, courtyards, canals and on roofs. Deaths, burnt nodes and caps hold across dormancy, saves and revisits. Native ecology tours pass in both modes. Human-only checks are deferred by D-80. |
-| Source revision | 15: `2855198` growth blocks and sacs → `1f84c16` the Veilmaw → `2da5df8` the Breacher → `83cd7d4` generator 14 → `c8b65ec` encounter catalogue 5 → `76d601b` membrane salve → `d02462b` ecology tour. Records follow separately. |
-| Default new world | Legacy (`World.DEFAULT_NEW_WORLD_GENERATOR = GEN_CAVE_IDENTITIES`), unchanged until 26 passes. Isolated `VEYLON_GENERATOR=urban-dev` creates generator 14 (`GEN_URBAN_ECOLOGY`, layout 11 / template 7 / content 3, encounter catalogue 5). Generators 1–13 stay loadable with their original geometry and encounters. |
-| Next package | **16 — Survivor camps and hidden civilians, NOT STARTED.** Keep `UrbanSliceRouteTest` (generators 10–14), `UrbanCatalogueQaSceneTest`, `UrbanDistrictQaSceneTest`, `UrbanUndergroundQaSceneTest` and `UrbanEcologyQaSceneTest` as regression gates. Owner question P-15 (the inverted day/night temperature curve) is open. |
+| Last completed package | **16 — Survivor camps and hidden civilians** (2026-10-22). Generator 15 brings people into the city: a camp of three to six on the reclaimed ground floor of a held walk-up in every region outside the quarantine, and two to five hidden civilians in every residential region's sealed cellar. They keep fixed routines on planned cells, live on their real stores hour by hour whether on screen or not, and judge the player by deeds. A refuge is found through its traces, its people's muffled sounds and its loose panel; helping a camp makes it a friend, and helping hidden civilians lets them move to a known camp. People, needs, deaths and standing hold across dormancy, saves and loads. Native survivor tours pass in both modes. Human-only checks are deferred by D-80. |
+| Source revision | 16: `dc1c447` site plans → `660d365` people, needs and standing → `3e82426` conversation → `1e4dfa3` clues and the camp place → `48d9533` survivor tour → `8a15656` sleepers on the floor. Records follow separately. |
+| Default new world | Legacy (`World.DEFAULT_NEW_WORLD_GENERATOR = GEN_CAVE_IDENTITIES`), unchanged until 26 passes. Isolated `VEYLON_GENERATOR=urban-dev` creates generator 15 (`GEN_URBAN_SURVIVORS`, layout 12 / template 7 / content 3, encounter catalogue 5). Generators 1–14 stay loadable with their original geometry and encounters. |
+| Next package | **17 — Guarded strongholds and hostile factions, NOT STARTED.** Keep `UrbanSliceRouteTest` (generators 10–15), `UrbanCatalogueQaSceneTest`, `UrbanDistrictQaSceneTest`, `UrbanUndergroundQaSceneTest`, `UrbanEcologyQaSceneTest` and `UrbanSurvivorQaSceneTest` as regression gates. Owner question P-15 (the inverted day/night temperature curve) is open. |
 | Human testing schedule | Owner instruction (2026-10-11, D-80): consolidated human playtesting/listening after milestone 22. Through 22, run automated and scripted native validation and record human-only checks as deferred; do not request interim human walks. |
 | Commits | Separate `feat`, `test`, `docs` and `chore` commits on `feature/urban-survival`; see the reconstruction ledger below. `main` stays at `923345f`. Original combined commit retained at `backup/urban-m01-m04-before-split`. No merge, push, tag or publication. |
 
@@ -34,7 +34,7 @@ The status vocabulary is NOT STARTED, IN PROGRESS, PARTIAL, BLOCKED or COMPLETE.
 | 13 | Urban biome differentiation | 12, 03 | New `DistrictRules`, overlays, district-to-climate mapping (D-08) | Six distinct districts change player choices. Seams connect. Basics never depend on rare districts. Overlays keep accessibility. Legacy biome consumers are unchanged. | **COMPLETE** (2026-10-19; human-only validation deferred by D-80) |
 | 14 | Basements, transit and rooftop routes | 13, 05–06, 10 | Basement, transit and roof planners; hidden entrances; portals; `urban.discovery` | Street → basement → service passage → street and street → fire escape → roof → exit work without clipping or traps. Underground joins agree across borders. Secrets are discoverable through real clues. | **COMPLETE** (2026-10-21; human-only validation deferred by D-80) |
 | 15 | Alien ecology and urban wildlife | 14, 09–10 | Alien kind (appended `BodyFamily`), growth-node state, wildlife anchors | Infected, alien and wildlife behaviour are distinct. The alien has a tell and a counter. Caps, deaths and revisits hold. No edible hostile meat. Creative gates. | **COMPLETE** (2026-10-22; human-only validation deferred by D-80) |
-| 16 | Survivor camps and hidden civilians | 15, 06, 14, 10 | Urban site registry over `settlement/Settlement`, `SettlementManager`, `DormantSettlementSimulation` (D-21); `ai/SettledNpcAI`; aid interaction | A generated camp and a secret basement refuge are found through play. Helping or stealing has a consequence. The same people, needs and deaths remain after save and dormancy. | NOT STARTED |
+| 16 | Survivor camps and hidden civilians | 15, 06, 14, 10 | Urban site registry over `settlement/Settlement`, `SettlementManager`, `DormantSettlementSimulation` (D-21); `ai/SettledNpcAI`; aid interaction | A generated camp and a secret basement refuge are found through play. Helping or stealing has a consequence. The same people, needs and deaths remain after save and dormancy. | **COMPLETE** (2026-10-22; human-only validation deferred by D-80) |
 | 17 | Guarded strongholds and hostile factions | 16 | `SettlementManager` guards, reputation, theft and counterattacks; urban faction ids | Approach, access rules, entry, trade and exploration. Guards react fairly. A hostile site with an alternative route. State persists without duplicate guards or infinite counterattacks. | NOT STARTED |
 | 18 | Safehouses, salvage and fortification | 17, 07, 04 | New `RefugeSystem`, `urban.refuges`; salvage in `PlayerBlockActions`; barricades; `SleepSystem` safety | Claim, store, dismantle, barricade from salvage and sleep. Threats attack or route around defences. Claims, salvage and defences persist. Survivor property has consequences. | NOT STARTED |
 | 19 | Water, power and refuge utilities | 18 | New `UtilitySystem` (`MediumTickSystem`), `urban.utilities`; `simulation/WaterSystem`; light emitters | One water utility and one power source and consumer run from urban supplies, conserve resources, persist, follow the pause and dormancy policy and respect Creative. | NOT STARTED |
@@ -1894,6 +1894,195 @@ was performed.
 **Next:** package 16, survivor camps and hidden civilians, starting from the
 hidden cellar reservation of package 14 on generator 14's city under a new
 generator.
+
+## Milestone 16 — survivor camps and hidden civilians (2026-10-22)
+
+**Status: COMPLETE.** Generator 15 brings people into the city: a camp of
+three to six on the reclaimed ground floor of a held walk-up in every region
+outside the quarantine, and two to five hidden civilians in every residential
+region's sealed cellar. They keep fixed routines on planned cells, live on
+their real stores hour by hour whether on screen or not, and judge the player
+by deeds alone. A refuge is found through its traces, its people's muffled
+sounds and its loose panel. Helping a camp makes it a friend; helping hidden
+civilians earns their trust and lets them move to a known camp. The same
+people, needs, deaths and standing hold across dormancy, saves and loads.
+Native survivor tours pass in both modes. Human-only validation remains
+deferred by D-80. Decisions D-141–D-153; D-21 is implemented; P-14 carries a
+note; P-15 is still open.
+
+### Start state
+
+- Branch `feature/urban-survival` at `c5b1782` (the 15 records), clean tree;
+  the 15 gate met.
+- Read the revised base, the prompt, `AGENTS.md`, `docs/COMMIT_WORKFLOW.md` and
+  these records. The work and its commits ran on 2026-10-22 in one session,
+  across a context compaction.
+
+### Sites and behaviour
+
+- **Generator 15 (D-141).** Layout 12 is layout 11 plus each region's pure
+  survivor-site plan; template 7, content 3 and encounter catalogue 5 are
+  unchanged, and sites stamp no block. `urban-dev` now creates it.
+- **Where they live (D-142).** A camp holds a held walk-up's ground floor,
+  entered by the unlatched rear door (its street door is locked), with a
+  lookout's post inside it, a safe cell farthest from it, beds, day cells, a
+  kitchen stash and up to five spare beds upstairs: a lookout, a trader, a
+  medic when there are four or more, and foragers. A refuge's people rest out
+  of reach across the cellar's walls. Courtyard and rooftop camps were not
+  built.
+- **Registration (D-143).** A site becomes an `UrbanSite` settlement record,
+  keyed by its building id, when the player first comes near, steps onto its
+  storeys or finds its cellar. No legacy planner, codec or settlement loop
+  touches these records; resident index and id come from the planned slot.
+- **Activation and discovery (D-144).** Bodies appear on their scheduled cells
+  within 96 blocks of their home, measured in three dimensions, and go dormant
+  beyond 130. A camp is found by sight within 24 blocks, entry or talk; a
+  refuge only by its panel or its cellar.
+- **Routines (D-145).** Beds at night with the lookout at the post, meals at
+  the stash, day cells otherwise; the frightened gather at the safe cell; a
+  lookout fights infected near its post, and a hostile camp's lookout the
+  player. They move only along indoor routes between planned cells, and
+  talking to or striking one needs a clear line.
+- **Needs (D-146).** Hourly lockstep from the first meeting, active or dormant,
+  from the real stash containers: hunger, thirst, starvation and death, camp
+  foraging, and fear, alarm and trust that fade or drift.
+- **Standing (D-147).** Aid, theft, wreckage, attacks, killings, defence and
+  trade move trust; harm while trusted is a lasting betrayal; a camp at −40
+  turns hostile and at 40 shares its storage, its trader's friend price and its
+  medic. What was taken is owed, so no deed can be farmed.
+- **Conversation (D-148).** Fixed lines from the site's state; talk, food and
+  water, the held item, two finite trades, the medic's dressing once a day,
+  word of a camp, a demand for supplies and an attack.
+- **The safe move (D-149).** Trusting hidden civilians move, unseen, to a known
+  camp's spare beds, leave their shelf to the player and raise the camp's trust
+  in the player when they arrive.
+- **Persistence (D-150).** `urban.sites` v1, required for generator 15, keeps
+  every registered site and its people; it binds live bodies by index and
+  fails the whole load on anything malformed.
+- **Clues, places and caps (D-151, D-152).** Hidden civilians can be heard near
+  their panel (`SurvivorSounds`), never found by it; the HUD names a camp's
+  storeys; the site-plan cache and site records are in the runtime snapshot.
+- **QA (D-153).** `VEYLON_SCENE=urban_survivors` finds, helps, moves, saves,
+  revisits and empties the two sites with ordinary controls.
+- **Sleepers on the floor.** The tour showed that the sleep pose drew every
+  sleeping person half a block under the floor they slept on, legacy settlers
+  beside their camp beds included, so nobody asleep could be seen. The pose now
+  rests the body on the floor.
+
+### Changed paths
+
+**Production** (`src/main/java/com/veylon/`):
+
+- New: `settlement/{UrbanSite,UrbanSiteDirector,UrbanSiteNeeds,
+  UrbanSiteRelations,UrbanSiteDialogue,UrbanSiteRelocation}.java`,
+  `ai/UrbanResidentAI.java`, `save/UrbanSitesSection.java`,
+  `world/urban/{SurvivorSites,SurvivorStash}.java`, `engine/SurvivorSounds.java`,
+  `UrbanSurvivorQaScene.java`, `UrbanSurvivorTourPlan.java`.
+- Edited: `world/World.java`, `world/urban/{UrbanRevision,UrbanWorldState,
+  UrbanSalts,UrbanContainers,UrbanPlaces}.java`, `settlement/SettlementManager.java`,
+  `ai/NpcAI.java`, `entity/{EntityManager,Player}.java`,
+  `save/{SaveSystem,UrbanContainersSection,V3ExtensionSections}.java`,
+  `simulation/EventSystem.java`, `ui/NpcScreen.java`,
+  `engine/{AudioManager,ProceduralAudio}.java`, `gfx/model/Animator.java` (the
+  sleep pose), `qa/RuntimeBudgetSnapshot.java`, `Game.java`,
+  `CrateTransactionSystem.java`, `FixtureActions.java`, `PlayerCombatSystem.java`,
+  `WorldInteractions.java`, `UrbanQaScenes.java`, `QaHarness.java` (one label on
+  an existing line).
+
+**Tests** (`src/test/java/com/veylon/`):
+
+- New: `world/urban/SurvivorSitesTest`, `UrbanSurvivorSitesTest`,
+  `save/UrbanSitesSaveTest`, `settlement/UrbanSiteRelocationTest`,
+  `UrbanSiteDialogueTest`, `UrbanSurvivorCluesTest`,
+  `engine/SurvivorSoundsTest`, `gfx/model/SleepPoseTest`,
+  `UrbanSurvivorQaSceneTest`, and the fixture `SurvivorWorldArena`.
+- Extended: `world/WorldGeneratorFingerprintTest` (generator 15),
+  `UrbanSliceRouteTest` (generator 15), `qa/RuntimeBoundsTest`,
+  `GameLoopIntegrationTest`, `simulation/UrbanSurfaceSpawnGateTest`.
+- Expectations: `world/urban/UrbanRevisionTest`,
+  `world/UrbanGeneratorDispatchTest` and `UrbanDevelopmentSelectorTest` name
+  generator 15.
+
+**Documents:** `docs/ARCHITECTURE.md`, `docs/DEVELOPING.md`,
+`docs/audio/AUDIO_DESIGN.md` and the urban DESIGN, DECISIONS, PROGRESS and
+VALIDATION records.
+
+### Compatibility
+
+- Generators 1–14 are unchanged: their absolute pins pass, and none of them
+  registers a survivor site, writes `urban.sites`, plays the hidden people's
+  sounds or names the camp place.
+- New: generator 15, layout 12, the section `urban.sites` v1 (required for
+  generator 15), the `SurvivorSounds` bank (appended after every earlier bank)
+  and the place `UrbanPlaces.Place.CAMP` (never saved). No block, item, enum
+  ordinal or persisted id was appended.
+- Unchanged: the v3 base, every existing section id and version, content
+  revision 3, template 7, encounter catalogue 5 and `urban.population` codec 2,
+  the legacy settlement codec, and the default new world (generator 3).
+- The sleep-pose fix is presentation only: sleepers in every world are drawn
+  lying on their floor instead of under it. No simulation, save or hit-zone
+  rule changed.
+- An older build rejects a generator-15 save before replacing its live world;
+  no older binary was run, and there is no downgrade promise.
+
+### Commands and results
+
+Exact commands and outputs are in
+[VALIDATION.md](VALIDATION.md#milestone-16--survivor-camps-and-hidden-civilians-2026-10-22).
+In short:
+
+- Each code commit was validated against its exact tree in an isolated
+  worktree with the full portable build.
+- The final portable build passed on `8a15656`'s exact tree on 2026-10-22:
+  2,033 tests in 235 classes, zero failures or errors, and the existing
+  Windows skip.
+- Native `urban_survivors` passed in Survival and Creative on seed
+  `20260731`, 16 captures each, with no survivor in a wall or out of its home
+  and zero GL, KHR and native-audio errors. The tour also showed every sleeper
+  drawn under its floor, in every world; `8a15656` fixes that.
+- `graphify update . --no-cluster` on the final code: 9,594 nodes and 38,434
+  edges, with the existing `build.gradle` extractor warning.
+- No reviewer subagents ran.
+
+The commits:
+
+| Commit | Subject |
+| --- | --- |
+| `dc1c447` | `feat(urban): plan survivor camps and hidden refuges under generator 15` |
+| `660d365` | `feat(settlement): bring survivor camps and hidden refuges to life` |
+| `3e82426` | `feat(settlement): trade, threaten and guide survivors in conversation` |
+| `1e4dfa3` | `feat(settlement): let hidden civilians be heard and camps be named` |
+| `48d9533` | `feat(qa): tour a survivor camp and a hidden refuge` |
+| `8a15656` | `fix(render): lay sleepers on the floor instead of under it` |
+
+These records follow in their own commit. No push, merge, tag or publication
+was performed.
+
+### Limitations and next concrete step
+
+- **Evidence types.** The tour stages poses between legs, a forward-only
+  clock, the weather and a kit, and makes its conversation choices and shelf
+  transfer through the screens' own commands; it is not the human playtest
+  D-80 defers until after 22. Whether the routines read as lived-in, the
+  dialogue's tone and the muffled cues were checked by script and captures, not
+  judged by a person.
+- **Site forms.** Camps only hold reclaimed ground floors; courtyard and
+  rooftop camps are not built (D-142). Strongholds in package 17 may revisit
+  open-ground sites with walls of their own.
+- **The move.** It is persistent relocation while nobody watches, not an
+  escort through the streets; no one follows the player.
+- **Conversation.** Fixed text with no rumours or quests yet; the relay rumour
+  (C1) and the hidden-civilian aid mission belong to package 20.
+- **Balance for 23.** Stash sizes, foraging, trust values, trade offers, the
+  medic's healing and the threat's yield are initial values.
+- **Presentation.** No map layer for sites (21); no camp ambience (22); names
+  are provisional (P-01).
+- **Day/night temperature (P-15).** Still inverted in every world; unchanged.
+- **Default.** The ordinary new world stays generator 3 until 26.
+
+**Next:** package 17, guarded strongholds and hostile factions, building its
+guards, access rules and counterattacks on the urban site director and
+`urban.sites` (D-143, D-150) under a new generator.
 
 ## Resume rules
 

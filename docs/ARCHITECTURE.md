@@ -29,7 +29,7 @@ Main.main
         │              Time/Weather/Temperature/Water/Fire/LiquidFire/Plant/
         │              Event definitions/Season/ItemCondition
         ├── settlement SettlementManager (+ dormant simulation, planner, builder,
-        │              counterattack director)
+        │              counterattack director, urban site director)
         ├── ai         FactionSystem
         ├── ui         Hud + one instance per screen, EventLog
         └── collaborators split out of Game (all in com.veylon)
@@ -268,14 +268,15 @@ same geometry (layout 7, template 4), and 11 adds the commercial and civic catal
 their overlays (layout 9, template 6) and encounter catalogue 3, and 13 adds basements,
 transit and rooftop routes to those districts (layout 10, template 7) with encounter
 catalogue 4, and 14 adds the quarantine's growth sites and the city's wildlife
-habitats (layout 11, template 7) with encounter catalogue 5. The development
-selector creates 14. New worlds use
+habitats (layout 11, template 7) with encounter catalogue 5, and 15 adds the
+survivor camps and hidden refuges (layout 12, template 7, catalogue 5). The
+development selector creates 15. New worlds use
 `World.DEFAULT_NEW_WORLD_GENERATOR` (3, until the urban rollout); a load accepts any
 supported version and rejects the rest, including anything above
 `MAX_SUPPORTED_GENERATOR`, before it replaces the live world. Feature gates name
 their versions (`hasDeepFrontier`, `hasCaveIdentities`, `isUrbanGenerator`) instead
 of comparing with `>=`, so a new generator inherits nothing by accident, and
-`WorldGeneratorFingerprintTest` pins versions 1–14 absolutely. `ShapedStairGenerationTest`
+`WorldGeneratorFingerprintTest` pins versions 1–15 absolutely. `ShapedStairGenerationTest`
 checks version 8 against frozen version 7 outside stair cells and across chunk orders.
 
 An urban world's layout revision follows from its generator, so it is known
@@ -283,17 +284,18 @@ before bootstrap generates a chunk; a geometry change means a new generator
 version, never a change under an old one (`UrbanRevision`). Its content revision
 (the rolled loot, encounter and trade tables) is saved in `urban.meta`, which
 only urban worlds write. It is optional for older layouts and required for
-generators 9–14. Until that section, or its
+generators 9–15. Until that section, or its
 absent default, has been read, a loading world's content revision cannot be read
 at all. Fresh worlds use content revision 3; revisions 1 and 2 remain supported.
 Revision 1 is the absent-metadata default. The tables and their hash inputs are frozen
-under each revision. Generators 9–14 require content 3. Encounter catalogues are
+under each revision. Generators 9–15 require content 3. Encounter catalogues are
 additive and versioned separately in `urban.population` (1 for generator 10, 2 for
-11, 3 for 12, 4 for 13, 5 for 14, which writes codec 2); they do not reroll content-3
-loot or add encounters to older generators. Generators 13 and 14 also write
+11, 3 for 12, 4 for 13, 5 for 14 and 15, which write codec 2); they do not reroll
+content-3 loot or add encounters to older generators. Generators 13–15 also write
 `urban.discovery` v1 (a count capped at 4,096,
 then ascending observed site ids, each checked against the plan); absence means
-nothing found. Compatibility directions:
+nothing found. Generator 15 also requires `urban.sites` v1, its survivor sites and
+their people. Compatibility directions:
 
 - this build, a legacy save: unchanged, and no urban state is created;
 - this build, an urban save: the same geometry through its generator, the content
@@ -546,10 +548,41 @@ under separate caps (4 alien organisms, 12 wildlife) and tombstones a Veilmaw
 whose node is gone. `urban.population` codec 2 stores the species and binds a
 row to the NPC or creature list.
 
+### Survivor camps and hidden refuges
+
+Generator 15 plans layout 12: layout 11 plus `SurvivorSites`, a pure per-region
+plan of at most one camp (the reclaimed ground floor of a held walk-up, outside the
+quarantine) and one hidden refuge (the region's sealed cellar). Each site lists its
+stable residents (`UrbanIds.resident`), their roles, beds and day cells, the way
+in, the safe cell, the lookout's post, its stash containers and, for a camp, spare
+beds upstairs. Sites stamp no block; `SurvivorStash` overrides the loot roll of a
+stash container so its first touch holds the people's rations and water.
+
+At runtime `SettlementManager.urbanSites` (`UrbanSiteDirector`) owns them inside the
+settlement slow tick. A site is registered as an `UrbanSite`, a `Settlement`
+subclass keyed by its building id in `world.settlements`, the first time the player
+comes near, steps onto its storeys or finds its cellar; every legacy settlement
+path (planner, codecs, slow tick, trade and gift hooks, camp illness, `nearest()`)
+skips these records, while attack, kill and reputation hooks route to the director.
+The director activates and retires bodies in three dimensions from the home anchor,
+records discovery only from sight, entry or the `urban.discovery` ledger, and steps
+every met site's needs hour by hour in lockstep (`UrbanSiteNeeds`), active or
+dormant, from the real stash containers. `UrbanSiteRelations` turns deeds into
+trust, fear and alarm; `UrbanSiteDialogue` is the conversation's command seam
+(fixed lines, trade from finite stores, the medic, threats, word of a camp);
+`UrbanSiteRelocation` moves hidden civilians to a camp's spare beds while unseen.
+`UrbanResidentAI` keeps the people to planned cells over bounded indoor routes, so
+they never walk into walls or leave hiding for a street- or roof-height target; the
+conversation and melee need a clear line to them. In the medium tick the director
+also lets hiding civilians be heard near their panel (`SurvivorSounds`), a
+presentation clue that discovers nothing. `urban.sites` v1 holds every registered
+site and its people (D-150 in the urban decisions); it is required for generator
+15 and read after the population, binding active bodies by core NPC index.
+
 Scripted urban QA routes extend `UrbanRouteScene`: a task queue played through the
 production input seam, mouse-look turns, bounded walking that opens doors with F,
 threat handling, forcing and captures. `urban_slice`, `urban_catalogue`,
-`urban_districts`, `urban_underground` and `urban_ecology` use it.
+`urban_districts`, `urban_underground`, `urban_ecology` and `urban_survivors` use it.
 
 ### Doors, windows and urban fixtures
 

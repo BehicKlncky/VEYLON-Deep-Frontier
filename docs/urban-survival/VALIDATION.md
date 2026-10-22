@@ -2395,3 +2395,184 @@ ignored artifacts under `build/`.
   final build and the native tours.
 
 Next: package 16.
+
+## Milestone 16 — survivor camps and hidden civilians (2026-10-22)
+
+### Scope and baseline
+
+- Branch `feature/urban-survival` at `c5b1782` (the 15 records), clean tree.
+  Read the revised base, the prompt, `AGENTS.md`, `docs/COMMIT_WORKFLOW.md` and
+  these records.
+- Generator 15 (layout 12, template 7, content 3, encounter catalogue 5) is new,
+  with the section `urban.sites` v1. No block, item, enum ordinal, persisted id
+  or existing section changed; the default new world is unchanged.
+- Generators 1–14 keep their absolute pins. Generator 15 was pinned at
+  introduction: its terrain equals generator 14's at every pinned chunk, and its
+  site plans are pinned on three seeds (D-141).
+
+### Behaviour, persistence and clue evidence
+
+Each code commit ran the full portable build against its exact tree in a
+detached worktree (`build/m14-check`) whose tree hash matched the index. Its
+message records the classes:
+
+| Commit | Checks on the exact tree | What they prove |
+| --- | --- | --- |
+| `dc1c447` | Full portable build: 1,998 tests in 227 classes, one existing skip | `SurvivorSitesTest`: a camp only in a held walk-up outside the quarantine with every planned cell standable, dry and inside the building, roles by head count, refuge beds out of reach across one wall, plans identical in any order and resolvable by id, and a camp and a refuge within two regions of the spawn on all six design seeds. The generator-15 terrain and site pins, dispatch, revision and selector naming generator 15, `RuntimeBoundsTest` (the site-plan cache) and every earlier pin |
+| `660d365` | Full portable build: 2,015 tests in 230 classes, one existing skip | `UrbanSurvivorSitesTest` (9): bodies appear and go dormant in three dimensions keeping health and needs; the daily routine on planned cells; hidden civilians stay in their cellar, are not met through its wall and are found by the panel; needs match hour for hour whether active or dormant over 96 hours; starvation leaves tombstones; theft, aid and debts; a hostile camp in Survival and Creative; refuge stash ownership. `UrbanSitesSaveTest` (3): repeated loads keep the people, injuries, needs, deaths, trust, fear and debts; a missing section fails the load and keeps the live world; every malformed payload fails the whole load. `UrbanSiteRelocationTest` (2), camp illness never choosing a survivor, `RuntimeBoundsTest` (site records), the slice loop on generator 15 for the six frozen seeds and `GameLoopIntegrationTest` |
+| `3e82426` | Full portable build: 2,020 tests in 231 classes, one existing skip | `UrbanSiteDialogueTest` (5): a trader's finite stock in Survival and Creative that a load does not refill; hidden civilians move only once aid has earned their trust; a threat robs a refuge with a lasting betrayal and turns a camp hostile; the medic once a game day |
+| `1e4dfa3` | Full portable build: 2,029 tests in 233 classes, one existing skip | `UrbanSurvivorCluesTest` (4): hiding people heard only near their panel, from inside their room, in turn, silenced by fear, never from a camp's door and never once inside; the log line once; nothing discovered by sound; a camp named and known on entry in both modes while generator 14's same building is not. `SurvivorSoundsTest` (2), `EcologySoundsTest`, `UrbanDiscoveryTest`, `UrbanSurvivorSitesTest` |
+| `48d9533` | Full portable build: 2,032 tests in 234 classes, one existing skip | `UrbanSurvivorQaSceneTest` plays the tour headlessly in Survival and Creative and refuses generator 14. Natively on this tree the Survival tour passed (`m16-native-survival-3.log`), with every sleeper still drawn out of sight |
+| `8a15656` | Full portable build: 2,033 tests in 235 classes, one existing skip | `SleepPoseTest`: asleep, every appearance's body rests within 0.05 of its floor and lies below 0.6, while standing its feet meet that floor; `FragmentAnatomyModelTest` and `SpeciesFragmentDrawTest` still reassemble the asleep pose. This tree is the final code; the final native runs below used it |
+
+### Native survivor tour, both modes
+
+Host: Windows 11 Pro 10.0.26200, AMD Ryzen 5 5600X, NVIDIA GeForce RTX 3060 Ti,
+driver 610.88, OpenGL 3.3.0 with KHR_debug; 1280 × 720.
+
+```powershell
+$env:VEYLON_GENERATOR='urban-dev'; $env:VEYLON_SEED='20260731'
+$env:VEYLON_GAME_MODE='survival'; $env:VEYLON_SCENE='urban_survivors'
+$env:VEYLON_RESOLUTION='1280x720'; $env:VEYLON_CAPTURE_TAG='m16-survivors-survival-4'
+.\gradlew.bat run -PveylonDataDir=build/qa/m16-survivors-survival-4 --console=plain
+```
+
+The runs used the same variables from Git Bash. The Creative twin used
+`creative` and the tag and directory `m16-survivors-creative`. Seed
+`20260731` gives these legs (from the `plan` and `staged-pose` lines):
+
+| Leg | Cells | Played |
+| --- | --- | --- |
+| Camp, 10:00 | camp `urban:building:0,0:53:0`: Teodor the lookout, Greta the trader and Zev, five spare beds upstairs; rear door leaf (176, 41, 93); yard pose (172, 41, 93); way in (177, 41, 93) | W with mouse look; F on the rear door; F to talk; the trade and three gifts through the conversation's command; Esc; F on the first stash container; Esc |
+| Refuge | refuge `urban:building:0,0:3:0`: Fenna, Saskia and Esme; street approach (41, 41, 56); hall (42, 37, 45); loose panel (43, 37, 45); inside (44, 37, 45) | W from the street door down to the hall; F on the panel; W; F to talk; three gifts and word of the camp through the command; Esc, F5, F9 |
+| Away | sidewalk corner (317, 41, 326), 170 blocks or more from both | staged pose, waiting for dormancy |
+| Camp, 23:00, then 09:00 | as above | W; a right click placing a torch beside a sleeper; W up the stairs to the spare beds |
+| Empty refuge, day 2 | as above | W; F on the shelf; one item through the storage screen's transfer command |
+
+Both runs printed `[urban-survivors] pass=true` with 5 staged poses and 16
+captures, `wallFrames=0 strayFrames=0` over 39,254 (Survival) and 39,275
+(Creative) resident-frames, no infected engaged and full health, in 99 route
+seconds. Their `deeds` lines are identical: the offers "4 Fiber for 1 Bandage"
+and "2 Plank for 2 Dried Berries"; "A fair trade."; the camp's trust 55 after
+three gifts; the civilians' "How did you find us? Keep your voice down.";
+"We don't know you well enough to follow you anywhere." three times, each
+answered by a gift ("Thank you. Thank you. This buys us days."); then "Then
+we'll go. Not now, not while anyone could follow. Thank you."; setting out at
+game minute 691 to arrive at 737; all three camp members at their beds and the
+post at night; and Dried Berries taken from the shelf left behind with no
+theft. After F9 every person, need, debt, stash count and plan matched the
+`before-save` line. Both `after` lines are identical too: the camp's trust 65
+(the arrival added 10) and the three civilians living at the camp. Each log
+reports `glGetError=0`, 19 KHR messages with 0 errors (the usual MEDIUM
+pixel-transfer notes) and `nativeErrors=0`; Gradle exited 0 after 1 min 42 s
+in both modes. The `views` lines name "District / Reclaimed Residential /
+Survivor camp" in the camp, "Basement" in the hall and "Hidden cellar" in the
+refuge, and the storage owner lines "Camp storage: shared with you as a
+friend" and "Left to you by the people who hid here".
+
+Inspected captures, from the final Survival run unless noted:
+
+- `01`: the camp's rear door from the yard, "Open door (crouch: bar it from
+  this side)". `02`: inside, HUD "Survivor camp", Teodor the lookout in the
+  corridor by the door and "Survivors hold this building: three people keep a
+  camp here." in the log.
+- `03`: Greta's conversation, "Trader - Survivor camp", Trust 0, with the two
+  trades, the demand and the attack. `04`: "A fair trade." and the log's
+  "Traded 4 Fiber for 1 Bandage." `05`: "(friends)", Trust 55, the friend
+  price ("3 Fiber for 1 Bandage", "1 Plank for 2 Dried Berries") and "The
+  survivor camp counts you as a friend" in the log.
+- `06`: the kitchen cupboard, "Camp storage: shared with you as a friend",
+  holding rations, waterskins and the traded fibre.
+- `07`: the plaster wall in the basement hall, the panel's prompt, HUD
+  "Basement" and "Somewhere behind the wall, someone is trying very hard to
+  be quiet." in the log, before anything was found. `08`: the panel slid
+  aside, two civilians beyond it. `09`: the cellar, HUD "Hidden cellar",
+  "Three people huddle at the back of the cellar, watching you."
+- `10`: Esme, "Villager - Hidden refuge", Trust −10, "[4] Tell them about the
+  camp you found", "How did you find us? Keep your voice down." `11`:
+  "(friends)", Trust 59, "Then we'll go." and "They will go to the survivor
+  camp once it is quiet" in the log. `12`: a civilian after F9, "Game
+  loaded."
+- `13`: a camp bedroom at 23:27 lit by the placed torch, a sleeper lying on
+  the floor. `14`: Esme upstairs in the camp at 09:19 the next morning, HUD
+  "Survivor camp", and the log's "Word reaches you: the people from the
+  hidden cellar reached the camp safely."
+- `15`: the empty cellar by day. `16`: the pantry shelf, "Left to you by the
+  people who hid here", rations and waterskins on it.
+- Creative: the same frames with the Creative panel; the placed torch is not
+  spent.
+
+Earlier native runs on the tour's earlier code (`m16-native-survival.log`,
+`-2`) passed but showed faults, fixed in the tour, and one in the game: the
+staged kit weighed 43 kg against a 28 kg capacity; the night view aimed at a
+sleeper through a wall and the spare beds were visited in the dark; and, at
+night, nobody asleep could be seen anywhere, because the sleep pose drew every
+sleeper half a block under its floor. The tour now carries 16.5 kg, walks to a
+sleeper with a clear view and lights the room, and visits the spare beds the
+next morning; the sleep pose was fixed in the game (the `fix(render)` commit
+above). `m16-native-survival-3.log` passed on the tour's own commit, before
+that fix, with every sleeper still out of sight.
+
+Observations, none a tour failure:
+
+- Hunger and thirst move on the hour: by the end the camp's members had
+  eaten and drunk from their stash on schedule (hunger 13.9, thirst 45.8),
+  and the travellers arrived hungry (33.3) but watered.
+- The arrival is reported when the travellers' clock catches up with the
+  camp's after a long absence, so its log time varies with chunk loading
+  (23:31 in the first native run, 09:04 the next morning in the final ones);
+  the arrival minute (737) and every need are the same.
+- A sleeper's position is its feet, so the night view's crosshair rests at
+  the sleeper's feet with the body beside it.
+
+### Commands and portable builds
+
+All Gradle commands used the bundled Temurin 25.0.4.1+1
+(`build/tools/jdk25/jdk-25.0.4.1+1`) and the Windows wrapper. Logs are local
+ignored artifacts under `build/`.
+
+- Focused runs while building each step, among them
+  `.\gradlew.bat test --tests "com.veylon.UrbanSiteDialogueTest"`
+  (`m16-stage3-focused.log`: 5 passed), the clue and sound tests
+  (`m16-stage4-focused.log`: `UrbanSurvivorCluesTest` 4, `SurvivorSoundsTest`
+  2 and `EcologySoundsTest` 1 passed) and
+  `.\gradlew.bat test --tests "com.veylon.UrbanSurvivorQaSceneTest"` after each
+  tour change (`m16-stage5-focused.log`: 3 passed).
+- The sleep pose: a throwaway probe measured the posed body (the old pose
+  drew it from 0.94 to 0.27 blocks under the feet; laid flat without a drop,
+  the body's lowest point lies 0.09 under them in every appearance, and a
+  trader's pack 0.29), and was deleted. `m16-sleep-probe.log` holds the
+  second, per-part measurement; it overwrote the first probe's log. `SleepPoseTest`,
+  `FragmentAnatomyModelTest`, `SpeciesFragmentDrawTest`, `FirePanicTest`,
+  `InfectedBehaviorTest`, `ProjectileHitZoneTest` and
+  `VillageDailyLifeGameplayTest` then passed (`m16-sleep-fix-focused.log`).
+- Each commit's exact-tree build, in the worktree: `m16-stage1-build.log` to
+  `m16-stage6-build.log` (the table above).
+- The final code is `8a15656`'s tree. Its exact-tree build passed in
+  12 min 15 s: 2,033 tests in 235 classes, zero failures or errors and the existing Windows
+  symlink-privilege skip in `AppPathsTest` (`m16-stage6-build.log`).
+- Native runs: `m16-native-survival.log` and `-2` (framing faults and the
+  hidden sleepers, see above), `m16-native-survival-3.log` (the tour's own
+  commit), then `m16-native-survival-4.log` and `m16-native-creative.log`
+  (final).
+- `graphify update . --no-cluster` once on the final code: 9,594 nodes and
+  38,434 edges, with the existing `build.gradle` extractor warning
+  (`m16-graph-update.log`). No clustering or semantic extraction ran.
+
+### Limits and next gate
+
+- The tour stages poses between legs, a forward-only clock, the weather and a
+  kit, and makes its conversation choices and the shelf transfer through the
+  screens' own commands; it is scripted evidence, not the human playtest
+  deferred by D-80. Whether the routines read as lived-in, the tone of the
+  lines and the muffled cues were checked by script, logs and captures, not
+  judged or heard by a person.
+- Camps hold reclaimed ground floors only (D-142). The move to a camp happens
+  unseen and is not an escort. Balance values (stash sizes, foraging, trust
+  steps, offers, the medic, a threat's yield) are initial values for 23.
+- Map presentation of sites is package 21; camp ambience is 22; rumours and the
+  hidden-civilian aid mission are 20.
+- No reviewer subagents ran. The commits rest on their exact-tree builds, the
+  native tours and the inspected captures.
+
+Next: package 17.
