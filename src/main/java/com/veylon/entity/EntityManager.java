@@ -344,7 +344,7 @@ public class EntityManager {
                 resident.live = null;
                 if (s instanceof com.veylon.settlement.UrbanSite site) {
                     resident.health = 0f;
-                    g.settlementManager.urbanSites.onDied(site);
+                    g.settlementManager.urbanSites.onDied(g, site);
                 }
             }
         }

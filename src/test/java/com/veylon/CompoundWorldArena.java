@@ -75,6 +75,32 @@ public final class CompoundWorldArena {
         return cell.offset(out.dx * steps, 0, out.dz * steps);
     }
 
+    /**
+     * A street cell some steps along the street in front of the gate, out of the gate's line of
+     * sight: the direction along the street that stays on street surface.
+     */
+    public static Vec3i alongStreet(Game g, CompoundSites.Compound c, int steps) {
+        Vec3i front = street(c, 2);
+        var out = c.gate().outward();
+        int ax = out.dz != 0 ? 1 : 0, az = out.dx != 0 ? 1 : 0;
+        for (int sign : new int[]{1, -1}) {
+            Vec3i cell = front.offset(ax * sign * steps, 0, az * sign * steps);
+            boolean street = true;
+            for (int k = 1; k <= steps && street; k++) {
+                var surface = g.world.urban.surfaceAt(front.x() + ax * sign * k, front.z() + az * sign * k);
+                street = surface.street;
+            }
+            if (street) { return cell; }
+        }
+        throw new AssertionError("no street runs " + steps + " cells either way past the gate");
+    }
+
+    /** Moves the clock forward to a time of the next day (the clock only ever runs forward). */
+    public static void nextDay(Game g, int minutes) {
+        long day = (long) (g.time.totalMinutes / (24 * 60));
+        g.time.totalMinutes = (day + 1) * 24 * 60 + minutes;
+    }
+
     /** Generates every chunk of a compound's block and its streets, so no planned cell is unloaded. */
     public static void load(Game g, CompoundSites.Compound c) {
         var b = c.site().bounds();

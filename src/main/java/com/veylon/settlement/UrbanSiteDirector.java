@@ -52,6 +52,8 @@ public final class UrbanSiteDirector {
 
     /** Set when {@code urban.sites} is read; a generator-15 save without it fails to load. */
     public boolean restored;
+    /** Set when {@code urban.compounds} is read; a generator-16 save without it fails to load. */
+    public boolean compoundsRestored;
     /** Diagnostics of the last slow tick. */
     public int lastSteps, lastActivated;
     /** Presentation: seconds to the next sound from hiding people, and how many were made. */
@@ -75,6 +77,7 @@ public final class UrbanSiteDirector {
 
     public void reset() {
         restored = false;
+        compoundsRestored = false;
         lastSteps = lastActivated = 0;
         noiseTimer = NOISE_PERIOD / 3f;
         noises = 0;
@@ -191,14 +194,25 @@ public final class UrbanSiteDirector {
 
     // ---- the fast tick -----------------------------------------------------------------------
 
-    /** Gates swung open by a compound's guards shut and lock behind them (milestone 17). */
+    /**
+     * Gates swung open by a compound's guards shut and lock behind them, and a compound's warnings,
+     * responses and hunts run their course (milestone 17).
+     */
     public void fastTick(Game g, float dt) {
         if (!manages(g.world) || !g.world.urban.hasStrongholds()) { return; }
         for (Settlement settlement : g.world.settlements.values()) {
             if (!(settlement instanceof UrbanSite s) || !s.compound()) { continue; }
-            if (s.gateTimer <= 0f && !anyLive(s)) { continue; }
+            if (s.gateTimer <= 0f && !anyLive(s)) {
+                // Nobody on screen: nothing in progress survives dormancy.
+                s.responders = s.hunters = 0;
+                s.responseTimer = s.huntTimer = s.warnTimer = 0f;
+                s.provoked = false;
+                continue;
+            }
             com.veylon.world.urban.CompoundSites.Compound c = s.compoundPlan(g.world.urban);
-            if (c != null) { CompoundGate.tick(g, s, c, dt); }
+            if (c == null) { continue; }
+            CompoundGate.tick(g, s, c, dt);
+            CompoundAccess.tick(g, s, c, dt);
         }
     }
 
@@ -457,8 +471,8 @@ public final class UrbanSiteDirector {
     }
 
     /** A resident died of anything else. */
-    public void onDied(UrbanSite s) {
-        UrbanSiteRelations.died(s);
+    public void onDied(Game g, UrbanSite s) {
+        UrbanSiteRelations.died(g, s);
     }
 
     /**

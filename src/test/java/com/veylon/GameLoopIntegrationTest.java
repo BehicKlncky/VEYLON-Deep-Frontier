@@ -165,6 +165,7 @@ class GameLoopIntegrationTest {
         game.entities.encounters.restored = true;
         game.entities.encounters.lastSpawns = 2;
         game.settlementManager.urbanSites.restored = true;
+        game.settlementManager.urbanSites.compoundsRestored = true;
         game.settlementManager.urbanSites.lastSteps = 3;
         game.uiMode = Game.UiMode.INVENTORY;
         game.simPaused = true;
@@ -220,6 +221,7 @@ class GameLoopIntegrationTest {
         assertEquals(0, game.entities.encounters.lastSpawns);
         assertEquals(0, game.entities.encounters.size());
         assertFalse(game.settlementManager.urbanSites.restored, "survivor sites are per world (milestone 16)");
+        assertFalse(game.settlementManager.urbanSites.compoundsRestored, "compound memories are per world (milestone 17)");
         assertEquals(0, game.settlementManager.urbanSites.lastSteps);
         assertEquals("", game.creativeCatalogScreen.query(),
                 "R16: the catalog query does not survive into a new world");

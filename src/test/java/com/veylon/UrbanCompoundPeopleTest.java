@@ -169,7 +169,7 @@ class UrbanCompoundPeopleTest {
         assertTrue(g.player.health < before, "they noticed the player");
         g.player.health = g.player.maxHealth;
         // Gone: far down the street, out of sight and beyond every post's leash.
-        Vec3i away = street(c, (int) CompoundResidentAI.LEASH + 26);
+        Vec3i away = alongStreet(g, c, (int) CompoundResidentAI.LEASH + 14);
         SurvivorWorldArena.standAt(g, away);
         SurvivorWorldArena.run(g, CompoundResidentAI.FORGET + 30f);
         for (Npc n : live(s)) {

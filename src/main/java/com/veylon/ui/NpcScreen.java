@@ -196,8 +196,9 @@ public class NpcScreen {
 
     /**
      * The numbered choices a survivor-site conversation offers, as shown: talk, aid and a gift
-     * for anyone; then a camp trader's two offers, a camp medic's dressing, or for hidden
-     * civilians the word of a safe camp; then a threat, and an attack.
+     * for anyone; then a camp or stronghold trader's two offers, a medic's dressing, for hidden
+     * civilians the word of a safe camp, or a stronghold gatekeeper's leave to come in; then a
+     * threat and an attack; and to a stronghold, news of a raider yard the player has taken.
      */
     public java.util.List<String> siteOptions(Game g, Npc n) {
         com.veylon.settlement.UrbanSite site = com.veylon.settlement.UrbanSiteDirector.siteOf(g.world, n);
@@ -217,10 +218,16 @@ public class NpcScreen {
             } else if (site.refuge()) {
                 out.add(com.veylon.settlement.UrbanSiteDialogue.campFor(g, site) == null
                         ? "[4] Tell them of a safe place (you know none)" : "[4] Tell them about the camp you found");
+            } else if (site.stronghold() && role == com.veylon.world.urban.SurvivorSites.Role.GATEKEEPER) {
+                out.add(com.veylon.settlement.CompoundAccess.hasPass(g, site)
+                        ? "[4] Ask to be let through (you have a visitor's pass)" : "[4] Ask to be let in");
             }
         }
         out.add("[6] Demand their supplies");
         out.add("[7] Attack");
+        if (site != null && site.stronghold() && com.veylon.settlement.CompoundAccess.unpaidYard(g) != null) {
+            out.add("[8] Tell them the raider yard is taken");
+        }
         return out;
     }
 
@@ -244,6 +251,10 @@ public class NpcScreen {
                     lastResponse = com.veylon.settlement.UrbanSiteDialogue.treat(g, n);
                 } else if (site.refuge()) {
                     lastResponse = com.veylon.settlement.UrbanSiteDialogue.guide(g, n);
+                } else if (site.stronghold() && role == com.veylon.world.urban.SurvivorSites.Role.GATEKEEPER) {
+                    var plan = site.compoundPlan(g.world.urban);
+                    if (plan == null) { return false; }
+                    lastResponse = com.veylon.settlement.CompoundAccess.admit(g, site, plan, n);
                 } else {
                     return false;
                 }
@@ -254,6 +265,10 @@ public class NpcScreen {
             }
             case 6 -> lastResponse = com.veylon.settlement.UrbanSiteDialogue.demand(g, n);
             case 7 -> performAttack(g, n);
+            case 8 -> {
+                if (!site.stronghold() || com.veylon.settlement.CompoundAccess.unpaidYard(g) == null) { return false; }
+                lastResponse = com.veylon.settlement.CompoundAccess.reward(g, site);
+            }
             default -> { return false; }
         }
         return true;

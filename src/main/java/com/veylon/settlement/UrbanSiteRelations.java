@@ -88,6 +88,7 @@ final class UrbanSiteRelations {
         frighten(s, 40f);
         alarm(g, s, 100f);
         seeAttacker(g, s);
+        CompoundAccess.provoked(s);
     }
 
     /** One of them died by the player's hand: a permanent tombstone and lasting grief. */
@@ -102,11 +103,14 @@ final class UrbanSiteRelations {
         frighten(s, 100f);
         alarm(g, s, 100f);
         seeAttacker(g, s);
+        CompoundAccess.provoked(s);
+        CompoundAccess.settleCapture(g, s, true);
     }
 
-    /** One of them died of something else: the others are shaken. */
-    static void died(UrbanSite s) {
+    /** One of them died of something else: the others are shaken, and a raider yard may be left empty. */
+    static void died(Game g, UrbanSite s) {
         frighten(s, 30f);
+        CompoundAccess.settleCapture(g, s, true);
     }
 
     /** Every living one of them who can see the player now knows where the attacker stands. */
@@ -132,10 +136,15 @@ final class UrbanSiteRelations {
         if (s.raiders()) {
             // Raiders have no standing to lose, and nobody who did not see it knows who took what.
             alarm(g, s, seen ? 100f : 15f);
-            if (seen) { seeAttacker(g, s); }
+            if (seen) {
+                seeAttacker(g, s);
+                CompoundAccess.provoked(s);
+            }
             g.log(seen ? "The raiders saw you take their supplies!" : "You take the raiders' supplies unseen.");
             return;
         }
+        // A stronghold judges by what its guards saw (CompoundAccess); a camp and a refuge as ever.
+        if (CompoundAccess.taken(g, s, count, seen)) { return; }
         harm(g, s, Math.min(THEFT_MAX, THEFT_BASE + count), seen ? "They saw you take their supplies!"
                 : "Their stores are short, and they know who took them.");
         frighten(s, s.refuge() ? 15f : 5f);
@@ -187,12 +196,17 @@ final class UrbanSiteRelations {
         trust(g, s, DEFENDED, capital(name(s)) + " saw you put down the " + infected.archetype.displayName + ".");
     }
 
-    /** Whether any of their live people can see the player now. */
+    /**
+     * Whether any of their live people can see the player now. A compound's people (milestone 17)
+     * see only through the fair sight test their guards use: range by light, closer for a
+     * crouching player, in front of them or very near, and in plain sight.
+     */
     static boolean anyoneSees(Game g, UrbanSite s) {
         if (g.player == null || !g.player.isPerceivableByAi()) { return false; }
         for (Settlement.Resident r : s.residents) {
             Npc n = r.live;
-            if (n != null && !n.dead && n.distSqTo(g.player) < 24 * 24
+            if (n == null || n.dead) { continue; }
+            if (s.compound() ? com.veylon.ai.InfectedAI.seesPlayer(g, n) : n.distSqTo(g.player) < 24 * 24
                     && com.veylon.ai.InfectedAI.clearSight(g.world, n.pos.x, n.pos.y + 1.55f, n.pos.z,
                     g.player.pos.x, g.player.pos.y + 1.4f, g.player.pos.z)) {
                 return true;

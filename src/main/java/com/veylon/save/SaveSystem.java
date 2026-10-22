@@ -712,6 +712,7 @@ public final class SaveSystem {
             UrbanRefugesSection.finishLoad(g);
             UrbanPopulationSection.finishLoad(g);
             UrbanSitesSection.finishLoad(g);
+            UrbanCompoundsSection.finishLoad(g);
             g.settlementManager.onWorldLoaded(g);
             return true;
         } catch (IOException ex) {

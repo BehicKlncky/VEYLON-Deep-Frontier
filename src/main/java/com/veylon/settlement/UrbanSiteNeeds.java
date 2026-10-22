@@ -75,6 +75,8 @@ final class UrbanSiteNeeds {
             forage(g, site, (present + 2) / 3, (present + 1) / 2);
         }
         fade(site);
+        // A stronghold finds stores taken unseen short at its hour, and judges by what it saw.
+        CompoundAccess.reckon(g, site);
     }
 
     /** Rations a site's foraging stocks up to: a stronghold feeds a garrison. */
@@ -135,6 +137,7 @@ final class UrbanSiteNeeds {
             g.log(r.name + " of the " + site.plan.kind().label.toLowerCase(java.util.Locale.ROOT) + " has died of "
                     + (r.thirst >= 100f ? "thirst." : "hunger."));
         }
+        CompoundAccess.settleCapture(g, site, site.discovered);
     }
 
     private static void fade(UrbanSite site) {

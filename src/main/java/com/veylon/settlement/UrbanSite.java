@@ -92,6 +92,36 @@ public final class UrbanSite extends Settlement {
     /** Transient (milestone 17): seconds a compound's guard still holds its gate open. */
     public float gateTimer;
 
+    // ---- what a compound remembers (milestone 17; saved in urban.compounds) ----
+    /** A stronghold's visitor's pass: the game minute it runs out, -1 for none. */
+    public double passUntil = -1;
+    /** The game minute a stronghold stops wanting the player gone, -1 for never wanted. */
+    public double wantedUntil = -1;
+    /** The last game minute a stronghold's guard saw the player inside its gate, -1 for never. */
+    public double lastSeenInside = -1;
+    /** Items taken from a stronghold's stores unseen, not yet noticed. */
+    public int missing;
+    /** The game minute a raider yard may next send hunters after the player, -1 for whenever. */
+    public double huntCooldownUntil = -1;
+    /** A stronghold has been told this raider yard is taken, and was grateful once. */
+    public boolean rewarded;
+
+    // ---- what happens now (transient: a load or dormancy ends it) ----
+    /** Seconds a stronghold remembers warning the player off; a second sighting after the grace costs the pass. */
+    public float warnTimer;
+    /** Seconds since someone rattled the shut gate. */
+    public float knockTimer;
+    /** The planned slots answering an alarm, the cell they look at, and how long they look. */
+    public int responders;
+    public com.veylon.util.Vec3i responseAt;
+    public float responseTimer;
+    /** A raider yard provoked by the player: a killing or a theft its people saw. */
+    public boolean provoked;
+    /** The raiders out hunting the player, where they set out to, and for how long. */
+    public int hunters;
+    public com.veylon.util.Vec3i huntFrom;
+    public float huntTimer;
+
     public UrbanSite(SurvivorSites.Site plan) {
         super(plan.id(), UrbanIds.regionX(plan.id()), UrbanIds.regionZ(plan.id()), SettlementType.CAMP, plan.anchor(),
                 sideOf(plan.kind()), plan.kind() == SurvivorSites.Kind.RAIDERS ? Alignment.HOSTILE : Alignment.NEUTRAL);

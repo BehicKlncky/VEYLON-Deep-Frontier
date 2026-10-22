@@ -5,6 +5,7 @@ import com.veylon.combat.WorldNoise;
 import com.veylon.entity.Npc;
 import com.veylon.entity.Npc.NpcState;
 import com.veylon.entity.Player;
+import com.veylon.settlement.CompoundAccess;
 import com.veylon.settlement.CompoundGate;
 import com.veylon.settlement.UrbanSite;
 import com.veylon.util.Vec3i;
@@ -58,11 +59,12 @@ public final class CompoundResidentAI {
         n.repathCooldown -= dt;
         n.workTimer -= dt;
         n.hunger = r.hunger;
-        Npc threat = perceive(g, n, s);
+        Npc threat = perceive(g, n, s, c);
         boolean defender = defender(r.role);
+        boolean hunter = (s.hunters >> r.slot & 1) != 0 && s.huntTimer > 0f;
         Player p = g.player;
-        if (defender && s.hostile() && p != null && !p.dead && p.isPerceivableByAi() && n.lastKnownAge < FORGET
-                && withinLeash(g, s, c, r, n.lastKnown.x, n.lastKnown.z)) {
+        if (defender && enemy(g, s, c) && p != null && !p.dead && p.isPerceivableByAi() && n.lastKnownAge < FORGET
+                && (hunter ? withinHunt(c, n.lastKnown.x, n.lastKnown.z) : withinLeash(g, s, c, r, n.lastKnown.x, n.lastKnown.z))) {
             fightPlayer(g, n, s, c, r);
             return;
         }
@@ -82,6 +84,19 @@ public final class CompoundResidentAI {
             travel(g, n, s, c, s.home(g.world.urban).safe(), n.archetype.speed * 1.1f);
             return;
         }
+        if (hunter && s.huntFrom != null) {
+            // On the trail: to where the player was last seen, looking about there.
+            n.state = NpcState.GUARD;
+            if (!travel(g, n, s, c, s.huntFrom, n.archetype.speed)) { n.yaw += 60f * dt; }
+            return;
+        }
+        if ((s.responders >> r.slot & 1) != 0 && s.responseTimer > 0f && s.responseAt != null) {
+            // Answering an alarm: to the place it came from, and a look round there.
+            n.state = NpcState.GUARD;
+            if (!travel(g, n, s, c, s.responseAt, n.archetype.speed)) { n.yaw += 60f * dt; }
+            return;
+        }
+        keepGate(g, n, s, c, r);
         Vec3i goal = scheduledCell(g, s, c, r, n);
         n.state = stateFor(g, r, goal);
         boolean arrived = !travel(g, n, s, c, goal, n.archetype.speed * (defender ? 0.9f : 0.8f));
@@ -115,6 +130,55 @@ public final class CompoundResidentAI {
                 return;
             }
         }
+    }
+
+    /**
+     * Whom a compound's defenders fight: anyone, for raiders; the player once a stronghold has turned
+     * hostile; and a player a stronghold wants gone, while they are still inside its gate.
+     */
+    static boolean enemy(Game g, UrbanSite s, CompoundSites.Compound c) {
+        if (s.hostile()) { return true; }
+        if (!CompoundAccess.wanted(g, s) || g.player == null) { return false; }
+        Vec3i f = feet(g.player);
+        return c.inside(f.x(), f.y(), f.z());
+    }
+
+    private static boolean withinHunt(CompoundSites.Compound c, float x, float z) {
+        Vec3i gate = c.gate().outside();
+        float dx = x - gate.x() - .5f, dz = z - gate.z() - .5f;
+        return dx * dx + dz * dz <= CompoundAccess.HUNT_RANGE * CompoundAccess.HUNT_RANGE;
+    }
+
+    /**
+     * A knock at a stronghold's shut gate (F on a leaf, from either side) is heard by the guard who
+     * keeps it: someone it lets through (a friend at any hour, a visitor with a pass by day) has the
+     * gate opened for them; a stranger at night is answered through the gate. Standing near the gate
+     * asks for nothing.
+     */
+    private static void keepGate(Game g, Npc n, UrbanSite s, CompoundSites.Compound c, UrbanSite.Resident r) {
+        Player p = g.player;
+        if (!s.stronghold() || !CompoundAccess.gateGuard(s, r) || p == null || p.dead || s.knockTimer <= 0f) { return; }
+        boolean atGate = n.distSqTo(c.gate().inside().x() + .5f, n.pos.y, c.gate().inside().z() + .5f) <= 3.5f * 3.5f
+                || n.distSqTo(c.gate().outside().x() + .5f, n.pos.y, c.gate().outside().z() + .5f) <= 3.5f * 3.5f;
+        if (!atGate) { return; }
+        s.knockTimer = 0f;
+        if (!CompoundAccess.letThrough(g, s)) {
+            if (CompoundAccess.night(g)) {
+                g.log(n.name + " calls through the gate: \"We don't open after dark. Come back at first light.\"");
+            }
+            return;
+        }
+        if (CompoundGate.open(g, c) || !CompoundGate.shuttable(g, c) || !atLane(p, c)) { return; }
+        CompoundGate.openFor(g, s, c, CompoundGate.HOLD_SECONDS);
+        g.log(n.name + " opens the gate for you.");
+    }
+
+    private static boolean atLane(Player p, CompoundSites.Compound c) {
+        for (Vec3i lane : List.of(c.gate().laneOutside(), c.gate().laneInside(), c.gate().outside(), c.gate().inside())) {
+            float dx = p.pos.x - lane.x() - .5f, dz = p.pos.z - lane.z() - .5f;
+            if (dx * dx + dz * dz <= CompoundAccess.GATE_REACH * CompoundAccess.GATE_REACH) { return true; }
+        }
+        return false;
     }
 
     // ---- the schedule ----------------------------------------------------------------------
@@ -206,9 +270,10 @@ public final class CompoundResidentAI {
 
     /**
      * Sight of the player through the fair test every hostile shares, hearing, and the nearest
-     * infected in sight. Runs on a staggered interval; returns the infected threat, if any.
+     * infected in sight. What a stronghold's guard sees or hears is what its rules act on
+     * ({@link CompoundAccess}). Runs on a staggered interval; returns the infected threat, if any.
      */
-    private static Npc perceive(Game g, Npc n, UrbanSite s) {
+    private static Npc perceive(Game g, Npc n, UrbanSite s, CompoundSites.Compound c) {
         if (n.decideTimer > 0) { return n.combatTarget instanceof Npc t && !t.dead ? t : null; }
         n.decideTimer = UrbanResidentAI.PERCEPTION_INTERVAL + g.entities.nextSettledNpcAiFloat() * 0.15f;
         n.perceptionChecks++;
@@ -220,6 +285,9 @@ public final class CompoundResidentAI {
             if (InfectedAI.seesPlayer(g, n)) {
                 n.lastKnown.set(p.pos);
                 n.lastKnownAge = 0;
+                if (s.stronghold() && defender(s.resident(n.residentIndex).role)) {
+                    CompoundAccess.sighted(g, s, c, n, feet(p));
+                }
             }
         }
         WorldNoise.NoiseEvent heard = g.noise.loudestAudible(g.world, n.pos.x, n.pos.y, n.pos.z,
@@ -227,7 +295,8 @@ public final class CompoundResidentAI {
         if (heard != null && (heard.playerSource || heard.intensity > 0.5f)) {
             n.lastHeard = heard;
             s.alertLevel = Math.min(100f, s.alertLevel + heard.intensity * 20f);
-            if (heard.playerSource && s.hostile() && p != null && p.isPerceivableByAi()) {
+            if (s.stronghold()) { CompoundAccess.heard(g, s, c, n, heard); }
+            if (heard.playerSource && enemy(g, s, c) && p != null && p.isPerceivableByAi()) {
                 n.lastKnown.set(heard.x, heard.y, heard.z);
                 n.lastKnownAge = Math.min(n.lastKnownAge, 6f);
             }
@@ -300,7 +369,7 @@ public final class CompoundResidentAI {
         n.yaw = (float) Math.toDegrees(Math.atan2(tx - n.pos.x, -(tz - n.pos.z)));
     }
 
-    private static Vec3i feet(Npc n) {
+    private static Vec3i feet(com.veylon.entity.Entity n) {
         return cell(n.pos.x, n.pos.y, n.pos.z);
     }
 
