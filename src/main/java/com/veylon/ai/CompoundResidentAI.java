@@ -32,7 +32,9 @@ import java.util.List;
  *       ({@link CompoundGate}).</li>
  *   <li><b>Senses.</b> A guard notices the player only as an infected would: in sight, within its
  *       profile's range scaled by light, closer when the player crouches, in front of it or very
- *       near ({@link InfectedAI#seesPlayer}), or by a sound it actually hears.</li>
+ *       near ({@link InfectedAI#seesPlayer}), or by a sound it actually hears. A stronghold's
+ *       guards take the player's footsteps, doors and knock where the rules let them be for
+ *       everyday life ({@link CompoundAccess#everyday}).</li>
  *   <li><b>Raiders</b> are hostile: any of them who notices a Survival player goes at them,
  *       striking through the player's damage gates, never farther than {@value #LEASH} blocks
  *       from their post, and gives up {@value #FORGET} seconds after losing them. A stronghold's
@@ -294,7 +296,8 @@ public final class CompoundResidentAI {
                 n.archetype.hearRange * 0.3f, n.lastHeard, n);
         if (heard != null && (heard.playerSource || heard.intensity > 0.5f)) {
             n.lastHeard = heard;
-            s.alertLevel = Math.min(100f, s.alertLevel + heard.intensity * 20f);
+            // A visitor walking the yard is no alarm; the same steps in the barracks are.
+            if (!CompoundAccess.everyday(g, s, c, heard)) { s.alertLevel = Math.min(100f, s.alertLevel + heard.intensity * 20f); }
             if (s.stronghold()) { CompoundAccess.heard(g, s, c, n, heard); }
             if (heard.playerSource && enemy(g, s, c) && p != null && p.isPerceivableByAi()) {
                 n.lastKnown.set(heard.x, heard.y, heard.z);

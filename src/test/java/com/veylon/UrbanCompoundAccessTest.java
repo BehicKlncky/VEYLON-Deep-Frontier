@@ -70,6 +70,48 @@ class UrbanCompoundAccessTest {
     }
 
     @Test
+    void aVisitorsFootstepsAndDoorsWhereTheyMayBeAlarmNobody() {
+        Game g = strongholdAtNoon(GameMode.SURVIVAL);
+        CompoundSites.Compound c = nearest(g, SurvivorSites.Kind.STRONGHOLD);
+        UrbanSite s = site(g, c);
+        assertTrue(g.npcScreen.performSiteChoice(g, s.resident(0).live, 4));
+        float alert = s.alertLevel;
+        // Up and down the gate's inner passage and the courtyard edge for half a minute, footsteps and all.
+        var out = c.gate().outward();
+        for (int t = 0; t < 30 * 20; t++) {
+            int k = t / 10 % 6;
+            Vec3i cell = c.gate().laneInside().offset(-out.dx * (1 + k), 0, -out.dz * (1 + k));
+            if (t % 10 == 0) {
+                SurvivorWorldArena.standAt(g, cell);
+                g.emitPlayerFootstepNoise(false, false);
+            }
+            g.advanceWorld(SurvivorWorldArena.DT);
+        }
+        assertTrue(CompoundAccess.hasPass(g, s));
+        assertTrue(s.alertLevel < 60f, "a visitor walking the yard is no alarm: " + alert + " -> " + s.alertLevel);
+        assertTrue(near(s.resident(4).live, c.market(), 1.5f), "and the trader keeps the pitch");
+        // The same footsteps where the visitor may not go, and a forced door anywhere, are not everyday.
+        g.emitPlayerFootstepNoise(false, false);
+        var walking = g.noise.loudestAudible(g.player.pos.x, g.player.pos.y, g.player.pos.z, 0f);
+        assertTrue(CompoundAccess.everyday(g, s, c, walking));
+        s.wantedUntil = g.time.totalMinutes + 60;
+        assertFalse(CompoundAccess.everyday(g, s, c, walking), "the steps of someone they want gone");
+        s.wantedUntil = -1;
+        Vec3i barracks = null;
+        for (SurvivorSites.Resident r : c.site().residents()) {
+            if (c.zoneAt(r.bed().x(), r.bed().y(), r.bed().z()) == CompoundSites.Zone.RESTRICTED) { barracks = r.bed(); break; }
+        }
+        assertNotNull(barracks);
+        g.noise.emit(g, barracks.x() + .5f, barracks.y(), barracks.z() + .5f, 10f, .15f, "footstep", true, g.player);
+        var trespass = g.noise.loudestAudible(barracks.x() + .5f, barracks.y(), barracks.z() + .5f, 0f);
+        assertFalse(CompoundAccess.everyday(g, s, c, trespass), "footsteps in the barracks");
+        Vec3i yard = c.gate().laneInside();
+        g.noise.emit(g, yard.x() + .5f, yard.y() + 1f, yard.z() + .5f, 36f, .7f, "door-forced", true, g.player);
+        var forced = g.noise.loudestAudible(yard.x() + .5f, yard.y() + 1f, yard.z() + .5f, 0f);
+        assertFalse(CompoundAccess.everyday(g, s, c, forced), "a door forced in the yard");
+    }
+
+    @Test
     void aVisitorSeenInTheBarracksIsWarnedOnceThenLosesThePassAndIsWanted() {
         Game g = strongholdAtNoon(GameMode.SURVIVAL);
         CompoundSites.Compound c = nearest(g, SurvivorSites.Kind.STRONGHOLD);

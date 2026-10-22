@@ -27,6 +27,10 @@ import com.veylon.world.urban.SurvivorSites.Role;
  *       thief is wanted and the alarm goes up. Taken unseen, it is only missing stores, which the
  *       stronghold notices at its next hour; it suspects the player only if a guard saw them
  *       inside within the last {@value #SUSPICION_HOURS} hours.</li>
+ *   <li><b>Sounds.</b> The player's footsteps, doors and knock where the rules let them be are
+ *       everyday life and alarm nobody, unless the stronghold has turned on them or wants them
+ *       gone; the same sounds anywhere else, and every other sound, raise its alert as any
+ *       site's.</li>
  *   <li><b>Responses.</b> A sound of forced entry, an intruder or a theft in sight raises an alarm:
  *       at most {@value #RESPONDERS} guards, never the gate's own, go to look for
  *       {@value #RESPONSE_SECONDS} seconds, and no new response starts while one is out.</li>
@@ -179,6 +183,23 @@ public final class CompoundAccess {
         } else if ("door-rattle".equals(e.category) && nearGate(c, e.x, e.z)) {
             s.knockTimer = 6f;
         }
+    }
+
+    /** The sounds of everyday life inside a stronghold: walking, doors and a knock at the gate. */
+    private static final java.util.Set<String> EVERYDAY = java.util.Set.of("footstep", "sprint", "door", "door-rattle");
+
+    /**
+     * Whether a sound a stronghold's guard hears is everyday life, which raises no alarm: the
+     * player's footsteps, doors or knock, made where the rules let the player be, while the
+     * stronghold has nothing against them. The same sounds where the player may not be or from a
+     * player it wants gone, and every other sound, are not.
+     */
+    public static boolean everyday(Game g, UrbanSite s, CompoundSites.Compound c, WorldNoise.NoiseEvent e) {
+        if (!s.stronghold() || s.hostile() || wanted(g, s) || e == null || !e.playerSource || !EVERYDAY.contains(e.category)) {
+            return false;
+        }
+        Zone zone = c.zoneAt((int) Math.floor(e.x), (int) Math.floor(e.y + .01f), (int) Math.floor(e.z));
+        return allowed(g, s, zone);
     }
 
     private static boolean nearGate(CompoundSites.Compound c, float x, float z) {
