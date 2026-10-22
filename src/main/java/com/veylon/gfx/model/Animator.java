@@ -17,6 +17,11 @@ import java.util.List;
  * movement speed so transitions read naturally without clip infrastructure.
  */
 public final class Animator {
+    /**
+     * How far a sleeper is raised after being laid on its back about its feet, so that its back,
+     * legs and head rest on the floor it sleeps on; whatever is strapped to its back lies under it.
+     */
+    static final float SLEEP_LIFT = 0.09f;
 
     private Animator() {
     }
@@ -366,7 +371,7 @@ public final class Animator {
             case SLEEP -> {
                 ModelPart root = m.part("root");
                 root.rotX = 1.5f;
-                root.poseY = -0.62f;
+                root.poseY = SLEEP_LIFT;
                 m.part("arm_l").rotX = 0.25f;
                 m.part("arm_r").rotX = 0.25f;
             }
