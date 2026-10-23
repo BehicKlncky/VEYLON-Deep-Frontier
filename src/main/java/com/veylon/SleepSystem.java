@@ -20,6 +20,8 @@ import java.util.Random;
  * <p>In a claimed refuge of a layout-fourteen city (urban milestone 18) the refuge's exposure is
  * read as sleep begins ({@link RefugeSystem#settleForNight}): shut tight with no light showing it
  * rests better, and an exposed one may draw a real infected body that wakes the sleeper early.
+ * A refuge shut tight also keeps out a hostile body beyond its building's walls, which elsewhere
+ * keeps a city sleeper awake within twelve blocks.
  */
 final class SleepSystem {
 
@@ -98,9 +100,12 @@ final class SleepSystem {
                 return;
             }
             for (var npc : game.entities.npcs) {
+                // Layout fourteen: a claimed refuge shut tight keeps out a body beyond its building's walls.
                 if (!npc.dead && npc.hostileToPlayer()
-                        && npc.distSqTo(game.player.pos.x, game.player.pos.y, game.player.pos.z) < 144) {
-                    game.log("A hostile survivor is too close to sleep safely.");
+                        && npc.distSqTo(game.player.pos.x, game.player.pos.y, game.player.pos.z) < 144
+                        && !game.refuges.keepsOut(npc)) {
+                    game.log(npc.infected() ? "Something infected is too close to sleep safely."
+                            : "A hostile survivor is too close to sleep safely.");
                     return;
                 }
             }

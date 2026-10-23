@@ -318,6 +318,21 @@ final class RefugeSystem {
         return new Night(exposure, light, drawn, game.time.totalMinutes + wake);
     }
 
+    /**
+     * True when a hostile body is kept out of the player's sleep: the player stands in a claimed
+     * refuge that is shut tight and the body is beyond its building's walls, so it could only come
+     * in by breaking through. A body anywhere inside the building, on any storey, is never kept out.
+     */
+    boolean keepsOut(Npc n) {
+        if (!applies(game.world)) { return false; }
+        Vec3i feet = feet(game.player.pos.x, game.player.pos.y, game.player.pos.z);
+        UrbanRefuges.Claim claim = game.world.urban.refuges.at(game.world, feet.x(), feet.y(), feet.z());
+        RefugeExposure.Assessment exposure = claim == null ? null : RefugeExposure.assess(game.world, claim);
+        if (exposure == null || !exposure.shutTight()) { return false; }
+        UrbanIndoorQueries.Location there = locate(feet(n.pos.x, n.pos.y, n.pos.z));
+        return there == null || there.building().id() != claim.building();
+    }
+
     /** A short account of a refuge's exposure for the bed prompt and the log. */
     static String exposureLine(RefugeExposure.Assessment a, boolean night) {
         int open = a.count(RefugeExposure.State.OPEN)

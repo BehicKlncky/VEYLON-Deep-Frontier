@@ -7,6 +7,7 @@ import com.veylon.settlement.NpcArchetype;
 import com.veylon.util.Vec3i;
 import com.veylon.world.BlockType;
 import com.veylon.world.FixtureStates;
+import com.veylon.world.VoxelClearance;
 import com.veylon.world.urban.BuildingPlan;
 import com.veylon.world.urban.RefugeExposure;
 import com.veylon.world.urban.UrbanIds;
@@ -14,6 +15,7 @@ import com.veylon.world.urban.UrbanRefuges;
 import com.veylon.world.urban.UrbanStarterSite;
 import org.junit.jupiter.api.Test;
 
+import java.util.Comparator;
 import java.util.List;
 
 import static com.veylon.RefugeWorldArena.*;
@@ -204,6 +206,26 @@ class UrbanRefugeNightTest {
         assertEquals(0f, blind.searchTimer, "boarded windows show no light");
     }
 
+    /** A standing cell inside the refuge's ground floor, a few blocks from the bed. */
+    private static Vec3i insideNear(Game g, Vec3i bed) {
+        BuildingPlan starter = UrbanStarterSite.of(g.world.urban).refuge();
+        for (BuildingPlan.Floor f : starter.floors()) {
+            if (f.index() != 0) { continue; }
+            for (BuildingPlan.Room room : f.rooms()) {
+                var r = room.interior();
+                for (int x = r.x0(); x <= r.x1(); x++) {
+                    for (int z = r.z0(); z <= r.z1(); z++) {
+                        double d = Math.hypot(x - bed.x(), z - bed.z());
+                        if (d >= 3 && d <= 8 && VoxelClearance.standable(g.world, x, bed.y(), z)) {
+                            return new Vec3i(x, bed.y(), z);
+                        }
+                    }
+                }
+            }
+        }
+        throw new AssertionError("no standing cell near the bed");
+    }
+
     /** An empty, supported cell on the refuge's ground floor that is not the bed's. */
     private static Vec3i freeCell(Game g) {
         BuildingPlan starter = UrbanStarterSite.of(g.world.urban).refuge();
@@ -240,6 +262,33 @@ class UrbanRefugeNightTest {
         g.interactions.interact();
         assertTrue(g.sleeping);
         assertEquals(0f, nearby.searchTimer, "outside a claim the night draws nothing new");
+    }
+
+    @Test
+    void aBodyBeyondTheWallsOfARefugeShutTightNoLongerKeepsItsSleeperAwakeButOneInsideStillDoes() {
+        Game g = session(GameMode.SURVIVAL);
+        g.entities.npcs.clear();
+        Vec3i bed = g.world.urban.refugeAnchor;
+        RefugeExposure.Way nearest = exposure(g).ways().stream()
+                .min(Comparator.comparingDouble(w -> w.outside().distSq(bed.x(), bed.y(), bed.z()))).orElseThrow();
+        Npc outside = infected(g, outFrom(nearest, 1));
+        assertTrue(outside.distSqTo(bed.x() + .5f, bed.y(), bed.z() + .5f) < 144, "within twelve blocks of the bed");
+        lieDown(g, 23);
+        assertFalse(g.sleeping, "its doors stand unbarred");
+        assertTrue(lastLog(g).endsWith("Something infected is too close to sleep safely."), lastLog(g));
+
+        shutTight(g, List.of());
+        lieDown(g, 23);
+        assertTrue(g.sleeping, "the refuge's walls keep it out: " + lastLog(g));
+        assertEquals(0f, outside.searchTimer, "and nothing is drawn to a refuge shut tight");
+
+        Game h = session(GameMode.SURVIVAL);
+        h.entities.npcs.clear();
+        shutTight(h, List.of());
+        infected(h, insideNear(h, bed));
+        lieDown(h, 23);
+        assertFalse(h.sleeping, "a body inside the building is never kept out");
+        assertTrue(lastLog(h).endsWith("Something infected is too close to sleep safely."), lastLog(h));
     }
 
     @Test
