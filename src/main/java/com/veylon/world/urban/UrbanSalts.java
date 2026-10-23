@@ -161,6 +161,8 @@ public final class UrbanSalts {
     public static final long VEHICLE_FRONT = 0x5656_4548_4652_4e54L;
     /** Whether a wreck's cabin burnt out. */
     public static final long VEHICLE_BURNT = 0x5656_4548_4255_524eL;
+    /** A generated fixture's wear, which decides how much dismantling it gives back. */
+    public static final long SALVAGE_CONDITION = 0x5653_414c_5643_4f4eL;
 
     private UrbanSalts() {
     }

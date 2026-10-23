@@ -81,7 +81,9 @@ class SerializedEnumOrderTest {
             "WOOD_DOOR", "METAL_DOOR", "WINDOW", "SHELF", "CABINET", "LOCKER", "TABLE",
             "RUBBLE_BLOCK", "DEBRIS_BLOCK",
             // Milestone 15 alien ecology.
-            "MEMBRANE_SAC");
+            "MEMBRANE_SAC",
+            // Milestone 18 salvage.
+            "SPARE_PARTS");
 
     private static final List<String> QUEST_TYPE_ORDER = List.of(
             "FETCH", "HUNT_PREDATOR", "INVESTIGATE",

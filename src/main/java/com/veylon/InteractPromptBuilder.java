@@ -56,12 +56,41 @@ final class InteractPromptBuilder {
      */
     void update() {
         game.interactPrompt = null;
-        if (fixturePrompt() || npcPrompt() || stuckArrowPrompt() || carcassPrompt() || fallingBodyPrompt()
-                || targetBlockPrompt()
-                || trackPrompt()) {
+        boolean fixture = fixturePrompt();
+        if (!fixture && (npcPrompt() || stuckArrowPrompt() || carcassPrompt() || fallingBodyPrompt())) {
+            return;
+        }
+        boolean block = fixture || targetBlockPrompt();
+        if (salvagePrompt() || block || trackPrompt()) {
             return;
         }
         waterPrompt();
+    }
+
+    /**
+     * Layout fourteen (milestone 18): what taking the aimed piece apart would give, after the door's
+     * or the block's own line. A generic tool hint gives way to it; an F action keeps its line and
+     * the dismantle follows. A piece that a standing break carries away learns that crouching
+     * takes it apart.
+     */
+    private boolean salvagePrompt() {
+        if (game.targetHit == null) {
+            return false;
+        }
+        Vec3i pos = new Vec3i(game.targetHit.x(), game.targetHit.y(), game.targetHit.z());
+        BlockType t = game.targetHit.type();
+        String hint = game.blockActions.dismantling.prompt(pos, t);
+        if (hint == null) {
+            return false;
+        }
+        if (game.blockActions.dismantling.applies(pos, t)) {
+            boolean generic = game.interactPrompt == null || game.interactPrompt.startsWith("Requires ");
+            game.interactPrompt = generic ? hint : game.interactPrompt + "  ·  " + hint.replace("[LMB] Hold", "hold LMB");
+        } else {
+            game.interactPrompt = (game.interactPrompt == null ? "[LMB] Hold to carry it away" : game.interactPrompt)
+                    + "  ·  " + hint;
+        }
+        return true;
     }
 
     /** An aimed door or window outranks nearby people, as it does for the F key. */

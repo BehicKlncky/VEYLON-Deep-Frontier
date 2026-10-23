@@ -32,4 +32,13 @@ public final class UrbanCrafting {
     public static final List<Recipe> ECOLOGY_RECIPES = java.util.stream.Stream.concat(RECIPES.stream(),
             java.util.stream.Stream.of(new Recipe("Membrane Salve x2", ItemType.HERBAL_POULTICE, 2, Station.HAND,
                     ItemType.MEMBRANE_SAC, 1, ItemType.FIBER, 1))).toList();
+
+    /**
+     * Generator 17 (urban milestone 18): the ecology recipes, less the planks broken out of a carried
+     * table. Furniture now comes apart only where it stands, by the dismantling of
+     * {@code SalvageTable}, which counts time, noise, tools and wear; a second, instant path from the
+     * same table would pay out differently. Earlier urban worlds keep their lists.
+     */
+    public static final List<Recipe> REFUGE_RECIPES = ECOLOGY_RECIPES.stream()
+            .filter(r -> !r.ingredients.containsKey(ItemType.TABLE)).toList();
 }

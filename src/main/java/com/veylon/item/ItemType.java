@@ -206,7 +206,11 @@ public enum ItemType {
 
     // ---- Alien ecology (urban package 15; append-only) ----
     // Taken from a Veilmaw's remains or a broken growth node; worked into a burn salve. Not food.
-    MEMBRANE_SAC("Membrane Sac", p().stack(8).weight(0.3f).color(0.62f, 0.56f, 0.70f));
+    MEMBRANE_SAC("Membrane Sac", p().stack(8).weight(0.3f).color(0.62f, 0.56f, 0.70f)),
+
+    // ---- Safehouses and salvage (urban package 18; append-only) ----
+    // Gears, springs, wiring and fittings stripped from engines and workshop gear.
+    SPARE_PARTS("Spare Parts", p().stack(16).weight(0.4f).color(0.60f, 0.56f, 0.46f));
 
     public final String displayName;
     public final int maxStack;

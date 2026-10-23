@@ -74,6 +74,10 @@ final class PlayerBlockActions {
     private static final float CREATIVE_BREAK_EPSILON = 0.000001f;
 
     private final Game game;
+    /** Taking pieces apart for materials in a layout-fourteen city (urban milestone 18). */
+    final Dismantling dismantling;
+    /** Whether the last held frame was taking a piece apart; a change restarts the work. */
+    private boolean wasDismantling;
     /** Break-outcome rolls; reseeded per world by {@code Game.reseedSimulation}. */
     private final Random rng = new Random();
     /**
@@ -84,6 +88,7 @@ final class PlayerBlockActions {
 
     PlayerBlockActions(Game game) {
         this.game = game;
+        this.dismantling = new Dismantling(game);
     }
 
     void setRandomSeed(long seed) {
@@ -105,6 +110,18 @@ final class PlayerBlockActions {
             return; // indestructible
         }
         Vec3i pos = new Vec3i(game.targetHit.x(), game.targetHit.y(), game.targetHit.z());
+        boolean dismantle = dismantling.applies(pos, t);
+        if (dismantle != wasDismantling) {
+            // Crouching down or standing up changes the job: the work starts again.
+            wasDismantling = dismantle;
+            dismantling.reset();
+            game.miningProgress = 0;
+            game.miningTarget = null;
+        }
+        if (dismantle) {
+            dismantling.work(dt, pos, t);
+            return;
+        }
         if (!pos.equals(game.miningTarget)) {
             game.miningTarget = pos;
             game.miningProgress = 0;
@@ -174,6 +191,16 @@ final class PlayerBlockActions {
         creativeBreakRemaining = 0;
         game.miningProgress = 0;
         game.miningTarget = null;
+        wasDismantling = false;
+        dismantling.reset();
+    }
+
+    /**
+     * Takes apart the piece at a cell for its materials (urban milestone 18): the command a held,
+     * finished dismantle ends in, and the one gameplay tests drive.
+     */
+    boolean completePlayerDismantle(Vec3i pos) {
+        return dismantling.complete(pos);
     }
 
     float creativeBreakRemaining() { return creativeBreakRemaining; }

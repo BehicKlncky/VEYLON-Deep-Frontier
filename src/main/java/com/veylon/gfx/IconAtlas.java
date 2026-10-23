@@ -757,6 +757,18 @@ public final class IconAtlas {
                 c.line(11, 15, 22, 20, 1, 0xFFB9E7FF);
                 c.rect(12, 17, 16, 22, 0xFFB9E7FF);
             }
+            case SPARE_PARTS -> {
+                // A toothed gear beside a coiled spring and a twist of copper wire.
+                for (int i = 0; i < 8; i++) {
+                    double a = i * Math.PI / 4;
+                    c.line(12, 14, 12 + (int) Math.round(Math.cos(a) * 9), 14 + (int) Math.round(Math.sin(a) * 9),
+                            3, shade(base, 0.6f));
+                }
+                c.circle(12, 14, 7, base);
+                c.circle(12, 14, 3, shade(base, 0.35f));
+                for (int y = 18; y <= 28; y += 3) { c.line(20, y, 28, y + 1, 2, shade(base, 1.3f)); }
+                c.line(4, 28, 14, 25, 1, 0xFFB87333);
+            }
             case MEMBRANE_SAC -> {
                 // A violet sac with pale yellow-green veins and one bright pore.
                 c.circle(16, 18, 11, shade(base, 0.45f));
