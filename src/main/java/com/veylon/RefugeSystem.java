@@ -9,6 +9,7 @@ import com.veylon.world.VoxelClearance;
 import com.veylon.world.World;
 import com.veylon.world.urban.BuildingPlan;
 import com.veylon.world.urban.ParcelPlan;
+import com.veylon.world.urban.RefugeExposure;
 import com.veylon.world.urban.SurvivorSites;
 import com.veylon.world.urban.UrbanIds;
 import com.veylon.world.urban.UrbanIndoorQueries;
@@ -229,14 +230,100 @@ final class RefugeSystem {
                 return "Crouch and press F again to give up this refuge";
             }
             boolean homeBed = refuges.homeFloor() == claim.floor && sleepCell(bed).equals(claim.sleep);
-            return homeBed ? "[F] Sleep in your refuge  (crouch: give it up)"
-                    : "[F] Sleep here and make this refuge home  (crouch: give it up)";
+            var exposure = RefugeExposure.assess(game.world, claim);
+            String note = (exposure == null ? "" : exposureLine(exposure, game.time.isNight()) + "; ")
+                    + "crouch: give it up";
+            return homeBed ? "[F] Sleep in your refuge  (" + note + ")"
+                    : "[F] Sleep here and make this refuge home  (" + note + ")";
         }
         String refusal = claimRefusal(bed);
         return refusal == null
                 ? "[F] Rest here  (crouch: claim these rooms as a refuge, " + (refuges.size() + 1) + " of "
                 + UrbanRefuges.MAX_CLAIMS + ")"
                 : "[F] Rest here  (" + refusal.toLowerCase(Locale.ROOT).charAt(0) + refusal.substring(1) + ")";
+    }
+
+    // ------------------------------------------------------------------
+    // The night: exposure draws what is really out there
+    // ------------------------------------------------------------------
+
+    /** Blocks from an open or unbarred way in within which an infected body notices a sleeper's refuge. */
+    static final float DRAW_RADIUS = 32f;
+    /** Blocks from a window or open way within which a light showing at night draws one. */
+    static final float LIGHT_DRAW_RADIUS = 48f;
+    /** Seconds a drawn body keeps looking at the way in it was drawn to. */
+    static final float DRAWN_SEARCH_SECONDS = 40f;
+    /** Game minutes per block of its distance before a drawn body wakes the sleeper, and the bounds. */
+    static final double WAKE_MINUTES_PER_BLOCK = 1.5, MIN_WAKE_MINUTES = 15, MAX_WAKE_MINUTES = 90;
+
+    /**
+     * What a night holds for a sleeper in a claimed refuge.
+     *
+     * @param exposure   the refuge's ways in and light as they stand
+     * @param light      a lit light shows from it into the night
+     * @param drawn      the infected body drawn to it, or null
+     * @param wakeMinute the game minute the drawn body wakes the sleeper, or -1
+     */
+    record Night(RefugeExposure.Assessment exposure, boolean light, Npc drawn, double wakeMinute) {
+        /** No way in stands open or unbarred, and no light shows into the night. */
+        boolean shutTight() {
+            return exposure.shutTight() && !light;
+        }
+    }
+
+    /**
+     * The rule for sleeping in a claimed refuge, applied once as sleep begins. A refuge shut tight,
+     * with no light showing, draws nothing. Otherwise the nearest living infected body that is
+     * actually out there and not panicking, within {@value #DRAW_RADIUS} blocks of a way in that
+     * stands open or unbarred, or at night within {@value #LIGHT_DRAW_RADIUS} blocks of a way a
+     * light shows through, comes to look at that way, and the sleeper wakes sooner the nearer it
+     * was. Nothing is ever conjured: with no such body the night passes quietly, and a Creative
+     * sleeper, whom no threat perceives, draws nothing.
+     *
+     * @return null when the sleeper is not in a claimed refuge of a layout-fourteen city
+     */
+    Night settleForNight() {
+        if (!applies(game.world)) { return null; }
+        Vec3i feet = feet(game.player.pos.x, game.player.pos.y, game.player.pos.z);
+        UrbanRefuges.Claim claim = game.world.urban.refuges.at(game.world, feet.x(), feet.y(), feet.z());
+        var exposure = claim == null ? null : RefugeExposure.assess(game.world, claim);
+        if (exposure == null) { return null; }
+        boolean light = game.time.isNight() && exposure.lightShows();
+        if (exposure.shutTight() && !light || !game.player.isPerceivableByAi()) {
+            return new Night(exposure, light, null, -1);
+        }
+        Npc drawn = null;
+        RefugeExposure.Way to = null;
+        double best = Double.MAX_VALUE;
+        for (Npc n : game.entities.npcs) {
+            if (n.dead || !n.infected() || n.panic.active()) { continue; }
+            for (var way : exposure.ways()) {
+                Vec3i o = way.outside();
+                double d = n.distSqTo(o.x() + .5f, o.y(), o.z() + .5f);
+                boolean reaches = way.admits() && d <= DRAW_RADIUS * DRAW_RADIUS
+                        || light && way.showsLight() && d <= LIGHT_DRAW_RADIUS * LIGHT_DRAW_RADIUS;
+                if (reaches && d < best) {
+                    best = d;
+                    drawn = n;
+                    to = way;
+                }
+            }
+        }
+        if (drawn == null) { return new Night(exposure, light, null, -1); }
+        Vec3i o = to.outside();
+        drawn.lastKnown.set(o.x() + .5f, o.y(), o.z() + .5f);
+        drawn.lastKnownAge = 0;
+        drawn.searchTimer = Math.max(drawn.searchTimer, DRAWN_SEARCH_SECONDS);
+        double wake = Math.max(MIN_WAKE_MINUTES, Math.min(MAX_WAKE_MINUTES, Math.sqrt(best) * WAKE_MINUTES_PER_BLOCK));
+        return new Night(exposure, light, drawn, game.time.totalMinutes + wake);
+    }
+
+    /** A short account of a refuge's exposure for the bed prompt and the log. */
+    static String exposureLine(RefugeExposure.Assessment a, boolean night) {
+        int open = a.count(RefugeExposure.State.OPEN)
+                + a.count(RefugeExposure.State.UNBARRED);
+        String ways = open == 0 ? "shut tight" : open + (open == 1 ? " way in open" : " ways in open");
+        return night && a.lightShows() ? ways + ", a light showing" : ways;
     }
 
     // ------------------------------------------------------------------

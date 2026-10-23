@@ -70,7 +70,8 @@ class UrbanRefugeClaimsTest {
         assertEquals(UrbanIds.floor(starter.id(), 0), home.floor);
         assertEquals(g.world.urban.refugeAnchor, home.sleep, "slept in at the starter bed");
         assertEquals(UrbanPlaces.Place.REFUGE, UrbanPlaces.at(g.world, home.sleep.x(), home.sleep.y(), home.sleep.z()).place());
-        assertEquals("[F] Sleep in your refuge  (crouch: give it up)", prompt(g, bed(starter, 0).position()));
+        String line = prompt(g, bed(starter, 0).position());
+        assertTrue(line.startsWith("[F] Sleep in your refuge  (") && line.endsWith("; crouch: give it up)"), line);
         // Its cupboards are the refuge's storage; the storey above it was never claimed.
         BuildingPlan.Fixture cupboard = piece(starter, 0, BlockType.CABINET);
         standAt(g, cupboard.target());

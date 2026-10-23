@@ -16,6 +16,10 @@ import java.util.Random;
  *
  * <p>{@code sleeping} and {@code sleepFade} stay on {@link Game} because the
  * renderer reads them to drive the screen fade.
+ *
+ * <p>In a claimed refuge of a layout-fourteen city (urban milestone 18) the refuge's exposure is
+ * read as sleep begins ({@link RefugeSystem#settleForNight}): shut tight with no light showing it
+ * rests better, and an exposed one may draw a real infected body that wakes the sleeper early.
  */
 final class SleepSystem {
 
@@ -42,6 +46,8 @@ final class SleepSystem {
     private static final float COMFORTABLE_QUALITY = 0.7f;
     /** Quality below which the night is miserable and can cause sickness. */
     private static final float MISERABLE_QUALITY = 0.4f;
+    /** Urban milestone 18: a claimed refuge shut tight, with no light showing, rests better. */
+    static final float SHUT_TIGHT_BONUS = 0.1f;
 
     // While asleep.
     private static final float FADE_PER_SECOND = 1.5f;
@@ -71,6 +77,8 @@ final class SleepSystem {
     private final Random rng = new Random();
     private float sleepQuality;
     private float sleptMinutes;
+    /** The game minute something drawn to an exposed refuge wakes the sleeper, or -1. */
+    private double disturbAt = -1;
 
     void setRandomSeed(long seed) {
         rng.setSeed(seed);
@@ -120,13 +128,28 @@ final class SleepSystem {
                     + (int) MIN_DAYTIME_FATIGUE + "+).");
             return;
         }
+        // Layout fourteen: a claimed refuge's exposure decides what the night draws (milestone 18).
+        RefugeSystem.Night refuge = game.refuges.settleForNight();
         sleepQuality = scoreSleepQuality(campBed);
+        if (refuge != null && refuge.shutTight()) {
+            sleepQuality = Math.min(1f, sleepQuality + SHUT_TIGHT_BONUS);
+        }
+        disturbAt = refuge == null || refuge.drawn() == null ? -1 : refuge.wakeMinute();
         game.sleeping = true;
         sleptMinutes = 0;
         game.audio.playSleep();
         game.log("You settle down to sleep"
                 + (sleepQuality > COMFORTABLE_QUALITY ? " comfortably."
                 : (sleepQuality < MISERABLE_QUALITY ? " - cold, wet and uneasy." : ".")));
+        if (refuge != null) {
+            game.log(refuge.shutTight() ? "Your refuge is shut tight."
+                    : "Your refuge: " + RefugeSystem.exposureLine(refuge.exposure(), refuge.light()) + ".");
+        }
+    }
+
+    /** The quality the current sleep was scored at. */
+    float quality() {
+        return sleepQuality;
     }
 
     /** Scores the resting conditions once, at the moment sleep begins. */
@@ -179,19 +202,25 @@ final class SleepSystem {
         boolean attacked = game.player.damageFlash > ATTACKED_DAMAGE_FLASH;
         // A fire wakes the sleeper even in afterburn, whose flash stays below that line.
         boolean burning = game.combustion.isBurning(game.player);
-        if (morning || rested || attacked || burning) {
-            wake(attacked, burning);
+        boolean disturbed = disturbAt >= 0 && game.time.totalMinutes >= disturbAt;
+        if (morning || rested || attacked || burning || disturbed) {
+            wake(attacked, burning, disturbed);
         }
     }
 
-    private void wake(boolean attacked, boolean burning) {
+    private void wake(boolean attacked, boolean burning, boolean disturbed) {
         game.sleeping = false;
+        disturbAt = -1;
         if (burning) {
             game.log("You wake up on fire!");
             return;
         }
         if (attacked) {
             game.log("You are attacked in your sleep!");
+            return;
+        }
+        if (disturbed) {
+            game.log("You wake with a start: something out there has found your refuge.");
             return;
         }
         game.log("You wake after " + (int) (sleptMinutes / 60f * 10) / 10f + " hours. Fatigue "
