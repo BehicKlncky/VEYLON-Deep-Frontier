@@ -55,7 +55,11 @@ final class InteractPromptBuilder {
      * <p>Sets it to {@code null} when nothing nearby is interactable.
      */
     void update() {
-        game.interactPrompt = null;
+        // Layout fourteen: what the use button does with a fortification item in hand (milestone 18).
+        game.interactPrompt = Fortification.prompt(game, game.player.selected());
+        if (game.interactPrompt != null) {
+            return;
+        }
         boolean fixture = fixturePrompt();
         if (!fixture && (npcPrompt() || stuckArrowPrompt() || carcassPrompt() || fallingBodyPrompt())) {
             return;
@@ -260,6 +264,8 @@ final class InteractPromptBuilder {
             case CAGE_BARS -> game.interactPrompt = world.isUrban() ? "Security bars over a window"
                     : "Cage bars (mine through to free captives)";
             case SIGN -> game.interactPrompt = signPrompt(targetX, targetZ);
+            case BARRICADE, BARRICADE_METAL -> game.interactPrompt = Fortification.barricadeInfo(game,
+                    new Vec3i(targetX, targetY, targetZ), game.targetHit.type());
             // Milestone 15: the growth teaches its own counters.
             case GROWTH_NODE -> game.interactPrompt = "Growth node: a torch set beside it burns it out";
             case VEIL_MEMBRANE -> game.interactPrompt = "Veil membrane: it wakes to footsteps and light";

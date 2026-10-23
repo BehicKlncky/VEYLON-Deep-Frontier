@@ -230,6 +230,11 @@ public final class MaterialRegistry {
             // Milestone 18 static salvage: a burnt-out car's scorched, rusting steel.
             register("car_wreck", BlockType.CAR_WRECK, "car_wreck_top", "car_wreck_side", "car_wreck_top",
                     1, TintMode.NONE, false, 0f, 0.6f);
+            // Milestone 18 fortification: boards nailed and sheet metal bolted across an opening.
+            register("barricade", BlockType.BARRICADE, "barricade", "barricade", "barricade",
+                    1, TintMode.NONE, false, 0f, 0.9f);
+            register("barricade_metal", BlockType.BARRICADE_METAL, "barricade_metal", "barricade_metal",
+                    "barricade_metal", 1, TintMode.NONE, false, 0f, 0.4f);
 
             // Standalone prop tiles used by special shapes (torch flame, campfire, basin water...).
             propTile("torch_head", 1.0f, 0.9f);

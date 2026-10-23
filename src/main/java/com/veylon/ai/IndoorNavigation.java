@@ -19,9 +19,10 @@ public final class IndoorNavigation {
 
     /**
      * As {@link #moveTo(Game, Npc, Vec3i, float, float)}; with {@code breach}, a Breacher (urban
-     * milestone 15) that finds no ordinary route plans through closed wooden doors
-     * ({@link Pathfinder#findBreach}), and stops at a locked or barred one on its route, naming it
-     * in {@link Npc#breachDoor} for its brain to hammer down. It opens unlocked doors as anyone does.
+     * milestone 15) that finds no ordinary route plans through closed wooden doors and plank
+     * barricades ({@link Pathfinder#findBreach}), and stops at a locked or barred door or a
+     * barricade on its route, naming it in {@link Npc#breachDoor} for its brain to hammer down. It
+     * opens unlocked doors as anyone does.
      */
     public static boolean moveTo(Game g, Npc n, Vec3i goal, float speed, float arrive, boolean breach) {
         if (n.distSqTo(goal.x() + .5f, goal.y(), goal.z() + .5f) < arrive * arrive
@@ -70,10 +71,17 @@ public final class IndoorNavigation {
         }
         if (breach) {
             for (int y = step.y(); y <= step.y() + 1; y++) {
+                BlockType b = g.world.getBlock(step.x(), y, step.z());
                 // Still closed after the shoulder above: locked or barred. Stop here and break it.
-                if (g.world.getBlock(step.x(), y, step.z()) == BlockType.WOOD_DOOR) {
+                if (b == BlockType.WOOD_DOOR) {
                     n.breachDoor = new Vec3i(step.x(), Fixtures.stackBottom(g.world, step.x(), y, step.z(),
                             Fixtures.Kind.WOOD_DOOR), step.z());
+                    Steering.stop(n);
+                    return true;
+                }
+                // Milestone 18: boards nailed across the way, hammered down one cell at a time.
+                if (b == BlockType.BARRICADE) {
+                    n.breachDoor = new Vec3i(step.x(), y, step.z());
                     Steering.stop(n);
                     return true;
                 }

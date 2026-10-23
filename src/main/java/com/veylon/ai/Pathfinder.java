@@ -79,6 +79,10 @@ public final class Pathfinder {
         if (breach && (lockedWood(w, x, y, z, feet) || lockedWood(w, x, y + 1, z, head))) {
             return BREACH_DOOR_COST;
         }
+        if (breach && (feet == BlockType.BARRICADE || head == BlockType.BARRICADE)
+                && com.veylon.world.urban.SalvageTable.applies(w)) {
+            return BREACH_BARRICADE_COST;
+        }
         if (feet == BlockType.GATE || head == BlockType.GATE
                 || Fixtures.isClosedDoor(feet) || Fixtures.isClosedDoor(head)) {
             return 2.5f;
@@ -96,6 +100,12 @@ public final class Pathfinder {
      * a little further through an open one than stop to hammer.
      */
     public static final float BREACH_DOOR_COST = 8f;
+
+    /**
+     * Step cost of a plank barricade on a Breacher's route (urban milestone 18): it hammers one down
+     * only when nothing easier reaches the sound.
+     */
+    public static final float BREACH_BARRICADE_COST = 10f;
 
     /**
      * Finds a path of standable cells from start to goal, or null. Both ends
@@ -309,17 +319,22 @@ public final class Pathfinder {
 
     /**
      * The world as a Breacher plans in it (urban milestone 15): a closed wooden door reads as
-     * unlocked whatever its lock or bar says, because it means to break it. Nothing else changes:
-     * metal doors, glass, walls and unloaded columns stop it as they stop anyone.
+     * unlocked whatever its lock or bar says, because it means to break it, and in a layout-fourteen
+     * city (milestone 18) a plank barricade reads as open air for the same reason. Nothing else changes: metal doors,
+     * sheet-metal barricades, glass, walls and unloaded columns stop it as they stop anyone.
      */
     static com.veylon.world.VoxelAccess breachAccess(World w) {
+        boolean fortified = com.veylon.world.urban.SalvageTable.applies(w);
         return new com.veylon.world.VoxelAccess() {
             public boolean isColumnLoaded(int x, int z) { return w.isColumnLoaded(x, z); }
             public int fixtureLockAt(int x, int y, int z) {
                 return w.getBlock(x, y, z) == BlockType.WOOD_DOOR ? com.veylon.world.FixtureStates.LOCK_NONE
                         : w.fixtureLockAt(x, y, z);
             }
-            public BlockType getBlock(int x, int y, int z) { return w.getBlock(x, y, z); }
+            public BlockType getBlock(int x, int y, int z) {
+                BlockType b = w.getBlock(x, y, z);
+                return b == BlockType.BARRICADE && fortified ? BlockType.AIR : b;
+            }
         };
     }
 }

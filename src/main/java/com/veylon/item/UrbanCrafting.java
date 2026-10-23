@@ -35,10 +35,19 @@ public final class UrbanCrafting {
 
     /**
      * Generator 17 (urban milestone 18): the ecology recipes, less the planks broken out of a carried
-     * table. Furniture now comes apart only where it stands, by the dismantling of
-     * {@code SalvageTable}, which counts time, noise, tools and wear; a second, instant path from the
-     * same table would pay out differently. Earlier urban worlds keep their lists.
+     * table, plus the fortifications. Furniture now comes apart only where it stands, by the
+     * dismantling of {@code SalvageTable}, which counts time, noise, tools and wear; a second,
+     * instant path from the same table would pay out differently. Barricades and braces are made
+     * from what salvage recovers: boards nailed with scrap by hand, sheet metal bolted at a
+     * workbench. Earlier urban worlds keep their lists.
      */
-    public static final List<Recipe> REFUGE_RECIPES = ECOLOGY_RECIPES.stream()
-            .filter(r -> !r.ingredients.containsKey(ItemType.TABLE)).toList();
+    public static final List<Recipe> REFUGE_RECIPES = java.util.stream.Stream.concat(ECOLOGY_RECIPES.stream()
+                    .filter(r -> !r.ingredients.containsKey(ItemType.TABLE)),
+            java.util.stream.Stream.of(
+                    new Recipe("Plank Barricade", ItemType.BARRICADE, 1, Station.HAND,
+                            ItemType.PLANK, 3, ItemType.SCRAP, 1),
+                    new Recipe("Sheet-Metal Barricade", ItemType.BARRICADE_METAL, 1, Station.WORKBENCH,
+                            ItemType.SHEET_METAL, 2, ItemType.SCRAP, 2),
+                    new Recipe("Door Brace", ItemType.DOOR_BRACE, 1, Station.HAND,
+                            ItemType.PLANK, 2, ItemType.SCRAP, 2))).toList();
 }

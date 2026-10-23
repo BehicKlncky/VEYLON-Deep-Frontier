@@ -127,13 +127,17 @@ public class Npc extends Entity {
     public com.veylon.combat.WorldNoise.NoiseEvent lastHeard;
     /**
      * A Breacher's door (urban milestone 15): the bottom cell of the closed wooden door on its
-     * route that it is hammering down, the seconds to its next blow and the blows landed.
-     * Transient intent: a load, a departure or a lost scent forgets it, and the door keeps only
-     * what the blows did, which is nothing until the last one forces it.
+     * route that it is hammering down, the seconds to its next blow and the blows landed on the
+     * door itself. From urban milestone 18 the target may also be a plank barricade cell, and a
+     * door's brace takes blows before the door does; {@link #breachStruck} counts every blow on the
+     * target. Transient intent: a load, a departure or a lost scent forgets it, and the door keeps
+     * only what the blows did, which is nothing until the last one forces it (a barricade's and a
+     * brace's lost strength is kept by the world).
      */
     public Vec3i breachDoor;
     public float breachTimer;
     public int breachBlows;
+    public int breachStruck;
 
     public Npc(World world, String name) {
         super(world);

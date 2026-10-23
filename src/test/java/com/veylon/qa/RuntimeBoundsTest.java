@@ -436,6 +436,39 @@ class RuntimeBoundsTest {
     }
 
     @Test
+    void fortificationLedgersStopAtTheirCaps() {
+        Game game = new Game();
+        game.newWorld(20260731, true, World.GEN_URBAN_REFUGES, com.veylon.entity.GameMode.SURVIVAL);
+        var f = game.world.urban.fortifications;
+        int damaged = com.veylon.world.urban.UrbanFortifications.MAX_DAMAGED;
+        // Far from anything generated: the ledger never loads a chunk to remember a cell.
+        for (int i = 0; i < damaged; i++) {
+            assertTrue(f.damage(BlockType.BARRICADE, new com.veylon.util.Vec3i(100_000 + i, 50, 0), 1f) > 0);
+        }
+        assertEquals(0f, f.damage(BlockType.BARRICADE, new com.veylon.util.Vec3i(-100_000, 50, 0), 1f),
+                "a cell the full ledger cannot remember gives way at once rather than growing it");
+        assertEquals(damaged, f.damagedCount());
+        int braces = com.veylon.world.urban.UrbanFortifications.MAX_BRACES;
+        for (int i = 0; i <= braces; i++) {
+            for (int y = 50; y <= 51; y++) {
+                assertTrue(game.world.fixtures.set(200_000 + 2 * i, y, 0, com.veylon.world.FixtureStates.LOCK_BARRED));
+            }
+            boolean set = f.setBrace(game.world, new com.veylon.util.Vec3i(200_000 + 2 * i, 50, 0), 10f);
+            assertEquals(i < braces, set, "brace " + i);
+        }
+        RuntimeBudgetSnapshot full = RuntimeBudgetSnapshot.capture(game);
+        assertEquals(damaged, full.damagedBarricades());
+        assertEquals(braces, full.doorBraces());
+        assertTrue(full.withinHardLimits(), full.occupancySummary());
+        assertTrue(RuntimeBudgetSnapshot.hardLimitSummary().contains("damagedBarricades=" + damaged));
+        assertTrue(RuntimeBudgetSnapshot.hardLimitSummary().contains("braces=" + braces));
+        // A brace whose door is no longer barred makes room again.
+        for (int y = 50; y <= 51; y++) { game.world.fixtures.remove(200_000, y, 0); }
+        assertTrue(f.setBrace(game.world, new com.veylon.util.Vec3i(200_000 + 2 * braces, 50, 0), 10f));
+        assertEquals(braces, f.braceCount());
+    }
+
+    @Test
     void survivorSiteRecordsStopAtTheirCap() {
         Game game = com.veylon.SurvivorWorldArena.session(com.veylon.SurvivorWorldArena.SEED,
                 com.veylon.entity.GameMode.SURVIVAL);

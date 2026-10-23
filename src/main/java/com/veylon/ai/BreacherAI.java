@@ -27,7 +27,10 @@ import com.veylon.world.BlockType;
  *       At a locked or barred one it hammers: a blow every {@value #BLOW_SECONDS} s, each one a
  *       loud noise other infected answer, and the {@value #BLOWS}th forces the door through the
  *       same recorded edits as a player's forced entry. Barring a door therefore buys time, not
- *       safety; metal doors hold.</li>
+ *       safety; metal doors hold. In a layout-fourteen city (urban milestone 18) a door's brace
+ *       takes blows before the door does, and it plans through plank barricades too, each blow
+ *       taking {@value com.veylon.Fortification#BREACHER_BLOW} of a barricade's strength until it
+ *       gives way; sheet-metal barricades hold like metal doors.</li>
  *   <li><b>Strike:</b> slow and heavy: {@value #WINDUP} s windup, {@value #CADENCE} s between
  *       blows, its archetype's melee damage through the player's damage gates.</li>
  * </ul>
@@ -128,15 +131,21 @@ public final class BreacherAI {
         }
     }
 
-    /** Blows on the door its route stopped at; the last one forces it. */
+    /**
+     * Blows on the door or barricade its route stopped at. A door's brace takes blows before the
+     * door does (urban milestone 18); the door's last blow forces it, and a barricade gives way
+     * when its strength is gone.
+     */
     private static void hammer(Game g, Npc n, float dt) {
         Vec3i door = n.breachDoor;
         float dx = door.x() + 0.5f - n.pos.x, dz = door.z() + 0.5f - n.pos.z;
-        if (g.world.getBlock(door.x(), door.y(), door.z()) != BlockType.WOOD_DOOR
+        BlockType target = g.world.getBlock(door.x(), door.y(), door.z());
+        if (target != BlockType.WOOD_DOOR && target != BlockType.BARRICADE
                 || n.searchTimer <= 0 || dx * dx + dz * dz > DOOR_REACH * DOOR_REACH) {
             // Opened, forced or broken meanwhile; lost interest; or pushed away from it.
             n.breachDoor = null;
             n.breachBlows = 0;
+            n.breachStruck = 0;
             n.path = null;
             return;
         }
@@ -148,8 +157,20 @@ public final class BreacherAI {
             return;
         }
         n.breachTimer = BLOW_SECONDS;
-        n.breachBlows++;
+        n.breachStruck++;
         float x = door.x() + 0.5f, y = door.y() + 1f, z = door.z() + 0.5f;
+        com.veylon.Fortification.Blow blow = com.veylon.Fortification.breacherBlow(g, door, n);
+        if (blow == com.veylon.Fortification.Blow.GAVE_WAY) {
+            n.breachDoor = null;
+            n.breachBlows = 0;
+            n.breachStruck = 0;
+            n.path = null;
+            n.repathCooldown = 0;
+            return;
+        }
+        if (blow == com.veylon.Fortification.Blow.NONE) {
+            n.breachBlows++;
+        }
         if (n.breachBlows >= BLOWS) {
             FixtureActions.breacherForces(g, door, n);
             if (g.player.isPerceivableByAi() && g.player.distSqTo(x, y, z) < 40 * 40) {
@@ -157,15 +178,17 @@ public final class BreacherAI {
             }
             n.breachDoor = null;
             n.breachBlows = 0;
+            n.breachStruck = 0;
             n.path = null;
             n.repathCooldown = 0;
             return;
         }
         g.audio.playEcology(EcologySounds.Cue.HAMMER, x, y, z);
-        g.particles.blockDust(BlockType.WOOD_DOOR, x, y, z, 4);
+        g.particles.blockDust(target, x, y, z, 4);
         g.noise.emit(g, x, y, z, BLOW_NOISE_RADIUS, BLOW_NOISE, "door-hammer", false, n);
-        if (n.breachBlows == 1 && g.player.isPerceivableByAi() && g.player.distSqTo(x, y, z) < 40 * 40) {
-            g.log("Something hammers at a door nearby.");
+        if (n.breachStruck == 1 && g.player.isPerceivableByAi() && g.player.distSqTo(x, y, z) < 40 * 40) {
+            g.log(target == BlockType.BARRICADE ? "Something hammers at a barricade nearby."
+                    : "Something hammers at a door nearby.");
         }
     }
 

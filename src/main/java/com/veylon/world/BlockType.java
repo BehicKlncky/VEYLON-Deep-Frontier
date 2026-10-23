@@ -132,7 +132,12 @@ public enum BlockType {
     // Milestone 18: one cell of a burnt-out car left in a street lane, a static salvage prop. What
     // part of the car a cell is comes from its region's plan (VehicleSites); nothing carries one,
     // and only a pry tool works its metal.
-    CAR_WRECK("Wrecked Car", Shape.CUBE, true, true, false, 8.0f, ToolKind.PICKAXE, true, null, 0, 0, 0f, 0.36f, 0.30f, 0.26f);
+    CAR_WRECK("Wrecked Car", Shape.CUBE, true, true, false, 8.0f, ToolKind.PICKAXE, true, null, 0, 0, 0f, 0.36f, 0.30f, 0.26f),
+    // Milestone 18 fortification: boards or sheet metal fixed across an opening, a thin panel in
+    // the wall plane over a solid cell. Their strength is in UrbanFortifications, and holding the
+    // attack button on one takes it down, returning most of what it cost (SalvageTable).
+    BARRICADE("Plank Barricade", Shape.PANE, true, true, true, 2.5f, ToolKind.AXE, false, null, 0, 0, 0f, 0.56f, 0.42f, 0.26f),
+    BARRICADE_METAL("Sheet-Metal Barricade", Shape.PANE, true, true, false, 6.0f, ToolKind.PICKAXE, false, null, 0, 0, 0f, 0.44f, 0.47f, 0.48f);
 
     /**
      * How a block is meshed. Not persisted: only {@link BlockType} ordinals are

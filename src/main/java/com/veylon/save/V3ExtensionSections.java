@@ -101,6 +101,9 @@ final class V3ExtensionSections {
             if (UrbanCompoundsSection.manages(g)) {
                 sections.add(new V3Section(UrbanCompoundsSection.ID, UrbanCompoundsSection.write(g)));
             }
+            if (UrbanFortificationsSection.manages(g)) {
+                sections.add(new V3Section(UrbanFortificationsSection.ID, UrbanFortificationsSection.write(g)));
+            }
             if (UrbanDiscoverySection.present(g)) {
                 sections.add(new V3Section(UrbanDiscoverySection.ID, UrbanDiscoverySection.write(g)));
             }
@@ -307,6 +310,7 @@ final class V3ExtensionSections {
         byte[] population = null;
         byte[] sites = null;
         byte[] compounds = null;
+        byte[] fortifications = null;
         for (int i = 0; i < sectionCount; i++) {
             String id = in.readUTF();
             if (id.isBlank() || !seen.add(id)) {
@@ -359,6 +363,8 @@ final class V3ExtensionSections {
                 sites = payload;
             } else if (UrbanCompoundsSection.ID.equals(id)) {
                 compounds = payload;
+            } else if (UrbanFortificationsSection.ID.equals(id)) {
+                fortifications = payload;
             } else if (UrbanPopulationSection.ID.equals(id)) {
                 population = payload;
             }
@@ -372,6 +378,8 @@ final class V3ExtensionSections {
         if (sites != null) { UrbanSitesSection.read(sites, g); }
         // What compounds remember names exactly the compounds urban.sites registered.
         if (compounds != null) { UrbanCompoundsSection.read(compounds, g); }
+        // Braces stand behind doors whose bars world.fixtures restored, wherever it appeared.
+        if (fortifications != null) { UrbanFortificationsSection.read(fortifications, g); }
         if (restoredLanterns) {
             g.world.refreshLoadedLights();
         }

@@ -487,6 +487,9 @@ public class World implements VoxelAccess {
             // gone, so its lock, bar and open state go with it.
             fixtures.remove(x, y, z);
         }
+        if (urban != null && com.veylon.world.urban.UrbanFortifications.isBarricade(old)) {
+            urban.fortifications.barricadeGone(pos); // taken down, smashed, burnt or blown out
+        }
         if (Fixtures.isUrbanContainer(old)) {
             // One owner for the contents: a hand break has already moved them
             // out; a blast or a fire destroys them with the furniture, so they

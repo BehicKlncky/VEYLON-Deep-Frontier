@@ -19,7 +19,9 @@ import java.util.Locale;
  *
  * <p>An entry names the seconds of work it takes by hand, the tool that halves them, whether that
  * tool is needed at all (metal needs a pry tool), whether the work rings like metal, and the
- * recovered wood, metal, textiles and parts a sound piece gives. Wear takes some of that back:
+ * recovered wood, metal, textiles and parts a sound piece gives. The player's own barricades are
+ * in the table too, so a misplaced one comes down from either side with no tool and returns most
+ * of what it cost, less when it is badly damaged. Wear takes some of that back:
  * <ul>
  *   <li><b>Sound</b>: the whole yield. Anything the player built or carried in, and every piece
  *       of a held building, where survivors kept it up.</li>
@@ -84,6 +86,10 @@ public final class SalvageTable {
             case WORKBENCH -> wood("workbench", 5f, ItemType.PLANK, 3, ItemType.SCRAP, 2, ItemType.SPARE_PARTS, 1);
             case RAIN_COLLECTOR -> new Entry("basin", 3f, ToolKind.PICKAXE, false, true, stacks(ItemType.SCRAP, 2));
             case CAR_WRECK -> wreck(w, p);
+            // The player's own fortifications come down quickly from either side, with no tool needed.
+            case BARRICADE -> wood("plank barricade", 1.5f, ItemType.PLANK, 2);
+            case BARRICADE_METAL -> new Entry("sheet-metal barricade", 3f, ToolKind.PICKAXE, false, true,
+                    stacks(ItemType.SHEET_METAL, 1, ItemType.SCRAP, 1));
             default -> null;
         };
     }
@@ -143,6 +149,11 @@ public final class SalvageTable {
 
     /** How worn the piece at a cell is. */
     public static Condition condition(World w, Vec3i p, BlockType t) {
+        if (UrbanFortifications.isBarricade(t)) {
+            // A barricade is as sound as the blows it has taken left it.
+            return w.urban.fortifications.health(t, p) * 2 >= UrbanFortifications.strength(t)
+                    ? Condition.SOUND : Condition.WRECKED;
+        }
         if (t == BlockType.CAR_WRECK) {
             VehicleSites.Wreck wreck = w.urban.wreckAt(p.x(), p.y(), p.z());
             return wreck != null && wreck.burnt() ? Condition.WRECKED : Condition.WORN;

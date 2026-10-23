@@ -127,6 +127,18 @@ public final class FixtureActions {
         String bar = kind.door ? "bar" : "latch";
         String forceTool = t.requiresTool
                 ? " with a " + t.preferredTool.name().toLowerCase(Locale.ROOT) : "";
+        // Layout fourteen: a brace behind a barred door (urban milestone 18).
+        Float brace = kind.door ? Fortification.braceAt(g, new Vec3i(x, y, z)) : null;
+        if (brace != null) {
+            Action action = decide(g, x, y, z);
+            if (action == Action.UNBAR) {
+                return "[F] Take down the brace and lift the bar (brace " + Math.round(brace) + "/"
+                        + Math.round(com.veylon.world.urban.UrbanFortifications.BRACE_STRENGTH) + ")";
+            }
+            if (action == Action.BARRED_OTHER_SIDE) {
+                return "Braced and barred from the other side. Break through it" + forceTool + " (loud) or go around";
+            }
+        }
         return switch (decide(g, x, y, z)) {
             case OPEN -> kind == Fixtures.Kind.HIDDEN_PANEL
                     ? "[F] Slide the loose panel aside  (crouch: bar it from this side)"
@@ -202,6 +214,10 @@ public final class FixtureActions {
                         : "You latch the window from this side.");
             }
             case UNBAR -> {
+                // A brace comes down with the bar, or the bar stays when the brace has nowhere to go.
+                if (kind.door && !Fortification.takeDownBrace(g, x, bottom, z)) {
+                    return true;
+                }
                 setLock(w, x, bottom, z, height, FixtureStates.LOCK_NONE);
                 sound(g, kind, cx, cy, cz, false);
                 g.log(kind.door ? "You lift the bar." : "You unlatch the window.");
@@ -260,6 +276,28 @@ public final class FixtureActions {
             }
         }
         return missing == 0 || w.fixtures.size() + missing <= FixtureStates.MAX_ENTRIES;
+    }
+
+    /**
+     * Bars a closed door from the player's side, as crouch and F does (urban milestone 18 sets a
+     * brace this way). False, changing nothing, when its state cannot be written.
+     */
+    static boolean barFromPlayerSide(Game g, int x, int bottom, int z, int height) {
+        if (!roomFor(g.world, x, bottom, z, height)) {
+            return false;
+        }
+        setLock(g.world, x, bottom, z, height, barState(g, g.world, x, bottom, z));
+        return true;
+    }
+
+    /** True when the player stands on the side a barred door's bar was set from. */
+    static boolean onPlayersBarSide(Game g, int x, int bottom, int z) {
+        return onBarSide(g, g.world.fixtures.stateAt(x, bottom, z), x, z);
+    }
+
+    /** True while a body stands in any cell of an opening. */
+    static boolean occupied(Game g, int x, int bottom, int z, int height) {
+        return bodyInOpening(g, x, bottom, z, height);
     }
 
     /** A bar set from the player's side of the opening. */

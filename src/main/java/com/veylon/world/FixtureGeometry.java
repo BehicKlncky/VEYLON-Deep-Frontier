@@ -4,9 +4,10 @@ package com.veylon.world;
  * The one definition of where a thin fixture sits inside its cell, shared by
  * {@link ChunkMesher} and {@link Raycaster} so what the player sees is what the
  * crosshair hits. An open door or casement ({@link BlockType.Shape#LEAF}) is a
- * leaf along a jamb of the opening. Closed doors, broken doors and shattered
- * windows ({@link BlockType.Shape#PANE}) sit in the wall plane. Closed doors
- * retain a solid cell for collision; the open and broken forms are passable.
+ * leaf along a jamb of the opening. Closed doors, broken doors, shattered
+ * windows and barricades ({@link BlockType.Shape#PANE}) sit in the wall plane. Closed
+ * doors and barricades retain a solid cell for collision; the open and broken forms are
+ * passable.
  *
  * <p>The wall an opening sits in is read from its neighbours: the axis with
  * more solid or fixture cells beside the opening is the wall's direction, ties
@@ -20,6 +21,8 @@ public final class FixtureGeometry {
     public static final float CLOSED_DOOR_THICKNESS = LEAF_THICKNESS;
     /** Thickness of a broken door or window frame. */
     public static final float PANE_THICKNESS = 0.10f;
+    /** Thickness of a barricade of boards or sheet metal fixed across an opening (milestone 18). */
+    public static final float BARRICADE_THICKNESS = 0.16f;
 
     private FixtureGeometry() {
     }
@@ -61,6 +64,12 @@ public final class FixtureGeometry {
         return t.solid && !Fixtures.isFixture(t);
     }
 
+    /** How thick a pane-shaped block is: a closed door, a barricade, or a broken frame. */
+    private static float paneThickness(BlockType t) {
+        if (Fixtures.isClosedDoor(t)) { return CLOSED_DOOR_THICKNESS; }
+        return t == BlockType.BARRICADE || t == BlockType.BARRICADE_METAL ? BARRICADE_THICKNESS : PANE_THICKNESS;
+    }
+
     /** True for the shapes whose visible and targetable volume is a thin box. */
     public static boolean isThin(BlockType t) {
         return t.shape == BlockType.Shape.LEAF || t.shape == BlockType.Shape.PANE;
@@ -86,7 +95,7 @@ public final class FixtureGeometry {
                 set(out, x, y, z + offset, x + 1, y + 1, z + offset + LEAF_THICKNESS);
             }
         } else {
-            float h = (Fixtures.isClosedDoor(t) ? CLOSED_DOOR_THICKNESS : PANE_THICKNESS) / 2f;
+            float h = paneThickness(t) / 2f;
             if (alongX) {
                 set(out, x, y, z + 0.5f - h, x + 1, y + 1, z + 0.5f + h);
             } else {
@@ -129,7 +138,7 @@ public final class FixtureGeometry {
                 z1 = z0 + LEAF_THICKNESS;
             }
         } else {
-            double h = (Fixtures.isClosedDoor(t) ? CLOSED_DOOR_THICKNESS : PANE_THICKNESS) / 2.0;
+            double h = paneThickness(t) / 2.0;
             if (alongX) {
                 x0 = x;
                 x1 = x + 1.0;

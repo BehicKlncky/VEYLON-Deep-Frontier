@@ -61,6 +61,8 @@ final class UrbanTextures {
             case "veil_membrane" -> veilMembrane(p, variant);
             case "car_wreck_side" -> carWreck(p, false);
             case "car_wreck_top" -> carWreck(p, true);
+            case "barricade" -> barricade(p);
+            case "barricade_metal" -> metalBarricade(p);
             default -> {
                 return false;
             }
@@ -715,6 +717,53 @@ final class UrbanTextures {
         }
         p.cracks(0x1c1816, 0.5f, 1609, 10);
         p.grain(0.05f);
+    }
+
+    /**
+     * A plank barricade (milestone 18): three salvaged boards of mismatched tone nailed across the
+     * opening with dark gaps between them, a diagonal brace over them and a bright nail head at each
+     * crossing, so it reads as the player's work rather than the building's.
+     */
+    private static void barricade(Painter p) {
+        int n = p.size, board = n / 3;
+        for (int y = 0; y < n; y++) {
+            int b = y / board;
+            float tone = 0.82f + p.rf(b * 31 + 1611) * 0.3f;
+            for (int x = 0; x < n; x++) {
+                float grain = p.noise(x / 3f, y * 2f, 9, 1612 + b);
+                boolean gap = y % board == board - 1 || y % board == 0;
+                p.set(x, y, gap ? 0x1c1612 : p.shade(0x7a5a38, tone * (0.86f + grain * 0.28f)));
+            }
+        }
+        for (int i = 0; i < n; i++) {
+            for (int w = -2; w <= 2; w++) {
+                p.set(i, i + w, p.shade(0x6e4f30, 0.95f + p.noise(i, w, 4, 1613) * 0.2f));
+            }
+        }
+        for (int b = 0; b < 3; b++) {
+            int y = b * board + board / 2;
+            p.dot(2, y, 0xc8c4b8);
+            p.dot(n - 3, y, 0xc8c4b8);
+            p.dot(y, y, 0xd8d4c8);
+        }
+        p.grain(0.05f);
+    }
+
+    /** A sheet-metal barricade: a dented corrugated panel bolted over the opening, its edge rusting. */
+    private static void metalBarricade(Painter p) {
+        int n = p.size;
+        for (int y = 0; y < n; y++) {
+            for (int x = 0; x < n; x++) {
+                float rib = (float) Math.sin(y / (float) n * Math.PI * 12) * 0.5f + 0.5f;
+                p.set(x, y, p.shade(0x6a7276, 0.76f + rib * 0.32f));
+            }
+        }
+        p.fillFbmBlend(0x7a4a2e, 0.62f, 6, 1621, 0.7f);
+        p.box(0, 0, n - 1, n - 1, 2, 0x3a3f42);
+        for (int[] bolt : new int[][]{{3, 3}, {n - 4, 3}, {3, n - 4}, {n - 4, n - 4}, {n / 2, 3}, {n / 2, n - 4}}) {
+            p.blob(bolt[0], bolt[1], 1, 0xa8b0b4);
+        }
+        p.grain(0.04f);
     }
 
     private static void railingTop(Painter p) {

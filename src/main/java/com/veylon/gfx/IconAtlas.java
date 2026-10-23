@@ -757,6 +757,14 @@ public final class IconAtlas {
                 c.line(11, 15, 22, 20, 1, 0xFFB9E7FF);
                 c.rect(12, 17, 16, 22, 0xFFB9E7FF);
             }
+            case DOOR_BRACE -> {
+                // A stout beam with an iron strap and two nail heads at each end.
+                c.polygon(new int[]{4, 8, 28, 24}, new int[]{25, 29, 7, 3}, shade(base, 0.5f));
+                c.polygon(new int[]{6, 8, 26, 24}, new int[]{25, 27, 7, 5}, base);
+                c.line(13, 20, 18, 15, 3, 0xFF5A5E62);
+                c.circle(8, 25, 1, 0xFFC8C4B8);
+                c.circle(24, 7, 1, 0xFFC8C4B8);
+            }
             case SPARE_PARTS -> {
                 // A toothed gear beside a coiled spring and a twist of copper wire.
                 for (int i = 0; i < 8; i++) {

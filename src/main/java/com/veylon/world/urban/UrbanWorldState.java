@@ -77,6 +77,8 @@ public final class UrbanWorldState {
     public final UrbanContainers containers = new UrbanContainers();
     /** Layout ten: the stations and hidden cellars this world's survivor has found. */
     public final UrbanDiscovery discovery = new UrbanDiscovery();
+    /** Layout fourteen: the strength left in damaged barricades and in braced doors (milestone 18). */
+    public final UrbanFortifications fortifications = new UrbanFortifications();
     /** Starter anchor only; claims and upgrades are introduced in milestone 18. */
     public long refugeBuilding;
     public com.veylon.util.Vec3i refugeAnchor;

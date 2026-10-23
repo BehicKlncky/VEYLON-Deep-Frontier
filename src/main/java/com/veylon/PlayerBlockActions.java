@@ -267,6 +267,11 @@ final class PlayerBlockActions {
         if (!FixtureActions.mayBreak(game, pos, type, held)) {
             return false;
         }
+        // Layout fourteen: a door braced behind takes blows on its brace before it can be forced.
+        if (Fixtures.isClosedDoor(type) && Fortification.braceTakesPlayerBlow(game, pos)) {
+            game.combat.consumeDurability(held, BREAK_DURABILITY_COST);
+            return true;
+        }
         if (container != null) {
             game.crates.onContainerSalvaged(container);
             game.world.urban.containers.moved(container);

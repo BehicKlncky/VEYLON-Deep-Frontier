@@ -142,6 +142,10 @@ final class WorldInteractions {
             game.consumables.eat(held);
             return;
         }
+        // Layout fourteen: boarding up, bracing, repairs and hanging doors (urban milestone 18).
+        if (Fortification.rightClick(game, held)) {
+            return;
+        }
         BlockType place = held.type.places();
         if (place != null && game.targetHit != null) {
             game.placeSelectedBlockAt(game.targetHit.x() + game.targetHit.nx(),

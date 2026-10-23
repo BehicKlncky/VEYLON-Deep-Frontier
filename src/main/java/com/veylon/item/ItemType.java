@@ -210,7 +210,11 @@ public enum ItemType {
 
     // ---- Safehouses and salvage (urban package 18; append-only) ----
     // Gears, springs, wiring and fittings stripped from engines and workshop gear.
-    SPARE_PARTS("Spare Parts", p().stack(16).weight(0.4f).color(0.60f, 0.56f, 0.46f));
+    SPARE_PARTS("Spare Parts", p().stack(16).weight(0.4f).color(0.60f, 0.56f, 0.46f)),
+    // Fortification: boards or sheet metal to fix across an opening, and a beam to brace a barred door.
+    BARRICADE("Plank Barricade", p().stack(8).places("BARRICADE").weight(3.2f).color(0.56f, 0.42f, 0.26f)),
+    BARRICADE_METAL("Sheet-Metal Barricade", p().stack(4).places("BARRICADE_METAL").weight(4.5f).color(0.44f, 0.47f, 0.48f)),
+    DOOR_BRACE("Door Brace", p().stack(4).weight(2.4f).color(0.50f, 0.38f, 0.24f));
 
     public final String displayName;
     public final int maxStack;
