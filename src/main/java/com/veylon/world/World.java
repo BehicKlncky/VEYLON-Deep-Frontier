@@ -96,10 +96,16 @@ public class World implements VoxelAccess {
      * barricaded passage, and a raider yard on an industrial depot row's service alley.
      */
     public static final int GEN_URBAN_STRONGHOLDS = 16;
+    /**
+     * Layout 14 (urban milestone 18): generator 16's city, routes, ecology, survivor sites and
+     * compounds exactly, plus the burnt-out cars left in the local streets' lanes, under the
+     * rules of claimed refuges, salvage and fortification.
+     */
+    public static final int GEN_URBAN_REFUGES = 17;
     /** The generator of every ordinary new world; generator 3 until the urban rollout. */
     public static final int DEFAULT_NEW_WORLD_GENERATOR = GEN_CAVE_IDENTITIES;
     /** The highest generator version a save may name; a load rejects anything above it. */
-    public static final int MAX_SUPPORTED_GENERATOR = GEN_URBAN_STRONGHOLDS;
+    public static final int MAX_SUPPORTED_GENERATOR = GEN_URBAN_REFUGES;
 
     public final long seed;
     /** Persisted in save v3; legacy (v2) saves always load as {@link #GEN_LEGACY}. */
@@ -202,7 +208,7 @@ public class World implements VoxelAccess {
                 || version == GEN_URBAN_ENCOUNTERS || version == GEN_URBAN_CIVIC
                 || version == GEN_URBAN_DISTRICTS || version == GEN_URBAN_UNDERGROUND
                 || version == GEN_URBAN_ECOLOGY || version == GEN_URBAN_SURVIVORS
-                || version == GEN_URBAN_STRONGHOLDS;
+                || version == GEN_URBAN_STRONGHOLDS || version == GEN_URBAN_REFUGES;
     }
 
     /** Generators 2 and 3: deep caves, underground POIs, cave mouths and settlements. */

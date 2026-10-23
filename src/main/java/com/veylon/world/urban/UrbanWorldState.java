@@ -70,6 +70,8 @@ public final class UrbanWorldState {
     private final BoundedPlanCache<Long, EcologySites> ecologySites;
     /** Layout twelve: each region's survivor camp and hidden refuge, beside its plan. */
     private final BoundedPlanCache<Long, SurvivorSites> survivorSites;
+    /** Layout fourteen: each region's burnt-out cars, beside its plan. */
+    private final BoundedPlanCache<Long, VehicleSites> vehicleSites;
     private int contentRevision = UNRESOLVED;
     /** Persistent sparse state, separate from evictable pure plan caches. */
     public final UrbanContainers containers = new UrbanContainers();
@@ -93,6 +95,7 @@ public final class UrbanWorldState {
         this.transitSegments = hasUnderground() ? new BoundedPlanCache<>(MAX_TRANSIT_SEGMENTS) : null;
         this.ecologySites = hasEcology() ? new BoundedPlanCache<>(MAX_REGION_PLANS) : null;
         this.survivorSites = hasSurvivors() ? new BoundedPlanCache<>(MAX_REGION_PLANS) : null;
+        this.vehicleSites = hasRefuges() ? new BoundedPlanCache<>(MAX_REGION_PLANS) : null;
     }
 
     public int layoutRevision() {
@@ -142,8 +145,16 @@ public final class UrbanWorldState {
      * and layout thirteen, which keeps them and adds the compounds.
      */
     public boolean hasSurvivors() { return layoutRevision == UrbanRevision.LAYOUT_SURVIVORS || hasStrongholds(); }
-    /** Layout thirteen: guarded strongholds and a raider yard (milestone 17). */
-    public boolean hasStrongholds() { return layoutRevision == UrbanRevision.LAYOUT_STRONGHOLDS; }
+    /**
+     * Guarded strongholds and a raider yard (milestone 17): layout thirteen, and layout fourteen,
+     * which keeps them exactly.
+     */
+    public boolean hasStrongholds() { return layoutRevision == UrbanRevision.LAYOUT_STRONGHOLDS || hasRefuges(); }
+    /**
+     * Layout fourteen (milestone 18): the burnt-out cars of the local streets, and the rules of
+     * claimed refuges, salvage and fortification.
+     */
+    public boolean hasRefuges() { return layoutRevision == UrbanRevision.LAYOUT_REFUGES; }
 
     public boolean contentRevisionResolved() {
         return contentRevision != UNRESOLVED;
@@ -201,6 +212,8 @@ public final class UrbanWorldState {
             if (hasUnderground()) { UrbanRouteStamper.stamp(chunk, district, this); }
             // A compound's barricades and gate close passages and alley mouths no route uses.
             if (hasStrongholds()) { UrbanCompoundStamper.stamp(chunk, sites(rx, rz)); }
+            // Wrecks stand in one lane of a local street, clear of every other plan.
+            if (hasRefuges()) { UrbanVehicleStamper.stamp(chunk, vehicles(rx, rz)); }
             // Growth last of all: its carpet and node lie over the courtyard and square.
             if (hasEcology()) { UrbanEcologyStamper.stamp(chunk, ecology(rx, rz)); }
         }
@@ -318,6 +331,25 @@ public final class UrbanWorldState {
     /** Site plans currently cached, for the runtime bounds snapshot; never above {@value #MAX_REGION_PLANS}. */
     public int cachedSitePlans() {
         return survivorSites == null ? 0 : survivorSites.size();
+    }
+
+    /**
+     * The burnt-out cars of a layout-fourteen region, planned once and cached; {@link VehicleSites#NONE}
+     * in every earlier layout. Pure, and rebuilt identically after eviction.
+     */
+    public VehicleSites vehicles(int rx, int rz) {
+        if (!hasRefuges() || !CityPlanner.isPlannable(rx, rz)) { return VehicleSites.NONE; }
+        return vehicleSites.get(UrbanIds.district(rx, rz), ignored -> VehicleSites.of(seed, regionPlan(rx, rz), sites(rx, rz)));
+    }
+
+    /** The wreck holding a cell, or null: always null before layout fourteen. Plans only. */
+    public VehicleSites.Wreck wreckAt(int x, int y, int z) {
+        return vehicles(StreetNetwork.regionOf(x), StreetNetwork.regionOf(z)).wreckAt(x, y, z);
+    }
+
+    /** Vehicle plans currently cached, for the runtime bounds snapshot; never above {@value #MAX_REGION_PLANS}. */
+    public int cachedVehiclePlans() {
+        return vehicleSites == null ? 0 : vehicleSites.size();
     }
 
     /** One transit segment of layout ten, planned once and cached; absent beyond the planned city. */

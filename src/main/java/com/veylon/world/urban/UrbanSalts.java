@@ -150,6 +150,18 @@ public final class UrbanSalts {
     /** How many people a stronghold or a raider yard holds. */
     public static final long COMPOUND_PEOPLE = 0x5643_4d50_5045_4f50L;
 
+    // Layout revision 14 (milestone 18): the burnt-out cars of the local streets.
+    /** Whether a local street segment holds a wreck. */
+    public static final long VEHICLE_SEGMENT = 0x5656_4548_5345_474dL;
+    /** Where along its segment a wreck stands. */
+    public static final long VEHICLE_OFFSET = 0x5656_4548_4f46_5354L;
+    /** Which side of the centre line a wreck's lane is. */
+    public static final long VEHICLE_SIDE = 0x5656_4548_5349_4445L;
+    /** Which end of a wreck is its engine. */
+    public static final long VEHICLE_FRONT = 0x5656_4548_4652_4e54L;
+    /** Whether a wreck's cabin burnt out. */
+    public static final long VEHICLE_BURNT = 0x5656_4548_4255_524eL;
+
     private UrbanSalts() {
     }
 }

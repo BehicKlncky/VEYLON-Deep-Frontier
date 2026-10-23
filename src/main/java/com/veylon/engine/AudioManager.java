@@ -313,7 +313,7 @@ public class AudioManager {
             case STONE, GRAVEL, COAL_ORE, COPPER_ORE, IRON_ORE, RUIN_STONE, FURNACE, ASH,
                  SCRAP_BLOCK, POD_HULL, ICE, STONE_BRICK, BASALT, ASPHALT, PAVING, CONCRETE,
                  BRICK, PLASTER, SHEET_METAL, RUBBLE, STAIRS, LOCKER, METAL_DOOR, RAILING,
-                 HIDDEN_PANEL -> bFootStone;
+                 HIDDEN_PANEL, CAR_WRECK -> bFootStone;
             case PLANK, LOG, WORKBENCH, CRATE, WALL, MAP_TABLE, HERB_STATION, WOOD_DOOR, SHELF,
                  CABINET, TABLE, SIGN -> bFootWood;
             case SNOW -> bFootSnow;

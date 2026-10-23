@@ -227,6 +227,9 @@ public final class MaterialRegistry {
                     1, TintMode.NONE, false, 0.75f, 0.45f);
             register("veil_membrane", BlockType.VEIL_MEMBRANE, "veil_membrane", "veil_membrane", "veil_membrane",
                     2, TintMode.NONE, false, 0.22f, 0.5f);
+            // Milestone 18 static salvage: a burnt-out car's scorched, rusting steel.
+            register("car_wreck", BlockType.CAR_WRECK, "car_wreck_top", "car_wreck_side", "car_wreck_top",
+                    1, TintMode.NONE, false, 0f, 0.6f);
 
             // Standalone prop tiles used by special shapes (torch flame, campfire, basin water...).
             propTile("torch_head", 1.0f, 0.9f);

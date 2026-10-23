@@ -385,6 +385,76 @@ class WorldGeneratorFingerprintTest {
                 + "re-recording:\n  " + String.join("\n  ", moved));
     }
 
+    /**
+     * Generator 17 (milestone 18), recorded 2026-10-23 at introduction. Its terrain is generator
+     * 14's at every pinned chunk, because no wreck stands in them; its own pins are the vehicle
+     * plans (every wreck within three regions of the spawn, with the survivor sites and compounds
+     * planned beside them, which are layout thirteen's) and the stamped chunks of the wreck nearest
+     * the spawn.
+     */
+    private static final long[] URBAN_VEHICLE_FINGERPRINTS = {
+            0x9d00f321b44c234eL, 0xe04266f32dd7abdbL, 0xb83f5b8e2f88b2ecL};
+    private static final long[] URBAN_VEHICLE_CHUNK_FINGERPRINTS = {
+            0x239a0a97d395c20dL, 0x8e19509e968a91f3L, 0x61c8f5407890e29cL};
+
+    @Test
+    void theWrecksKeepTheCityAndTheirRecordedPlans() {
+        List<String> moved = new ArrayList<>();
+        for (int i = 0; i < SEEDS.length; i++) {
+            long terrain = terrainFingerprint(SEEDS[i], World.GEN_URBAN_REFUGES);
+            long vehicles = vehicleFingerprint(SEEDS[i]);
+            long chunks = vehicleChunkFingerprint(SEEDS[i]);
+            if (terrain != URBAN_ECOLOGY_TERRAIN_FINGERPRINTS[i] || vehicles != URBAN_VEHICLE_FINGERPRINTS[i]
+                    || chunks != URBAN_VEHICLE_CHUNK_FINGERPRINTS[i]) {
+                moved.add(String.format("seed %d: terrain 0x%016xL, vehicles 0x%016xL, chunks 0x%016xL",
+                        SEEDS[i], terrain, vehicles, chunks));
+            }
+        }
+        assertTrue(moved.isEmpty(), () -> "generator 17 changed; add a generator version instead of "
+                + "re-recording:\n  " + String.join("\n  ", moved));
+    }
+
+    /** Every wreck within three regions of the spawn, and the compounds and sites planned beside them. */
+    private static long vehicleFingerprint(long seed) {
+        World world = new World(seed, World.GEN_URBAN_REFUGES);
+        long hash = 0xcbf29ce484222325L;
+        for (int rz = -3; rz <= 3; rz++) {
+            for (int rx = -3; rx <= 3; rx++) {
+                for (var w : world.urban.vehicles(rx, rz).wrecks()) { hash = mix(hash, w.toString().hashCode()); }
+                var sites = world.urban.sites(rx, rz);
+                for (var s : sites.sites()) { hash = mix(hash, s.toString().hashCode()); }
+                for (var c : sites.compounds()) { hash = mix(hash, c.toString().hashCode()); }
+            }
+        }
+        return hash;
+    }
+
+    /** The stamped chunks under the wreck nearest the spawn. */
+    private static long vehicleChunkFingerprint(long seed) {
+        World world = new World(seed, World.GEN_URBAN_REFUGES);
+        com.veylon.world.urban.VehicleSites.Wreck nearest = null;
+        for (int rz = -1; rz <= 1; rz++) {
+            for (int rx = -1; rx <= 1; rx++) {
+                for (var w : world.urban.vehicles(rx, rz).wrecks()) {
+                    if (nearest == null || (long) w.x0() * w.x0() + (long) w.z0() * w.z0()
+                            < (long) nearest.x0() * nearest.x0() + (long) nearest.z0() * nearest.z0()) {
+                        nearest = w;
+                    }
+                }
+            }
+        }
+        assertTrue(nearest != null, "a wreck lies within a region of the spawn");
+        long hash = 0xcbf29ce484222325L;
+        LinkedHashSet<Long> chunks = new LinkedHashSet<>();
+        for (var cell : nearest.cells()) {
+            chunks.add(((long) Math.floorDiv(cell.x(), Chunk.SX) << 32) | (Math.floorDiv(cell.z(), Chunk.SZ) & 0xffffffffL));
+        }
+        for (long chunk : chunks) {
+            hash = mix(hash, hashChunk(world.getOrCreateChunk((int) (chunk >> 32), (int) chunk)));
+        }
+        return hash;
+    }
+
     /** Every compound claim and plan within three regions of the spawn, with the camps and refuges beside them. */
     private static long compoundFingerprint(long seed) {
         World world = new World(seed, World.GEN_URBAN_STRONGHOLDS);

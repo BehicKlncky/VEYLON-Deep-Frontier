@@ -59,6 +59,8 @@ final class UrbanTextures {
             case "growth_node" -> growthNode(p, false);
             case "growth_node_top" -> growthNode(p, true);
             case "veil_membrane" -> veilMembrane(p, variant);
+            case "car_wreck_side" -> carWreck(p, false);
+            case "car_wreck_top" -> carWreck(p, true);
             default -> {
                 return false;
             }
@@ -672,6 +674,49 @@ final class UrbanTextures {
     }
 
     /** A rail seen from above: a narrow steel frame, open in the middle. */
+    /**
+     * A burnt-out car (milestone 18): steel scorched to a dark brown-grey, rust blooming through
+     * it, scraps of faded teal paint where the fire did not reach and soot rising up the panels.
+     * The side carries a pressed body crease and a panel seam; the top a dented roof with a seam
+     * across it. Every cell of a wreck shares the tiles, so nothing in them must line up.
+     */
+    private static void carWreck(Painter p, boolean top) {
+        int n = p.size;
+        p.fillFbm(0x3e3632, 0.16f, 6, 1601);
+        p.fillFbmBlend(0x7a4a2e, 0.56f, 7, 1602, 0.75f);
+        p.fillFbmBlend(0x4f6e6a, 0.74f, 9, 1603, 0.6f);
+        if (top) {
+            // Dents: soft dark hollows with a light rim on their far side.
+            for (int i = 0; i < 5; i++) {
+                int x = p.ri(i * 3 + 1604), y = p.ri(i * 3 + 1605);
+                int r = 3 + (int) (p.rf(i + 1606) * 4);
+                p.pebble(x, y, r, p.shade(0x3a322e, 0.85f + p.rf(i + 1607) * 0.2f));
+            }
+            for (int x = 0; x < n; x++) {
+                p.set(x, n / 2, 0x241e1c);
+                p.mulAt(x, n / 2 + 1, 1.25f);
+            }
+        } else {
+            // The body crease catches light above a shadowed groove.
+            int crease = n * 3 / 8;
+            for (int x = 0; x < n; x++) {
+                p.mulAt(x, crease, 1.35f);
+                p.mulAt(x, crease + 1, 0.6f);
+            }
+            for (int y = 0; y < n; y++) {
+                p.set(n - 3, y, 0x221c1a);
+            }
+            // Soot thickens towards the top, where the flames licked out.
+            for (int y = 0; y < n / 3; y++) {
+                for (int x = 0; x < n; x++) {
+                    p.mulAt(x, y, 0.6f + 0.4f * y / (n / 3f) + p.noise(x, y, 6, 1608) * 0.15f);
+                }
+            }
+        }
+        p.cracks(0x1c1816, 0.5f, 1609, 10);
+        p.grain(0.05f);
+    }
+
     private static void railingTop(Painter p) {
         int n = p.size;
         p.clearAlpha();

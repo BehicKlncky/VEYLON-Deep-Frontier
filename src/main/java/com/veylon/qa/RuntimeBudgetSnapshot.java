@@ -55,6 +55,7 @@ public record RuntimeBudgetSnapshot(
         int residentDoors,
         int urbanEncounterRecords,
         int urbanEcologyPlans, int activeAliens, int activeWildlife, int urbanSitePlans, int urbanSiteRecords,
+        int urbanVehiclePlans,
         int navigationRoutes, int pathQueries, int pathExpansions, int pathDeferred,
         int pathFailures, int unsupportedEntries, int hearingSamples) {
 
@@ -109,6 +110,7 @@ public record RuntimeBudgetSnapshot(
                 game.entities.encounters.activeAliens(game), game.entities.encounters.activeWildlife(game),
                 game.world.urban == null ? 0 : game.world.urban.cachedSitePlans(),
                 com.veylon.settlement.UrbanSiteDirector.sites(game.world).size(),
+                game.world.urban == null ? 0 : game.world.urban.cachedVehiclePlans(),
                 game.world.navigation.size(), game.world.navigation.budget.queries(),
                 game.world.navigation.budget.expansions(), game.world.navigation.budget.deferred(),
                 game.world.navigation.budget.failures(), game.world.navigation.budget.unsupportedEntries(),
@@ -128,6 +130,7 @@ public record RuntimeBudgetSnapshot(
                 && urbanEncounterRecords <= com.veylon.entity.UrbanEncounterDirector.MAX_RECORDS
                 && urbanEcologyPlans <= UrbanWorldState.MAX_REGION_PLANS
                 && urbanSitePlans <= UrbanWorldState.MAX_REGION_PLANS
+                && urbanVehiclePlans <= UrbanWorldState.MAX_REGION_PLANS
                 && urbanSiteRecords <= com.veylon.settlement.UrbanSiteDirector.MAX_SITES
                 && activeAliens <= com.veylon.entity.UrbanEncounterDirector.MAX_ACTIVE_ALIENS
                 && activeWildlife <= com.veylon.entity.UrbanEncounterDirector.MAX_ACTIVE_WILDLIFE
@@ -199,6 +202,7 @@ public record RuntimeBudgetSnapshot(
                 + " encounterRecords=" + urbanEncounterRecords
                 + " ecologyPlans=" + urbanEcologyPlans + " creatures={aliens=" + activeAliens
                 + ",wildlife=" + activeWildlife + "} sitePlans=" + urbanSitePlans + " sites=" + urbanSiteRecords
+                + " vehiclePlans=" + urbanVehiclePlans
                 + " fixtures={states=" + fixtureStates + ",residentDoors=" + residentDoors + "}";
     }
 
@@ -210,6 +214,7 @@ public record RuntimeBudgetSnapshot(
                 + " wildlife=" + com.veylon.entity.UrbanEncounterDirector.MAX_ACTIVE_WILDLIFE
                 + " ecologyPlans=" + UrbanWorldState.MAX_REGION_PLANS
                 + " sitePlans=" + UrbanWorldState.MAX_REGION_PLANS
+                + " vehiclePlans=" + UrbanWorldState.MAX_REGION_PLANS
                 + " sites=" + com.veylon.settlement.UrbanSiteDirector.MAX_SITES
                 + " resident=" + SettlementManager.MAX_ACTIVE_RESIDENTS
                 + " party=" + SettlementManager.MAX_ACTIVE_WAR_PARTY_NPCS

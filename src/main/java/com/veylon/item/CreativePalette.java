@@ -127,6 +127,9 @@ public final class CreativePalette {
         excluded.put(BlockType.VEIL_MEMBRANE,
                 "the generated membrane floor of a growth territory; no item carries it, and scraping"
                         + " it away yields nothing");
+        excluded.put(BlockType.CAR_WRECK,
+                "a cell of a generated burnt-out car whose engine, cabin and body come from its region's"
+                        + " plan; no item carries it, and what it gives is salvage, not the car");
         EXCLUDED = Collections.unmodifiableMap(excluded);
     }
 

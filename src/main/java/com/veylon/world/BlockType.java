@@ -127,7 +127,12 @@ public enum BlockType {
     // withers. The membrane carpet round it is the territory floor: it burns, and scraping it
     // away by hand leaves nothing.
     GROWTH_NODE("Growth Node", Shape.CUBE, true, true, true, 2.5f, ToolKind.AXE, false, ItemType.MEMBRANE_SAC, 1, 0, 0f, 0.46f, 0.38f, 0.54f),
-    VEIL_MEMBRANE("Veil Membrane", Shape.CUBE, true, true, true, 0.9f, ToolKind.NONE, false, null, 0, 0, 0f, 0.29f, 0.26f, 0.33f);
+    VEIL_MEMBRANE("Veil Membrane", Shape.CUBE, true, true, true, 0.9f, ToolKind.NONE, false, null, 0, 0, 0f, 0.29f, 0.26f, 0.33f),
+
+    // Milestone 18: one cell of a burnt-out car left in a street lane, a static salvage prop. What
+    // part of the car a cell is comes from its region's plan (VehicleSites); nothing carries one,
+    // and only a pry tool works its metal.
+    CAR_WRECK("Wrecked Car", Shape.CUBE, true, true, false, 8.0f, ToolKind.PICKAXE, true, null, 0, 0, 0f, 0.36f, 0.30f, 0.26f);
 
     /**
      * How a block is meshed. Not persisted: only {@link BlockType} ordinals are

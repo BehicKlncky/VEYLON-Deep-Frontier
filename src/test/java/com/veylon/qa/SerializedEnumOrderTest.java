@@ -48,7 +48,9 @@ class SerializedEnumOrderTest {
             // Milestone 14 guard rails and the loose panel over a hidden cellar, closed and open.
             "RAILING", "HIDDEN_PANEL", "HIDDEN_PANEL_OPEN",
             // Milestone 15 alien growth: a node and its membrane floor.
-            "GROWTH_NODE", "VEIL_MEMBRANE");
+            "GROWTH_NODE", "VEIL_MEMBRANE",
+            // Milestone 18 static salvage: a cell of a burnt-out car.
+            "CAR_WRECK");
 
     private static final List<String> ITEM_TYPE_ORDER = List.of(
             "DIRT", "STONE", "SAND", "GRAVEL", "CLAY", "SNOW", "LOG", "PLANK", "WALL", "STICK",

@@ -127,6 +127,21 @@ class UrbanSliceRouteTest {
         }
     }
 
+    /**
+     * Generator 17 (milestone 18) keeps generator 16's city and leaves burnt-out cars in one lane
+     * of the local streets, including those round the starter superblock. The development selector
+     * now creates it; the loop must still hold.
+     */
+    @Test
+    void theSliceLoopStillCompletesOnTheRefugeGenerator() {
+        for (long seed : SLICE_SEEDS) {
+            UrbanSliceRun run = new UrbanSliceRun(seed, GameMode.SURVIVAL, World.GEN_URBAN_REFUGES).play();
+            assertTrue(run.slice().passed(), "seed=" + seed);
+            assertEquals(World.GEN_URBAN_REFUGES, run.game.world.generatorVersion);
+            assertTrue(run.game.player.inventory.count(ItemType.IRON_SPEAR) >= 1, "the first upgrade seed=" + seed);
+        }
+    }
+
     @Test
     void frozenSeedsPlayTheScavengeRiskReturnLoopInSurvivalAndCreative() {
         for (GameMode mode : GameMode.values()) {

@@ -417,6 +417,25 @@ class RuntimeBoundsTest {
     }
 
     @Test
+    void vehiclePlansStopAtTheirCap() {
+        Game game = new Game();
+        game.newWorld(20260731, true, World.GEN_URBAN_REFUGES, com.veylon.entity.GameMode.SURVIVAL);
+        var urban = game.world.urban;
+        int chunks = game.world.loadedCount();
+        int cap = com.veylon.world.urban.UrbanWorldState.MAX_REGION_PLANS;
+        // Pure wreck plans across more regions than the cache holds, generating nothing.
+        for (int i = 0; i < cap + 8; i++) {
+            urban.vehicles(i, -i);
+            RuntimeBudgetSnapshot snapshot = RuntimeBudgetSnapshot.capture(game);
+            assertTrue(snapshot.withinHardLimits(), snapshot.occupancySummary());
+        }
+        assertEquals(cap, RuntimeBudgetSnapshot.capture(game).urbanVehiclePlans());
+        assertEquals(chunks, game.world.loadedCount(), "planning wrecks generates no chunk");
+        assertTrue(RuntimeBudgetSnapshot.hardLimitSummary().contains("vehiclePlans=" + cap));
+        assertTrue(RuntimeBudgetSnapshot.capture(game).occupancySummary().contains("vehiclePlans=" + cap));
+    }
+
+    @Test
     void survivorSiteRecordsStopAtTheirCap() {
         Game game = com.veylon.SurvivorWorldArena.session(com.veylon.SurvivorWorldArena.SEED,
                 com.veylon.entity.GameMode.SURVIVAL);
