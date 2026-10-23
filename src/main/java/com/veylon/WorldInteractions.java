@@ -285,8 +285,8 @@ final class WorldInteractions {
             }
             case LANTERN -> interactLantern(pos);
             case RAIN_COLLECTOR -> { collectorInteract(pos); yield true; }
-            case CAMP_BED -> { sleepInBed(pos); yield true; }
-            case BEDROLL -> { game.startSleep(false); yield true; }
+            case CAMP_BED -> { rest(pos, true); yield true; }
+            case BEDROLL -> { rest(pos, false); yield true; }
             case POWDER_KEG -> {
                 lightKegFuse(pos);
                 yield true;
@@ -385,13 +385,29 @@ final class WorldInteractions {
                     game.uiMode = Game.UiMode.CRAFTING;
             case DRYING_RACK -> rackInteract(pos);
             case RAIN_COLLECTOR -> collectorInteract(pos);
-            case BEDROLL -> game.startSleep(false);
-            case CAMP_BED -> sleepInBed(pos);
+            case BEDROLL -> rest(pos, false);
+            case CAMP_BED -> rest(pos, true);
             default -> {
                 return false;
             }
         }
         return true;
+    }
+
+    /**
+     * F on a bed. In a layout-fourteen city a crouched press claims its storey or gives a refuge up
+     * instead of sleeping, and a bed of a claimed refuge becomes its sleeping place and home
+     * (urban milestone 18); then the sleep goes ahead as it always has.
+     */
+    private void rest(Vec3i pos, boolean campBed) {
+        if (game.refuges.atBed(pos)) {
+            return;
+        }
+        if (campBed) {
+            sleepInBed(pos);
+        } else {
+            game.startSleep(false);
+        }
     }
 
     private void sleepInBed(Vec3i pos) {

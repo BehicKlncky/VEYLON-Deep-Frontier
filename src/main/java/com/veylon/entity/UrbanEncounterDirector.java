@@ -356,6 +356,10 @@ public final class UrbanEncounterDirector {
         if (inSanctuary(g, x, y, z)) { return false; }
         var location = g.world.urbanLocation(cell(x), cell(y), cell(z));
         if (location != null && location.building().variant() == BuildingPlan.Variant.OCCUPIED) { return false; }
+        // Layout fourteen: like rooms survivors hold, a storey the player claimed lets nothing new appear inside.
+        if (location != null && g.world.urban.hasRefuges() && g.world.urban.refuges.claim(location.floor().id()) != null) {
+            return false;
+        }
         for (Npc n : g.entities.npcs) {
             if (!n.dead && n.distSqTo(x, y, z) < 4) { return false; }
         }

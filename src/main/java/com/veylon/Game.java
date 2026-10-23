@@ -250,6 +250,8 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
 
     /** Sleep eligibility, quality scoring and the night's effects. */
     final SleepSystem sleep = new SleepSystem(this);
+    /** Claimed refuges of a layout-fourteen city: claiming at a bed, home and respawn (urban 18). */
+    final RefugeSystem refuges = new RefugeSystem(this);
 
     // Ranged-weapon aim state the HUD draws. The rules live in PlayerCombatSystem;
     // these stay here because Hud reads them straight off the Game instance.

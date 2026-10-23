@@ -6,8 +6,9 @@ import com.veylon.world.World;
 /**
  * Which of a layout-ten city's routes a body stands in (milestone 14): a basement, a rooftop, a
  * hidden cellar, a service passage, a transit station or a tunnel; from layout twelve also a
- * survivor camp (milestone 16), and from layout thirteen a guarded stronghold or a raider yard
- * (milestone 17), whose finding the site director records. It reads loaded columns and
+ * survivor camp (milestone 16), from layout thirteen a guarded stronghold or a raider yard
+ * (milestone 17), whose finding the site director records, and from layout fourteen a storey the
+ * player has claimed as a refuge (milestone 18), which outranks the rest. It reads loaded columns and
  * pure plans only, never creating a chunk, and answers {@link Place#NONE} in every earlier
  * world, so nothing changes there.
  *
@@ -26,7 +27,9 @@ public final class UrbanPlaces {
         /** Layout thirteen (milestone 17): a stronghold's yard and buildings, inside its gate. */
         STRONGHOLD("Guarded stronghold"),
         /** Layout thirteen: a raider yard's alley and the buildings they hold. */
-        RAIDER_YARD("Raider yard");
+        RAIDER_YARD("Raider yard"),
+        /** Layout fourteen (milestone 18): a storey the player has claimed as a refuge. */
+        REFUGE("Your refuge");
 
         public final String label;
 
@@ -48,6 +51,9 @@ public final class UrbanPlaces {
         UrbanIndoorQueries.Location location = UrbanIndoorQueries.location(world, x, y, z);
         if (location != null) {
             BuildingPlan building = location.building();
+            if (world.urban.hasRefuges() && world.urban.refuges.claim(location.floor().id()) != null) {
+                return new Observation(Place.REFUGE, UrbanIds.NONE);
+            }
             if (building.family() == BuildingPlan.Family.TRANSIT) {
                 return new Observation(Place.STATION, building.id());
             }

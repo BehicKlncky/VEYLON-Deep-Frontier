@@ -86,6 +86,23 @@ public class MapScreen {
             }
         }
 
+        // Layout fourteen: the player's claimed refuges, home ringed in white (urban milestone 18).
+        if (world.urban != null && world.urban.hasRefuges()) {
+            for (var claim : world.urban.refuges.claims()) {
+                if (claim.sleep == null) {
+                    continue;
+                }
+                int dx = (claim.sleep.x() - px) / STEP + half;
+                int dz = (claim.sleep.z() - pz) / STEP + half;
+                if (dx >= 0 && dx < CELLS && dz >= 0 && dz < CELLS) {
+                    boolean home = claim.floor == world.urban.refuges.homeFloor();
+                    ui.rect(x0 + dx * cell - 3, y0 + dz * cell - 3, 7, 7, 0.2f, 0.85f, 0.75f, 1f);
+                    ui.rectOutline(x0 + dx * cell - 4, y0 + dz * cell - 4, 9, 9, 1,
+                            home ? 1f : 0f, home ? 1f : 0f, home ? 1f : 0f, 1f);
+                }
+            }
+        }
+
         // Camp marker.
         if (world.campPos != null) {
             int dx = (world.campPos.x() - px) / STEP + half;
@@ -175,7 +192,8 @@ public class MapScreen {
         ui.rectOutline(x0 + half * cell - 4, y0 + half * cell - 4, 9, 9, 1, 0f, 0f, 0f, 1f);
 
         ui.textCentered(w / 2f, y0 + size + 8, 1.2f,
-                "White = you   Orange = camp   Cyan = beacon   ? = settlement rumor   Gold ! = objective   "
+                (world.urban != null && world.urban.hasRefuges() ? "Teal = your refuges (white ring: home)   " : "")
+                + "White = you   Orange = camp   Cyan = beacon   ? = settlement rumor   Gold ! = objective   "
                         + "Green/yellow/red = discovered settlement (C/V/F/K/X; $/+/Z services)   POIs: " + discovered
                         + "/" + world.pois.size(), 0.75f, 0.75f, 0.75f, 1f);
         // POI legend (wraps into rows now that cave POIs exist).

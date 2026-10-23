@@ -522,8 +522,11 @@ public final class UrbanSiteDirector {
         return s.camp() ? "Camp storage: taking supplies is theft" : "Their last supplies: taking them is theft";
     }
 
-    /** Storage whose people are gone, left to the player, or taken from raiders is nobody's to defend. */
-    private static boolean abandoned(UrbanSite s) {
+    /**
+     * Storage whose people are gone, left to the player, or taken from raiders is nobody's to
+     * defend; from urban milestone 18 such a site's rooms may also be claimed as a refuge.
+     */
+    public static boolean abandoned(UrbanSite s) {
         return s.present() == 0 || s.refuge() && s.stashReleased || s.raiders() && s.cleared;
     }
 

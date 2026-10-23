@@ -576,6 +576,11 @@ public class Player extends Entity {
         }
     }
 
+    /** Asks the next tick to read the place underfoot again: a claim changed what it is (milestone 18). */
+    public void forgetPlace() {
+        placeX = Integer.MIN_VALUE;
+    }
+
     /**
      * The HUD's location line: the district in a six-district city, the climate biome elsewhere,
      * then the route place underfoot when there is one.

@@ -210,6 +210,7 @@ final class WorldBootstrap {
         game.combat.reset();
         game.blockActions.reset();
         game.crates.reset();
+        game.refuges.reset();
         game.creativeCatalogScreen.reset();
     }
 

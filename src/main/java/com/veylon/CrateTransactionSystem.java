@@ -218,6 +218,12 @@ final class CrateTransactionSystem {
         if (openEntry == null) { return "Click an item to transfer it."; }
         String site = openEntry.owner == UrbanContainers.Owner.SURVIVOR
                 ? game.settlementManager.urbanSites.storageLabel(game, openEntry.ownerId) : null;
+        // Layout fourteen: nobody else's storage inside a claimed storey is the refuge's (milestone 18).
+        Vec3i p = openEntry.position;
+        if (site == null && openEntry.owner != UrbanContainers.Owner.SURVIVOR && game.world.urban.hasRefuges()
+                && game.world.urban.refuges.at(game.world, p.x(), p.y(), p.z()) != null) {
+            site = "Your refuge's storage";
+        }
         String owner = site != null ? site : switch (openEntry.owner) {
             case ABANDONED -> "Abandoned property";
             case SURVIVOR -> "Survivor storage: taking supplies is theft";

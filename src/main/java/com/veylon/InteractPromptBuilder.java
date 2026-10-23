@@ -90,6 +90,9 @@ final class InteractPromptBuilder {
         if (game.blockActions.dismantling.applies(pos, t)) {
             boolean generic = game.interactPrompt == null || game.interactPrompt.startsWith("Requires ");
             game.interactPrompt = generic ? hint : game.interactPrompt + "  ·  " + hint.replace("[LMB] Hold", "hold LMB");
+        } else if (RefugeSystem.isBed(t)) {
+            // A bed's own line already says what crouching does to it: claim or give up a refuge.
+            return game.interactPrompt != null;
         } else {
             game.interactPrompt = (game.interactPrompt == null ? "[LMB] Hold to carry it away" : game.interactPrompt)
                     + "  ·  " + hint;
@@ -270,6 +273,13 @@ final class InteractPromptBuilder {
             case GROWTH_NODE -> game.interactPrompt = "Growth node: a torch set beside it burns it out";
             case VEIL_MEMBRANE -> game.interactPrompt = "Veil membrane: it wakes to footsteps and light";
             default -> {
+            }
+        }
+        // Layout fourteen: a bed claims a refuge or chooses home (urban milestone 18).
+        if (game.targetHit.type() == BlockType.BEDROLL || game.targetHit.type() == BlockType.CAMP_BED) {
+            String refuge = game.refuges.bedPrompt(new Vec3i(targetX, targetY, targetZ));
+            if (refuge != null) {
+                game.interactPrompt = refuge;
             }
         }
         // Outpost claim prompt overrides the campfire line.

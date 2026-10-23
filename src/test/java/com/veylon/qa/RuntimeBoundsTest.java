@@ -41,6 +41,7 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Long-running release QA for every persistent or high-churn bounded collection. */
@@ -466,6 +467,24 @@ class RuntimeBoundsTest {
         for (int y = 50; y <= 51; y++) { game.world.fixtures.remove(200_000, y, 0); }
         assertTrue(f.setBrace(game.world, new com.veylon.util.Vec3i(200_000 + 2 * braces, 50, 0), 10f));
         assertEquals(braces, f.braceCount());
+    }
+
+    @Test
+    void refugeClaimsStopAtThree() {
+        Game game = new Game();
+        game.newWorld(20260731, true, World.GEN_URBAN_REFUGES, com.veylon.entity.GameMode.SURVIVAL);
+        var refuges = game.world.urban.refuges;
+        assertEquals(1, refuges.size(), "the starter refuge is the first claim");
+        var neighbour = com.veylon.RefugeWorldArena.neighbour(game);
+        refuges.add(com.veylon.world.urban.UrbanIds.floor(neighbour.id(), 1), null, 0);
+        refuges.add(com.veylon.world.urban.UrbanIds.floor(neighbour.id(), 2), null, 0);
+        assertTrue(refuges.full());
+        assertThrows(IllegalStateException.class,
+                () -> refuges.add(com.veylon.world.urban.UrbanIds.floor(neighbour.id(), 0), null, 0));
+        RuntimeBudgetSnapshot snapshot = RuntimeBudgetSnapshot.capture(game);
+        assertEquals(com.veylon.world.urban.UrbanRefuges.MAX_CLAIMS, snapshot.refugeClaims());
+        assertTrue(snapshot.withinHardLimits(), snapshot.occupancySummary());
+        assertTrue(RuntimeBudgetSnapshot.hardLimitSummary().contains("refuges=" + com.veylon.world.urban.UrbanRefuges.MAX_CLAIMS));
     }
 
     @Test

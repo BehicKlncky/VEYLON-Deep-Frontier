@@ -56,6 +56,8 @@ final class UrbanBootstrap {
                 urban.refugeBuilding = site.refuge().id(); urban.refugeAnchor = anchor;
                 world.campfireFuel.put(site.fire(), 240f);
                 world.collectorWater.put(site.collector(), 3f);
+                // Layout fourteen: the starter refuge's ground floor is the first claimed refuge and home.
+                if (urban.hasRefuges()) { game.refuges.claimStarter(site.refuge(), anchor); }
             }
             return;
         }
@@ -76,6 +78,8 @@ final class UrbanBootstrap {
     static boolean restoreRespawn(Game game) {
         var urban = game.world.urban;
         if (urban == null || !urban.hasStarter()) { return false; }
+        // Layout fourteen: wake at home, the claimed refuge last slept in, before the starter refuge.
+        if (urban.hasRefuges() && game.refuges.restoreRespawn()) { return true; }
         Vec3i anchor = urban.refugeAnchor;
         if (anchor == null) {
             int[] column = urban.spawnColumn();

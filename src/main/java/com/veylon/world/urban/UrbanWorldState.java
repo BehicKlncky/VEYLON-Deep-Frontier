@@ -79,7 +79,12 @@ public final class UrbanWorldState {
     public final UrbanDiscovery discovery = new UrbanDiscovery();
     /** Layout fourteen: the strength left in damaged barricades and in braced doors (milestone 18). */
     public final UrbanFortifications fortifications = new UrbanFortifications();
-    /** Starter anchor only; claims and upgrades are introduced in milestone 18. */
+    /** Layout fourteen: the storeys the survivor has claimed as refuges, and home (milestone 18). */
+    public final UrbanRefuges refuges = new UrbanRefuges();
+    /**
+     * The starter refuge and its ground-floor respawn anchor (milestone 08). In layout fourteen it
+     * is the fallback respawn behind the claimed refuges, and its ground floor is the first claim.
+     */
     public long refugeBuilding;
     public com.veylon.util.Vec3i refugeAnchor;
     public boolean refugeSectionRestored;
@@ -413,6 +418,20 @@ public final class UrbanWorldState {
     public int plannedRoofY(int x, int z) {
         ParcelPlan parcel = parcelAt(x, z);
         return parcel == null ? groundY(x, z) : parcel.plannedRoofY();
+    }
+
+    /**
+     * The plan of a building by its stable id, through its region's parcel; null when the id names
+     * no planned building. Plans only: no chunk is generated.
+     */
+    public BuildingPlan buildingById(long building) {
+        if (!UrbanIds.isValid(building) || UrbanIds.kind(building) != UrbanIds.Kind.BUILDING) { return null; }
+        int rx = UrbanIds.regionX(building), rz = UrbanIds.regionZ(building);
+        if (!hasCityPlan() || !CityPlanner.isPlannable(rx, rz)) { return null; }
+        ParcelPlan parcel = regionPlan(rx, rz).parcel(UrbanIds.parcelIndex(building));
+        if (parcel == null) { return null; }
+        BuildingPlan plan = buildingAt(parcel.x0(), parcel.z0());
+        return plan != null && plan.id() == building ? plan : null;
     }
 
     /** The reserved parcel covering a column, or null. */
