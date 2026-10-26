@@ -284,12 +284,13 @@ class UrbanSalvageTest {
         assertTrue(g.interactPrompt.startsWith("[LMB] Hold to take apart the ")
                 && g.interactPrompt.contains(" table for " + expected), g.interactPrompt);
 
-        // A search keeps its F line, and the dismantle follows it.
+        // A search keeps its F line, and the dismantle follows it in short, to fit the HUD's one line.
         BuildingPlan.Fixture cabinet = piece(neighbour(g), 0, BlockType.CABINET);
         standAt(g, cabinet.target());
         aim(g, cabinet.position());
         g.updatePrompt();
-        assertTrue(g.interactPrompt.startsWith("[F] Search cabinet  ·  hold LMB to take apart the "), g.interactPrompt);
+        assertEquals("[F] Search cabinet  ·  hold LMB for "
+                + SalvageTable.describe(SalvageTable.yields(g.world, cabinet.position(), BlockType.CABINET)), g.interactPrompt);
 
         VehicleSites.Wreck wreck = nearestWreck(g);
         g.player.crouching = false;

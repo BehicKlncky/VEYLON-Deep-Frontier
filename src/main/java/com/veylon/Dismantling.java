@@ -228,4 +228,15 @@ final class Dismantling {
         return "[LMB] Hold to take apart the " + (c == SalvageTable.Condition.SOUND ? "" : c.label + " ") + e.noun()
                 + " for " + SalvageTable.describe(SalvageTable.yields(game.world, pos, t)) + " (loud)";
     }
+
+    /**
+     * {@link #prompt} cut short to follow another action's line, so the HUD's single line still
+     * shows what the piece gives: "hold LMB for 2 scrap metal". The crouch hint and a refusal are
+     * already short and come back unchanged.
+     */
+    String shortPrompt(Vec3i pos, BlockType t) {
+        String full = prompt(pos, t);
+        if (full == null || !full.startsWith("[LMB] Hold to take apart")) { return full; }
+        return "hold LMB for " + SalvageTable.describe(SalvageTable.yields(game.world, pos, t));
+    }
 }

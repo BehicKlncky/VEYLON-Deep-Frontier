@@ -74,8 +74,8 @@ final class InteractPromptBuilder {
     /**
      * Layout fourteen (milestone 18): what taking the aimed piece apart would give, after the door's
      * or the block's own line. A generic tool hint gives way to it; an F action keeps its line and
-     * the dismantle follows. A piece that a standing break carries away learns that crouching
-     * takes it apart.
+     * the dismantle follows in short, so the HUD's one line still shows what the piece gives. A
+     * piece that a standing break carries away learns that crouching takes it apart.
      */
     private boolean salvagePrompt() {
         if (game.targetHit == null) {
@@ -89,7 +89,8 @@ final class InteractPromptBuilder {
         }
         if (game.blockActions.dismantling.applies(pos, t)) {
             boolean generic = game.interactPrompt == null || game.interactPrompt.startsWith("Requires ");
-            game.interactPrompt = generic ? hint : game.interactPrompt + "  ·  " + hint.replace("[LMB] Hold", "hold LMB");
+            game.interactPrompt = generic ? hint
+                    : game.interactPrompt + "  ·  " + game.blockActions.dismantling.shortPrompt(pos, t);
         } else if (RefugeSystem.isBed(t)) {
             // A bed's own line already says what crouching does to it: claim or give up a refuge.
             return game.interactPrompt != null;
