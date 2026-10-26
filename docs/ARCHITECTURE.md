@@ -270,14 +270,16 @@ transit and rooftop routes to those districts (layout 10, template 7) with encou
 catalogue 4, and 14 adds the quarantine's growth sites and the city's wildlife
 habitats (layout 11, template 7) with encounter catalogue 5, and 15 adds the
 survivor camps and hidden refuges (layout 12, template 7, catalogue 5), and 16
-adds guarded strongholds and raider yards (layout 13, template 7, catalogue 5). The
-development selector creates 16. New worlds use
+adds guarded strongholds and raider yards (layout 13, template 7, catalogue 5), and 17
+adds burnt-out cars to the local streets and the refuge, salvage and fortification
+rules (layout 14, template 7, catalogue 5). The development selector creates 17. New
+worlds use
 `World.DEFAULT_NEW_WORLD_GENERATOR` (3, until the urban rollout); a load accepts any
 supported version and rejects the rest, including anything above
 `MAX_SUPPORTED_GENERATOR`, before it replaces the live world. Feature gates name
 their versions (`hasDeepFrontier`, `hasCaveIdentities`, `isUrbanGenerator`) instead
 of comparing with `>=`, so a new generator inherits nothing by accident, and
-`WorldGeneratorFingerprintTest` pins versions 1–16 absolutely. `ShapedStairGenerationTest`
+`WorldGeneratorFingerprintTest` pins versions 1–17 absolutely. `ShapedStairGenerationTest`
 checks version 8 against frozen version 7 outside stair cells and across chunk orders.
 
 An urban world's layout revision follows from its generator, so it is known
@@ -285,19 +287,21 @@ before bootstrap generates a chunk; a geometry change means a new generator
 version, never a change under an old one (`UrbanRevision`). Its content revision
 (the rolled loot, encounter and trade tables) is saved in `urban.meta`, which
 only urban worlds write. It is optional for older layouts and required for
-generators 9–16. Until that section, or its
+generators 9–17. Until that section, or its
 absent default, has been read, a loading world's content revision cannot be read
 at all. Fresh worlds use content revision 3; revisions 1 and 2 remain supported.
 Revision 1 is the absent-metadata default. The tables and their hash inputs are frozen
-under each revision. Generators 9–16 require content 3. Encounter catalogues are
+under each revision. Generators 9–17 require content 3. Encounter catalogues are
 additive and versioned separately in `urban.population` (1 for generator 10, 2 for
-11, 3 for 12, 4 for 13, 5 for 14–16, which write codec 2); they do not reroll
-content-3 loot or add encounters to older generators. Generators 13–16 also write
+11, 3 for 12, 4 for 13, 5 for 14–17, which write codec 2); they do not reroll
+content-3 loot or add encounters to older generators. Generators 13–17 also write
 `urban.discovery` v1 (a count capped at 4,096,
 then ascending observed site ids, each checked against the plan); absence means
-nothing found. Generators 15 and 16 also require `urban.sites` v1, their survivor
-sites and people, and generator 16 `urban.compounds` v1, what its compounds
-remember. Compatibility directions:
+nothing found. Generators 15–17 also require `urban.sites` v1, their survivor
+sites and people, generators 16 and 17 `urban.compounds` v1, what their compounds
+remember, and generator 17 `urban.refuges` v2, its claimed refuges, and
+`urban.fortifications` v1, its damaged barricades and braces. Compatibility
+directions:
 
 - this build, a legacy save: unchanged, and no urban state is created;
 - this build, an urban save: the same geometry through its generator, the content
@@ -612,10 +616,64 @@ clears the transient ones on dormancy. `urban.compounds` v1, required for genera
 Scripted urban QA routes extend `UrbanRouteScene`: a task queue played through the
 production input seam, mouse-look turns, bounded walking that opens doors with F,
 threat handling, forcing and captures. `urban_slice`, `urban_catalogue`,
-`urban_districts`, `urban_underground`, `urban_ecology`, `urban_survivors` and
-`urban_strongholds` use it; the two that meet people extend `UrbanPeopleScene`,
-which adds the staged clock and poses, walking up to someone and talking,
-conversation choices through the screen's command, a trade and F5 and F9.
+`urban_districts`, `urban_underground`, `urban_ecology`, `urban_survivors`,
+`urban_strongholds` and `urban_refuge` use it; the last three extend
+`UrbanPeopleScene`, which adds the staged clock and poses, walking up to someone and
+talking, conversation choices through the screen's command, a trade and F5 and F9.
+
+### Refuges, salvage and fortification
+
+Generator 17 plans layout 14: layout 13 exactly, plus the burnt-out cars of the local
+streets (`VehicleSites`, a pure function of the seed, layout and region with at most
+six a region, stamped as `CAR_WRECK` cells by `UrbanVehicleStamper` after the
+compounds) and the rules below, each gated on `UrbanWorldState.hasRefuges()`, so
+earlier layouts are unchanged.
+
+`SalvageTable` says what can be taken apart: per block kind, and per part of a wreck,
+the seconds of work, the tool that halves them, whether that tool is required
+(metal), and what a sound piece gives. Wear (sound, worn, wrecked) is a pure function
+of the building's variant and the cell, so it is never saved. `Dismantling`, owned by
+`PlayerBlockActions`, runs the hold: crouched for anything a standing hold carries
+away whole, any hold for pieces with no item form, each blow a `WorldNoise` event.
+Its completion is the single transfer: what the piece gives and whatever a container
+still holds must fit before anything moves; a container's contents leave
+`World.crateContents` once and its `UrbanContainers` identity is retired; the cell
+becomes a recorded edit, so depletion persists with the other block edits.
+Survivors' pieces raise the existing wrecked-stores consequence. A Creative break
+removes the piece and gives no materials.
+
+`Fortification` owns the use button on openings: a plank or sheet-metal barricade
+(`BARRICADE`, `BARRICADE_METAL`, solid and opaque pane blocks) goes into a broken
+frame or the cell before the aimed face; a door brace bars a closed door from the
+player's side and reinforces the bar; planks and scrap repair; a salvaged door or
+window refills a broken frame. `UrbanFortifications`, on `UrbanWorldState`, keeps
+only damaged barricade cells (at most 2,048; a blow on one more breaks it) and braces
+(at most 256), forgetting a cell that is no longer a barricade (`World.setBlock`
+tells it) or a brace whose door is no longer barred. A Breacher plans through plank
+barricades with `Pathfinder.breachAccess` (step cost 10, beside 8 for a locked
+wooden door) and hammers them through `Fortification.breacherBlow` (15 a blow, a
+brace before its door); every other body treats a barricade as a wall.
+`urban.fortifications` v1, required for generator 17, restores the damage once the
+block edits are in (`UrbanFortificationsSection.finishLoad`).
+
+`UrbanRefuges`, on `UrbanWorldState`, holds at most three claims, each a storey's
+floor id with its sleeping cell and the minute it was claimed, and which is home.
+Claims are plan ids, never a transient object, so edits inside one leave it whole.
+`RefugeSystem`, a `Game` field reset by `WorldBootstrap`, applies the rules: claiming
+at a bed (`WorldInteractions.rest`), the refusals (survivors' rooms through
+`SurvivorSites` and `UrbanSiteDirector.abandoned`, something hostile on the storey,
+roofs, stations and unloaded parcels), giving up, the bed prompt, home, the respawn
+`UrbanBootstrap` asks for before the starter anchor, and the starter claim of a fresh
+world. `UrbanEncounterDirector.safeSpawn` lets nothing new appear inside a claimed
+storey; `UrbanPlaces` names it "Your refuge", the map marks the claims, and
+`CrateTransactionSystem` labels storage there that nobody else owns.
+`RefugeExposure` reads a claim's ways in (the building's outer and roof doors and the
+claimed storey's windows) and its light from the live world. `SleepSystem` asks
+`RefugeSystem.settleForNight` once as sleep begins, which may send the nearest real
+infected to an open way and sets the minute it wakes the sleeper, and
+`RefugeSystem.keepsOut` lets a refuge shut tight keep out a body beyond its walls.
+`urban.refuges` v2 holds the claims and home for generator 17; generators 9–16 keep
+version 1.
 
 ### Doors, windows and urban fixtures
 
@@ -767,23 +825,28 @@ Ordinary search, ownership and depletion remain authoritative; the kit and
 initial 3-litre collector / 240-second fire are granted only by fresh bootstrap.
 There is no wilderness camp, NPC population or protected radius. Shelter uses
 the existing room/portal queries; a courtyard fire does not count as indoor smoke.
-Sleep checks loaded support and nearby hostile survivors as well as the existing
-conditions and predator gate.
+Sleep checks loaded support and any hostile body within 12 blocks (in a layout-14
+refuge shut tight, not one beyond its walls) as well as the existing conditions and
+predator gate.
 
-`CraftingSystem.recipesFor` selects fifteen repair/reuse recipes only for the
-starter generators 9–10, retaining the original list for older worlds. Recovered wood,
+`CraftingSystem.recipesFor` selects fifteen repair/reuse recipes for the starter
+generators, retaining the original list for older worlds; layout 11 adds the ecology
+recipes, and layout 14 (`REFUGE_RECIPES`) drops the carried-table plank recipe and
+adds the two barricades and the door brace. Recovered wood,
 metal and textiles cover the first reinforced spear, stations, treatment,
 containers, light, bedroll and tool/weapon repair. Crafting, cooking, boiling,
 refilling and Survival drinking check the complete output transaction before
 consuming ingredients or water. Failed capacity leaves the source intact.
 
-`urban.refuges` v1 is required for generators 9–10: version + strict presence byte,
+`urban.refuges` v1 is required for generators 9–16: version + strict presence byte,
 then optional generated refuge id and integer anchor (5 or 25 bytes). It validates
-the pure ground-floor plan; no claim catalogue is introduced. Load replaces it
-without restocking, and missing/corrupt sections reject before publication.
-Respawn checks actual loaded colliders/support at y=41 in at most 4,225 cells
-within 32 blocks of the saved anchor, refusing if none is safe. It retains the
-existing carried-inventory death policy. Claims and utilities remain 18–19.
+the pure ground-floor plan. Load replaces it without restocking, and
+missing/corrupt sections reject before publication. Respawn checks actual loaded
+colliders/support at y=41 in at most 4,225 cells within 32 blocks of the saved
+anchor, refusing if none is safe. It retains the existing carried-inventory death
+policy. Generator 17 writes version 2, which adds the claims and home of milestone
+18, and wakes the survivor at home first (see "Refuges, salvage and fortification");
+utilities remain 19.
 
 ### Urban infected encounters
 

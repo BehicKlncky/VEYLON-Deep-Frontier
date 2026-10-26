@@ -6,10 +6,10 @@ This is the running record for the 26-package urban-survival roadmap. The pack i
 
 | Item | Value |
 | --- | --- |
-| Last completed package | **17 — Guarded strongholds and hostile factions** (2026-10-23). Generator 16 adds guarded compounds: a stronghold of 8–16 in every civic region, walled by its own courtyard buildings, with a metal gate, posts, a trader, a clinic and barracks, and a raider yard of 4–8 in an industrial depot row near the spawn with an unheld back way into it. A visitor is let in by day to the yard and the clinic; guards perceive fairly, warn and then put out a visitor found in their buildings and drive out intruders, theft is judged by evidence, and alarms are answered by at most three guards; raiders hunt with at most two, once a day, and a yard emptied of raiders is taken and rewarded once. Passes, evidence, cooldowns, deaths, standing and capture hold across dormancy, saves and loads without duplicate guards. Native stronghold tours pass in both modes. Human-only checks are deferred by D-80. |
-| Source revision | 17: `90ea27d` compound plans → `380ade8` guards and raiders → `9b360a0` access and consequences → `4ed1957` everyday sounds → `64851d5` inaudible noises removed → `c2575cd` theft witnesses documented → `44b3e50` shared people tasks → `cd63d2d` stronghold tour → `8a858fc` talking past a nearer person. Records follow separately. |
-| Default new world | Legacy (`World.DEFAULT_NEW_WORLD_GENERATOR = GEN_CAVE_IDENTITIES`), unchanged until 26 passes. Isolated `VEYLON_GENERATOR=urban-dev` creates generator 16 (`GEN_URBAN_STRONGHOLDS`, layout 13 / template 7 / content 3, encounter catalogue 5). Generators 1–15 stay loadable with their original geometry and encounters. |
-| Next package | **18 — Safehouses, salvage and fortification, NOT STARTED.** Keep `UrbanSliceRouteTest` (generators 10–16), `UrbanCatalogueQaSceneTest`, `UrbanDistrictQaSceneTest`, `UrbanUndergroundQaSceneTest`, `UrbanEcologyQaSceneTest`, `UrbanSurvivorQaSceneTest` and `UrbanStrongholdQaSceneTest` as regression gates. Owner question P-15 (the inverted day/night temperature curve) is open. |
+| Last completed package | **18 — Safehouses, salvage and fortification** (2026-10-27). Generator 17 lets the player claim up to three refuges, each one storey claimed at a bed, with home, storage and respawn there; take furniture, doors, rails and the burnt-out cars of the local streets apart for materials by time, tool, wear and noise; and board up openings and brace doors with what salvage gives. A Breacher hammers plank barricades and braces down, every other threat walks round, and a refuge's real ways in and light decide what its night draws. Claims, storage, depletion and battle damage survive saves and loads; survivors' rooms cannot be claimed while their people are there. Native refuge tours pass in both modes. Human-only checks are deferred by D-80. |
+| Source revision | 18: `c771b14` wrecks → `4fa6057` salvage → `746d896` fortification → `47abd8b` claims → `414c248` the night → `ab1f4bc` the sleep gate → `ed8999d` the short salvage hint → `f084ff6` refuge tour. Records follow separately. |
+| Default new world | Legacy (`World.DEFAULT_NEW_WORLD_GENERATOR = GEN_CAVE_IDENTITIES`), unchanged until 26 passes. Isolated `VEYLON_GENERATOR=urban-dev` creates generator 17 (`GEN_URBAN_REFUGES`, layout 14 / template 7 / content 3, encounter catalogue 5). Generators 1–16 stay loadable with their original geometry and encounters. |
+| Next package | **19 — Water, power and refuge utilities, NOT STARTED.** Keep `UrbanSliceRouteTest` (generators 10–17), `UrbanCatalogueQaSceneTest`, `UrbanDistrictQaSceneTest`, `UrbanUndergroundQaSceneTest`, `UrbanEcologyQaSceneTest`, `UrbanSurvivorQaSceneTest`, `UrbanStrongholdQaSceneTest` and `UrbanRefugeQaSceneTest` as regression gates. Owner question P-15 (the inverted day/night temperature curve) is open. |
 | Human testing schedule | Owner instruction (2026-10-11, D-80): consolidated human playtesting/listening after milestone 22. Through 22, run automated and scripted native validation and record human-only checks as deferred; do not request interim human walks. |
 | Commits | Separate `feat`, `test`, `docs` and `chore` commits on `feature/urban-survival`; see the reconstruction ledger below. `main` stays at `923345f`. Original combined commit retained at `backup/urban-m01-m04-before-split`. No merge, push, tag or publication. |
 
@@ -36,7 +36,7 @@ The status vocabulary is NOT STARTED, IN PROGRESS, PARTIAL, BLOCKED or COMPLETE.
 | 15 | Alien ecology and urban wildlife | 14, 09–10 | Alien kind (appended `BodyFamily`), growth-node state, wildlife anchors | Infected, alien and wildlife behaviour are distinct. The alien has a tell and a counter. Caps, deaths and revisits hold. No edible hostile meat. Creative gates. | **COMPLETE** (2026-10-22; human-only validation deferred by D-80) |
 | 16 | Survivor camps and hidden civilians | 15, 06, 14, 10 | Urban site registry over `settlement/Settlement`, `SettlementManager`, `DormantSettlementSimulation` (D-21); `ai/SettledNpcAI`; aid interaction | A generated camp and a secret basement refuge are found through play. Helping or stealing has a consequence. The same people, needs and deaths remain after save and dormancy. | **COMPLETE** (2026-10-22; human-only validation deferred by D-80) |
 | 17 | Guarded strongholds and hostile factions | 16 | `SettlementManager` guards, reputation, theft and counterattacks; urban faction ids | Approach, access rules, entry, trade and exploration. Guards react fairly. A hostile site with an alternative route. State persists without duplicate guards or infinite counterattacks. | **COMPLETE** (2026-10-23; human-only validation deferred by D-80) |
-| 18 | Safehouses, salvage and fortification | 17, 07, 04 | New `RefugeSystem`, `urban.refuges`; salvage in `PlayerBlockActions`; barricades; `SleepSystem` safety | Claim, store, dismantle, barricade from salvage and sleep. Threats attack or route around defences. Claims, salvage and defences persist. Survivor property has consequences. | NOT STARTED |
+| 18 | Safehouses, salvage and fortification | 17, 07, 04 | New `RefugeSystem`, `urban.refuges`; salvage in `PlayerBlockActions`; barricades; `SleepSystem` safety | Claim, store, dismantle, barricade from salvage and sleep. Threats attack or route around defences. Claims, salvage and defences persist. Survivor property has consequences. | **COMPLETE** (2026-10-27; human-only validation deferred by D-80) |
 | 19 | Water, power and refuge utilities | 18 | New `UtilitySystem` (`MediumTickSystem`), `urban.utilities`; `simulation/WaterSystem`; light emitters | One water utility and one power source and consumer run from urban supplies, conserve resources, persist, follow the pause and dormancy policy and respect Creative. | NOT STARTED |
 | 20 | Urban missions and long-term purpose | 19, 16–17, 02 | New `UrbanMissions`, `CommsObjective`, `urban.missions`; `ai/Quest`, `ai/FactionSystem` model; `ui/QuestObjectiveView`; victory flow | An integration route advances C1–C5 without trees or ore. A hidden-refuge mission and a guarded-access mission. Failure alternatives. Rewards exactly once. The legacy beacon is intact. | NOT STARTED |
 | 21 | Map, HUD and onboarding | 20 | `ui/MapScreen` plan layer, `ui/Hud`, `InteractPromptBuilder`, `ui/NewFrontierScreen`, `ui/PauseMenu` | A new player finds supplies, floors, the refuge and the next step through ordinary UI. Secrets stay secret. `docs/graphics/HUD_VALIDATION.md` captures. | NOT STARTED |
@@ -2287,6 +2287,223 @@ was performed.
 **Next:** package 18, safehouses, salvage and fortification, building claims,
 salvage and barricades of the player's own on the refuge and fixture state
 (D-48, D-76) under a new generator.
+
+## Milestone 18 — safehouses, salvage and fortification (2026-10-23 to 2026-10-27)
+
+**Status: COMPLETE.** Generator 17 lets the player make a defensible home of
+the city. Up to three refuges can be claimed, each one storey of one building,
+at a bed; the claiming bed is where it is slept in, and the refuge last chosen
+by sleeping is home, where the survivor wakes after death. Survivors' rooms
+cannot be taken while anyone of theirs is left, nothing is confiscated, and a
+claimed storey lets no new encounter appear inside it. Furniture, doors, rails,
+signs, beds, basins, the workbench and the burnt-out cars now left in the
+local streets come apart for planks, scrap, sheet metal, fibre and spare parts,
+by time, tool, wear and noise, through one transfer that pays once. Plank and
+sheet-metal barricades and door braces made from that salvage board up
+openings and reinforce barred doors; a Breacher hammers them down blow by blow,
+every other threat walks round, and the player can mend or remove them with no
+tool. A refuge's safety is read from its real ways in and light: shut tight it
+rests better and draws nothing, left open it may draw a real infected body that
+wakes the sleeper. Claims, home, storage, depletion, damaged barricades and
+braces survive saves and loads. Native refuge tours pass in both modes.
+Human-only validation remains deferred by D-80. Decisions D-169–D-182; the
+defaults of P-08 and P-13 are implemented; P-15 is still open.
+
+### Start state
+
+- Branch `feature/urban-survival` at `2012dcd` (the 17 records), clean tree;
+  the 17 gate met.
+- Read the revised base, the prompt, `AGENTS.md`, `docs/COMMIT_WORKFLOW.md` and
+  these records. The work and its commits ran from 2026-10-23 to 2026-10-27 in
+  one session, across context compactions.
+
+### Refuges and behaviour
+
+- **Generator 17 (D-169).** Layout 14 is layout 13 plus the burnt-out cars of
+  the local streets, and every rule below is gated on it; template 7, content 3
+  and encounter catalogue 5 are unchanged. `urban-dev` now creates it.
+- **Burnt-out cars (D-170).** At most six wrecks a region, each one lane wide
+  and four cells long with an engine and a cabin, on planned roadway clear of
+  crossings, overlays and compounds, so both sidewalks and the other lane stay
+  open; one in three burnt out. A new block, `CAR_WRECK`.
+- **Salvage (D-171, D-172).** One table for every furniture kind, the doors,
+  rails, signs, barricades and each part of a wreck: work time, the tool that
+  halves it and must be held for metal, and yields by wear, which is derived
+  from the plan. Crouch and hold the attack button; a piece with no item form
+  comes apart under any hold. Every blow is heard. What a piece gives and what
+  a container still holds must fit before anything moves, and a container's
+  contents and identity leave the world once. A survivor's piece wrecks their
+  stores. Creative removes the piece and gives no materials. Spare Parts is a
+  new item, and the carried-table plank recipe is gone under generator 17.
+- **Fortification (D-173–D-176).** A plank barricade (60) and a sheet-metal one
+  (160), solid and opaque, go into broken frames or open cells; a door brace
+  (90) bars and reinforces a closed door from the player's side. A Breacher
+  plans through plank barricades and hammers them and braces at 15 a blow;
+  metal holds and every other threat walks round. Planks and scrap repair; a
+  salvaged door or window refills a broken frame; a crouched hold takes a
+  barricade down from either side with no tool. Only damage is extra state,
+  in the new `urban.fortifications` v1.
+- **Claims (D-177–D-179).** At most three, each a storey's floor id, claimed with
+  crouch and F at a bed; refused for survivors' rooms until their site is
+  abandoned, for something hostile on the storey, roofs, stations and unloaded
+  parcels. Giving up takes a second crouched F. Home moves to the refuge last
+  slept in and is the respawn. A fresh world claims the starter refuge. The
+  HUD says "Your refuge", the map marks claims, storage is labelled only where
+  nobody else owns it, and no new encounter appears inside a claim.
+  `urban.refuges` v2 holds the claims for generator 17.
+- **The night (D-180, D-181).** Ways in are the building's outer and roof doors
+  and the claimed storey's windows, read live; shut tight means none open or
+  unbarred. Shut tight with no light showing rests better and draws nothing;
+  otherwise the nearest real infected within 32 blocks of an open way (48 for a
+  light at night) comes to look and wakes the sleeper, sooner the nearer it
+  was. A body beyond a refuge's walls no longer keeps its sleeper awake when it
+  is shut tight, and the refusal now names an infected body as such.
+- **QA (D-182).** `VEYLON_SCENE=urban_refuge` claims a flat, stocks it, salvages
+  its furniture, crafts and puts up the defences, meets a Breacher and a
+  Veilbound, sleeps, saves and loads and is refused a camp's bed, with ordinary
+  controls in both modes.
+- **Found while writing the tour.** Any infected within 12 blocks kept a city
+  sleeper awake through walls, and the refusal called it a hostile survivor, so
+  a barred refuge could not be slept in with a body in the street
+  (`ab1f4bc`).
+- **Found by the native tour.** The HUD shows one line of about 56
+  characters, and a salvage hint behind an F action was cut off before saying
+  what the piece gives; it now reads "hold LMB for 2 scrap metal" there
+  (`ed8999d`). The first native Creative run failed when native frame timing left
+  the player standing on the cell the tour meant to put a barricade in; the
+  tour now walks to the hall cell first, faces the hammered door for its
+  capture and waits for the sleep fade to clear.
+
+### Changed paths
+
+**Production** (`src/main/java/com/veylon/`):
+
+- New: `world/urban/{VehicleSites,UrbanVehicleStamper,SalvageTable,
+  UrbanFortifications,UrbanRefuges,RefugeExposure}.java`,
+  `{Dismantling,Fortification,RefugeSystem}.java`,
+  `save/UrbanFortificationsSection.java`, `UrbanRefugeQaScene.java`,
+  `UrbanRefugeTourPlan.java`.
+- Edited: `world/{World,BlockType,FixtureGeometry}.java`,
+  `world/urban/{UrbanRevision,UrbanSalts,UrbanWorldState,UrbanPlaces}.java`,
+  `item/{ItemType,UrbanCrafting,CraftingSystem,CreativePalette}.java`,
+  `gfx/{MaterialRegistry,UrbanTextures,IconAtlas}.java`,
+  `engine/AudioManager.java`, `ai/{Pathfinder,IndoorNavigation,BreacherAI}.java`,
+  `entity/{Npc,Player,UrbanEncounterDirector}.java`,
+  `save/{SaveSystem,V3ExtensionSections,UrbanRefugesSection}.java`,
+  `settlement/UrbanSiteDirector.java`, `ui/MapScreen.java`,
+  `qa/RuntimeBudgetSnapshot.java`, `{Game,WorldBootstrap,UrbanBootstrap,
+  WorldInteractions,PlayerBlockActions,FixtureActions,InteractPromptBuilder,
+  CrateTransactionSystem,SleepSystem}.java`, `UrbanPeopleScene.java` (the
+  quick-save failure prints what was logged), `UrbanSurvivorTourPlan.java`
+  (its nearest-camp step is shared), `UrbanQaScenes.java`, `QaHarness.java`
+  (one label on an existing line).
+
+**Tests** (`src/test/java/com/veylon/`):
+
+- New: `world/urban/VehicleSitesTest`, `UrbanSalvageTest`,
+  `UrbanFortificationTest`, `save/UrbanFortificationsSectionTest`,
+  `UrbanRefugeClaimsTest`, `UrbanRefugeNightTest`, `UrbanRefugeQaSceneTest`, and
+  the fixture `RefugeWorldArena`.
+- Extended: `world/WorldGeneratorFingerprintTest` (generator 17),
+  `UrbanSliceRouteTest` (generator 17), `save/UrbanRefugesSectionTest`
+  (version 2), `qa/RuntimeBoundsTest`, `qa/SerializedEnumOrderTest` (the
+  appended blocks and items).
+- Expectations: `world/urban/UrbanRevisionTest`,
+  `world/UrbanGeneratorDispatchTest` and `UrbanDevelopmentSelectorTest` name
+  generator 17.
+
+**Documents:** `docs/ARCHITECTURE.md`, `docs/DEVELOPING.md` and the urban
+DESIGN, DECISIONS, PROGRESS and VALIDATION records.
+
+### Compatibility
+
+- Generators 1–16 are unchanged: their absolute pins pass; none of them plans a
+  wreck, takes a piece apart, braces a door, keeps a barricade's damage,
+  claims a refuge, writes `urban.fortifications` or `urban.refuges` v2, or reads
+  a refuge's night (a barricade placed there is an ordinary block). Generators
+  9–16 keep `urban.refuges` v1 and their recipes; a Breacher in an earlier
+  layout plans and hammers exactly as before. The one change an earlier city
+  shows is wording: a sleep refused for a nearby infected body now says
+  "Something infected is too close to sleep safely."
+- New: generator 17, layout 14, the blocks `CAR_WRECK`, `BARRICADE` and
+  `BARRICADE_METAL` (ids 89–91), the items Spare Parts, Plank Barricade,
+  Sheet-Metal Barricade and Door Brace (appended), the section
+  `urban.fortifications` v1 and `urban.refuges` v2 (both required for, and
+  accepted only with, generator 17), the place "Your refuge" (never saved) and
+  the vehicle salts. Every enum was appended; no ordinal moved.
+- Unchanged: the v3 base, every other section id and version, content revision
+  3, template 7, encounter catalogue 5, and the default new world (generator 3).
+- An older build rejects a generator-17 save before replacing its live world;
+  no older binary was run, and there is no downgrade promise.
+
+### Commands and results
+
+Exact commands and outputs are in
+[VALIDATION.md](VALIDATION.md#milestone-18--safehouses-salvage-and-fortification-2026-10-23-to-2026-10-27).
+In short:
+
+- Each code commit was validated against its exact tree with the full portable
+  build in the isolated worktree `build/m14-check`.
+- The final portable build passed on `f084ff6`'s exact tree on 2026-10-27:
+  2,126 tests in 248 classes, zero failures or errors, and the existing
+  Windows skip.
+- Native `urban_refuge` passed in Survival and Creative on seed `20260731`, 17
+  captures each, with zero GL, KHR and native-audio errors, on the final code.
+  The first native Survival run passed, but its captures showed the salvage
+  hint cut off; the first Creative run failed at the hall barricade. Both were
+  fixed before the final runs.
+- `graphify update . --no-cluster` on the final code: 10,464 nodes and
+  42,720 edges, with the existing `build.gradle` extractor warning.
+- No reviewer subagents ran.
+
+The commits:
+
+| Commit | Subject |
+| --- | --- |
+| `c771b14` | `feat(urban): leave burnt-out cars in the local streets under generator 17` |
+| `4fa6057` | `feat(salvage): take furniture, doors and wrecks apart for materials` |
+| `746d896` | `feat(fortification): board up openings, brace doors and mend them` |
+| `47abd8b` | `feat(refuge): claim up to three refuges at their beds` |
+| `414c248` | `feat(refuge): judge a refuge's night by its real ways in` |
+| `ab1f4bc` | `fix(sleep): let a refuge shut tight keep out a body beyond its walls` |
+| `ed8999d` | `fix(salvage): keep what a piece gives readable beside an F action` |
+| `f084ff6` | `feat(qa): tour a refuge claimed, salvaged, fortified and slept in` |
+
+These records follow in their own commit. No push, merge, tag or publication
+was performed.
+
+### Limitations and next concrete step
+
+- **Evidence types.** The tour stages poses between legs, a forward-only
+  clock, the weather, two infected and a kit (and, in Creative, the materials
+  salvage would have given), and uses the container and crafting screens' own
+  commands; it is not the human playtest D-80 defers until after 22. Whether a
+  refuge feels safe, salvage worth the noise and the threats fair was checked
+  by script, logs and captures, not judged by a person.
+- **Tour coverage.** The native tour shows a Breacher breaking a braced door
+  and a Veilbound kept out; a Breacher hammering a barricade, a Veilbound
+  walking round half a barricaded doorway, repairs, a hung door, a glazed
+  window, wrecks, the light rule and a body drawn to an open refuge rest on
+  the headless tests (`UrbanFortificationTest`, `UrbanSalvageTest`,
+  `UrbanRefugeNightTest`).
+- **Boarding glass.** A barricade goes into a broken frame or an open cell;
+  intact glass must be broken first, and the light rule counts a window only
+  by its own cells.
+- **Interior doors.** A refuge's exposure counts only the building's
+  entrances and the claimed storey's windows; a flat's own door does not secure
+  it.
+- **Owners.** The salvage prompt does not warn that a piece belongs to
+  survivors; the consequence follows the act, with its log line.
+- **Balance for 23.** Work times, yields, wear, strengths, blow damage, repair
+  amounts, the draw radii and the wake timing are initial values.
+- **Presentation.** Map markers for claims only (the plan layer is 21); no
+  refuge ambience (22).
+- **Day/night temperature (P-15).** Still inverted in every world; unchanged.
+- **Default.** The ordinary new world stays generator 3 until 26.
+
+**Next:** package 19, water, power and refuge utilities: one water utility and
+one power source with a consumer, run from urban supplies in a claimed refuge,
+under a new generator.
 
 ## Resume rules
 

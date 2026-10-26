@@ -41,9 +41,9 @@ runs. All are inert when unset. Everything below is handled by `QaHarness`;
 |---|---|
 | `VEYLON_SEED` | Fixed world seed (a non-numeric value is hashed) |
 | `VEYLON_GAME_MODE=survival\|creative` | Initial mode for automated world runs only; absent means Survival. Invalid values fail explicitly. Ignored for normal title sessions and frontend-only captures. |
-| `VEYLON_GENERATOR=urban-dev` | Development selector: NEW FRONTIER and automated worlds use the newest urban generator (`UrbanRevision.DEVELOPMENT_GENERATOR`, now `World.GEN_URBAN_SURVIVORS`: generator 15, layout 12 / template 7 / content 3, encounter catalogue 5). Absent keeps the ordinary default. Any other value fails, and so does `urban-dev` without an isolated data directory (see below). |
+| `VEYLON_GENERATOR=urban-dev` | Development selector: NEW FRONTIER and automated worlds use the newest urban generator (`UrbanRevision.DEVELOPMENT_GENERATOR`, now `World.GEN_URBAN_REFUGES`: generator 17, layout 14 / template 7 / content 3, encounter catalogue 5). Absent keeps the ordinary default. Any other value fails, and so does `urban-dev` without an isolated data directory (see below). |
 | `VEYLON_SMOKE=<seconds>` | Release smoke gate: save/load, fire, storm, a fortress approach, then a pass/fail report. Throws on failure |
-| `VEYLON_SCENE=<name>` | Stage a deterministic benchmark scene (`day`, `pinefog`, `nightfire`, `ruin`, `toxic`, `ao_shadow`, `phase4`, `ashwolf`, `silhouette30`, `vfx_blood`, `vfx_mining`, `vfx_beacon`, `death_ragdoll_showcase`, `death_ragdoll_sequence`, `dismember_showcase`, `dismember_wall`, `dismember_bomb` (a real scrap bomb thrown into a group of six, one outside the lethal radius; it goes off at 2.4 s), `dismember_species`, `dismember_species_wall` and `dismember_species_close` (every species, a guard and the player's remains blown apart at 1 s; open meadow, a step and a wall, and a close view of the small bodies), `molotov_ground`, `molotov_tree` and `molotov_rain` (a real fire bomb thrown at 0.5 s onto a dry clearing at dusk, beside a round tree that catches, or with rain from 3 s that puts the pool out; shots `0.7,1.2,3,7,11`, `1,4,10,20` and `2,3.5,5`), the burning-body scenes `body_fire_row`, `body_fire_row_night`, `body_fire_close`, `body_fire_out`, `body_fire_blast`, `body_fire_panic`, `body_fire_bird`, `body_fire_rain`, `body_fire_ragdoll` and `body_fire_player` (see "Burning bodies QA" below), `movement`, `inventory`, `ui_cycle`, `held_*`, `creative_flight` with `VEYLON_GAME_MODE=creative`, which flies east at Shift speed and prints a `[flight]` streaming report at 29 s, and the urban scenes `urban_streets`, `urban_intersection`, `urban_seam_walk`, `urban_fixtures`, `urban_fixtures_night`, `urban_apartments`, `urban_apartments_night`, `urban_apartments_lit_night`, `urban_apartments_manual`, `urban_apartments_manual_night`, `urban_loot`, the playable-slice route `urban_slice`, the catalogue walk `urban_catalogue`, the district tour `urban_districts`, the route tour `urban_underground`, the ecology tour `urban_ecology`, the survivor tour `urban_survivors` and the stronghold tour `urban_strongholds` with `VEYLON_GENERATOR=urban-dev` (see "Urban planning QA" below)) |
+| `VEYLON_SCENE=<name>` | Stage a deterministic benchmark scene (`day`, `pinefog`, `nightfire`, `ruin`, `toxic`, `ao_shadow`, `phase4`, `ashwolf`, `silhouette30`, `vfx_blood`, `vfx_mining`, `vfx_beacon`, `death_ragdoll_showcase`, `death_ragdoll_sequence`, `dismember_showcase`, `dismember_wall`, `dismember_bomb` (a real scrap bomb thrown into a group of six, one outside the lethal radius; it goes off at 2.4 s), `dismember_species`, `dismember_species_wall` and `dismember_species_close` (every species, a guard and the player's remains blown apart at 1 s; open meadow, a step and a wall, and a close view of the small bodies), `molotov_ground`, `molotov_tree` and `molotov_rain` (a real fire bomb thrown at 0.5 s onto a dry clearing at dusk, beside a round tree that catches, or with rain from 3 s that puts the pool out; shots `0.7,1.2,3,7,11`, `1,4,10,20` and `2,3.5,5`), the burning-body scenes `body_fire_row`, `body_fire_row_night`, `body_fire_close`, `body_fire_out`, `body_fire_blast`, `body_fire_panic`, `body_fire_bird`, `body_fire_rain`, `body_fire_ragdoll` and `body_fire_player` (see "Burning bodies QA" below), `movement`, `inventory`, `ui_cycle`, `held_*`, `creative_flight` with `VEYLON_GAME_MODE=creative`, which flies east at Shift speed and prints a `[flight]` streaming report at 29 s, and the urban scenes `urban_streets`, `urban_intersection`, `urban_seam_walk`, `urban_fixtures`, `urban_fixtures_night`, `urban_apartments`, `urban_apartments_night`, `urban_apartments_lit_night`, `urban_apartments_manual`, `urban_apartments_manual_night`, `urban_loot`, the playable-slice route `urban_slice`, the catalogue walk `urban_catalogue`, the district tour `urban_districts`, the route tour `urban_underground`, the ecology tour `urban_ecology`, the survivor tour `urban_survivors`, the stronghold tour `urban_strongholds` and the refuge tour `urban_refuge` with `VEYLON_GENERATOR=urban-dev` (see "Urban planning QA" below)) |
 | `VEYLON_SHOT="5,10"` | Capture screenshots at those elapsed seconds |
 | `VEYLON_FRONTEND=<name>` | Pin a front-end screen (`options`, `audio`, `loading`, `death`, `victory`, `glyphs`, `newworld`). `newworld-save` shows the replace-save notice without writing a save. `pause` and `gamemode` stage a Survival world with the pause menu or the mode confirmation open; `pause-creative`, `gamemode-creative` and `victory-creative` stage a Creative world; `catalog`, `catalog-tools`, `catalog-search` (query "iron") and `catalog-inventory` open the Creative catalog; `worldcontrols` and `worldcontrols-held` open the Creative world controls, the second with dusk, a frozen clock, a locked storm and paused spawning already applied |
 | `VEYLON_RESOLUTION=1920x1080` | Framebuffer override |
@@ -104,6 +104,7 @@ the spawn column.
 | `urban_ecology` | The package-15 ecology tour in either mode on a generator-14 world: by day the nearest growth site, crouched onto its membrane without waking the Veilmaw, then (Survival) one step back that wakes it, its telegraph and the lunge the backing player escapes, or (Creative) the unseen player beside it; a torch beside the node that burns it, the withered Veilmaw's membrane sacs cut with F, and F5/F9 keeping it dead; at night the second site's glow and a torch set inside its ground that the Veilmaw creeps to and smothers; a park's animals bolting inside the park and a roof flock; a Breacher blind to a crouched observer. Bodies are admitted through the production gate from a staged observer pose; that admission, poses between legs, the clock, the weather, the fire seed and a kit of a spear and torches are staged and printed as staged. Prints `[urban-ecology] pass=true`, writes 16 labelled captures and closes itself; it refuses to stage on an older generator. |
 | `urban_survivors` | The package-16 survivor tour in either mode on a generator-15 world: by day the camp nearest the spawn, entered by its rear door, a trade with its trader, food and water until the camp counts the player a friend, and its shared storage; the hidden refuge nearest the spawn, from its street door to the basement hall where its people are heard before anything is found, the loose panel slid aside with F, supplies until the civilians trust the player, and word of the camp, which they agree to move to; F5 and F9 with every person, need, debt and plan compared; a street far from both until both go dormant; the camp at night with everyone at their beds and the post, one sleeper seen by a torch placed with a right click; the next morning the civilians in the spare beds upstairs; and the empty refuge, whose shelf is left to the player. Every frame every survivor on screen must stand clear of solid blocks and inside its home. Conversation choices use the conversation screen's command and the shelf item the storage screen's transfer command; poses between legs, the forward-only clock, the weather and a kit of a spear, food, water, trade goods and torches are staged and printed as staged. Prints `[urban-survivors] pass=true`, writes 16 labelled captures and closes itself; it refuses to stage on an older generator. |
 | `urban_strongholds` | The package-17 stronghold tour in either mode on a generator-16 world: by day the guarded stronghold nearest the spawn, its sign and gate, the gatekeeper's rules, leave to come in as a visitor, the gate opened and shut and locked behind the player, the yard, a trade with its trader and the clinic's medic; a barracks door off the yard where a guard warns the visitor out (in Creative nobody perceives the player), and back to the yard with the pass kept; one staged infected met and put down at the gate by the gatekeeper while the player only watches; the raider yard nearest the spawn, entered through its back way's street door and crept down crouched to the unlocked rear door, unnoticed; F5 and F9 with every compound's memories, people and stores compared; a street far from both until both go dormant; and the stronghold at night, its people back once each with the watch at the gate and a stranger's knock answered through the shut gate (unheard in Creative). Every frame every compound person on screen must stand clear of solid blocks and inside their compound or its porch, or a guard within its leash. Conversation choices use the conversation screen's command; poses between legs, the forward-only clock, the weather, the infected and a kit of a spear, trade goods, food and water are staged and printed as staged. Prints `[urban-strongholds] pass=true`, writes 16 labelled captures and closes itself; it refuses to stage on an older generator. |
+| `urban_refuge` | The package-18 refuge tour in either mode on a generator-17 world: by day into the abandoned apartment beside the starter refuge and up to its first-floor flat, claimed at its bed with crouch and F as the second of three refuges and home; food and water put into its searched cupboard, now the refuge's storage; the flat's furniture taken apart crouched until salvage has given the planks and scrap for a door brace and three plank barricades, made by hand through the crafting screen's command (Creative salvage takes nothing, so there the materials are staged); the street door braced on one leaf and barred on the other and the rear door barred, the bed reading shut tight; one staged Breacher hammering the braced leaf until the brace splinters and the door breaks, put down at the breach (unheard in Creative), and the broken doorway boarded up; a barricade put up in the hall and taken down with no tool; one staged Veilbound kept out; at night a shut-tight sleep with the Veilbound outside and a quiet waking; F5 and F9 with the refuge compared, the staged bodies still about taken out first; and by day the nearest camp's bed refused. Poses between legs, the forward-only clock, the weather, the two infected and a kit of a spear, food and water are staged and printed as staged. Prints `[urban-refuge] pass=true`, writes 17 labelled captures and closes itself; it refuses to stage on an older generator. |
 | `urban_catalogue` | The package-12 catalogue walk in either mode on a generator-11 or generator-12 world. It visits the nearest building of each commercial and civic family: a damaged grocer, a clinic and a security post that keep their locks, a school and an office block with upper floors, and a warehouse. Moving between buildings is a staged pose at each street door, and the run starts with a staged spear and pry tool; both are printed as staged. Inside it plays through the production input seam: the sign, a shop floor, the clinic's locked staff door, the street door, the dispensary forced by holding the left button and its stock searched with F, a treatment room, ground and upper classrooms and offices, the armoury lock, the squad room, a rack aisle and the workbench. Prints `[urban-catalogue] pass=true`, writes 16 labelled captures and closes itself. |
 
 ```powershell
@@ -467,6 +468,77 @@ the HUD location line or the door prompt; the `before-save`, `after` and `deeds`
 lines record each compound's memories, people and stores and every answer.
 `UrbanStrongholdQaSceneTest` plays the same tour headlessly in both modes and
 refuses generator 15.
+
+For safehouses, salvage and fortification (package 18), run each mode in a fresh
+directory:
+
+```powershell
+$env:VEYLON_GENERATOR='urban-dev'; $env:VEYLON_SEED='20260731'
+$env:VEYLON_GAME_MODE='survival'; $env:VEYLON_SCENE='urban_refuge'
+$env:VEYLON_RESOLUTION='1280x720'; $env:VEYLON_CAPTURE_TAG='m18-refuge-survival'
+Remove-Item Env:VEYLON_SHOT -ErrorAction SilentlyContinue
+.\gradlew.bat run -PveylonDataDir=build/qa/m18-refuge-survival --console=plain
+```
+
+Repeat with `creative` for the twin. The tour reads its legs from pure plans
+and prints them as one `plan` line: the abandoned apartment beside the starter
+refuge nearest the refuge's bed, its first-floor bed and the cupboard nearest
+it, the first-floor furniture nearest the bed whose salvage, after its wear,
+covers a door brace and three plank barricades, the street door's two leaves
+and the rear door's, two hall cells behind the braced leaf and a street cell
+three steps out, and the camp nearest the spawn with the bed nearest its way
+in. At 10:00 it walks in and up to the flat. Crouched, the bed must read
+"[F] Rest here  (crouch: claim these rooms as a refuge, 2 of 3)", followed by
+the bed's own salvage hint; F must log "You claim the first-floor flat as a
+refuge (2 of 3)", make the flat home and name the place "Your refuge". The
+cupboard's screen must read "Your refuge's storage"; four dried berries and a
+waterskin go in through the screen's transfer command. Each piece is taken
+apart crouched with the attack button held: in Survival exactly what the
+salvage table says it gives (storage also spills what it still held), in
+Creative no materials, and every piece must be gone as a recorded edit. The
+crafting screen, opened with C, makes a door brace and three barricades
+through its command. From the hall the brace goes on the first street leaf
+with the use button ("You bar the door and brace it from this side.", 90/90,
+used up in Survival and kept in Creative); crouch and F bars the second leaf
+and both rear leaves (a Creative crouch locks them), and the bed must read
+"[F] Sleep in your refuge  (shut tight; crouch: give it up)". Walks inside the
+shut refuge never chase a threat outside it.
+
+Pacing the hall, the tour stages one Breacher on the street. In Survival the
+brace must take the first blow and splinter before the door breaks, nothing
+else may give, the refuge must then count a way in open, and the Breacher must
+be put down within 150 seconds; two barricades then board the broken
+doorway's two cells and the refuge must be shut tight again. In Creative
+nothing may hunt the builder for 20 seconds and the braced leaf must stand. A
+barricade put up on the hall floor must come down crouched with no tool for
+two planks (nothing in Creative). One staged Veilbound must hear the hall in
+Survival (nobody hears a Creative builder), never get into the building, leave
+every defence as it was and lose the trail once the hall is quiet. At 23:15 F
+on the bed must log "Your refuge is shut tight." with the Veilbound neither
+keeping the sleeper awake nor drawn, and the waking must be a quiet "You wake
+after …". Before F5 the staged bodies still about are taken out and printed
+(`unstaged-infected`), since a save refuses a body that is no encounter
+record; after F9 the claims, home, storage, salvaged furniture, barricades,
+braces and bars must equal the `before-save` line. At 09:00 at the camp,
+crouch and F on their bed must be refused with "These rooms are the camp's:
+claiming them would be taking what is theirs." and nothing claimed. The frozen
+capture list is:
+
+`01-a-flat-claimed`, `02-supplies-stored`, `03-taking-it-apart`,
+`04-what-salvage-gave`, `05-crafted`, `06-the-street-door-braced`,
+`07-shut-tight`, `08-a-breacher-at-the-brace` (Creative
+`08-a-breacher-outside`), `09-the-breacher-put-down`
+(`09-after-the-breacher`), `10-the-breach-boarded-up`
+(`10-the-street-door-after`), `11-a-barricade-in-the-way`, `12-taken-down`,
+`13-a-veilbound-kept-out` (`13-a-veilbound-outside`), `14-asleep-in-the-refuge`,
+`15-morning-in-the-refuge`, `16-after-reload` and `17-their-rooms-refused`.
+
+Require `[urban-refuge] pass=true` and zero GL, KHR and native-audio errors. The
+`views` line pairs captures with the bed, storage and door prompts and the HUD
+location line; the `before-save`, `refuge` and `deeds` lines record the
+refuge's claims, storage, salvage and defences and what each threat did.
+`UrbanRefugeQaSceneTest` plays the same tour headlessly in both modes and
+refuses generator 16.
 
 For the generated apartment appearance sequence use an isolated directory and a
 tag such as `m06_scripted_camera_day`. Change the scene to

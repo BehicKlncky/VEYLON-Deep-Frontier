@@ -2785,3 +2785,208 @@ are local ignored artifacts under `build/`.
   native tours and the inspected captures.
 
 Next: package 18.
+
+## Milestone 18 — safehouses, salvage and fortification (2026-10-23 to 2026-10-27)
+
+### Scope and baseline
+
+- Branch `feature/urban-survival` at `2012dcd` (the 17 records), clean tree.
+  Read the revised base, the prompt, `AGENTS.md`, `docs/COMMIT_WORKFLOW.md` and
+  these records.
+- Generator 17 (layout 14, template 7, content 3, encounter catalogue 5) is new,
+  with three appended blocks (`CAR_WRECK`, `BARRICADE`, `BARRICADE_METAL`, ids
+  89–91), four appended items, the section `urban.fortifications` v1 and
+  `urban.refuges` v2. No existing ordinal, persisted id or other section
+  version changed, and no earlier generator's behaviour but one line of
+  wording: a city sleep refused for a nearby infected now names it as such. The
+  default new world is unchanged.
+- Generators 1–16 keep their absolute pins. Generator 17 was pinned at
+  introduction: its terrain equals generator 14's at every shared pinned chunk,
+  and its vehicle plans and the stamped chunks under the wreck nearest the
+  origin are pinned on three seeds (D-169).
+
+### Behaviour, persistence and fortification evidence
+
+Each code commit was checked against its exact tree. Its staged diff was
+applied to its parent in the detached validation worktree `build/m14-check`,
+the two `git write-tree` hashes were compared equal, and the full portable
+build ran there while later work went on in the main checkout, untouched by
+that build. Each message records the classes:
+
+| Commit | Checks on the exact tree | What they prove |
+| --- | --- | --- |
+| `c771b14` | Full portable build: 2,079 tests in 242 classes, one existing skip | `VehicleSitesTest` (5): wrecks in one lane of a local street, clear of crossings, water, hazards, lots and compound gates; the same wrecks in any planning order; an engine, a body and a cabin over the middle; a generated wreck whole in every chunk order with the street past it open; generator 16 the same city without wrecks. The generator-17 terrain, vehicle-plan and wreck-chunk pins, the slice loop on generator 17, `RuntimeBoundsTest`'s vehicle-plan cap and the dispatch, revision and selector expectations, with every earlier pin |
+| `4fa6057` | Full portable build: 2,089 tests in 243 classes, one existing skip | `UrbanSalvageTest` (10): a table apart for planks after steady loud work, an axe halving the time; metal needing a pry tool and a locker giving what it held; a cupboard searched, emptied and taken apart paying its contents once; a full pack refusing and moving nothing; a wreck's engine, cabin and body; a camp's furniture wrecking what is theirs; Creative removing and taking nothing; generator 16 still carrying furniture away whole with its recipes; the HUD prompt; pieces taken apart staying gone through a save and a load |
+| `746d896` | Full portable build: 2,103 tests in 245 classes, one existing skip | `UrbanFortificationTest` (9): a shattered window boarded up with a salvaged barricade that stops bodies, sight and light loudly; a Breacher hammering a barricaded doorway down blow by blow while a Veilbound waits outside; a Veilbound walking round half a barricaded doorway untouched; a brace taking a Breacher's blows before the door and coming down with its bar; from the far side the player's own blows going into the brace; repairs, a hung door and a glazed window; a misplaced barricade down from either side for most of its cost; Creative fortifying free with no Breacher coming; battle damage through a save and a load. `UrbanFortificationsSectionTest` (4): an exact round trip, a missing section failing the load and keeping the live world, the section refused in an earlier world, and every malformed row failing the whole load. The fortification caps in `RuntimeBoundsTest` |
+| `47abd8b` | Full portable build: 2,116 tests in 246 classes, one existing skip | `UrbanRefugeClaimsTest` (10): the starter claim of a fresh world; an abandoned flat claimed at its bed and made home; a storey underfoot required and never a roof or station; survivors keeping their rooms until gone and a held building's upper floors anybody's; something hostile on the storey; three refuges at most and a second press to give one up; sleeping choosing home and death waking there; claims outlasting edits, saves and loads, home falling back to its storey; nothing new appearing inside a claim; Creative claiming alike and generator 16 without claims. `UrbanRefugesSectionTest`'s generator-17 round trip and malformed-claim cases, and the claim cap |
+| `414c248` | Full portable build: 2,122 tests in 247 classes, one existing skip | `UrbanRefugeNightTest` (6): shut tight drawing nothing and resting better than one door unbarred; the nearest infected out there drawn to an unbarred door and waking the sleeper sooner; a quiet night with nothing out there and nothing made to appear; a torch drawing from farther through glass at night (not by day) until the windows are shattered and boarded up; a Creative sleeper drawing nothing and nothing changing outside a claim; the bed saying how the refuge stands |
+| `ab1f4bc` | Full portable build: 2,123 tests in 247 classes, one existing skip | `UrbanRefugeNightTest`'s new case: an infected outside the unbarred starter refuge keeps its sleeper awake with "Something infected is too close to sleep safely.", the same body outside it shut tight does not and is not drawn, and a body inside the shut refuge still does |
+| `ed8999d` | Full portable build: 2,123 tests in 247 classes, one existing skip | `UrbanSalvageTest`'s HUD case now expects the exact short line "[F] Search cabinet  ·  hold LMB for …" after a cupboard's search |
+| `f084ff6` | Full portable build: 2,126 tests in 248 classes, one existing skip | `UrbanRefugeQaSceneTest` plays the refuge tour headlessly in Survival and Creative and refuses generator 16. This tree is the final code; the final native runs below used it |
+
+### Native refuge tour, both modes
+
+Host: Windows 11 Pro 10.0.26200, AMD Ryzen 5 5600X, NVIDIA GeForce RTX 3060 Ti,
+driver 610.88, OpenGL 3.3.0 with KHR_debug; 1280 × 720.
+
+```powershell
+$env:VEYLON_GENERATOR='urban-dev'; $env:VEYLON_SEED='20260731'
+$env:VEYLON_GAME_MODE='survival'; $env:VEYLON_SCENE='urban_refuge'
+$env:VEYLON_RESOLUTION='1280x720'; $env:VEYLON_CAPTURE_TAG='m18-refuge-survival-2'
+.\gradlew.bat run -PveylonDataDir=build/qa/m18-refuge-survival-2 --console=plain
+```
+
+The runs used the same variables from Git Bash, each in a QA directory checked
+not to exist beforehand. The Creative twin used `creative` and the tag and
+directory `m18-refuge-creative-2`. Seed `20260731` gives these legs (from the
+`plan` and `staged-pose` lines):
+
+| Leg | Cells | Played |
+| --- | --- | --- |
+| The flat, 10:00 | apartment `urban:building:0,0:40:0` (intact, three storeys) beside the starter refuge; street pose (75, 41, 62); first-floor bed (65, 45, 65), slept in at (66, 45, 65); cupboard (65, 45, 66) | W with mouse look through the street door (F) and up the stairs; left Control and F on the bed; F on the cupboard, the transfers through the screen's command, Esc |
+| Salvage and crafting | basins (65, 45, 68) and (65, 45, 74), cabinets (65, 45, 70) and (65, 45, 75), tables (65, 45, 73) and (65, 45, 77) | W to each; left Control and the left button held until it comes apart; C, the screen's craft command for a brace and three barricades, C |
+| Defences | street leaves (75, 41, 64) braced and (76, 41, 64) barred; rear leaves (83, 41, 80) and (84, 41, 80) barred; hall cells (75, 41, 66) and (75, 41, 68) | F to close the leaf left open; the right button with the brace; left Control and F on each other leaf; back to the bed |
+| Threats | one Breacher, then one Veilbound, staged at (75, 41, 60) on the street | pacing the hall with W; the spear when the Breacher came through; the right button with two barricades on the broken doorway; the right button on the hall floor and the left button held, crouched, to take that barricade down |
+| Night | the bed at 23:15 | F; sleeping until the waking |
+| Save | the bed | F5, F9 |
+| Camp, 09:00 | camp `urban:building:0,0:53:0`; yard pose before its rear door; bed (190, 41, 79) | W through the rear door; left Control and F on the bed |
+
+Both final runs printed `[urban-refuge] pass=true` with 2 staged poses and 17
+captures, full health, in 132 (Survival) and 106 (Creative) route seconds.
+The Survival `deeds` line: six pieces taken apart for 12 planks and 6 scrap; a
+door brace and three plank barricades made, leaving a plank and a scrap; the
+brace taking the first blow 4 seconds after the Breacher was staged (75/90);
+the door giving way at 15 seconds, the refuge then counting "1 way in open";
+the Breacher put down at the breach (75, 41, 63), the player at 100 health;
+the breach boarded up with two barricades at 60/60; the hall barricade taken
+down for 2 planks; the Veilbound hearing the hall at once and kept out, at
+(75, 41, 63); the night starting "You settle down to sleep comfortably." and
+"Your refuge is shut tight." at 23:15 with the Veilbound outside; and a quiet
+"You wake after 2.0 hours. Fatigue 0." at 01:17. The Veilbound, still about,
+was taken out before F5 (`unstaged-infected veilbound at 75, 41, 63`; in
+Creative also the Breacher, never having heard the builder). After F9 the
+claims (the starter ground floor at minute 480 and the flat at 612.4), home,
+the storage's four berries and waterskin (searched), the six salvaged pieces'
+air, both barricades at 60, the barred leaf and the rear leaves matched the
+`before-save` line. Creative: salvage gave no materials (the staged ones were
+used), the Breacher never hunted the builder and the brace stayed at 90, crouch
+and F locked the leaves, the hall barricade came down for nothing, and the
+night, save and camp went as in Survival. Each log reports `glGetError=0`, 20
+KHR messages with 0 errors (the usual MEDIUM pixel-transfer notes) and
+`nativeErrors=0`; Gradle exited 0 after 2 min 19 s (Survival) and 1 min 49 s
+(Creative). The boot logs read 122 of 160 texture layers and 131 of 131 item
+icons.
+
+The `views` lines read the crouched bed "[F] Rest here  (crouch: claim these
+rooms as a refuge, 2 of 3)  ·  hold LMB for 4 fiber, 1 plank, 1 scrap metal";
+"District / Reclaimed Residential / Your refuge"
+after the claim; "Your refuge's storage | Searched"; "[F] Rain collector:
+0.0/3.0 L  ·  hold LMB for 2 scrap metal" while taking the first basin apart;
+"[F] Take down the brace and lift the bar (brace 90/90)  ·  crouch and hold
+LMB to take it apart"; "[F] Sleep in your refuge  (shut tight; crouch: give it
+up)"; and at the camp "[F] Rest here  (these rooms are the camp's: claiming
+them would be taking what is theirs)  ·  hold LMB for 4 fiber, 1 plank, 1 scrap
+metal".
+
+Inspected captures, from the final Survival run unless noted:
+
+- `01`: the camp bed in the flat's bedroom, the HUD "Your refuge", the prompt
+  "Sleep in your refuge  (4 ways in open; crouch: give it up)" and "You claim
+  the first-floor flat as a refuge…" in the log. `02`: the cupboard's screen,
+  "Your refuge's storage | Searched", the berries and waterskin in it beside
+  what it held.
+- `03`: a basin half taken apart, the progress bar and "Rain collector:
+  0.0/3.0 L · hold LMB for 2 scrap metal" whole on the one line. `04`: where the
+  last table stood, the log listing each piece and what it gave, 12 planks and
+  6 scrap on the hotbar. `05`: the crafting screen and "Crafted 1 x Door Brace",
+  "Crafted 1 x Plank Barricade" three times.
+- `06`: the braced street leaf, "Take down the brace and lift the bar (brace
+  90/90)", the other leaf still open. `07`: the bed, "shut tight", and the four
+  bars in the log.
+- `08`: the braced leaf from the hall, "(brace 75/90)", and "Something hammers
+  at a door nearby." `09`: the Breacher fallen in the broken doorway, "A brace
+  splinters behind a door.", "A door gives way with a crash." and "The Breacher
+  collapses." `10`: the doorway boarded up, "Plank Barricade (60/60) · hold LMB
+  for 2 planks", "You barricade the broken doorway." twice.
+- `11`: a barricade standing in the hall. `12`: the hall clear again, "You take
+  apart the plank barricade: 2 p…". `13`: the boarded doorway still at 60/60
+  from inside, the Veilbound beyond it.
+- `14`: "Sleeping… (Esc to wake)" over "Your refuge is shut tight." `15`: the
+  bedroom at 01:18 after the fade, "You wake after 2.0 hours." `16`: the same
+  after "Game loaded.", still shut tight.
+- `17`: the camp's bed, the HUD "Survivor camp", "Survivors hold this
+  building: three peo…" and "These rooms are the camp's: claiming…".
+- Creative: `08` and `10` show the braced leaf, "Already braced" with the
+  brace kept in hand, and "The door is now locked." for the other leaves; `04`
+  shows the staged planks and scrap untouched by salvage.
+
+The first native runs, on the tour before its last fixes
+(`qa-m18-refuge-survival.log`, `qa-m18-refuge-creative.log`, 2026-10-23):
+Survival passed with the same outcomes, but its captures showed the salvage
+hint behind an F action cut off ("hold LMB to take apart the b…"), capture `08`
+looking down the hall instead of at the hammered door, and `15` still dark with
+the sleep fade. Creative failed at the hall barricade, "the barricade never
+went up at 75, 41, 68: AIR": on native frame times the pacing had ended with
+the player standing on that cell. `ed8999d` shortens the hint, and the tour now
+walks to the near hall cell before both board-up steps, faces the door for
+`08`, waits for the fade before `15`, and keeps walks inside the shut refuge
+from chasing a threat outside. The final runs above passed on that code.
+
+Observations, none a tour failure:
+
+- An "Ashfall" event darkened the sky from 11:52; the tour pins clear weather
+  only where it stages the clock, and the event is presentation here.
+- The Veilbound noticed at once because the Breacher's last noises were still
+  fresh; it then stood at the boarded doorway and lost the trail once the hall
+  was quiet.
+- A fresh survivor wakes rested after two hours, so the night ends at 01:17;
+  a tired one sleeps to morning (`UrbanRefugeNightTest`).
+
+### Commands and portable builds
+
+All Gradle commands used the bundled Temurin 25.0.4.1+1
+(`build/tools/jdk25/jdk-25.0.4.1+1`) and the Windows wrapper from Git Bash. Logs
+are local ignored artifacts under `build/`.
+
+- Throwaway probes surveyed the starter superblock's apartments, the salvage
+  wear of the flat's furniture and the survivor buildings near the spawn
+  (`m18-probe.log`, `m18-probe2.log`, `probe.log`) and were deleted.
+- Focused runs while building each step (`m18-c1-focus*.log`,
+  `m18-c2-salvage.log`, `m18-c3-*.log`, `m18-c4-*.log`, `m18-c5-*.log`), then the
+  tour while it was written (`tour.log`, the last of several runs: the claim
+  prompt carried the bed's salvage hint; a Creative container spills what it
+  held, as every broken container does; the salvage aim was read before it
+  settled; the brace was asked for again after it was used; and the first
+  save refused the two staged bodies, which are no encounter records) and the
+  last focused check of salvage, fortification, claims and the tour
+  (`focused.log`: 10, 9, 10 and 3 passed).
+- Each commit's exact-tree check, in commit order: `m18-c1-build.log` to
+  `m18-c5-build.log`, `m18-c5b-build.log`, `m18-c5c-build.log` and
+  `m18-c6-build.log` (the table above).
+- The final code is `f084ff6`'s tree. Its exact-tree build passed in 13 min 18 s:
+  2,126 tests in 248 classes, zero failures or errors and the existing
+  Windows symlink-privilege skip in `AppPathsTest` (`m18-c6-build.log`).
+- Native runs: `qa-m18-refuge-survival.log` and `qa-m18-refuge-creative.log`
+  (first, see above), then `qa-m18-refuge-survival-2.log` and
+  `qa-m18-refuge-creative-2.log` (final).
+- `graphify update . --no-cluster` once on the final code: 10,464 nodes and
+  42,720 edges, with the existing `build.gradle` extractor warning
+  (`m18-graph-update.log`). No clustering or semantic extraction ran.
+
+### Limits and next gate
+
+- The tour stages poses between legs, a forward-only clock, the weather, two
+  infected and a kit (and in Creative the materials), and uses the container
+  and crafting screens' own commands; it is scripted evidence, not the human
+  playtest deferred by D-80. Whether a refuge feels safe, salvage worth its
+  noise and the threats fair was checked by script, logs and captures, not
+  judged by a person.
+- The native tour does not hammer a barricade, repair, hang a door, glaze a
+  window, salvage a wreck or draw a body to an open refuge; those rest on the
+  headless tests above.
+- Balance values are initial values for 23. Map presentation is 21 and refuge
+  ambience 22; utilities are 19.
+- No reviewer subagents ran. The commits rest on their exact-tree builds, the
+  native tours and the inspected captures.
+
+Next: package 19.
