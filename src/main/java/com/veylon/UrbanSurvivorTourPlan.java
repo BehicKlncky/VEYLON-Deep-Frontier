@@ -42,6 +42,11 @@ record UrbanSurvivorTourPlan(Camp camp, Refuge refuge, Vec3i away) {
         return new UrbanSurvivorTourPlan(camp(world, camp), refuge(world, refuge), away(world, camp, refuge));
     }
 
+    /** The camp nearest the spawn and its way in, for a later tour that calls there (milestone 18). */
+    static Camp nearestCamp(World world) {
+        return camp(world, nearest(world, world.urban.spawnColumn(), SurvivorSites.Kind.CAMP));
+    }
+
     private static SurvivorSites.Site nearest(World world, int[] spawn, SurvivorSites.Kind kind) {
         SurvivorSites.Site best = null;
         int rx0 = StreetNetwork.regionOf(spawn[0]), rz0 = StreetNetwork.regionOf(spawn[1]);

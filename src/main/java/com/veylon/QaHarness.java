@@ -773,7 +773,7 @@ final class QaHarness {
                 updateUiCycle(0);
             }
             case "creative_flight" -> game.creativeQa.stageFlightScene();
-            case "urban_streets", "urban_intersection", "urban_seam_walk", "urban_fixtures",
+            case "urban_streets", "urban_intersection", "urban_seam_walk", "urban_fixtures", "urban_refuge",
                  "urban_fixtures_night", "urban_apartments", "urban_apartments_night", "urban_underground", "urban_ecology",
                  "urban_apartments_manual", "urban_apartments_manual_night", "urban_slice", "urban_districts",
                  "urban_apartments_lit_night", "urban_loot", "urban_starter_manual", "urban_catalogue", "urban_strongholds",

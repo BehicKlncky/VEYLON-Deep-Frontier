@@ -56,6 +56,11 @@ final class UrbanQaScenes {
      * gate and a raider yard avoided ({@code urban_strongholds}).
      */
     private final UrbanStrongholdQaScene strongholds;
+    /**
+     * Package 18: a flat claimed, stocked, salvaged and fortified, a Breacher at its door, a
+     * Veilbound outside, a night inside and a camp's bed refused ({@code urban_refuge}).
+     */
+    private final UrbanRefugeQaScene refuge;
     private final PlayerMovementSystem.Command walk = new PlayerMovementSystem.Command();
     private boolean holding;
     private float holdX;
@@ -94,6 +99,7 @@ final class UrbanQaScenes {
         this.ecology = new UrbanEcologyQaScene(game);
         this.survivors = new UrbanSurvivorQaScene(game);
         this.strongholds = new UrbanStrongholdQaScene(game);
+        this.refuge = new UrbanRefugeQaScene(game);
     }
 
     /** Stages one of the urban scenes; inert, with a notice, outside a street-network world. */
@@ -134,6 +140,10 @@ final class UrbanQaScenes {
         }
         if (scene.equals("urban_strongholds")) {
             strongholds.stage(); // a normal session: poses between legs, the clock (forward), one infected and the kit are staged
+            return;
+        }
+        if (scene.equals("urban_refuge")) {
+            refuge.stage(); // a normal session: poses between legs, the clock (forward), two infected and the kit are staged
             return;
         }
         if (!world.isUrban() || !world.urban.hasCityPlan()) {
@@ -230,6 +240,7 @@ final class UrbanQaScenes {
     UrbanEcologyQaScene ecology() { return ecology; }
     UrbanSurvivorQaScene survivors() { return survivors; }
     UrbanStrongholdQaScene strongholds() { return strongholds; }
+    UrbanRefugeQaScene refuge() { return refuge; }
 
     /** Per-frame hook, before streaming and rendering; inert unless a scene is staged. */
     void update(double elapsed) {
@@ -255,6 +266,7 @@ final class UrbanQaScenes {
         ecology.update(elapsed);
         survivors.update(elapsed);
         strongholds.update(elapsed);
+        refuge.update(elapsed);
         if (holding) {
             apply();
         }

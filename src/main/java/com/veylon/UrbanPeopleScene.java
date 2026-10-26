@@ -329,7 +329,7 @@ abstract class UrbanPeopleScene extends UrbanRouteScene {
                 pressed = true;
                 return false;
             }
-            if (!loggedSince(mark, "Game saved.")) { throw fail("quick-save failed"); }
+            if (!loggedSince(mark, "Game saved.")) { throw fail("quick-save failed: " + loggedAfter(mark)); }
             return true;
         }
 
