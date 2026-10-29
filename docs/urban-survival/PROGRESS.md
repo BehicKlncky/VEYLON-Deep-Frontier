@@ -6,10 +6,10 @@ This is the running record for the 26-package urban-survival roadmap. The pack i
 
 | Item | Value |
 | --- | --- |
-| Last completed package | **19 — Water, power and refuge utilities** (2026-10-29): generator 18 gives a building's taps only the stale water left in its pipes, and a generator rebuilt from salvage, fuelled from the tanks of cars that did not burn, lights its building's work lamps and runs a water purifier that pumps and treats that water, all kept by `urban.utilities` v1. The final portable build on the tour commit's code and the native tour in both modes passed the same day. Human-only checks are deferred by D-80. |
-| Source revision | 19: `7258c34` taps → `d4c5d7b` power → `4c93639` purifier → `640bf67` sustainability check → `def0278` utility tour; records `ef29fe8` and the gate's closing record. 18: `c771b14` … `f084ff6`. |
-| Default new world | Legacy (`World.DEFAULT_NEW_WORLD_GENERATOR = GEN_CAVE_IDENTITIES`), unchanged until 26 passes. Isolated `VEYLON_GENERATOR=urban-dev` creates generator 18 (`GEN_URBAN_UTILITIES`, layout 15 / template 7 / content 3, encounter catalogue 5). Generators 1–17 stay loadable with their original geometry and encounters. |
-| Next package | **20 — Urban missions and long-term purpose, IN PROGRESS** (started 2026-10-29). Keep `UrbanSliceRouteTest` (generators 10–18), `UrbanCatalogueQaSceneTest`, `UrbanDistrictQaSceneTest`, `UrbanUndergroundQaSceneTest`, `UrbanEcologyQaSceneTest`, `UrbanSurvivorQaSceneTest`, `UrbanStrongholdQaSceneTest`, `UrbanRefugeQaSceneTest` and `UrbanUtilityQaSceneTest` as regression gates. Owner question P-15 (the inverted day/night temperature curve) is open. |
+| Last completed package | **20 — Urban missions and long-term purpose** (2026-10-30): generator 19 plans one old relay mast on a precinct roof; survivors speak of it, its three parts lie in two independent kinds of source each, friends share its codes, and the parts fitted and a radio workstation on the refuge's generator carry a call until the city answers once, on the existing ending card, from which the player carries on. Camps and strongholds give five kinds of mission on real objects, rewarded once and failing for good, four in hand, all kept by `urban.missions` v1. The acceptance route reaches the answer from the city alone, and the native tour passed in both modes. Human-only checks are deferred by D-80. |
+| Source revision | 20: `ff1edff` 19's gate → `71cf2ca` relay → `6d5a317` communications → `cc874ac` missions → `3888a28` acceptance route → `b8967b8` mission tour; the records follow in their own commit. 19: `7258c34` taps → `d4c5d7b` power → `4c93639` purifier → `640bf67` sustainability check → `def0278` utility tour; records `ef29fe8` and the gate's closing record. |
+| Default new world | Legacy (`World.DEFAULT_NEW_WORLD_GENERATOR = GEN_CAVE_IDENTITIES`), unchanged until 26 passes. Isolated `VEYLON_GENERATOR=urban-dev` creates generator 19 (`GEN_URBAN_MISSIONS`, layout 16 / template 7 / content 3, encounter catalogue 5). Generators 1–18 stay loadable with their original geometry and encounters. |
+| Next package | **21 — Map, HUD and onboarding, NOT STARTED.** Keep `UrbanSliceRouteTest` (generators 10–19), `UrbanCatalogueQaSceneTest`, `UrbanDistrictQaSceneTest`, `UrbanUndergroundQaSceneTest`, `UrbanEcologyQaSceneTest`, `UrbanSurvivorQaSceneTest`, `UrbanStrongholdQaSceneTest`, `UrbanRefugeQaSceneTest`, `UrbanUtilityQaSceneTest`, `UrbanMissionRouteTest` and `UrbanMissionQaSceneTest` as regression gates. Owner question P-15 (the inverted day/night temperature curve) is open. |
 | Human testing schedule | Owner instruction (2026-10-11, D-80): consolidated human playtesting/listening after milestone 22. Through 22, run automated and scripted native validation and record human-only checks as deferred; do not request interim human walks. |
 | Commits | Separate `feat`, `test`, `docs` and `chore` commits on `feature/urban-survival`; see the reconstruction ledger below. `main` stays at `923345f`. Original combined commit retained at `backup/urban-m01-m04-before-split`. No merge, push, tag or publication. |
 
@@ -38,7 +38,7 @@ The status vocabulary is NOT STARTED, IN PROGRESS, PARTIAL, BLOCKED or COMPLETE.
 | 17 | Guarded strongholds and hostile factions | 16 | `SettlementManager` guards, reputation, theft and counterattacks; urban faction ids | Approach, access rules, entry, trade and exploration. Guards react fairly. A hostile site with an alternative route. State persists without duplicate guards or infinite counterattacks. | **COMPLETE** (2026-10-23; human-only validation deferred by D-80) |
 | 18 | Safehouses, salvage and fortification | 17, 07, 04 | New `RefugeSystem`, `urban.refuges`; salvage in `PlayerBlockActions`; barricades; `SleepSystem` safety | Claim, store, dismantle, barricade from salvage and sleep. Threats attack or route around defences. Claims, salvage and defences persist. Survivor property has consequences. | **COMPLETE** (2026-10-27; human-only validation deferred by D-80) |
 | 19 | Water, power and refuge utilities | 18 | `world/urban/UrbanUtilities` (taps, devices, circuits), `UtilitySystem` (owned by `RefugeSystem`, one medium-tick line in `Game`), `urban.utilities` v1; `World.emitterOn` and `Chunk` light lists for lamps; `SalvageTable` (fuel tanks, devices); `UtilitySounds` | One water utility and one power source and consumer run from urban supplies, conserve resources, persist, follow the pause and dormancy policy and respect Creative. | **COMPLETE** (2026-10-29; human-only validation deferred by D-80) |
-| 20 | Urban missions and long-term purpose | 19, 16–17, 02 | New `UrbanMissions`, `CommsObjective`, `urban.missions`; `ai/Quest`, `ai/FactionSystem` model; `ui/QuestObjectiveView`; victory flow | An integration route advances C1–C5 without trees or ore. A hidden-refuge mission and a guarded-access mission. Failure alternatives. Rewards exactly once. The legacy beacon is intact. | NOT STARTED |
+| 20 | Urban missions and long-term purpose | 19, 16–17, 02 | `world/urban/{RelaySites,CommsComponents,UrbanMissions}`, `settlement/{UrbanComms,UrbanMissionBoard}`, `CommsObjective` (owned by `RefugeSystem`), `urban.missions` v1, a fourth `UrbanUtilities` device kind, hooks in the storage, aid, guide and purifier paths, `NpcScreen`, `Hud`, `QuestObjectiveView` and the victory flow | An integration route advances C1–C5 without trees or ore. A hidden-refuge mission and a guarded-access mission. Failure alternatives. Rewards exactly once. The legacy beacon is intact. | **COMPLETE** (2026-10-30; human-only validation deferred by D-80) |
 | 21 | Map, HUD and onboarding | 20 | `ui/MapScreen` plan layer, `ui/Hud`, `InteractPromptBuilder`, `ui/NewFrontierScreen`, `ui/PauseMenu` | A new player finds supplies, floors, the refuge and the next step through ordinary UI. Secrets stay secret. `docs/graphics/HUD_VALIDATION.md` captures. | NOT STARTED |
 | 22 | Ruined-city visuals and sound | 21 | Materials, lighting (D-19), `AmbienceSystem`, `AudioSceneState`, `engine/ReverbPresets`, `engine/AudioManager` | Districts, sites and threats are recognisable in day, night and fog. Props, lights and audio stay bounded. Dry fallback works. A manual listening pass. | NOT STARTED |
 | 23 | Survival economy and extended play | 22 | Loot tables, recipes, trade stock, encounter pressure; balance record in DESIGN | One route reaches the objective plus several days without trees or ore. Other seeds have reachability. Conservation holds. Fresh extended play recorded. | NOT STARTED |
@@ -2710,6 +2710,201 @@ top of `def0278`, so the code is the tour commit's):
 **Next:** package 20, urban missions and long-term purpose: the communications
 chain and its radio workstation on the refuge circuit, and a modest mission
 catalogue, under a new generator.
+
+## Milestone 20 — urban missions and long-term purpose (2026-10-29 to 2026-10-30)
+
+**Status: COMPLETE.** Generator 19 gives the city a long-term goal and its
+survivors work to offer. One old relay mast stands on a precinct roof. Its
+rumour comes from anyone of a camp, a stronghold or a hidden refuge; its three
+parts lie in two independent kinds of source each across the districts; a
+friendly stronghold or trusting hidden civilians share its codes, which only
+shorten the call; the parts are fitted at its cabinet and a radio workstation,
+built round the transmitter module, goes on the refuge's own wiring. On the
+generator's power the radio carries a call, a real noise every three seconds,
+until the city answers once: the survivors the player knows trust them more and
+the existing ending card shows, from which Enter or Escape carries on in the
+same world. Beside the chain, camps and strongholds give five kinds of mission,
+each naming a real object, counting only the deed itself on that object,
+rewarded once and failing explicitly and for good; the journal holds four. A
+fixed route reaches the city's answer from the city's own stores, people and
+wrecks with no tree or ore, through a mission that visits a hidden refuge and
+one through a stronghold's guarded stores, and a save and a load repeat
+nothing. The native tour passes in both modes. Human-only validation remains
+deferred by D-80. Decisions D-197–D-208; P-01 and P-07 carry package-20 notes;
+P-15 is still open.
+
+### Start state
+
+- Branch `feature/urban-survival` at `ef29fe8` (the 19 records), clean tree.
+  Package 19's gate was closed first (`ff1edff`, above).
+- Read the revised base, the prompt, `AGENTS.md`, `docs/COMMIT_WORKFLOW.md` and
+  these records. The work and its commits ran on 2026-10-29 and 2026-10-30.
+
+### Missions and behaviour
+
+- **Generator 19 (D-197).** Layout 16 is layout 15 plus one relay mast; every
+  generator-18 rule holds in it. `urban-dev` now creates it.
+- **The relay (D-198).** Planned from the seed and the frozen plans: the civic
+  region nearest the spawn, the roof of its tallest unheld office block outside
+  every compound (else a school, security post or clinic), an open roof cell near
+  the stair door. An unbreakable cabinet under a three-cell guard-rail mast.
+- **C1 and C3, the rumour and the codes (D-200).** "[9] Ask about the old radio
+  relay" names a district and a compass direction, never the building; standing
+  beside the relay finds it too. A friendly stronghold, or hidden civilians who
+  trust the player 30 or more, share the codes; without them the call takes 240
+  seconds instead of 60. Later answers point at the parts still missing.
+- **C2, the parts (D-199).** A transmitter module (security posts' armoury
+  lockers; every stronghold's stores), power cells (warehouse tool chests; clinic
+  utility lockers) and antenna cable (office utility lockers; roof maintenance
+  lockers), each in the first roll of its container, never put back.
+- **C4, the repair and the radio (D-201).** The use button at the cabinet fits
+  each part (a pry tool in the pack in Survival); a radio workstation, built at a
+  workbench from the module, a spare part and two scrap, is a fourth device kind
+  on its building's wiring and a load while on.
+- **C5, the call and the answer (D-202).** Switched on and fed in a building the
+  player holds, with the relay repaired, the radio counts the generator's running
+  seconds and is a player-attributed noise of 32 blocks every three seconds
+  (nobody hears Creative). When the call is long enough the city answers once,
+  known friendly camps and strongholds trust the player 10 more, and the existing
+  ending card shows with urban text. The audit of `AppState.VICTORY`: the card
+  pauses the simulation, Enter continued and Escape went to the title; in a city
+  Escape continues too, and a load never shows the card again. The legacy beacon
+  is unchanged.
+- **Missions (D-203–D-206).** "[0] Ask if they need help": a camp gives, in turn,
+  medicine from a named clinic, help for the hidden people near it, news of the
+  relay and clean water for its own building; a stronghold offers its module (six
+  supplies, or taken by a friend). Evidence is only the deed on the named object
+  after accepting; reports pay trust once and the clinic's two medicines go into
+  the camp's stash. Failures (givers dead, gone or hostile; stores or container
+  destroyed; the hidden people dead or betrayed; the module stolen) are logged
+  once and final. Four in hand, 256 records; the HUD and map show the first in
+  hand before the objective.
+- **Saves (D-207).** `urban.missions` v1, required for generator 19: the
+  objective's facts and every record, cross-checked; anything else fails the
+  load.
+- **QA (D-208).** `VEYLON_SCENE=urban_missions` plays the chain and three
+  missions with ordinary controls in both modes.
+- **Found while writing the tour.** Aiming at the relay cabinet's centre from its
+  stand cell hits the mast's bottom rail, so the tour aims at the cabinet's face
+  toward the stand, as a player would. The tour first put the radio down out of reach and now reuses the utility tour's
+  generator and lamp cells, and its report first left the native run open; it
+  now closes it like the other tours.
+
+### Changed paths
+
+**Production** (`src/main/java/com/veylon/`):
+
+- New: `world/urban/{RelaySites,CommsComponents,UrbanMissions}.java`,
+  `settlement/{UrbanComms,UrbanMissionBoard}.java`, `CommsObjective.java`,
+  `save/UrbanMissionsSection.java`, `UrbanMissionQaScene.java`,
+  `UrbanMissionTourPlan.java`.
+- Edited: `world/{World,BlockType}.java`,
+  `world/urban/{UrbanRevision,UrbanWorldState,UrbanSalts,UrbanContainers,UrbanUtilities,SalvageTable}.java`,
+  `item/{ItemType,UrbanCrafting,CraftingSystem,CreativePalette}.java`,
+  `gfx/{MaterialRegistry,UrbanTextures,IconAtlas}.java`,
+  `save/{SaveSystem,V3ExtensionSections,UrbanUtilitiesSection}.java`,
+  `settlement/{UrbanSiteDialogue,UrbanSiteRelations,UrbanSiteRelocation}.java`,
+  `ui/{Hud,NpcScreen,QuestObjectiveView,PresentationOverlay}.java`,
+  `qa/RuntimeBudgetSnapshot.java`,
+  `{Game,RefugeSystem,UtilitySystem,WorldInteractions,InteractPromptBuilder,
+  PlayerBlockActions,CrateTransactionSystem,UrbanQaScenes}.java`, `QaHarness.java`
+  (one label on an existing line).
+
+**Tests** (`src/test/java/com/veylon/`):
+
+- New: `world/urban/RelaySitesTest`, `UrbanCommsTest`, `UrbanBroadcastTest`,
+  `UrbanMissionsTest`, `save/UrbanMissionsSectionTest`, `UrbanMissionRouteTest`,
+  `UrbanMissionQaSceneTest`.
+- Edited: `world/WorldGeneratorFingerprintTest`, `world/UrbanGeneratorDispatchTest`,
+  `world/urban/UrbanRevisionTest`, `UrbanDevelopmentSelectorTest`,
+  `UrbanSliceRouteTest`, `qa/SerializedEnumOrderTest`, `qa/RuntimeBoundsTest`.
+
+**Records:** this file, [DESIGN.md](DESIGN.md) (§3.3, §10, §12, §13),
+[DECISIONS.md](DECISIONS.md) (D-197–D-208, §3, P-01, P-07),
+[VALIDATION.md](VALIDATION.md#milestone-20--urban-missions-and-long-term-purpose-2026-10-29-to-2026-10-30),
+`docs/ARCHITECTURE.md` and `docs/DEVELOPING.md`.
+
+### Compatibility
+
+- Generators 1–18 are unchanged: their absolute pins pass, and none of them has a
+  relay, parts in its containers, missions or `urban.missions`. A radio is refused
+  in a generator-18 city, and the relay is not in the Creative palette.
+- New: generator 19, layout 16, the blocks `RELAY` and `RADIO` (ids 95–96), the
+  items Transmitter Module, Power Cells, Antenna Cable and Radio Workstation
+  (appended), the section `urban.missions` v1 (required for, and accepted only
+  with, generator 19), radio rows in `urban.utilities` v1 (generator 19 only) and
+  four texture layers (130 of 160). Every enum was appended; no ordinal moved. No
+  audio buffer was added: the radio and the fitting reuse existing cues.
+- Unchanged: the v3 base, every other section id and version, content revision
+  3, template 7, encounter catalogue 5, the legacy beacon quest and its card, and
+  the default new world (generator 3).
+- An older build rejects a generator-19 save before replacing its live world; no
+  older binary was run, and there is no downgrade promise.
+
+### Commands and results
+
+Exact commands and outputs are in
+[VALIDATION.md](VALIDATION.md#milestone-20--urban-missions-and-long-term-purpose-2026-10-29-to-2026-10-30).
+In short:
+
+- Every code commit was validated with the full portable build on its exact
+  tree in the isolated worktree `build/m14-check`, with no failures and the
+  existing Windows skip: `71cf2ca` and `6d5a317` (VALIDATION has their counts),
+  `cc874ac` 2,200 tests in 260 classes, `3888a28` 2,201 in 261 and `b8967b8` 2,204 in 262.
+- Native `urban_missions` on seed `20260731` passed in Survival and Creative, 15
+  captures each, with zero GL, KHR and native-audio errors.
+- `graphify update . --no-cluster` on the final code: 11,169 nodes and 46,334
+  edges, with an extractor warning for `settings.gradle`.
+- No reviewer subagents ran.
+
+The commits:
+
+| Commit | Subject |
+| --- | --- |
+| `ff1edff` | `docs(urban): close package 19's gate with the final build and native tours` |
+| `71cf2ca` | `feat(urban): raise a relay mast on a precinct roof under generator 19` |
+| `6d5a317` | `feat(comms): restore a city's communications through its old relay mast` |
+| `cc874ac` | `feat(missions): give camp and stronghold missions on real city objects` |
+| `3888a28` | `test(missions): restore a city's comms from its own stores, people and wrecks` |
+| `b8967b8` | `feat(qa): tour the missions and the relay until the city answers` |
+
+These records follow in their own commit. No push, merge, tag or publication
+was performed.
+
+### Limitations and next concrete step
+
+- **Evidence types.** The tour stages poses between legs (into the Wardens'
+  stores too), a forward-only clock, the weather and a kit (food to share, a pry
+  tool, salvage for the bench and a fuel can) and builds through the crafting
+  screen's command; the route test gathers everything in the city but stages
+  poses and puts down infected that come near. Neither is the human playtest D-80
+  defers until after 22: whether the missions feel worth their walk, the relay
+  worth its climb and the ending worth the wait was checked by script, logs and
+  captures, not judged by a person.
+- **Tour coverage.** The tour reports two missions and leaves the clinic's open;
+  the clinic's medicine, the camp's water, the Wardens' price, every failure, the
+  band scan without codes, the refuge's codes, a broadcast cut by a power loss
+  and the save rules rest on the headless tests (`UrbanMissionsTest`,
+  `UrbanCommsTest`, `UrbanBroadcastTest`, `UrbanMissionsSectionTest`).
+- **Navigation.** A hidden refuge's mission points the map at the building above
+  it; the panel must still be found, and whether that says too much is for 21's
+  onboarding review.
+- **Infiltration.** Stealing the module from the Wardens' stores is the existing
+  intrusion and theft; no separate tunnel or roof route to it is planned.
+- **One relay.** A world plans exactly one; the call needs it repaired.
+- **Text.** Giving supplies to a stronghold logs "The camp takes in your
+  supplies.", a package-16 line package 17 did not adjust; left for 21's text and
+  HUD pass.
+- **Balance for 23.** Prices, rewards, broadcast seconds, noise and part
+  placement are initial values.
+- **Presentation.** The relay and radio have their first tiles and reuse
+  existing cues; a radio's own sound and the city's answer as audio are 22.
+- **Day/night temperature (P-15).** Still inverted in every world; unchanged.
+- **Default.** The ordinary new world stays generator 3 until 26.
+
+**Next:** package 21, map, HUD and onboarding: a new player finds supplies,
+floors, the refuge and the next step (now including the relay, the parts and
+the missions) through ordinary UI, with secrets kept secret.
 
 ## Resume rules
 

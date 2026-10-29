@@ -279,7 +279,7 @@ supported version and rejects the rest, including anything above
 `MAX_SUPPORTED_GENERATOR`, before it replaces the live world. Feature gates name
 their versions (`hasDeepFrontier`, `hasCaveIdentities`, `isUrbanGenerator`) instead
 of comparing with `>=`, so a new generator inherits nothing by accident, and
-`WorldGeneratorFingerprintTest` pins versions 1–18 absolutely. `ShapedStairGenerationTest`
+`WorldGeneratorFingerprintTest` pins versions 1–19 absolutely. `ShapedStairGenerationTest`
 checks version 8 against frozen version 7 outside stair cells and across chunk orders.
 
 An urban world's layout revision follows from its generator, so it is known
@@ -287,22 +287,23 @@ before bootstrap generates a chunk; a geometry change means a new generator
 version, never a change under an old one (`UrbanRevision`). Its content revision
 (the rolled loot, encounter and trade tables) is saved in `urban.meta`, which
 only urban worlds write. It is optional for older layouts and required for
-generators 9–18. Until that section, or its
+generators 9–19. Until that section, or its
 absent default, has been read, a loading world's content revision cannot be read
 at all. Fresh worlds use content revision 3; revisions 1 and 2 remain supported.
 Revision 1 is the absent-metadata default. The tables and their hash inputs are frozen
-under each revision. Generators 9–18 require content 3. Encounter catalogues are
+under each revision. Generators 9–19 require content 3. Encounter catalogues are
 additive and versioned separately in `urban.population` (1 for generator 10, 2 for
-11, 3 for 12, 4 for 13, 5 for 14–18, which write codec 2); they do not reroll
-content-3 loot or add encounters to older generators. Generators 13–18 also write
+11, 3 for 12, 4 for 13, 5 for 14–19, which write codec 2); they do not reroll
+content-3 loot or add encounters to older generators. Generators 13–19 also write
 `urban.discovery` v1 (a count capped at 4,096,
 then ascending observed site ids, each checked against the plan); absence means
-nothing found. Generators 15–18 also require `urban.sites` v1, their survivor
-sites and people, generators 16–18 `urban.compounds` v1, what their compounds
-remember, generators 17 and 18 `urban.refuges` v2, their claimed refuges, and
-`urban.fortifications` v1, their damaged barricades and braces, and generator 18
-`urban.utilities` v1, its taps' ledger and devices. Compatibility
-directions:
+nothing found. Generators 15–19 also require `urban.sites` v1, their survivor
+sites and people, generators 16–19 `urban.compounds` v1, what their compounds
+remember, generators 17–19 `urban.refuges` v2, their claimed refuges, and
+`urban.fortifications` v1, their damaged barricades and braces, generators 18 and 19
+`urban.utilities` v1, their taps' ledger and devices, and generator 19
+`urban.missions` v1, what its survivor learned and did toward the city's
+communications. Compatibility directions:
 
 - this build, a legacy save: unchanged, and no urban state is created;
 - this build, an urban save: the same geometry through its generator, the content
@@ -618,7 +619,7 @@ Scripted urban QA routes extend `UrbanRouteScene`: a task queue played through t
 production input seam, mouse-look turns, bounded walking that opens doors with F,
 threat handling, forcing and captures. `urban_slice`, `urban_catalogue`,
 `urban_districts`, `urban_underground`, `urban_ecology`, `urban_survivors`,
-`urban_strongholds`, `urban_refuge` and `urban_utilities` use it; the last four extend
+`urban_strongholds`, `urban_refuge`, `urban_utilities` and `urban_missions` use it; the last five extend
 `UrbanPeopleScene`, which adds the staged clock and poses, walking up to someone and
 talking, conversation choices through the screen's command, a trade and F5 and F9.
 
@@ -673,7 +674,7 @@ claimed storey's windows) and its light from the live world. `SleepSystem` asks
 `RefugeSystem.settleForNight` once as sleep begins, which may send the nearest real
 infected to an open way and sets the minute it wakes the sleeper, and
 `RefugeSystem.keepsOut` lets a refuge shut tight keep out a body beyond its walls.
-`urban.refuges` v2 holds the claims and home for generators 17 and 18; generators 9–16
+`urban.refuges` v2 holds the claims and home for generators 17–19; generators 9–16
 keep version 1.
 
 ### Refuge utilities
@@ -719,11 +720,54 @@ world's side: pure plan queries and the persistent ledger.
   can, and takes devices apart for most of their parts and a generator's whole cans;
   device blocks have no drop, so nothing carries one away whole.
 
-`urban.utilities` v1, required for generator 18 and rejected elsewhere, holds the tap
-ledger and the devices in placement order, validated against the block edits and the
+`urban.utilities` v1, required for generators 18 and 19 and rejected elsewhere (a
+radio row only for generator 19), holds the tap ledger and the devices in placement order, validated against the block edits and the
 plans once every other section is in (`UrbanUtilitiesSection.finishLoad` rejects a
 generator-18 save without it). The noise and sound timers and the pump's part-litre
 are transient.
+
+### Missions and the communications objective
+
+Generator 19 plans layout 16: layout 15 plus one relay mast, with the rules below gated
+on `UrbanWorldState.hasMissions()` (`hasUtilities()` and every earlier predicate also
+hold for it). The world's side is pure plans and one ledger:
+
+- **The relay and the parts.** `RelaySites` plans the one relay from the seed and the
+  frozen plans (a roof cell, a stand cell beside it and a three-cell guard-rail mast),
+  cached once per world on `UrbanWorldState.relay()`; its stamp writes only inside
+  the chunk being generated. `CommsComponents` names the containers whose first roll
+  holds a part, and `UrbanContainers.touch` adds the part to that roll only.
+- **The ledger.** `UrbanMissions`, on `UrbanWorldState`, keeps the objective's facts
+  (`Comms`: rumoured, found, parts recovered and fitted, codes, radio built, seconds
+  broadcast, complete) and the mission records, at most 256, four in hand. The stage a
+  player sees is derived from the facts, never stored.
+
+The game side reaches the ledger through the seams the screens and tests share:
+
+- **`UrbanComms`** (settlement) answers "[9] Ask about the old radio relay", shares
+  the codes, counts parts taken into the pack, finds the relay in the refuge
+  system's medium tick once the survivor's own body stands beside it in a loaded
+  column, and gives the HUD line and the map target of the objective's next step.
+- **`UrbanMissionBoard`** (settlement) answers "[0]": offers, accepts, reports and the
+  Wardens' price. Evidence arrives through hooks on the deed itself:
+  `CrateTransactionSystem` after a storage-screen transfer, `UrbanSiteRelations.aided`,
+  `UrbanSiteRelocation.guide`, `UtilitySystem` as a purifier treats water, and the
+  survivor's own position on the relay roof in its medium tick, which also checks
+  failures. Its journal line and target feed `Hud` and `QuestObjectiveView` before
+  the objective's.
+- **`CommsObjective`**, owned by `RefugeSystem` beside `UtilitySystem` and reset with
+  it, fits parts at the relay (`WorldInteractions.rightClick` asks it first), gives the
+  relay's and the radio's prompts, and in the refuge system's medium tick, the one
+  line in `Game.mediumTick`, counts the broadcast, emits the radio's player-attributed
+  `WorldNoise` and completes the objective once, which sets `AppState.VICTORY`. The
+  radio itself is the fourth `UrbanUtilities` device kind, so power, load and wiring
+  are `UtilitySystem`'s. On the ending card `Game` returns to play on Enter, and in a
+  city on Escape too; the legacy beacon's card keeps Escape for the title.
+
+`urban.missions` v1, required for generator 19 and rejected elsewhere, holds the facts
+and the records, validated against the plans and each other
+(`UrbanMissionsSection.finishLoad` rejects a generator-19 save without it). The noise
+timer and the once-per-tick broadcast guard are transient.
 
 ### Doors, windows and urban fixtures
 

@@ -3132,3 +3132,174 @@ VEYLON_GENERATOR=urban-dev VEYLON_SEED=20260731 VEYLON_GAME_MODE=survival VEYLON
 - No reviewer subagents ran.
 
 Next: package 20.
+
+## Milestone 20 — urban missions and long-term purpose (2026-10-29 to 2026-10-30)
+
+### Scope and baseline
+
+- Branch `feature/urban-survival` at `ef29fe8` (the 19 records), clean tree.
+  Package 19's gate was closed first (`ff1edff`). Read the revised base, the
+  prompt, `AGENTS.md`, `docs/COMMIT_WORKFLOW.md` and these records.
+- Generator 19 (layout 16, template 7, content 3, encounter catalogue 5) is new,
+  with two appended blocks (`RELAY`, `RADIO`, ids 95–96), four appended items
+  (Transmitter Module, Power Cells, Antenna Cable, Radio Workstation), four
+  texture layers (130 of 160), no audio buffer, the section `urban.missions` v1
+  and radio rows in `urban.utilities` v1 for generator 19 only. No existing
+  ordinal, persisted id or other section version changed, and no earlier
+  generator's behaviour. The default new world is unchanged.
+- Generators 1–18 keep their absolute pins. Generator 19 was pinned at
+  introduction on three seeds: its terrain, wreck, site and compound plans and
+  the stamped chunks under the nearest wreck equal the pins generators 17 and 18
+  share, and the relay's plan and the stamped chunk holding its cabinet have
+  their own (D-197).
+
+### Behaviour, persistence and mission evidence
+
+Every commit was validated in the detached worktree `build/m14-check`, checked
+out at the commit before it and given exactly the staged diff, whose tree was
+compared with the main index (`git write-tree`) before the build and committed
+unchanged after it.
+
+| Commit | Checks on the exact tree | What they prove |
+| --- | --- | --- |
+| `71cf2ca` | Full portable build: 2,174 tests in 256 classes, one existing skip (`m20-c1-build.log`) | `RelaySitesTest` (4): every design seed has one relay on an unheld precinct roof, stamped in any chunk order with its roof still walkable, none before generator 19, and a cabinet that cannot be broken, blasted, burnt or taken from the palette; the fingerprint, dispatch, revision, selector, enum-order and slice tests extended to generator 19. |
+| `6d5a317` | Full portable build: 2,190 tests in 259 classes, one existing skip (`m20-c2-build.log`) | `UrbanCommsTest` (6): the rumour names a district, never the building; only the survivor's body at the relay finds it; each part in the first roll of its real sources and recovered when taken; a stronghold's module in a restricted stash; codes only from a friendly stronghold or trusting civilians; nothing in earlier cities. `UrbanBroadcastTest` (4): fitting takes a pry tool and the parts (Creative spends nothing); a powered radio in the refuge carries the call, heard (by nobody in Creative), kept through a power cut, and the city answers once, a save and load changing nothing; without codes four times as long, and nothing out unrepaired or away from a refuge; no radio wired in earlier cities. `UrbanMissionsSectionTest` (the facts' round trip and rejections). `BeaconEndgameIntegrationTest` unchanged. |
+| `cc874ac` | Full portable build: 2,200 tests in 260 classes, one existing skip (`m20-c3-build.log`) | `UrbanMissionsTest` (8): a camp's missions in turn, each naming a real object once; clinic medicine only from the named clinic after accepting, paid once; the hidden people's mission visiting their refuge; the Wardens' module by price or friendship and a theft failing it; failures explicit and final; the landmark only by the body on the roof; camp water only on the camp's wiring; no missions in earlier cities. `UrbanMissionsSectionTest` (every mission field, malformed rows failing the whole load). `RuntimeBoundsTest` (four in hand, records capped at 256). |
+| `3888a28` | Full portable build: 2,201 tests in 261 classes, one existing skip (`m20-c4-build.log`) | `UrbanMissionRouteTest` (1): on seed `20260731` the objective from rumour to the city's answer through the city's own containers, wrecks and furniture, its people and the relay, with no log, coal, ore, sulfur or saltpeter in the pack; the hidden refuge behind its panel and the Wardens' restricted stores; four missions completed and rewarded once across a save and load, no second ending. |
+| `b8967b8` | Full portable build: 2,204 tests in 262 classes, one existing skip (`m20-c5-build.log`); before it `UrbanMissionQaSceneTest` on the same code (`m20-tour-test-2.log`): Survival and Creative pass, 15 captures each, about 118 and 128 simulated seconds; generator 18 refused | The scripted tour below, headless, with the ending card's Escape answered as `Game.frame` does. |
+
+### Native mission tour, both modes
+
+GPU and driver from the run's `[gl]` line: NVIDIA GeForce RTX 3060 Ti, driver
+610.88, OpenGL 3.3.0 with KHR_debug; 1280 × 720.
+
+```bash
+export VEYLON_GENERATOR=urban-dev VEYLON_SEED=20260731 VEYLON_GAME_MODE=survival
+export VEYLON_SCENE=urban_missions VEYLON_RESOLUTION=1280x720 VEYLON_CAPTURE_TAG=m20-missions-survival-3
+./gradlew.bat run -PveylonDataDir=build/qa/m20-missions-survival-3 --console=plain
+```
+
+Each QA directory was checked not to exist beforehand. Seed `20260731` gives
+these places (from the `plan` line): the camp `urban:building:0,0:53:0` met at
+(177, 41, 93); the stronghold `urban:building:1,2:112:0`, its gate street (416,
+41, 702) and its module in the stash at (386, 41, 749) worked from (387, 41, 749);
+the power cells' tool chest at (7, 41, −269); the antenna cable's utility locker
+at (−31, 37, −13); the relay on `urban:building:1,2:49:0`, its cabinet at (427,
+61, 583) and stand at (428, 61, 583); in the starter refuge
+`urban:building:0,0:44:0` the bench at (73, 41, 82), the generator at (79, 41,
+94) put down from (78, 41, 92) and the radio at (76, 41, 88) from (76, 41, 90).
+The camp's mission named the hidden refuge whose basement hall is at (42, 37, 45).
+
+First run (`qa-m20-missions-survival.log`, tag `m20-missions-survival`): every
+leg passed and the scene printed `[urban-missions] pass=true` with 15 captures,
+each `glErrors=0 khrErrors=0`, but its report did not ask the harness to close,
+so the session stayed open and was stopped; it has no shutdown summary. The
+report now calls `finishScriptedRun()` like the other tours.
+
+Second runs, with that call: Survival (`m20-missions-survival-2`) and Creative
+(`VEYLON_GAME_MODE=creative`, `m20-missions-creative`) both passed with the
+results below (117 and 127 route seconds, Gradle exit 0 after 2 min 13 s and
+2 min 19 s). Two helpers of the tour were then tidied without changing what it
+does (an unused mode check removed, the gatekeeper lookup rewritten), so both
+runs were repeated on the tour commit's exact code.
+
+Final runs (2026-10-30, the tour commit's exact code): Survival
+(`m20-missions-survival-3`) and Creative (`m20-missions-creative-2`), both from
+the main checkout. Survival printed `[urban-missions] pass=true` with 10 staged
+poses, 15 captures and full health in 117 route seconds; every capture reports
+`glErrors=0 khrErrors=0`, the log `glGetError=0`, 18 KHR messages with 0 errors
+(the usual MEDIUM pixel-transfer notes) and `nativeErrors=0`; Gradle exited 0
+after 2 min 7 s (`qa-m20-missions-survival-3.log`). Creative printed `pass=true` with 10 poses, 15 captures and full health
+in 127 route seconds, the same error-free summaries (18 KHR messages, 0 errors)
+and exit 0 after 2 min 23 s (`qa-m20-missions-creative-2.log`); its
+`before-save` and `state` lines match, the city answering at game minute 778.40.
+
+The Survival `deeds` line: the rumour ("There's an old relay mast on a rooftop in
+the Civic Precinct south of here…"); the three missions (the Northlight Clinic &
+Pharmacy to the east, people under the street to the west, the mast); the hidden
+civilians reached past a neighbour and given six supplies ("Thank you. Thank you.
+This buys us days."), the mission ready; the ward a friend after three handovers
+(trust 54), its codes ("The ward kept the relay's codes…") and its module offered
+for six supplies or as a friend, taken from (386, 41, 749) and reported ("Use the
+module well. The ward doesn't give twice."); the cells from (7, 41, −269) and the
+cable from (−31, 37, −13); the relay found (the mast's mission ready); the
+generator and radio built and put down at (79, 41, 94) and (76, 41, 88); the call
+on the Wardens' codes for 60 seconds of generator time, the city answering at
+game minute 763.21; the camp's reports ("You found them…", "It still stands?…").
+The `before-save` and final `state` lines match: rumoured, found, all three parts
+recovered, both fitted, codes from the stronghold, the radio built, 60.00 seconds
+broadcast, complete; the clinic's mission active, the hidden people's, the
+mast's and the Wardens' completed and rewarded.
+
+Inspected captures, all fifteen across the three Survival runs, which show the
+same frames: `01` Teodor of the camp
+with "[9] Ask about the old radio relay" and "[0] Ask if they need help", the
+rumour and "Comms / recover the relay's parts: 0 of 3", the map line "Rumoured
+relay - 585m S"; `02` "Missions 3/4 / Medicine from the clinic" and the three
+logged missions, the navigation line on the clinic; `03` the slid panel and the
+hidden people at the end of the cellar passage; `04` Fenna of the hidden refuge,
+"You give 6 supplies to the hidden refuge.", "Mission ready: The people below.";
+`05` Gideon, "Guarded stronghold (friends)", trust 54, the codes; `06` the
+Wardens' kitchen cupboard, "Stronghold stores: shared with you as a friend |
+Searched", the module on the hotbar, "Mission ready: The Wardens' transmitter";
+`07`–`08` the tool chest and utility locker with their parts; `09` the relay's
+cabinet under its mast, "Relay mast: needs antenna cable and power cells",
+"Mission ready: The old relay mast"; `10` "Relay mast: repaired, listening for a
+radio" and "Comms / build a radio workstation at a workbench"; `11` the radio in
+the refuge's kitchen, "Comms / broadcasting: 5 of 60 s"; `12` the ending card,
+"THE CITY ANSWERS", "Enter or Esc: continue surviving"; `13` the same room after
+Escape, "Comms / restored: the city answered", "Word of your call reaches 2 of
+the survivors' holds you know"; `14` Teodor's "It still stands? Then maybe it can
+still talk.", "Missions 1/4"; `15` the same after "Game loaded.". From Creative (its first and final runs): `06` the Wardens' cupboard shared as
+with a friend, `11` the parts, generator and fuel can still on the hotbar
+(Creative keeps what it holds) and no salvage hint on the radio, `12` the card
+marked "Creative world", `13` the radio after Escape, and `15` the same state
+after the load.
+An Ashfall event darkened the sky from 11:52 in Survival; it is presentation
+here.
+
+### Commands and portable builds
+
+The JDK is the repository-local Temurin 25.0.4.1 in `build/tools/jdk25`:
+
+```bash
+export JAVA_HOME="$PWD/build/tools/jdk25/jdk-25.0.4.1+1" PATH="$JAVA_HOME/bin:$PATH"
+# Each commit: its staged diff applied with `git apply --index` in build/m14-check, trees compared, then
+(cd build/m14-check && ./gradlew.bat build --console=plain) > build/m20-c1-build.log 2>&1   # c2–c5 likewise
+./gradlew.bat test --tests "com.veylon.UrbanMissionRouteTest" -i --console=plain > build/m20-route.log 2>&1
+./gradlew.bat test --tests "com.veylon.UrbanMissionQaSceneTest" -i --console=plain > build/m20-tour-test-2.log 2>&1
+VEYLON_GENERATOR=urban-dev VEYLON_SEED=20260731 VEYLON_GAME_MODE=survival VEYLON_SCENE=urban_missions \
+  VEYLON_RESOLUTION=1280x720 VEYLON_CAPTURE_TAG=m20-missions-survival-3 \
+  ./gradlew.bat run -PveylonDataDir=build/qa/m20-missions-survival-3 --console=plain > build/qa-m20-missions-survival-3.log 2>&1
+# Creative likewise with VEYLON_GAME_MODE=creative and the tag and directory m20-missions-creative-2;
+# the earlier runs used the tags m20-missions-survival, m20-missions-survival-2 and m20-missions-creative.
+graphify update . --no-cluster > build/m20-graphify.log 2>&1
+```
+
+- Focused classes while iterating: `RelaySitesTest`, `UrbanCommsTest`,
+  `UrbanBroadcastTest`, `UrbanMissionsTest`, `UrbanMissionsSectionTest`,
+  `UrbanUtilitiesSectionTest`, `UrbanPowerTest`, `UrbanPurifierTest`,
+  `BeaconEndgameIntegrationTest`, `RuntimeBoundsTest`, `SerializedEnumOrderTest`,
+  `UrbanMaterialsTest` (130 of 160 layers), `WorldGeneratorFingerprintTest`, the
+  dispatch, revision and selector tests, `UrbanMissionRouteTest` and
+  `UrbanMissionQaSceneTest`.
+- The portable builds above, each `BUILD SUCCESSFUL` with no failures.
+- `graphify update . --no-cluster` on the final code: 11,169 nodes and 46,334
+  edges, with an extractor warning for `settings.gradle` (`m20-graphify.log`). No clustering or semantic extraction ran.
+
+### Limits and next gate
+
+- The gate is met: every code commit's portable build, the acceptance route and
+  the native tour in both modes passed. Package 20 is COMPLETE.
+- The tour stages poses between legs, a forward-only clock, the weather and a
+  kit, and builds through the crafting screen's command; the route stages poses
+  and puts down infected that come near. Both are scripted evidence, not the
+  human playtest deferred by D-80.
+- The tour reports two missions; the clinic's medicine, the camp's water, the
+  Wardens' price, failures, the band scan, the refuge's codes and a power cut
+  rest on the headless tests above.
+- Balance values are initial values for 23; a radio's own sound and the answer
+  as audio are 22; the map and onboarding for the objective are 21.
+- No reviewer subagents ran.
+
+Next: package 21.
