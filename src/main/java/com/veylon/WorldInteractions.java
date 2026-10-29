@@ -441,14 +441,25 @@ final class WorldInteractions {
             game.log("Filled a waterskin with untreated water. Boil it at a campfire.");
             return;
         }
+        drinkUntreated(null);
+    }
+
+    /**
+     * Drinking untreated water where it stands: open water, or a layout-fifteen tap (urban milestone
+     * 19). It quenches as much either way and risks the same sickness.
+     *
+     * @param what what was drunk, for the log, or null for open water's own words
+     */
+    void drinkUntreated(String what) {
         game.player.thirst = Math.min(MAX_NEED, game.player.thirst + WATER_THIRST);
         game.audio.playDrink();
         if (!game.player.abilities.invulnerable() && rng.nextFloat() < WATER_POISON_CHANCE) {
             game.player.addAffliction(Affliction.FOOD_POISONING,
                     PlayerConsumables.rollPoisonDuration(rng));
-            game.log("You drank dirty water and feel ill...");
+            game.log(what == null ? "You drank dirty water and feel ill..." : "You drank " + what + " and feel ill...");
         } else {
-            game.log("You drink from the water (+" + (int) WATER_THIRST + " thirst).");
+            game.log((what == null ? "You drink from the water" : "You drink " + what)
+                    + " (+" + (int) WATER_THIRST + " thirst).");
         }
     }
 
@@ -676,6 +687,10 @@ final class WorldInteractions {
     }
 
     private void collectorInteract(Vec3i pos) {
+        // Layout fifteen: a planned basin is a tap on its building's pipes, not a rain collector.
+        if (game.refuges.utilities.tap(pos)) {
+            return;
+        }
         float liters = game.world.collectorWater.getOrDefault(pos, 0f);
         if (liters >= COLLECTOR_LITRES_PER_USE
                 && game.player.inventory.count(ItemType.WATERSKIN_EMPTY) > 0) {

@@ -488,6 +488,39 @@ class RuntimeBoundsTest {
     }
 
     @Test
+    void theTapLedgerStopsAtItsCapAndAFullOneRunsNoNewBuildingsTaps() {
+        com.veylon.Game game = com.veylon.UtilityWorldArena.session(com.veylon.entity.GameMode.SURVIVAL);
+        var u = game.world.urban.utilities;
+        int cap = com.veylon.world.urban.UrbanUtilities.MAX_TAPPED;
+        java.util.Map<Long, Integer> rows = new java.util.HashMap<>();
+        for (int i = 0; i < cap; i++) { rows.put(farBuilding(i), 1); }
+        u.restore(rows);
+        var neighbour = com.veylon.RefugeWorldArena.neighbour(game);
+        var tap = com.veylon.UtilityWorldArena.basins(neighbour).getFirst();
+        game.player.inventory.clear();
+        com.veylon.UtilityWorldArena.giveEmptySkins(game, 1);
+        com.veylon.SurvivorWorldArena.standAt(game, tap.target());
+        com.veylon.SurvivorWorldArena.pressF(game, tap.position());
+        assertEquals(1, game.player.inventory.count(com.veylon.item.ItemType.WATERSKIN_EMPTY),
+                "a building the full ledger cannot remember gives no water rather than growing it");
+        assertEquals(0, u.drawn(neighbour.id()));
+        RuntimeBudgetSnapshot full = RuntimeBudgetSnapshot.capture(game);
+        assertEquals(cap, full.tappedBuildings());
+        assertTrue(full.withinHardLimits(), full.occupancySummary());
+        assertTrue(RuntimeBudgetSnapshot.hardLimitSummary().contains("tapped=" + cap));
+        assertThrows(IllegalArgumentException.class, () -> {
+            rows.put(farBuilding(cap), 1);
+            u.restore(rows);
+        });
+    }
+
+    /** A building id in a far region, distinct for every index; no plan is ever built for it. */
+    private static long farBuilding(int i) {
+        long district = com.veylon.world.urban.UrbanIds.district(10_000 + i / 100, 10_000);
+        return com.veylon.world.urban.UrbanIds.building(com.veylon.world.urban.UrbanIds.parcel(district, i % 100), 0);
+    }
+
+    @Test
     void survivorSiteRecordsStopAtTheirCap() {
         Game game = com.veylon.SurvivorWorldArena.session(com.veylon.SurvivorWorldArena.SEED,
                 com.veylon.entity.GameMode.SURVIVAL);

@@ -47,7 +47,8 @@ class UrbanGeneratorDispatchTest {
         assertEquals(15, World.GEN_URBAN_SURVIVORS, "survivor camps and hidden civilians (milestone 16)");
         assertEquals(16, World.GEN_URBAN_STRONGHOLDS, "guarded strongholds and a raider yard (milestone 17)");
         assertEquals(17, World.GEN_URBAN_REFUGES, "safehouses, salvage and fortification (milestone 18)");
-        assertEquals(World.GEN_URBAN_REFUGES, World.MAX_SUPPORTED_GENERATOR);
+        assertEquals(18, World.GEN_URBAN_UTILITIES, "water, power and refuge utilities (milestone 19)");
+        assertEquals(World.GEN_URBAN_UTILITIES, World.MAX_SUPPORTED_GENERATOR);
         for (int version = -1; version <= World.MAX_SUPPORTED_GENERATOR + 2; version++) {
             boolean known = version >= World.GEN_LEGACY && version <= World.MAX_SUPPORTED_GENERATOR;
             assertEquals(known, World.isSupportedGenerator(version), "supported " + version);
@@ -57,7 +58,8 @@ class UrbanGeneratorDispatchTest {
                             || version == World.GEN_URBAN_ENCOUNTERS || version == World.GEN_URBAN_CIVIC
                             || version == World.GEN_URBAN_DISTRICTS || version == World.GEN_URBAN_UNDERGROUND
                             || version == World.GEN_URBAN_ECOLOGY || version == World.GEN_URBAN_SURVIVORS
-                            || version == World.GEN_URBAN_STRONGHOLDS || version == World.GEN_URBAN_REFUGES,
+                            || version == World.GEN_URBAN_STRONGHOLDS || version == World.GEN_URBAN_REFUGES
+                            || version == World.GEN_URBAN_UTILITIES,
                     World.isUrbanGenerator(version), "urban " + version);
             assertEquals(version == World.GEN_DEEP || version == World.GEN_CAVE_IDENTITIES,
                     World.hasDeepFrontier(version), "deep frontier " + version);

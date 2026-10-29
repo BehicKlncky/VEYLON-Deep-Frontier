@@ -48,14 +48,18 @@ final class RefugeSystem {
     private final Game game;
     private long pendingGiveUp = UrbanIds.NONE;
     private double pendingUntil;
+    /** The water and power of a layout-fifteen city's refuges (urban milestone 19). */
+    final UtilitySystem utilities;
 
     RefugeSystem(Game game) {
         this.game = game;
+        this.utilities = new UtilitySystem(game, this);
     }
 
     void reset() {
         pendingGiveUp = UrbanIds.NONE;
         pendingUntil = 0;
+        utilities.reset();
     }
 
     static boolean applies(World w) {
@@ -116,9 +120,10 @@ final class RefugeSystem {
 
     /**
      * Whose rooms these are, as the reason a claim is refused, or null when nobody living holds
-     * them. Reads registered sites only: one never met still has all its people.
+     * them. Reads registered sites only: one never met still has all its people. A building's taps
+     * on a storey survivors hold are theirs too ({@link UtilitySystem}).
      */
-    private String heldBy(BuildingPlan b, BuildingPlan.Floor floor) {
+    String heldBy(BuildingPlan b, BuildingPlan.Floor floor) {
         SurvivorSites.Site plan = SurvivorSites.owner(game.world.urban, b.id());
         boolean held = b.variant() == BuildingPlan.Variant.OCCUPIED && (b.family().walkUp() || floor.index() <= 0);
         if (plan != null && plan.kind().compound()) { held = true; }

@@ -102,10 +102,16 @@ public class World implements VoxelAccess {
      * rules of claimed refuges, salvage and fortification.
      */
     public static final int GEN_URBAN_REFUGES = 17;
+    /**
+     * Layout 15 (urban milestone 19): generator 17's city exactly, every block, plan and id, under
+     * the rules of refuge utilities as well: taps that hold only the stale water left in their
+     * building's pipes, and generators, work lamps and water purifiers built from salvage.
+     */
+    public static final int GEN_URBAN_UTILITIES = 18;
     /** The generator of every ordinary new world; generator 3 until the urban rollout. */
     public static final int DEFAULT_NEW_WORLD_GENERATOR = GEN_CAVE_IDENTITIES;
     /** The highest generator version a save may name; a load rejects anything above it. */
-    public static final int MAX_SUPPORTED_GENERATOR = GEN_URBAN_REFUGES;
+    public static final int MAX_SUPPORTED_GENERATOR = GEN_URBAN_UTILITIES;
 
     public final long seed;
     /** Persisted in save v3; legacy (v2) saves always load as {@link #GEN_LEGACY}. */
@@ -208,7 +214,8 @@ public class World implements VoxelAccess {
                 || version == GEN_URBAN_ENCOUNTERS || version == GEN_URBAN_CIVIC
                 || version == GEN_URBAN_DISTRICTS || version == GEN_URBAN_UNDERGROUND
                 || version == GEN_URBAN_ECOLOGY || version == GEN_URBAN_SURVIVORS
-                || version == GEN_URBAN_STRONGHOLDS || version == GEN_URBAN_REFUGES;
+                || version == GEN_URBAN_STRONGHOLDS || version == GEN_URBAN_REFUGES
+                || version == GEN_URBAN_UTILITIES;
     }
 
     /** Generators 2 and 3: deep caves, underground POIs, cave mouths and settlements. */

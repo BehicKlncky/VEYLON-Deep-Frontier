@@ -402,8 +402,8 @@ class WorldGeneratorFingerprintTest {
         List<String> moved = new ArrayList<>();
         for (int i = 0; i < SEEDS.length; i++) {
             long terrain = terrainFingerprint(SEEDS[i], World.GEN_URBAN_REFUGES);
-            long vehicles = vehicleFingerprint(SEEDS[i]);
-            long chunks = vehicleChunkFingerprint(SEEDS[i]);
+            long vehicles = vehicleFingerprint(SEEDS[i], World.GEN_URBAN_REFUGES);
+            long chunks = vehicleChunkFingerprint(SEEDS[i], World.GEN_URBAN_REFUGES);
             if (terrain != URBAN_ECOLOGY_TERRAIN_FINGERPRINTS[i] || vehicles != URBAN_VEHICLE_FINGERPRINTS[i]
                     || chunks != URBAN_VEHICLE_CHUNK_FINGERPRINTS[i]) {
                 moved.add(String.format("seed %d: terrain 0x%016xL, vehicles 0x%016xL, chunks 0x%016xL",
@@ -414,9 +414,31 @@ class WorldGeneratorFingerprintTest {
                 + "re-recording:\n  " + String.join("\n  ", moved));
     }
 
+    /**
+     * Generator 18 (milestone 19), recorded 2026-10-29 at introduction: refuge utilities are rules
+     * over generator 17's city, so its terrain, wrecks, sites, compounds and the stamped chunks under
+     * the nearest wreck are generator 17's pins exactly.
+     */
+    @Test
+    void theUtilityCityIsTheRefugeCityExactly() {
+        List<String> moved = new ArrayList<>();
+        for (int i = 0; i < SEEDS.length; i++) {
+            long terrain = terrainFingerprint(SEEDS[i], World.GEN_URBAN_UTILITIES);
+            long vehicles = vehicleFingerprint(SEEDS[i], World.GEN_URBAN_UTILITIES);
+            long chunks = vehicleChunkFingerprint(SEEDS[i], World.GEN_URBAN_UTILITIES);
+            if (terrain != URBAN_ECOLOGY_TERRAIN_FINGERPRINTS[i] || vehicles != URBAN_VEHICLE_FINGERPRINTS[i]
+                    || chunks != URBAN_VEHICLE_CHUNK_FINGERPRINTS[i]) {
+                moved.add(String.format("seed %d: terrain 0x%016xL, vehicles 0x%016xL, chunks 0x%016xL",
+                        SEEDS[i], terrain, vehicles, chunks));
+            }
+        }
+        assertTrue(moved.isEmpty(), () -> "generator 18 left generator 17's city; add a generator version "
+                + "instead of re-recording:\n  " + String.join("\n  ", moved));
+    }
+
     /** Every wreck within three regions of the spawn, and the compounds and sites planned beside them. */
-    private static long vehicleFingerprint(long seed) {
-        World world = new World(seed, World.GEN_URBAN_REFUGES);
+    private static long vehicleFingerprint(long seed, int generator) {
+        World world = new World(seed, generator);
         long hash = 0xcbf29ce484222325L;
         for (int rz = -3; rz <= 3; rz++) {
             for (int rx = -3; rx <= 3; rx++) {
@@ -430,8 +452,8 @@ class WorldGeneratorFingerprintTest {
     }
 
     /** The stamped chunks under the wreck nearest the spawn. */
-    private static long vehicleChunkFingerprint(long seed) {
-        World world = new World(seed, World.GEN_URBAN_REFUGES);
+    private static long vehicleChunkFingerprint(long seed, int generator) {
+        World world = new World(seed, generator);
         com.veylon.world.urban.VehicleSites.Wreck nearest = null;
         for (int rz = -1; rz <= 1; rz++) {
             for (int rx = -1; rx <= 1; rx++) {

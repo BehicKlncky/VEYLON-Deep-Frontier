@@ -81,6 +81,8 @@ public final class UrbanWorldState {
     public final UrbanFortifications fortifications = new UrbanFortifications();
     /** Layout fourteen: the storeys the survivor has claimed as refuges, and home (milestone 18). */
     public final UrbanRefuges refuges = new UrbanRefuges();
+    /** Layout fifteen: the water drawn from each building's taps (milestone 19). */
+    public final UrbanUtilities utilities = new UrbanUtilities();
     /**
      * The starter refuge and its ground-floor respawn anchor (milestone 08). In layout fourteen it
      * is the fallback respawn behind the claimed refuges, and its ground floor is the first claim.
@@ -159,9 +161,15 @@ public final class UrbanWorldState {
     public boolean hasStrongholds() { return layoutRevision == UrbanRevision.LAYOUT_STRONGHOLDS || hasRefuges(); }
     /**
      * Layout fourteen (milestone 18): the burnt-out cars of the local streets, and the rules of
-     * claimed refuges, salvage and fortification.
+     * claimed refuges, salvage and fortification; and layout fifteen, which keeps them exactly.
      */
-    public boolean hasRefuges() { return layoutRevision == UrbanRevision.LAYOUT_REFUGES; }
+    public boolean hasRefuges() { return layoutRevision == UrbanRevision.LAYOUT_REFUGES || hasUtilities(); }
+    /**
+     * Layout fifteen (milestone 19): layout fourteen's city under the rules of refuge utilities, a
+     * building's taps holding only the stale water left in its pipes, and generators, work lamps
+     * and water purifiers built from salvage.
+     */
+    public boolean hasUtilities() { return layoutRevision == UrbanRevision.LAYOUT_UTILITIES; }
 
     public boolean contentRevisionResolved() {
         return contentRevision != UNRESOLVED;

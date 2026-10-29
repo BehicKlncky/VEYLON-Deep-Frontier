@@ -46,7 +46,10 @@ class UrbanRevisionTest {
         assertEquals(UrbanRevision.LAYOUT_REFUGES, UrbanRevision.layoutRevisionOf(World.GEN_URBAN_REFUGES));
         assertEquals(UrbanRevision.BUILDING_TEMPLATE_ROUTES,
                 UrbanRevision.buildingTemplateRevisionOf(World.GEN_URBAN_REFUGES), "layout fourteen keeps template seven");
-        assertEquals(World.GEN_URBAN_REFUGES, UrbanRevision.DEVELOPMENT_GENERATOR,
+        assertEquals(UrbanRevision.LAYOUT_UTILITIES, UrbanRevision.layoutRevisionOf(World.GEN_URBAN_UTILITIES));
+        assertEquals(UrbanRevision.BUILDING_TEMPLATE_ROUTES,
+                UrbanRevision.buildingTemplateRevisionOf(World.GEN_URBAN_UTILITIES), "layout fifteen keeps template seven");
+        assertEquals(World.GEN_URBAN_UTILITIES, UrbanRevision.DEVELOPMENT_GENERATOR,
                 "the development selector builds the newest layout (decision D-35)");
         for (int notUrban : new int[]{0, World.GEN_LEGACY, World.GEN_DEEP,
                 World.GEN_CAVE_IDENTITIES, World.MAX_SUPPORTED_GENERATOR + 1}) {

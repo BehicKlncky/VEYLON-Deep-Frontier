@@ -142,6 +142,21 @@ class UrbanSliceRouteTest {
         }
     }
 
+    /**
+     * Generator 18 (milestone 19) keeps generator 17's city exactly under the rules of refuge
+     * utilities, whose taps hold only their building's stale water. The development selector now
+     * creates it; the loop must still hold.
+     */
+    @Test
+    void theSliceLoopStillCompletesOnTheUtilityGenerator() {
+        for (long seed : SLICE_SEEDS) {
+            UrbanSliceRun run = new UrbanSliceRun(seed, GameMode.SURVIVAL, World.GEN_URBAN_UTILITIES).play();
+            assertTrue(run.slice().passed(), "seed=" + seed);
+            assertEquals(World.GEN_URBAN_UTILITIES, run.game.world.generatorVersion);
+            assertTrue(run.game.player.inventory.count(ItemType.IRON_SPEAR) >= 1, "the first upgrade seed=" + seed);
+        }
+    }
+
     @Test
     void frozenSeedsPlayTheScavengeRiskReturnLoopInSurvivalAndCreative() {
         for (GameMode mode : GameMode.values()) {

@@ -220,9 +220,11 @@ final class InteractPromptBuilder {
             case DRYING_RACK -> game.interactPrompt = rackPrompt(
                     new Vec3i(targetX, targetY, targetZ));
             case RAIN_COLLECTOR -> {
+                // Layout fifteen: a planned basin is a tap on its building's pipes (milestone 19).
+                String tap = game.refuges.utilities.tapPrompt(new Vec3i(targetX, targetY, targetZ));
                 float liters = world.collectorWater.getOrDefault(
                         new Vec3i(targetX, targetY, targetZ), 0f);
-                game.interactPrompt = "[F] Rain collector: " + String.format("%.1f", liters)
+                game.interactPrompt = tap != null ? tap : "[F] Rain collector: " + String.format("%.1f", liters)
                         + "/" + String.format("%.1f", COLLECTOR_CAPACITY_L) + " L"
                         + (liters >= 1f ? " (fill waterskin)" : "");
             }

@@ -104,6 +104,9 @@ final class V3ExtensionSections {
             if (UrbanFortificationsSection.manages(g)) {
                 sections.add(new V3Section(UrbanFortificationsSection.ID, UrbanFortificationsSection.write(g)));
             }
+            if (UrbanUtilitiesSection.manages(g)) {
+                sections.add(new V3Section(UrbanUtilitiesSection.ID, UrbanUtilitiesSection.write(g)));
+            }
             if (UrbanDiscoverySection.present(g)) {
                 sections.add(new V3Section(UrbanDiscoverySection.ID, UrbanDiscoverySection.write(g)));
             }
@@ -311,6 +314,7 @@ final class V3ExtensionSections {
         byte[] sites = null;
         byte[] compounds = null;
         byte[] fortifications = null;
+        byte[] utilities = null;
         for (int i = 0; i < sectionCount; i++) {
             String id = in.readUTF();
             if (id.isBlank() || !seen.add(id)) {
@@ -365,6 +369,8 @@ final class V3ExtensionSections {
                 compounds = payload;
             } else if (UrbanFortificationsSection.ID.equals(id)) {
                 fortifications = payload;
+            } else if (UrbanUtilitiesSection.ID.equals(id)) {
+                utilities = payload;
             } else if (UrbanPopulationSection.ID.equals(id)) {
                 population = payload;
             }
@@ -380,6 +386,8 @@ final class V3ExtensionSections {
         if (compounds != null) { UrbanCompoundsSection.read(compounds, g); }
         // Braces stand behind doors whose bars world.fixtures restored, wherever it appeared.
         if (fortifications != null) { UrbanFortificationsSection.read(fortifications, g); }
+        // Taps and devices are checked against the block edits and plans, which are all in by now.
+        if (utilities != null) { UrbanUtilitiesSection.read(utilities, g); }
         if (restoredLanterns) {
             g.world.refreshLoadedLights();
         }
