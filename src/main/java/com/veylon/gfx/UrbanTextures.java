@@ -67,6 +67,8 @@ final class UrbanTextures {
             case "generator_top" -> generator(p, true);
             case "purifier_side" -> purifier(p, false);
             case "purifier_top" -> purifier(p, true);
+            case "relay_side" -> relay(p, false);
+            case "relay_top" -> relay(p, true);
             default -> {
                 return false;
             }
@@ -835,6 +837,43 @@ final class UrbanTextures {
         p.box(0, 0, n - 1, n - 1, Math.max(1, n / 16), 0x5a6064);
         p.fillFbmBlend(0x6a5a40, 0.75f, 5, 1913, 0.2f);
         p.grain(0.04f);
+    }
+
+    /**
+     * The cabinet of the old relay mast (milestone 20): weathered steel with rain streaks, a louvred
+     * vent, a cable gland and a row of dead indicator lamps on its face, and a bolted lid with the
+     * mast's foot plate on top. Its one accent is the faded signal-amber of the lamps.
+     */
+    private static void relay(Painter p, boolean top) {
+        int n = p.size, rim = Math.max(1, n / 16);
+        p.fillFbm(0x5c6468, 0.08f, 6, 1921);
+        if (top) {
+            p.box(n / 4, n / 4, n - 1 - n / 4, n - 1 - n / 4, Math.max(1, n / 18), 0x3a4044); // the foot plate
+            p.blob(n / 2, n / 2, Math.max(1, n / 9), 0x2c3236);
+            for (int[] b : new int[][]{{n / 6, n / 6}, {n - n / 6, n / 6}, {n / 6, n - n / 6}, {n - n / 6, n - n / 6}}) {
+                p.dot(b[0], b[1], 0x9a9c96);
+            }
+        } else {
+            int louvre = Math.max(1, n / 16);
+            for (int y = n / 6; y < n / 2; y++) {
+                boolean slot = (y / louvre) % 2 == 0;
+                for (int x = n / 6; x < n - n / 6; x++) {
+                    p.set(x, y, p.shade(0x3e4448, slot ? 0.62f : 1.0f));
+                }
+            }
+            for (int i = 0; i < 4; i++) {
+                p.dot(n / 5 + i * (n / 6), n - n / 3, 0x8a6a2e); // dead indicator lamps
+            }
+            p.blob(n - n / 5, n - n / 6, Math.max(1, n / 12), 0x24282a); // the cable gland
+            for (int x = 0; x < n; x += Math.max(2, n / 7)) {
+                for (int y = n / 2; y < n; y++) {
+                    if (p.noise(x, y, 3, 1922) > 0.55f) { p.mulAt(x, y, 0.84f); } // rain streaks
+                }
+            }
+        }
+        p.box(0, 0, n - 1, n - 1, rim, 0x2e3438);
+        p.fillFbmBlend(0x6a4a30, 0.74f, 5, 1923, 0.22f);
+        p.grain(0.05f);
     }
 
     private static void railingTop(Painter p) {

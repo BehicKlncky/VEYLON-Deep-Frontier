@@ -52,7 +52,9 @@ class SerializedEnumOrderTest {
             // Milestone 18 static salvage: a cell of a burnt-out car; fortification panels.
             "CAR_WRECK", "BARRICADE", "BARRICADE_METAL",
             // Urban milestone 19: refuge utilities.
-            "GENERATOR", "ELECTRIC_LAMP", "WATER_PURIFIER");
+            "GENERATOR", "ELECTRIC_LAMP", "WATER_PURIFIER",
+            // Urban milestone 20: the relay mast's cabinet.
+            "RELAY");
 
     private static final List<String> ITEM_TYPE_ORDER = List.of(
             "DIRT", "STONE", "SAND", "GRAVEL", "CLAY", "SNOW", "LOG", "PLANK", "WALL", "STICK",

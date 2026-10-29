@@ -121,6 +121,13 @@ public final class UrbanRevision {
      * lamps and water purifiers are put down from salvage. It stamps nothing new.
      */
     public static final int LAYOUT_UTILITIES = 15;
+    /**
+     * Layout of {@link World#GEN_URBAN_MISSIONS}, urban missions and the long-term objective (milestone
+     * 20): layout fifteen exactly, every block, plan and id, plus the old relay mast ({@link RelaySites})
+     * on the roof of one building in the civic precinct nearest the spawn, which the communications
+     * objective repairs. Missions, rumours and the broadcast are rules over that city.
+     */
+    public static final int LAYOUT_MISSIONS = 16;
 
     /** Content revision every new urban world records. */
     public static final int CURRENT_CONTENT = 3;
@@ -134,7 +141,7 @@ public final class UrbanRevision {
     public static final int ABSENT_CONTENT = 1;
 
     /** The urban generator the development selector creates: the newest layout. */
-    public static final int DEVELOPMENT_GENERATOR = World.GEN_URBAN_UTILITIES;
+    public static final int DEVELOPMENT_GENERATOR = World.GEN_URBAN_MISSIONS;
 
     private UrbanRevision() {
     }
@@ -161,6 +168,7 @@ public final class UrbanRevision {
             case World.GEN_URBAN_STRONGHOLDS -> LAYOUT_STRONGHOLDS;
             case World.GEN_URBAN_REFUGES -> LAYOUT_REFUGES;
             case World.GEN_URBAN_UTILITIES -> LAYOUT_UTILITIES;
+            case World.GEN_URBAN_MISSIONS -> LAYOUT_MISSIONS;
             default -> throw new IllegalArgumentException(
                     "generator " + generatorVersion + " is not an urban generator");
         };
@@ -177,7 +185,8 @@ public final class UrbanRevision {
             case World.GEN_URBAN_CIVIC -> BUILDING_TEMPLATE_CIVIC;
             case World.GEN_URBAN_DISTRICTS -> BUILDING_TEMPLATE_DISTRICTS;
             case World.GEN_URBAN_UNDERGROUND, World.GEN_URBAN_ECOLOGY, World.GEN_URBAN_SURVIVORS,
-                 World.GEN_URBAN_STRONGHOLDS, World.GEN_URBAN_REFUGES, World.GEN_URBAN_UTILITIES
+                 World.GEN_URBAN_STRONGHOLDS, World.GEN_URBAN_REFUGES, World.GEN_URBAN_UTILITIES,
+                 World.GEN_URBAN_MISSIONS
                     -> BUILDING_TEMPLATE_ROUTES;
             default -> throw new IllegalArgumentException("not an urban generator " + generatorVersion);
         };

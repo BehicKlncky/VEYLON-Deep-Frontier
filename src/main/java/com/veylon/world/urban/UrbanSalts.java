@@ -164,6 +164,10 @@ public final class UrbanSalts {
     /** A generated fixture's wear, which decides how much dismantling it gives back. */
     public static final long SALVAGE_CONDITION = 0x5653_414c_5643_4f4eL;
 
+    // Layout revision 16 (milestone 20): urban missions and the long-term objective.
+    /** Which of the precinct's candidate roofs carries the relay mast. */
+    public static final long RELAY_SITE = 0x5652_454c_4159_5354L;
+
     private UrbanSalts() {
     }
 }

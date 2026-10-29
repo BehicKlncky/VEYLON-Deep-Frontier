@@ -157,6 +157,21 @@ class UrbanSliceRouteTest {
         }
     }
 
+    /**
+     * Generator 19 (milestone 20) keeps generator 18's city and adds one relay mast on a precinct roof
+     * far from the starter superblock, under the rules of urban missions. The development selector now
+     * creates it; the loop must still hold.
+     */
+    @Test
+    void theSliceLoopStillCompletesOnTheMissionGenerator() {
+        for (long seed : SLICE_SEEDS) {
+            UrbanSliceRun run = new UrbanSliceRun(seed, GameMode.SURVIVAL, World.GEN_URBAN_MISSIONS).play();
+            assertTrue(run.slice().passed(), "seed=" + seed);
+            assertEquals(World.GEN_URBAN_MISSIONS, run.game.world.generatorVersion);
+            assertTrue(run.game.player.inventory.count(ItemType.IRON_SPEAR) >= 1, "the first upgrade seed=" + seed);
+        }
+    }
+
     @Test
     void frozenSeedsPlayTheScavengeRiskReturnLoopInSurvivalAndCreative() {
         for (GameMode mode : GameMode.values()) {

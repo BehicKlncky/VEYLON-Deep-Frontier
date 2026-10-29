@@ -147,7 +147,12 @@ public enum BlockType {
     ELECTRIC_LAMP("Work Lamp", Shape.TORCH, false, false, false, 0.4f, ToolKind.NONE, false, null, 0, 14, 0f, 0.86f, 0.84f, 0.70f),
     // A pump and filter unit built from salvage: on a generator's wiring it draws its building's stale
     // water and treats it. Its tanks and filter are in UrbanUtilities, like a generator's fuel.
-    WATER_PURIFIER("Water Purifier", Shape.CUBE, true, true, false, 2.5f, ToolKind.PICKAXE, false, null, 0, 0, 0f, 0.55f, 0.60f, 0.64f);
+    WATER_PURIFIER("Water Purifier", Shape.CUBE, true, true, false, 2.5f, ToolKind.PICKAXE, false, null, 0, 0, 0f, 0.55f, 0.60f, 0.64f),
+
+    // Urban milestone 20: the cabinet of the old relay mast on one precinct roof (RelaySites), which
+    // the communications objective repairs. It cannot be broken or blasted; what has been fitted into
+    // it is kept by the missions ledger, never as a block state.
+    RELAY("Relay Mast", Shape.CUBE, true, true, false, -1f, ToolKind.NONE, false, null, 0, 0, 0f, 0.40f, 0.45f, 0.48f);
 
     /**
      * How a block is meshed. Not persisted: only {@link BlockType} ordinals are

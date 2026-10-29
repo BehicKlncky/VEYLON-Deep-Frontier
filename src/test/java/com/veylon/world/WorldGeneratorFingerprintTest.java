@@ -436,6 +436,42 @@ class WorldGeneratorFingerprintTest {
                 + "instead of re-recording:\n  " + String.join("\n  ", moved));
     }
 
+    /**
+     * Generator 19 (milestone 20), recorded 2026-10-29 at introduction: urban missions are rules over
+     * generator 18's city plus one relay mast on a precinct roof. Its terrain, wrecks, sites, compounds
+     * and the stamped chunks under the nearest wreck are generator 17's pins exactly; its own pins are
+     * the relay's plan (building, region, cabinet, stand and mast cells) and the stamped chunk holding
+     * the cabinet.
+     */
+    private static final long[] URBAN_RELAY_FINGERPRINTS = {
+            0xa69545d61a0ae1f7L, 0x900bb3142bc8a524L, 0x81ca4e455a8f8685L};
+    private static final long[] URBAN_RELAY_CHUNK_FINGERPRINTS = {
+            0x6c583644a421997fL, 0xf7d3584d05da8759L, 0xc9142dbd24c3d5c3L};
+
+    @Test
+    void theMissionCityIsTheUtilityCityWithOneRelayMast() {
+        List<String> moved = new ArrayList<>();
+        for (int i = 0; i < SEEDS.length; i++) {
+            long terrain = terrainFingerprint(SEEDS[i], World.GEN_URBAN_MISSIONS);
+            long vehicles = vehicleFingerprint(SEEDS[i], World.GEN_URBAN_MISSIONS);
+            long chunks = vehicleChunkFingerprint(SEEDS[i], World.GEN_URBAN_MISSIONS);
+            World world = new World(SEEDS[i], World.GEN_URBAN_MISSIONS);
+            var relay = world.urban.relay();
+            assertTrue(relay != null, "seed " + SEEDS[i] + " has a relay");
+            long site = mix(0xcbf29ce484222325L, relay.toString().hashCode());
+            long relayChunk = hashChunk(world.getOrCreateChunk(Math.floorDiv(relay.relay().x(), Chunk.SX),
+                    Math.floorDiv(relay.relay().z(), Chunk.SZ)));
+            if (terrain != URBAN_ECOLOGY_TERRAIN_FINGERPRINTS[i] || vehicles != URBAN_VEHICLE_FINGERPRINTS[i]
+                    || chunks != URBAN_VEHICLE_CHUNK_FINGERPRINTS[i] || site != URBAN_RELAY_FINGERPRINTS[i]
+                    || relayChunk != URBAN_RELAY_CHUNK_FINGERPRINTS[i]) {
+                moved.add(String.format("seed %d: terrain 0x%016xL, vehicles 0x%016xL, chunks 0x%016xL, relay 0x%016xL,"
+                        + " relay chunk 0x%016xL", SEEDS[i], terrain, vehicles, chunks, site, relayChunk));
+            }
+        }
+        assertTrue(moved.isEmpty(), () -> "generator 19 changed; add a generator version instead of "
+                + "re-recording:\n  " + String.join("\n  ", moved));
+    }
+
     /** Every wreck within three regions of the spawn, and the compounds and sites planned beside them. */
     private static long vehicleFingerprint(long seed, int generator) {
         World world = new World(seed, generator);

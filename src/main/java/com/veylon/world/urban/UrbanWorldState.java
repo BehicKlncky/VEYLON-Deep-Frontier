@@ -83,6 +83,9 @@ public final class UrbanWorldState {
     public final UrbanRefuges refuges = new UrbanRefuges();
     /** Layout fifteen: the water drawn from each building's taps (milestone 19). */
     public final UrbanUtilities utilities = new UrbanUtilities();
+    /** Layout sixteen: the world's relay mast, planned once on first need (milestone 20). */
+    private RelaySites.Site relay;
+    private boolean relayPlanned;
     /**
      * The starter refuge and its ground-floor respawn anchor (milestone 08). In layout fourteen it
      * is the fallback respawn behind the claimed refuges, and its ground floor is the first claim.
@@ -167,9 +170,15 @@ public final class UrbanWorldState {
     /**
      * Layout fifteen (milestone 19): layout fourteen's city under the rules of refuge utilities, a
      * building's taps holding only the stale water left in its pipes, and generators, work lamps
-     * and water purifiers built from salvage.
+     * and water purifiers built from salvage; and layout sixteen, which keeps them exactly.
      */
-    public boolean hasUtilities() { return layoutRevision == UrbanRevision.LAYOUT_UTILITIES; }
+    public boolean hasUtilities() { return layoutRevision == UrbanRevision.LAYOUT_UTILITIES || hasMissions(); }
+    /**
+     * Layout sixteen (milestone 20): layout fifteen's city and rules, plus the relay mast on one roof of
+     * the civic precinct nearest the spawn, under the rules of urban missions and the communications
+     * objective.
+     */
+    public boolean hasMissions() { return layoutRevision == UrbanRevision.LAYOUT_MISSIONS; }
 
     public boolean contentRevisionResolved() {
         return contentRevision != UNRESOLVED;
@@ -231,6 +240,11 @@ public final class UrbanWorldState {
             if (hasRefuges()) { UrbanVehicleStamper.stamp(chunk, vehicles(rx, rz)); }
             // Growth last of all: its carpet and node lie over the courtyard and square.
             if (hasEcology()) { UrbanEcologyStamper.stamp(chunk, ecology(rx, rz)); }
+            // The relay mast stands on its roof over everything (layout sixteen).
+            if (hasMissions() && DistrictMap.districtOf(seed, rx, rz) == UrbanDistrict.CIVIC) {
+                RelaySites.Site r = relay();
+                if (r != null && r.rx() == rx && r.rz() == rz) { RelaySites.stamp(chunk, r); }
+            }
         }
     }
 
@@ -363,6 +377,26 @@ public final class UrbanWorldState {
     }
 
     /** Vehicle plans currently cached, for the runtime bounds snapshot; never above {@value #MAX_REGION_PLANS}. */
+    /**
+     * The world's relay mast in a layout-sixteen world, planned on first need and kept: one record,
+     * pure and rebuilt identically in any session; null in every earlier layout (or, on a seed no
+     * test has found, where no civic roof leaves room for it).
+     */
+    public RelaySites.Site relay() {
+        if (!hasMissions()) { return null; }
+        if (!relayPlanned) {
+            relay = RelaySites.plan(seed, this);
+            relayPlanned = true;
+        }
+        return relay;
+    }
+
+    /** Whether a cell is the relay's cabinet or mast. Plans only. */
+    public boolean relayAt(int x, int y, int z) {
+        RelaySites.Site r = relay();
+        return r != null && r.holds(x, y, z);
+    }
+
     public int cachedVehiclePlans() {
         return vehicleSites == null ? 0 : vehicleSites.size();
     }

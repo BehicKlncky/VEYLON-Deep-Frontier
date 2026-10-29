@@ -130,6 +130,9 @@ public final class CreativePalette {
         excluded.put(BlockType.CAR_WRECK,
                 "a cell of a generated burnt-out car whose engine, cabin and body come from its region's"
                         + " plan; no item carries it, and what it gives is salvage, not the car");
+        excluded.put(BlockType.RELAY,
+                "the cabinet of the world's one relay mast, planned on a precinct roof; it is unbreakable,"
+                        + " and a placed copy would carry no broadcast and fake the communications objective");
         EXCLUDED = Collections.unmodifiableMap(excluded);
     }
 

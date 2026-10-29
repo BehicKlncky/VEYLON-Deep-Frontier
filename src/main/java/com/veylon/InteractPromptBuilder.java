@@ -283,6 +283,8 @@ final class InteractPromptBuilder {
             // Milestone 15: the growth teaches its own counters.
             case GROWTH_NODE -> game.interactPrompt = "Growth node: a torch set beside it burns it out";
             case VEIL_MEMBRANE -> game.interactPrompt = "Veil membrane: it wakes to footsteps and light";
+            // Milestone 20: the old relay mast on the precinct roof.
+            case RELAY -> game.interactPrompt = "Relay mast: its cabinet is dead and its antenna gone";
             default -> {
             }
         }
