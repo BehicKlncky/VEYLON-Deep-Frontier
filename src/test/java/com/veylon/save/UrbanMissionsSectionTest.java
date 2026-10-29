@@ -38,8 +38,9 @@ class UrbanMissionsSectionTest {
     private record History(Game game, long camp, long stronghold, long raiders, long office) { }
 
     /**
-     * A camp's lookout spoke of the relay, the stronghold (a friend) gave its codes, two kinds of
-     * part are recovered and the relay itself was found.
+     * A camp's lookout spoke of the relay and gave three missions, the stronghold (a friend) gave its
+     * codes, two kinds of part are recovered and the relay itself was found, which readied the mast's
+     * mission.
      */
     private static History history() {
         Game g = SurvivorWorldArena.session(SurvivorWorldArena.SEED, GameMode.SURVIVAL, World.GEN_URBAN_MISSIONS,
@@ -49,6 +50,8 @@ class UrbanMissionsSectionTest {
         SurvivorWorldArena.slowTick(g);
         UrbanSite camp = SurvivorWorldArena.site(g, campPlan);
         UrbanComms.askAboutRadio(g, camp.resident(0).live);
+        // Three of the camp's missions: the clinic's medicine, the hidden people and the mast.
+        for (int i = 0; i < 3; i++) { com.veylon.settlement.UrbanMissionBoard.askForWork(g, camp.resident(0).live); }
         CompoundSites.Compound c = CompoundWorldArena.nearest(g, SurvivorSites.Kind.STRONGHOLD);
         CompoundWorldArena.load(g, c);
         CompoundWorldArena.standFacing(g, c, CompoundWorldArena.street(c, 2), c.gate().outside());
@@ -61,6 +64,7 @@ class UrbanMissionsSectionTest {
         UrbanComms.onTaken(g, CommsComponents.Kind.ANTENNA.item, 1);
         SurvivorWorldArena.standAt(g, g.world.urban.relay().stand());
         UrbanComms.mediumTick(g, 0.25f);
+        com.veylon.settlement.UrbanMissionBoard.mediumTick(g, 0.25f);
         UrbanMissions.Comms comms = g.world.urban.missions.comms;
         assertTrue(comms.rumoured && comms.relayFound);
         assertEquals(UrbanMissions.CODES_STRONGHOLD, comms.codes);
@@ -83,6 +87,16 @@ class UrbanMissionsSectionTest {
             assertEquals(UrbanMissions.CODES_STRONGHOLD, c.codes);
             assertEquals(h.stronghold(), c.codesFrom);
             assertEquals("Comms / recover the relay's parts: 2 of 3", UrbanComms.hudLine(g));
+            var missions = g.world.urban.missions.missions();
+            assertEquals(3, missions.size(), "every mission record");
+            assertEquals(UrbanMissions.Kind.CLINIC_SUPPLIES, missions.get(0).kind);
+            assertEquals(UrbanMissions.Status.ACTIVE, missions.get(0).status);
+            assertEquals(UrbanMissions.Kind.HIDDEN_AID, missions.get(1).kind);
+            assertEquals(UrbanMissions.Kind.LANDMARK, missions.get(2).kind);
+            assertEquals(UrbanMissions.Status.READY, missions.get(2).status, "the mast's mission is ready to report");
+            assertEquals(1f, missions.get(2).progress);
+            for (UrbanMissions.Mission m : missions) { assertEquals(h.camp(), m.giver); }
+            assertEquals(3, g.world.urban.missions.activeCount());
         }
         Game fresh = new Game();
         assertTrue(SaveSystem.load(fresh, file));
@@ -123,6 +137,9 @@ class UrbanMissionsSectionTest {
     /** Field offsets of the payload as written. */
     private static final int FLAGS = 4, RUMOUR = 5, RECOVERED = 13, INSTALLED = 17, CODES = 21, CODES_FROM = 25,
             BROADCAST = 33, COMPLETED = 37, MISSIONS = 45;
+    /** Mission rows, 32 bytes each from offset 49, and the offsets of their fields. */
+    private static final int ROW0 = 49, ROW1 = 81, ROW2 = 113, KIND = 0, TARGET = 1, GIVER = 9, STATUS = 17, PROGRESS = 18,
+            FAILURE = 22, ACCEPTED = 23, REWARDED = 31;
 
     @Test
     void everyMalformedFieldFailsTheWholeLoad() throws IOException {
@@ -131,7 +148,7 @@ class UrbanMissionsSectionTest {
         Path file = directory.resolve("good.sav");
         assertTrue(SaveSystem.save(g, file));
         byte[] good = UrbanMissionsSection.write(g);
-        assertEquals(49, good.length, "a version, the objective and no missions");
+        assertEquals(49 + 3 * 32, good.length, "a version, the objective and three missions");
         List<byte[]> bad = List.of(
                 withInt(good, 0, 2),                                          // another version
                 withByte(good, FLAGS, 3 | 16),                                // a flag nothing knows
@@ -157,7 +174,30 @@ class UrbanMissionsSectionTest {
                 withDouble(good, COMPLETED, 12.0),                            // a completion minute unfinished
                 withDouble(completed(good), COMPLETED, -1),                   // complete with no minute
                 withFloat(completed(good), BROADCAST, UrbanMissions.BROADCAST_SECONDS - 1), // complete too soon
-                withInt(good, MISSIONS, 1),                                   // a mission before missions exist
+                withInt(good, MISSIONS, 1),                                   // fewer missions than the bytes hold
+                withInt(good, MISSIONS, 4),                                   // more missions than the bytes hold
+                withInt(good, MISSIONS, UrbanMissions.MAX_RECORDS + 1),       // past the cap
+                withByte(good, ROW0 + KIND, 9),                               // a kind nothing knows
+                withByte(good, ROW0 + KIND, 5),                               // a camp offering the Wardens' module
+                withLong(good, ROW0 + TARGET, h.office()),                    // an office is no clinic
+                withLong(good, ROW1 + TARGET, h.camp()),                      // a camp is no hidden refuge
+                withLong(good, ROW2 + TARGET, h.camp()),                      // the mast is the relay's building
+                withLong(good, ROW0 + GIVER, h.stronghold()),                 // a stronghold asks no clinic's medicine
+                withLong(good, ROW0 + GIVER, h.raiders()),                    // raiders give no missions
+                withByte(good, ROW0 + STATUS, 9),                             // a status nothing knows
+                withByte(good, ROW0 + STATUS, 2),                             // ready with no evidence
+                withByte(good, ROW2 + STATUS, 1),                             // in hand with all its evidence
+                withByte(good, ROW2 + STATUS, 3),                             // complete with no reward given
+                withFloat(good, ROW0 + PROGRESS, Float.NaN),
+                withFloat(good, ROW1 + PROGRESS, 4f),                         // more evidence than it asks
+                withFloat(good, ROW1 + PROGRESS, -1f),
+                withByte(good, ROW0 + FAILURE, 6),                            // a failure while in hand
+                withByte(good, ROW0 + FAILURE, 9),                            // a failure nothing knows
+                withByte(good, ROW2 + REWARDED, 1),                           // rewarded before it was reported
+                withByte(good, ROW2 + REWARDED, 2),
+                withDouble(good, ROW0 + ACCEPTED, -1),
+                withDouble(good, ROW0 + ACCEPTED, Double.NaN),
+                duplicate(good, ROW0, ROW1),                                  // the clinic asked for twice
                 Arrays.copyOf(good, good.length + 1));                        // trailing byte
         for (int i = 0; i < bad.size(); i++) {
             byte[] payload = bad.get(i);
@@ -172,6 +212,17 @@ class UrbanMissionsSectionTest {
         assertDoesNotThrow(() -> UrbanMissionsSection.read(withFloat(repaired(good), BROADCAST, 20f), reloaded(file)),
                 "a broadcast under way reads");
         assertDoesNotThrow(() -> UrbanMissionsSection.read(completed(good), reloaded(file)), "a finished objective reads");
+        byte[] reported = withByte(withByte(good, ROW2 + STATUS, 3), ROW2 + REWARDED, 1);
+        assertDoesNotThrow(() -> UrbanMissionsSection.read(reported, reloaded(file)), "a reported mission reads");
+        byte[] failed = withByte(withByte(good, ROW0 + STATUS, 4), ROW0 + FAILURE, 3);
+        assertDoesNotThrow(() -> UrbanMissionsSection.read(failed, reloaded(file)), "a failed mission reads");
+    }
+
+    /** One 32-byte mission row copied over another. */
+    private static byte[] duplicate(byte[] good, int from, int to) {
+        byte[] out = good.clone();
+        System.arraycopy(good, from, out, to, 32);
+        return out;
     }
 
     /** The payload with the relay repaired and a radio built. */

@@ -232,7 +232,7 @@ public final class UrbanSiteDialogue {
     }
 
     /** How many of a stack the site's stash could take, tried on copies in fill order. */
-    private static int stashRoom(Game g, UrbanSite s, ItemType type, int count) {
+    static int stashRoom(Game g, UrbanSite s, ItemType type, int count) {
         int left = count;
         for (com.veylon.util.Vec3i p : UrbanSiteNeeds.stashOf(g, s)) {
             if (left <= 0) { break; }

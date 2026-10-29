@@ -73,6 +73,7 @@ final class RefugeSystem {
     void mediumTick(float dt) {
         utilities.mediumTick(dt);
         com.veylon.settlement.UrbanComms.mediumTick(game, dt);
+        com.veylon.settlement.UrbanMissionBoard.mediumTick(game, dt);
     }
 
     static boolean applies(World w) {

@@ -234,8 +234,9 @@ public class Hud {
         panel(ui, box, "FRONTIER / OPERATIONS", CYAN);
         float x = box.x() + PAD, width = box.width() - PAD * 2;
         fitted(ui, x, box.y() + 33, width, SMALL, "Events / " + g.events.summary(), AMBER);
+        String journal = com.veylon.settlement.UrbanMissionBoard.journalLine(g);
         fitted(ui, x, box.y() + 55, width, SMALL,
-                g.world.isUrban() ? "Refuge / close doors before resting"
+                journal != null ? journal : g.world.isUrban() ? "Refuge / close doors before resting"
                         : "Camp / " + g.faction.standing() + " (" + (int) g.faction.trust + ")",
                 g.faction.hostile ? RED_TEXT : TEXT);
         rect(ui, x, box.y() + 79, width, 1, LINE, 0.65f);

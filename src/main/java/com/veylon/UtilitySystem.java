@@ -552,6 +552,8 @@ final class UtilitySystem {
             litres = Math.min(litres, p.condition / UrbanUtilities.FILTER_WEAR);
             p.untreated -= litres;
             p.clean += litres;
+            // Layout sixteen: water treated on a camp's wiring answers its mission (urban milestone 20).
+            com.veylon.settlement.UrbanMissionBoard.onTreated(game, p.building, litres);
             p.condition = Math.max(0f, p.condition - litres * UrbanUtilities.FILTER_WEAR);
             if (p.condition <= LITRE_SLACK) {
                 p.condition = 0;

@@ -180,6 +180,8 @@ final class UrbanSiteRelations {
         s.owed -= repaid;
         int newRations = Math.max(0, rations - repaid);
         int newMedicine = Math.max(0, medicine - Math.max(0, repaid - rations));
+        // Layout sixteen: supplies beyond anything owed count toward a mission to help these people (urban 20).
+        UrbanMissionBoard.onAided(g, s, newRations + newMedicine);
         float gain = Math.min(AID_MAX, newRations * AID_PER_ITEM + newMedicine * AID_MEDICINE);
         if (gain <= 0f) {
             if (repaid > 0) { g.log("You put back what was taken. It earns no thanks."); }

@@ -51,6 +51,7 @@ final class UrbanSiteRelocation {
         refuge.stashReleased = true;
         if (refuge.simMinute < 0) { refuge.simMinute = g.time.totalMinutes; }
         UrbanSiteRelations.trust(g, refuge, MOVED, null);
+        UrbanMissionBoard.onGuided(g, refuge);
         g.log("They will go to the " + SurvivorSites.Kind.CAMP.label.toLowerCase(java.util.Locale.ROOT)
                 + " once it is quiet, and leave what is on their shelf to you.");
         return true;

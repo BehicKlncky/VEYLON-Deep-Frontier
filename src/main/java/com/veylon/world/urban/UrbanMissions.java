@@ -65,6 +65,168 @@ public final class UrbanMissions {
         }
     }
 
+    // ------------------------------------------------------------------
+    // Missions
+    // ------------------------------------------------------------------
+
+    /** Missions in hand at once: the journal's bound (DESIGN §10, D-30). */
+    public static final int MAX_ACTIVE = 4;
+    /** Mission records kept, finished and failed ones included; past it nobody offers another. */
+    public static final int MAX_RECORDS = 256;
+
+    /** What a mission asks; the code is what saves store, the title what the journal shows. */
+    public enum Kind {
+        /** A camp asks for medicine from a named clinic's stores. */
+        CLINIC_SUPPLIES(1, "Medicine from the clinic", 1, 12f),
+        /** A camp asks the survivor to find and help people hiding below a building. */
+        HIDDEN_AID(2, "The people below", 3, 10f),
+        /** A camp asks for clean water: a purifier working on its own building's wiring. */
+        CAMP_UTILITY(3, "Clean water for the camp", 2, 15f),
+        /** A camp or stronghold asks whether the old relay mast still stands. */
+        LANDMARK(4, "The old relay mast", 1, 8f),
+        /** A stronghold keeps a transmitter module, for a price or for a friend. */
+        STRONGHOLD_COMPONENT(5, "The Wardens' transmitter", 1, 5f);
+
+        public final int code;
+        public final String title;
+        /** How much evidence finishes it: items, litres or one deed. */
+        public final int required;
+        /** The trust its giver gives once, on its report. */
+        public final float reward;
+
+        Kind(int code, String title, int required, float reward) {
+            this.code = code;
+            this.title = title;
+            this.required = required;
+            this.reward = reward;
+        }
+
+        public static Kind fromCode(int code) {
+            for (Kind k : values()) {
+                if (k.code == code) { return k; }
+            }
+            return null;
+        }
+    }
+
+    /** Where a mission stands. */
+    public enum Status {
+        ACTIVE(1), READY(2), COMPLETED(3), FAILED(4);
+
+        public final int code;
+
+        Status(int code) {
+            this.code = code;
+        }
+
+        public static Status fromCode(int code) {
+            for (Status s : values()) {
+                if (s.code == code) { return s; }
+            }
+            return null;
+        }
+    }
+
+    /** Why a mission failed; explicit, logged once, and kept. */
+    public enum Failure {
+        NONE(0, ""), GIVER_GONE(1, "no one is left to report to"), GIVER_HOSTILE(2, "they want nothing more to do with you"),
+        TARGET_GONE(3, "what it asked for is gone"), TARGET_DEAD(4, "the people it was for are dead"),
+        BETRAYED(5, "they will never trust anyone you send"), THEFT(6, "you took it without leave");
+
+        public final int code;
+        public final String reason;
+
+        Failure(int code, String reason) {
+            this.code = code;
+            this.reason = reason;
+        }
+
+        public static Failure fromCode(int code) {
+            for (Failure f : values()) {
+                if (f.code == code) { return f; }
+            }
+            return null;
+        }
+    }
+
+    /**
+     * One mission accepted from a giver: the kind, the stable id of what it is about (a clinic, a
+     * refuge, the camp's building, the relay's building or a stronghold's container) and the site that
+     * gave it. A kind and target are asked for once in a world, whoever asks.
+     */
+    public static final class Mission {
+        public final Kind kind;
+        public final long target;
+        public final long giver;
+        public final double acceptedMinute;
+        public Status status = Status.ACTIVE;
+        /** Evidence so far, up to {@link Kind#required}; only deeds done after accepting count. */
+        public float progress;
+        public Failure failure = Failure.NONE;
+        /** Its reward was given; a completed mission always has been, once. */
+        public boolean rewarded;
+
+        public Mission(Kind kind, long target, long giver, double acceptedMinute) {
+            this.kind = kind;
+            this.target = target;
+            this.giver = giver;
+            this.acceptedMinute = acceptedMinute;
+        }
+
+        /** In hand: accepted and neither finished nor failed. */
+        public boolean active() {
+            return status == Status.ACTIVE || status == Status.READY;
+        }
+
+        /** The stable text id of the mission. */
+        public String id() {
+            return "urban:mission:" + kind.code + ":" + UrbanIds.format(target);
+        }
+    }
+
+    private final java.util.List<Mission> missions = new java.util.ArrayList<>();
+
+    /** Every mission record, in the order they were accepted. */
+    public java.util.List<Mission> missions() {
+        return java.util.Collections.unmodifiableList(missions);
+    }
+
+    /** Missions in hand. */
+    public int activeCount() {
+        int n = 0;
+        for (Mission m : missions) {
+            if (m.active()) { n++; }
+        }
+        return n;
+    }
+
+    /** The record of a kind and target, or null when it was never accepted. */
+    public Mission find(Kind kind, long target) {
+        for (Mission m : missions) {
+            if (m.kind == kind && m.target == target) { return m; }
+        }
+        return null;
+    }
+
+    /** Whether another mission may be accepted: room in the journal and in the records. */
+    public boolean canAccept() {
+        return activeCount() < MAX_ACTIVE && missions.size() < MAX_RECORDS;
+    }
+
+    /**
+     * Records a newly accepted mission.
+     *
+     * @throws IllegalStateException with no room, or for a kind and target already asked for
+     */
+    public Mission accept(Kind kind, long target, long giver, double minute) {
+        if (!canAccept() || find(kind, target) != null) {
+            throw new IllegalStateException("no room for, or a repeat of, " + kind + " " + UrbanIds.format(target));
+        }
+        Mission m = new Mission(kind, target, giver, minute);
+        missions.add(m);
+        return m;
+    }
+
     public final Comms comms = new Comms();
     private boolean sectionRestored;
 
@@ -73,8 +235,15 @@ public final class UrbanMissions {
         return sectionRestored;
     }
 
-    /** Load only: the validated objective of {@code urban.missions}. */
-    public void restore(Comms saved) {
+    /** Load only: the validated objective and mission records of {@code urban.missions}. */
+    public void restore(Comms saved, java.util.List<Mission> records) {
+        missions.clear();
+        missions.addAll(records);
+        restore(saved);
+    }
+
+    /** The validated objective of {@code urban.missions}. */
+    private void restore(Comms saved) {
         comms.rumoured = saved.rumoured;
         comms.rumourFrom = saved.rumourFrom;
         comms.relayFound = saved.relayFound;

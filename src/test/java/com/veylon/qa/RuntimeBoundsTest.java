@@ -515,6 +515,35 @@ class RuntimeBoundsTest {
     }
 
     @Test
+    void theMissionJournalHoldsFourInHandAndTheRecordsStopAtTheirCap() {
+        com.veylon.Game game = com.veylon.SurvivorWorldArena.session(com.veylon.SurvivorWorldArena.SEED,
+                com.veylon.entity.GameMode.SURVIVAL, com.veylon.world.World.GEN_URBAN_MISSIONS,
+                new com.veylon.engine.AudioManager());
+        var ledger = game.world.urban.missions;
+        var kind = com.veylon.world.urban.UrbanMissions.Kind.CLINIC_SUPPLIES;
+        for (int i = 0; i < com.veylon.world.urban.UrbanMissions.MAX_ACTIVE; i++) {
+            ledger.accept(kind, farBuilding(i), farBuilding(10_000), 0);
+        }
+        assertFalse(ledger.canAccept(), "four in hand");
+        assertThrows(IllegalStateException.class, () -> ledger.accept(kind, farBuilding(99), farBuilding(10_000), 0));
+        int cap = com.veylon.world.urban.UrbanMissions.MAX_RECORDS;
+        for (int i = 4; i < cap; i++) {
+            for (var m : ledger.missions()) {
+                if (m.active()) { m.status = com.veylon.world.urban.UrbanMissions.Status.COMPLETED; }
+            }
+            ledger.accept(kind, farBuilding(i), farBuilding(10_000), 0);
+        }
+        for (var m : ledger.missions()) { m.status = com.veylon.world.urban.UrbanMissions.Status.FAILED; }
+        assertEquals(cap, ledger.missions().size());
+        assertFalse(ledger.canAccept(), "a full ledger takes no more missions, whoever offers");
+        assertThrows(IllegalStateException.class, () -> ledger.accept(kind, farBuilding(cap), farBuilding(10_000), 0));
+        RuntimeBudgetSnapshot full = RuntimeBudgetSnapshot.capture(game);
+        assertEquals(cap, full.missionRecords());
+        assertTrue(full.withinHardLimits(), full.occupancySummary());
+        assertTrue(RuntimeBudgetSnapshot.hardLimitSummary().contains("urbanMissions=" + cap));
+    }
+
+    @Test
     void theDeviceLedgerStopsAtItsCapAndAFullOneTakesNoNewDevice() {
         com.veylon.Game game = com.veylon.UtilityWorldArena.session(com.veylon.entity.GameMode.SURVIVAL);
         var u = game.world.urban.utilities;

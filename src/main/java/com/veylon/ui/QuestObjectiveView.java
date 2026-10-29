@@ -37,9 +37,10 @@ public final class QuestObjectiveView {
     }
 
     public static Objective resolve(Game game) {
-        // Layout sixteen: the communications objective's marker, a rumour's rough place or the relay itself.
+        // Layout sixteen: the first mission in hand, or else the communications objective's next place.
         if (game != null && com.veylon.settlement.UrbanComms.applies(game.world)) {
-            com.veylon.settlement.UrbanComms.Target t = com.veylon.settlement.UrbanComms.target(game);
+            com.veylon.settlement.UrbanComms.Target t = com.veylon.settlement.UrbanMissionBoard.target(game);
+            if (t == null) { t = com.veylon.settlement.UrbanComms.target(game); }
             return t == null ? null : new Objective(t.id(), t.id(), t.position(), Phase.TARGET, t.exact(), t.label());
         }
         if (game == null || game.world == null || game.faction.quest == null) {

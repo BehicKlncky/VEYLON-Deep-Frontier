@@ -192,6 +192,9 @@ public class NpcScreen {
                 break;
             }
         }
+        if (g.input.wasKeyPressed(GLFW_KEY_0)) {
+            performSiteChoice(g, n, 10);
+        }
     }
 
     /**
@@ -199,7 +202,8 @@ public class NpcScreen {
      * for anyone; then a camp or stronghold trader's two offers, a medic's dressing, for hidden
      * civilians the word of a safe camp, or a stronghold gatekeeper's leave to come in; then a
      * threat and an attack; to a stronghold, news of a raider yard the player has taken; and, in layout
-     * sixteen, the old radio relay ({@link com.veylon.settlement.UrbanComms}).
+     * sixteen, the old radio relay ({@link com.veylon.settlement.UrbanComms}) and, on the key 0 (choice 10),
+     * their missions ({@link com.veylon.settlement.UrbanMissionBoard}).
      */
     public java.util.List<String> siteOptions(Game g, Npc n) {
         com.veylon.settlement.UrbanSite site = com.veylon.settlement.UrbanSiteDirector.siteOf(g.world, n);
@@ -232,6 +236,8 @@ public class NpcScreen {
         // Layout sixteen: the old relay, its rumour and its codes (urban milestone 20).
         String radio = com.veylon.settlement.UrbanComms.radioOption(g, n);
         if (radio != null) { out.add(radio); }
+        String work = com.veylon.settlement.UrbanMissionBoard.missionOption(g, n);
+        if (work != null) { out.add(work); }
         return out;
     }
 
@@ -276,6 +282,11 @@ public class NpcScreen {
             case 9 -> {
                 if (com.veylon.settlement.UrbanComms.radioOption(g, n) == null) { return false; }
                 lastResponse = com.veylon.settlement.UrbanComms.askAboutRadio(g, n);
+            }
+            // The key 0 (urban milestone 20): work, a report or a price.
+            case 10 -> {
+                if (com.veylon.settlement.UrbanMissionBoard.missionOption(g, n) == null) { return false; }
+                lastResponse = com.veylon.settlement.UrbanMissionBoard.askForWork(g, n);
             }
             default -> { return false; }
         }
