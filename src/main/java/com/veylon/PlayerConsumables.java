@@ -42,8 +42,8 @@ final class PlayerConsumables {
     static final float POISON_DURATION_MIN = 90f;
     static final float POISON_DURATION_RANGE = 60f;
 
-    // Drinking.
-    private static final float CLEAN_WATER_THIRST = 60f;
+    // Drinking. A clean litre's relief is read by the urban sustainability check (milestone 19).
+    static final float CLEAN_WATER_THIRST = 60f;
     private static final float DIRTY_WATER_THIRST = 35f;
     private static final double DIRTY_WATER_POISON_CHANCE = 0.30;
 
