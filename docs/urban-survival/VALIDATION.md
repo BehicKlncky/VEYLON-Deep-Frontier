@@ -3023,9 +3023,9 @@ the next gate).
 | `d4c5d7b` | Full portable build: 2,155 tests in 252 classes, one existing skip (`m19-c2-build.log`) | `UrbanPowerTest` (10): a running generator lighting its building's lamps, its light registered and its fuel burnt by time and load, worn and heard, one lamp switched off lightening the load, F stopping it and darkening every lamp and the meshes; the tank running dry through the game loop; the circuit as one building's four nearest loads within reach, a second generator and a lamp in the street refused; taking the generator away leaving the lamps dark and giving back its whole cans; seizing and a rebuild needing spare parts and a pry tool; pause and distance holding the circuit still with nothing caught up; Creative spending nothing and heard by nobody while the world's fuel burns the same; a body in the generator's room drawn to it and one far down the street not; fuel only from the tank of a car that did not burn, once, under generator 18. The section's device rows and their corruption cases, the device cap, `UtilitySoundsTest` (2) and the appended enum order |
 | `4c93639` | Full portable build: 2,163 tests in 253 classes, one existing skip (`m19-c3-build.log`) | `UrbanPurifierTest` (8): a purifier built with its filter spent working only once packed with two fibre; water moving from the pipes and skins through its tanks into clean skins with nothing made or lost and the filter worn by the litre; no treatment without power and its work weighing on the fuel; a clogged filter stopping it until fresh fibre; taking it apart spilling its water and giving back its parts; survivors' pipes not pumped; Creative packing the filter for nothing. The section's purifier rows and their corruption cases |
 | `640bf67` | Full portable build in `build/m14-check`: 2,165 tests in 254 classes, one existing skip (`m19-c4-build.log`) | `UrbanUtilitySustainabilityTest` (2): twenty days of each design seed's own weather filling the starter courtyard's collector, emptied once a day, giving 2.40–3.00 litres a day against a waking day's 1.13, the survivor never below 1.88 litres in hand; a can treating twelve litres, a filter more than a week's water, and 22–32 wrecks with fuel within a region of the spawn |
-| `def0278` | `UrbanUtilityQaSceneTest` only (`m19-tour2.log`): Survival and Creative pass, 13 captures each, about 205 simulated seconds; generator 17 refused. **The portable build was not run** | The tour, headlessly: built, wired and dark; fuel from the wreck; two litres from the tap; lights on; the filter packed and a litre treated; the Veilbound drawn (heard by nobody in Creative); shut down; run dry; rebuilt from 88.5 to 100; the same utilities after F5 and F9 (the purifier holding 7.00 clean litres after 8 litres in, 1 drawn off, its filter at 68) |
+| `def0278` | `UrbanUtilityQaSceneTest` (`m19-tour2.log`): Survival and Creative pass, 13 captures each, about 205 simulated seconds; generator 17 refused. Later the same day, the full portable build on `ef29fe8`'s tree (records only over this code) in `build/m14-check`: 2,168 tests in 255 classes, one existing skip (`m19-final-build.log`) | The tour, headlessly: built, wired and dark; fuel from the wreck; two litres from the tap; lights on; the filter packed and a litre treated; the Veilbound drawn (heard by nobody in Creative); shut down; run dry; rebuilt from 88.5 to 100; the same utilities after F5 and F9 (the purifier holding 7.00 clean litres after 8 litres in, 1 drawn off, its filter at 68) |
 
-### Native utility tour (partial)
+### Native utility tour, both modes
 
 GPU and driver from the run's `[gl]` line: NVIDIA GeForce RTX 3060 Ti, driver
 610.88, OpenGL 3.3.0 with KHR_debug; 1280 × 720.
@@ -3044,14 +3044,49 @@ kitchen tap (74, 41, 82), the generator at (79, 41, 94) put down from (78, 41,
 down from (75, 41, 84), the wreck at (58, 43) with its tank at (58, 41, 46)
 worked from (58, 41, 47), and the staged Veilbound at (85, 41, 96).
 
-Result (`qa-m19-utilities-survival.log`, on the tour code of `def0278`): ten of
-the thirteen captures, `01-generator-rebuilt` to `10-shut-down`, each with
+First run (`qa-m19-utilities-survival.log`, on the tour code of `def0278`): ten
+of the thirteen captures, `01-generator-rebuilt` to `10-shut-down`, each with
 `glErrors=0 khrErrors=0` and only the driver's medium-severity performance
 notices; the Veilbound was drawn from (85, 41, 96) to (83, 41, 96) before it was
 taken away. The process then exited cleanly during the run-dry leg (`11` would
 follow about 140 seconds later), with no `pass=false` line or exception logged,
-and the owner asked to stop testing. The captures were not yet reviewed, and
-the Creative twin was not run.
+and the owner asked to stop testing.
+
+Final runs (2026-10-29, the same code at `ef29fe8`): Survival with the tag and
+directory `m19-utilities-survival-2` from the main checkout, Creative
+(`VEYLON_GAME_MODE=creative`, `m19-utilities-creative`) from the isolated worktree
+`build/m14-check` at the same tree, each directory checked not to exist
+beforehand. Both printed `[urban-utilities] pass=true` with 2 staged poses, 13
+captures and full health, in 205 (Survival) and 202 (Creative) route seconds;
+every capture reports `glErrors=0 khrErrors=0`, each log `glGetError=0`, 16 KHR
+messages with 0 errors (the usual MEDIUM pixel-transfer notes) and
+`nativeErrors=0`; Gradle exited 0 after 3 min 29 s and 3 min 24 s
+(`qa-m19-utilities-survival-2.log`, `qa-m19-utilities-creative.log`). The
+Survival `deeds` line: the generator built and put down at (79, 41, 94), two lamps
+and the purifier at (76, 41, 88), (67, 41, 88) and (75, 41, 82); a fuel can from
+the tank at (58, 41, 46); the purifier at 2.92 litres in and its filter at 95.70
+after the first treatment; the Veilbound drawn from (85, 41, 96) toward the
+generator; the tank run dry at condition 89 and rebuilt from 88.5 to 100. The
+`before-save` and post-load `utilities` lines match: generator off at condition
+100 with an empty tank, both lamps on, the purifier on with its filter at 68 and
+7.00 clean litres, 8 litres drawn from the pipes, skins 2/0/1. Creative staged its
+fuel can (`staged-creative-fuel-can 1`), nobody heard its generator (`09-heard-by-nobody`)
+and the rest went as in Survival.
+
+Inspected captures, all thirteen from the Survival run: `01` the crafting screen
+and "Crafted 1 x Generator"; `02` a work lamp put down dark, "Water purifier put
+down"; `03` the worn wreck's fuel tank half taken apart; `04` the kitchen tap,
+"stale tap water, 7 L left", two skins filled; `05`–`06` the generator running at
+21:39, "1.0 can left", the room lit; `07` the filter packed; `08` "treating, 2.9 L
+in", a clean waterskin filled; `09` the generator still running at 22:28 (the
+Veilbound, behind the courtyard wall, is not in frame; the log line records its
+move); `10` the refuge dark after "You switch the generator off."; `11` at 02:13
+"The generator sputters and dies: its tank is dry", a lamp reading "(no power)";
+`12` "You rebuild the generator's worn parts…", tank dry; `13` the same after
+"Game loaded.". From Creative: `03` the tank cell gone in dust with the staged can
+on the hotbar, `09` the running generator, and `13` the dry tank after the load.
+An Ashfall event darkened the night sky from 22:41 in both runs; it is
+presentation here.
 
 ### Commands and portable builds
 
@@ -3063,6 +3098,13 @@ export JAVA_HOME="$PWD/build/tools/jdk25/jdk-25.0.4.1+1" PATH="$JAVA_HOME/bin:$P
 (cd build/m14-check && ./gradlew.bat build --console=plain) > build/m19-c4-build.log 2>&1
 ./gradlew.bat test --tests "com.veylon.UrbanUtilityQaSceneTest" -i --console=plain > build/m19-tour2.log 2>&1
 graphify update . --no-cluster > build/m19-graphify.log 2>&1
+# Closing the gate (2026-10-29): the final build, then the native runs (Creative from the worktree).
+(cd build/m14-check && ./gradlew.bat build --console=plain) > build/m19-final-build.log 2>&1
+VEYLON_GENERATOR=urban-dev VEYLON_SEED=20260731 VEYLON_GAME_MODE=survival VEYLON_SCENE=urban_utilities \
+  VEYLON_RESOLUTION=1280x720 VEYLON_CAPTURE_TAG=m19-utilities-survival-2 \
+  ./gradlew.bat run -PveylonDataDir=build/qa/m19-utilities-survival-2 --console=plain > build/qa-m19-utilities-survival-2.log 2>&1
+# Creative likewise from build/m14-check with VEYLON_GAME_MODE=creative, the tag m19-utilities-creative and an
+# absolute -PveylonDataDir under the main checkout's build/qa.
 ```
 
 - Focused classes while iterating: `UrbanTapsTest`, `UrbanPowerTest`,
@@ -3077,11 +3119,8 @@ graphify update . --no-cluster > build/m19-graphify.log 2>&1
 
 ### Limits and next gate
 
-- **Pending, required:** the portable build on `def0278` or later, and
-  `urban_utilities` natively to its `pass=true` line in Survival and in
-  Creative (`VEYLON_GAME_MODE=creative`), each in a fresh QA directory such as
-  `build/qa/m19-utilities-survival-2` and `build/qa/m19-utilities-creative`, with
-  the thirteen captures inspected. Package 19 stays PARTIAL until then.
+- The gate is met: the portable build on the tour's code and the native tour in
+  both modes passed on 2026-10-29 (above). Package 19 is COMPLETE.
 - The tour stages poses between legs, a forward-only clock, the weather, one
   infected and a kit, and builds through the crafting screen's own command; it
   is scripted evidence, not the human playtest deferred by D-80.
@@ -3092,4 +3131,4 @@ graphify update . --no-cluster > build/m19-graphify.log 2>&1
   machinery ambience is 22.
 - No reviewer subagents ran.
 
-Next: finish package 19's native and portable-build gate, then package 20.
+Next: package 20.
