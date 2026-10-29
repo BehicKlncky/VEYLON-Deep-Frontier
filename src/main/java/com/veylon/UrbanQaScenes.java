@@ -66,6 +66,11 @@ final class UrbanQaScenes {
      * heard through its wall, run dry and rebuilt ({@code urban_utilities}).
      */
     private final UrbanUtilityQaScene utilities;
+    /**
+     * Package 20: the relay's rumour, three missions, a hidden refuge helped, a stronghold's module
+     * taken as a friend, the relay repaired and the city answering, then F5 and F9 ({@code urban_missions}).
+     */
+    private final UrbanMissionQaScene missions;
     private final PlayerMovementSystem.Command walk = new PlayerMovementSystem.Command();
     private boolean holding;
     private float holdX;
@@ -106,6 +111,7 @@ final class UrbanQaScenes {
         this.strongholds = new UrbanStrongholdQaScene(game);
         this.refuge = new UrbanRefugeQaScene(game);
         this.utilities = new UrbanUtilityQaScene(game);
+        this.missions = new UrbanMissionQaScene(game);
     }
 
     /** Stages one of the urban scenes; inert, with a notice, outside a street-network world. */
@@ -154,6 +160,10 @@ final class UrbanQaScenes {
         }
         if (scene.equals("urban_utilities")) {
             utilities.stage(); // a normal session: poses between legs, the clock (forward), one infected and the kit are staged
+            return;
+        }
+        if (scene.equals("urban_missions")) {
+            missions.stage(); // a normal session: poses between legs, the clock (forward) and the kit are staged
             return;
         }
         if (!world.isUrban() || !world.urban.hasCityPlan()) {
@@ -252,6 +262,7 @@ final class UrbanQaScenes {
     UrbanStrongholdQaScene strongholds() { return strongholds; }
     UrbanRefugeQaScene refuge() { return refuge; }
     UrbanUtilityQaScene utilities() { return utilities; }
+    UrbanMissionQaScene missions() { return missions; }
 
     /** Per-frame hook, before streaming and rendering; inert unless a scene is staged. */
     void update(double elapsed) {
@@ -279,6 +290,7 @@ final class UrbanQaScenes {
         strongholds.update(elapsed);
         refuge.update(elapsed);
         utilities.update(elapsed);
+        missions.update(elapsed);
         if (holding) {
             apply();
         }
