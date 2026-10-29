@@ -169,7 +169,7 @@ public class NpcScreen {
      * legacy quests or wilderness trades, only what those people deal in.
      */
     private void updateSite(Game g, Npc n, com.veylon.settlement.UrbanSite site, UiRenderer ui, int w, int h) {
-        float pw = 600, ph = 360;
+        float pw = 600, ph = 420;
         float x0 = w / 2f - pw / 2f, y0 = h / 2f - ph / 2f;
         ui.panel(x0, y0, pw, ph);
         ui.textCentered(w / 2f, y0 + 12, 2f, n.name, 1f, 1f, 0.9f, 1f);
@@ -198,7 +198,8 @@ public class NpcScreen {
      * The numbered choices a survivor-site conversation offers, as shown: talk, aid and a gift
      * for anyone; then a camp or stronghold trader's two offers, a medic's dressing, for hidden
      * civilians the word of a safe camp, or a stronghold gatekeeper's leave to come in; then a
-     * threat and an attack; and to a stronghold, news of a raider yard the player has taken.
+     * threat and an attack; to a stronghold, news of a raider yard the player has taken; and, in layout
+     * sixteen, the old radio relay ({@link com.veylon.settlement.UrbanComms}).
      */
     public java.util.List<String> siteOptions(Game g, Npc n) {
         com.veylon.settlement.UrbanSite site = com.veylon.settlement.UrbanSiteDirector.siteOf(g.world, n);
@@ -228,6 +229,9 @@ public class NpcScreen {
         if (site != null && site.stronghold() && com.veylon.settlement.CompoundAccess.unpaidYard(g) != null) {
             out.add("[8] Tell them the raider yard is taken");
         }
+        // Layout sixteen: the old relay, its rumour and its codes (urban milestone 20).
+        String radio = com.veylon.settlement.UrbanComms.radioOption(g, n);
+        if (radio != null) { out.add(radio); }
         return out;
     }
 
@@ -268,6 +272,10 @@ public class NpcScreen {
             case 8 -> {
                 if (!site.stronghold() || com.veylon.settlement.CompoundAccess.unpaidYard(g) == null) { return false; }
                 lastResponse = com.veylon.settlement.CompoundAccess.reward(g, site);
+            }
+            case 9 -> {
+                if (com.veylon.settlement.UrbanComms.radioOption(g, n) == null) { return false; }
+                lastResponse = com.veylon.settlement.UrbanComms.askAboutRadio(g, n);
             }
             default -> { return false; }
         }

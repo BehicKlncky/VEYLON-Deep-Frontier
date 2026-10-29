@@ -107,6 +107,9 @@ final class V3ExtensionSections {
             if (UrbanUtilitiesSection.manages(g)) {
                 sections.add(new V3Section(UrbanUtilitiesSection.ID, UrbanUtilitiesSection.write(g)));
             }
+            if (UrbanMissionsSection.manages(g)) {
+                sections.add(new V3Section(UrbanMissionsSection.ID, UrbanMissionsSection.write(g)));
+            }
             if (UrbanDiscoverySection.present(g)) {
                 sections.add(new V3Section(UrbanDiscoverySection.ID, UrbanDiscoverySection.write(g)));
             }
@@ -315,6 +318,7 @@ final class V3ExtensionSections {
         byte[] compounds = null;
         byte[] fortifications = null;
         byte[] utilities = null;
+        byte[] urbanMissions = null;
         for (int i = 0; i < sectionCount; i++) {
             String id = in.readUTF();
             if (id.isBlank() || !seen.add(id)) {
@@ -371,6 +375,8 @@ final class V3ExtensionSections {
                 fortifications = payload;
             } else if (UrbanUtilitiesSection.ID.equals(id)) {
                 utilities = payload;
+            } else if (UrbanMissionsSection.ID.equals(id)) {
+                urbanMissions = payload;
             } else if (UrbanPopulationSection.ID.equals(id)) {
                 population = payload;
             }
@@ -388,6 +394,8 @@ final class V3ExtensionSections {
         if (fortifications != null) { UrbanFortificationsSection.read(fortifications, g); }
         // Taps and devices are checked against the block edits and plans, which are all in by now.
         if (utilities != null) { UrbanUtilitiesSection.read(utilities, g); }
+        // The objective names sites and the relay by their plans, which need nothing loaded.
+        if (urbanMissions != null) { UrbanMissionsSection.read(urbanMissions, g); }
         if (restoredLanterns) {
             g.world.refreshLoadedLights();
         }

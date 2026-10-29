@@ -54,7 +54,9 @@ class SerializedEnumOrderTest {
             // Urban milestone 19: refuge utilities.
             "GENERATOR", "ELECTRIC_LAMP", "WATER_PURIFIER",
             // Urban milestone 20: the relay mast's cabinet.
-            "RELAY");
+            "RELAY",
+            // The radio workstation, a device on a refuge's wiring.
+            "RADIO");
 
     private static final List<String> ITEM_TYPE_ORDER = List.of(
             "DIRT", "STONE", "SAND", "GRAVEL", "CLAY", "SNOW", "LOG", "PLANK", "WALL", "STICK",
@@ -89,7 +91,9 @@ class SerializedEnumOrderTest {
             // Milestone 18 salvage and fortification.
             "SPARE_PARTS", "BARRICADE", "BARRICADE_METAL", "DOOR_BRACE",
             // Urban milestone 19: refuge utilities.
-            "FUEL_CAN", "GENERATOR", "WORK_LAMP", "WATER_PURIFIER");
+            "FUEL_CAN", "GENERATOR", "WORK_LAMP", "WATER_PURIFIER",
+            // Urban milestone 20: communications parts.
+            "TRANSMITTER_MODULE", "POWER_CELL", "ANTENNA_CABLE", "RADIO");
 
     private static final List<String> QUEST_TYPE_ORDER = List.of(
             "FETCH", "HUNT_PREDATOR", "INVESTIGATE",

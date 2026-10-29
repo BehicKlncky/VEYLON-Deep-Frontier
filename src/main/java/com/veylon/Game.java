@@ -478,12 +478,12 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
                 appState = AppState.PLAYING;
             }
         } else if (appState == AppState.VICTORY) {
-            if (input.wasKeyPressed(GLFW_KEY_ESCAPE)) {
+            if (input.wasKeyPressed(GLFW_KEY_ESCAPE) && !world.isUrban()) { // a city's card never ends the game (urban 20)
                 frontend.returnToTitle();
                 frontend.frame(dt);
                 return;
             }
-            if (input.wasKeyPressed(GLFW_KEY_ENTER)) {
+            if (input.wasKeyPressed(GLFW_KEY_ENTER) || input.wasKeyPressed(GLFW_KEY_ESCAPE)) {
                 appState = AppState.PLAYING;
             }
         } else {
@@ -530,7 +530,7 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
         if (appState == AppState.DEATH) {
             PresentationOverlay.death(ui, deathTimer);
         } else if (appState == AppState.VICTORY) {
-            PresentationOverlay.victory(ui, totalTime, creativeMarked());
+            PresentationOverlay.victory(ui, totalTime, creativeMarked(), world.isUrban());
         }
         ui.end();
     }
@@ -968,7 +968,7 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
         environment.mediumTick(dt);
         ambience.updateAmbienceMix();
         settlementManager.urbanSites.listen(this, dt);
-        refuges.utilities.mediumTick(dt);
+        refuges.mediumTick(dt);
     }
 
     @Override

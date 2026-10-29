@@ -491,7 +491,7 @@ final class PlayerBlockActions {
             case RAIN_COLLECTOR -> game.world.collectorWater.put(pos, 0f);
             case LANTERN -> game.log(
                     "Lantern placed empty. Hold charcoal and press [F] to refuel it.");
-            case GENERATOR, ELECTRIC_LAMP, WATER_PURIFIER -> game.refuges.utilities.placed(pos, place);
+            case GENERATOR, ELECTRIC_LAMP, WATER_PURIFIER, RADIO -> game.refuges.utilities.placed(pos, place);
             case BEACON -> {
                 game.world.beaconPos = pos;
                 game.world.beaconStage = 0;

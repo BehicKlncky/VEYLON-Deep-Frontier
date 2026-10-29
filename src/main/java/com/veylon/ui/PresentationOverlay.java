@@ -39,17 +39,28 @@ public final class PresentationOverlay {
 
     /** The ending card; {@code creativeWorld} adds the permanent-mark note (R6). */
     public static void victory(UiRenderer ui, double time, boolean creativeWorld) {
+        victory(ui, time, creativeWorld, false);
+    }
+
+    /**
+     * The ending card. In a city ({@code urban}) it is the communications objective's completion
+     * (urban milestone 20): the call answered over the old relay, and both Enter and Esc carry on
+     * surviving, since the city's long game goes on after it; the legacy beacon's card keeps Esc for
+     * the title.
+     */
+    public static void victory(UiRenderer ui, double time, boolean creativeWorld, boolean urban) {
         int w = ui.screenW(), h = ui.screenH();
         ui.rect(0, 0, w, h, 0.005f, 0.035f, 0.045f, 0.88f);
         float beam = 0.72f + 0.18f * (float) Math.sin(time * 2.4);
         ui.rect(w / 2f - 2, h * 0.10f, 4, h * 0.38f, 0.22f, 0.85f, 0.90f, beam);
-        ui.textCentered(w / 2f, h / 2f - 34, 2.7f, "SIGNAL ACQUIRED",
+        ui.textCentered(w / 2f, h / 2f - 34, 2.7f, urban ? "THE CITY ANSWERS" : "SIGNAL ACQUIRED",
                 0.54f, 0.96f, 0.98f, 1f);
         ui.textCentered(w / 2f, h / 2f + 8, 1.45f,
-                "The beacon cuts through Veylon's sky. Rescue is inbound.",
+                urban ? "Your call goes out over the old relay, and the survivors of the city answer."
+                        : "The beacon cuts through Veylon's sky. Rescue is inbound.",
                 0.82f, 0.90f, 0.90f, 1f);
         ui.textCentered(w / 2f, h / 2f + 42, 1.12f,
-                "Enter: continue surviving     Esc: return to title",
+                urban ? "Enter or Esc: continue surviving" : "Enter: continue surviving     Esc: return to title",
                 0.52f, 0.64f, 0.68f, 1f);
         if (creativeWorld) {
             ui.textCentered(w / 2f, h / 2f + 74, 1.12f, "Creative world",

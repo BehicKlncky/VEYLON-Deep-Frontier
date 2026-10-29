@@ -125,6 +125,8 @@ public final class UrbanContainers {
                 rolled = LootTables.roll(world.seed,world.urban.contentRevision(),entry.id,plan.table,
                         world.urban.districtAt(position.x(),position.z()),plan.building.variant());
             }
+            // Layout sixteen: the relay's parts are in the first roll of their source containers.
+            rolled = CommsComponents.withPart(world.urban, plan.building, plan.fixture, rolled);
             if (rolled != null) { world.crateContents.put(position,rolled); }
         }
         compact(world,entry);

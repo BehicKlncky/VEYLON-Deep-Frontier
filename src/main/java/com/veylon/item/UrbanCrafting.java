@@ -66,4 +66,14 @@ public final class UrbanCrafting {
                             ItemType.SPARE_PARTS, 1, ItemType.SCRAP, 1),
                     new Recipe("Build Water Purifier", ItemType.WATER_PURIFIER, 1, Station.WORKBENCH,
                             ItemType.SPARE_PARTS, 1, ItemType.SHEET_METAL, 1, ItemType.SCRAP, 2))).toList();
+
+    /**
+     * Generator 19 (urban milestone 20): the utility recipes, plus a radio workstation built at a
+     * workbench round a transmitter module, the module's only use. The relay's own parts are found,
+     * never made. Earlier urban worlds keep their lists.
+     */
+    public static final List<Recipe> MISSION_RECIPES = java.util.stream.Stream.concat(UTILITY_RECIPES.stream(),
+            java.util.stream.Stream.of(
+                    new Recipe("Build Radio Workstation", ItemType.RADIO, 1, Station.WORKBENCH,
+                            ItemType.TRANSMITTER_MODULE, 1, ItemType.SPARE_PARTS, 1, ItemType.SCRAP, 2))).toList();
 }

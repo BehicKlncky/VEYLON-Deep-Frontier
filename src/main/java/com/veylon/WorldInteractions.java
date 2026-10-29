@@ -100,6 +100,11 @@ final class WorldInteractions {
     // ------------------------------------------------------------------
 
     void rightClick() {
+        // Layout sixteen: a part fitted to the aimed relay (urban milestone 20).
+        if (game.refuges.comms.rightClick(game.player.selected())) {
+            game.swingTimer = Math.max(game.swingTimer, SECONDARY_SWING_SECONDS);
+            return;
+        }
         // Layout fifteen: fuel, parts and water used on an aimed device come before drinking or placing.
         if (game.refuges.utilities.rightClick(game.player.selected())) {
             game.swingTimer = Math.max(game.swingTimer, SECONDARY_SWING_SECONDS);
@@ -319,7 +324,12 @@ final class WorldInteractions {
             case WOOD_DOOR, WOOD_DOOR_OPEN, METAL_DOOR, METAL_DOOR_OPEN, WINDOW, WINDOW_OPEN ->
                     FixtureActions.interact(game, pos.x(), pos.y(), pos.z());
             // Layout fifteen: a device's switch (urban milestone 19).
-            case GENERATOR, ELECTRIC_LAMP, WATER_PURIFIER -> game.refuges.utilities.toggle(pos);
+            case GENERATOR, ELECTRIC_LAMP, WATER_PURIFIER, RADIO -> game.refuges.utilities.toggle(pos);
+            // Layout sixteen: F at the relay says what it still lacks (urban milestone 20).
+            case RELAY -> {
+                game.log(game.refuges.comms.relayPrompt() + ".");
+                yield true;
+            }
             default -> false;
         };
     }
@@ -387,7 +397,7 @@ final class WorldInteractions {
             }
             case CAMPFIRE, LANTERN, POWDER_KEG, GATE, ALARM_BELL, BEACON, BEACON_LIT ->
                     interactWithBlockAt(pos);
-            case GENERATOR, ELECTRIC_LAMP, WATER_PURIFIER -> {
+            case GENERATOR, ELECTRIC_LAMP, WATER_PURIFIER, RADIO, RELAY -> {
                 if (!interactWithBlockAt(pos)) {
                     return false;
                 }

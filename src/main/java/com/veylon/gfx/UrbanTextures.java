@@ -69,6 +69,8 @@ final class UrbanTextures {
             case "purifier_top" -> purifier(p, true);
             case "relay_side" -> relay(p, false);
             case "relay_top" -> relay(p, true);
+            case "radio_side" -> radio(p, false);
+            case "radio_top" -> radio(p, true);
             default -> {
                 return false;
             }
@@ -873,6 +875,39 @@ final class UrbanTextures {
         }
         p.box(0, 0, n - 1, n - 1, rim, 0x2e3438);
         p.fillFbmBlend(0x6a4a30, 0.74f, 5, 1923, 0.22f);
+        p.grain(0.05f);
+    }
+
+    /**
+     * A radio workstation built round a transmitter module (milestone 20): an olive steel case with a
+     * dial window, a grille over its speaker, two knobs and a key switch on its face; a handset cradle
+     * and a whip socket on top. Its one accent is the dial's dim green.
+     */
+    private static void radio(Painter p, boolean top) {
+        int n = p.size, rim = Math.max(1, n / 16);
+        p.fillFbm(0x4e5646, 0.08f, 6, 1931);
+        if (top) {
+            p.box(n / 6, n / 4, n - n / 6, n / 2, Math.max(1, n / 20), 0x23261f); // the handset cradle
+            p.blob(n - n / 5, n - n / 5, Math.max(1, n / 12), 0x1e201c); // the whip socket
+            p.dot(n - n / 5, n - n / 5, 0x9a9c90);
+        } else {
+            for (int y = n / 6; y < n / 3; y++) {
+                for (int x = n / 6; x < n - n / 6; x++) {
+                    p.set(x, y, p.shade(0x3a5a3a, 0.75f + p.noise(x, y, 4, 1932) * 0.3f)); // the dial window
+                }
+            }
+            int slot = Math.max(1, n / 20);
+            for (int y = n / 2; y < n - n / 6; y++) {
+                for (int x = n / 6; x < n / 2; x++) {
+                    if ((x / slot + y / slot) % 2 == 0) { p.mulAt(x, y, 0.62f); } // the speaker grille
+                }
+            }
+            p.blob(2 * n / 3, n / 2 + n / 10, Math.max(1, n / 12), 0x24261f); // two knobs
+            p.blob(2 * n / 3 + n / 6, n / 2 + n / 10, Math.max(1, n / 14), 0x24261f);
+            p.dot(2 * n / 3 + n / 12, n - n / 4, 0x8a8c80); // the key switch
+        }
+        p.box(0, 0, n - 1, n - 1, rim, 0x2a2e26);
+        p.fillFbmBlend(0x5a4a34, 0.76f, 5, 1933, 0.2f);
         p.grain(0.05f);
     }
 

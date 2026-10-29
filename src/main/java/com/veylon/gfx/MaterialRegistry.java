@@ -246,6 +246,8 @@ public final class MaterialRegistry {
             // Milestone 20: the relay mast's weathered steel cabinet, its vents and dead indicator lamps.
             register("relay", BlockType.RELAY, "relay_top", "relay_side", "relay_top",
                     1, TintMode.NONE, false, 0f, 0.4f);
+            register("radio", BlockType.RADIO, "radio_top", "radio_side", "radio_top",
+                    1, TintMode.NONE, false, 0f, 0.42f);
 
             // Standalone prop tiles used by special shapes (torch flame, campfire, basin water...).
             propTile("torch_head", 1.0f, 0.9f);

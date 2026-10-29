@@ -803,6 +803,48 @@ public final class IconAtlas {
                 c.rect(11, 5, 19, 9, 0xFF5A1A12);
                 c.line(20, 7, 25, 3, 2, 0xFF7A7A72);
             }
+            // Milestone 20: the relay's parts read by their shapes.
+            case TRANSMITTER_MODULE -> {
+                // A green circuit board in a steel bracket, with chips, a crystal can and a connector.
+                c.rect(4, 8, 28, 26, 0xFF3A3E42);
+                c.rect(6, 10, 26, 24, base);
+                c.rect(9, 13, 15, 18, 0xFF1C1E20);
+                c.rect(18, 13, 23, 16, 0xFF1C1E20);
+                c.circle(20, 21, 2, 0xFFB8B8B0);
+                for (int x = 8; x <= 24; x += 4) { c.line(x, 24, x, 28, 1, 0xFFC8A040); }
+                c.line(9, 20, 16, 20, 1, 0xFFC8A040);
+            }
+            case POWER_CELL -> {
+                // Two squat cells side by side, amber sleeves, their terminals on top.
+                for (int x : new int[]{6, 17}) {
+                    c.rect(x, 9, x + 9, 28, shade(base, 0.55f));
+                    c.rect(x + 1, 10, x + 8, 27, base);
+                    c.rect(x + 3, 6, x + 6, 9, 0xFF8A8C88);
+                    c.line(x + 1, 15, x + 8, 15, 1, 0xFF2A2A2A);
+                }
+            }
+            case ANTENNA_CABLE -> {
+                // A coil of black coax, two turns with a gap between, and a brass plug on its free end.
+                for (int y = -10; y <= 10; y++) {
+                    for (int x = -10; x <= 10; x++) {
+                        int d = x * x + y * y;
+                        if (d <= 100 && d > 56) { c.set(14 + x, 17 + y, 0xFF1A1A1C); }
+                        else if (d <= 36 && d > 12) { c.set(14 + x, 17 + y, 0xFF2E2E30); }
+                    }
+                }
+                c.line(22, 22, 28, 28, 2, 0xFF1A1A1C);
+                c.rect(26, 26, 30, 30, 0xFFC8A040);
+            }
+            case RADIO -> {
+                // An olive set with a green dial, a speaker grille, knobs and a whip aerial.
+                c.rect(4, 12, 28, 28, shade(base, 0.55f));
+                c.rect(5, 13, 27, 27, base);
+                c.rect(7, 15, 25, 18, 0xFF3A5A3A);
+                for (int y = 20; y <= 26; y += 2) { c.line(7, y, 14, y, 1, shade(base, 0.45f)); }
+                c.circle(19, 23, 2, 0xFF24261F);
+                c.circle(24, 23, 2, 0xFF24261F);
+                c.line(24, 12, 29, 3, 1, 0xFF8A8C80);
+            }
             case SPARE_PARTS -> {
                 // A toothed gear beside a coiled spring and a twist of copper wire.
                 for (int i = 0; i < 8; i++) {

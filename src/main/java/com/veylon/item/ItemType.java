@@ -223,7 +223,16 @@ public enum ItemType {
     GENERATOR("Generator", p().stack(1).places("GENERATOR").weight(16f).color(0.55f, 0.24f, 0.18f)),
     WORK_LAMP("Work Lamp", p().stack(4).places("ELECTRIC_LAMP").weight(0.8f).color(0.86f, 0.84f, 0.70f)),
     // A pump and filter unit that treats untreated water on a generator's power.
-    WATER_PURIFIER("Water Purifier", p().stack(1).places("WATER_PURIFIER").weight(9f).color(0.55f, 0.60f, 0.64f));
+    WATER_PURIFIER("Water Purifier", p().stack(1).places("WATER_PURIFIER").weight(9f).color(0.55f, 0.60f, 0.64f)),
+
+    // ---- Communications restoration (urban package 20; append-only) ----
+    // The three kinds of part the old relay and a radio workstation need, found in the city's
+    // security posts, warehouses, clinics and offices (CommsComponents), or kept by a stronghold.
+    TRANSMITTER_MODULE("Transmitter Module", p().stack(1).weight(1.6f).color(0.30f, 0.42f, 0.36f)),
+    POWER_CELL("Power Cells", p().stack(4).weight(1.2f).color(0.78f, 0.62f, 0.22f)),
+    ANTENNA_CABLE("Antenna Cable", p().stack(2).weight(1.8f).color(0.20f, 0.20f, 0.22f)),
+    // A radio workstation built at a workbench round a transmitter module.
+    RADIO("Radio Workstation", p().stack(1).places("RADIO").weight(7f).color(0.34f, 0.38f, 0.33f));
 
     public final String displayName;
     public final int maxStack;

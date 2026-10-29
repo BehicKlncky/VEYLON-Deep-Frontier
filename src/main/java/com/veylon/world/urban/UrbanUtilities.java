@@ -97,7 +97,9 @@ public final class UrbanUtilities {
     public enum Kind {
         GENERATOR(1, BlockType.GENERATOR, "generator"),
         LAMP(2, BlockType.ELECTRIC_LAMP, "work lamp"),
-        PURIFIER(3, BlockType.WATER_PURIFIER, "water purifier");
+        PURIFIER(3, BlockType.WATER_PURIFIER, "water purifier"),
+        /** Layout sixteen (milestone 20): a radio workstation, a load while it is switched on. */
+        RADIO(4, BlockType.RADIO, "radio workstation");
 
         public final int code;
         public final BlockType block;
@@ -175,6 +177,11 @@ public final class UrbanUtilities {
             return kind == Kind.LAMP && on && feeder != null;
         }
 
+        /** A radio workstation switched on and fed. */
+        public boolean transmitting() {
+            return kind == Kind.RADIO && on && feeder != null;
+        }
+
         /** A purifier switched on, fed and with a filter that still works. */
         public boolean working() {
             return kind == Kind.PURIFIER && on && feeder != null && condition > 0;
@@ -190,7 +197,8 @@ public final class UrbanUtilities {
          * to treat or room to pump into.
          */
         public boolean drawing() {
-            return lit() || working() && (untreated > 0 && clean < PURIFIER_LITRES || untreated <= PURIFIER_LITRES - 1f);
+            return lit() || transmitting()
+                    || working() && (untreated > 0 && clean < PURIFIER_LITRES || untreated <= PURIFIER_LITRES - 1f);
         }
     }
 
@@ -338,6 +346,9 @@ public final class UrbanUtilities {
         }
         if (kind == Kind.GENERATOR && generatorOf(building) != null) {
             return "This building's wiring already has a generator";
+        }
+        if (kind == Kind.RADIO && (w.urban == null || !w.urban.hasMissions())) {
+            return "Nothing on the air in this city answers a radio";
         }
         return null;
     }

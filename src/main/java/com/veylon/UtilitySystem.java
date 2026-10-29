@@ -174,12 +174,17 @@ final class UtilitySystem {
         if (!applies(game.world) || !UrbanUtilities.isDevice(t)) { return; }
         Device d = ledger().add(game.world, pos, t);
         if (d == null) { return; }
+        if (d.kind == Kind.RADIO) {
+            refuges.comms.radioPlaced(d);
+            return;
+        }
         game.log(switch (d.kind) {
             case GENERATOR -> "Generator put down. Pour in a fuel can, then press [F] to start it.";
             case LAMP -> d.powered() ? "Work lamp put down on the running generator's wiring."
                     : "Work lamp put down: it lights while a generator in this building runs.";
             case PURIFIER -> "Water purifier put down. Its filter is spent: pack it with "
                     + UrbanUtilities.FILTER_FIBRE + " fibre.";
+            case RADIO -> "Radio workstation put down.";
         });
     }
 
@@ -218,6 +223,13 @@ final class UtilitySystem {
                         : d.condition <= 0 ? "You switch the water purifier on, but its filter is spent."
                         : d.powered() ? "The water purifier hums into work."
                         : "You switch the water purifier on, but nothing feeds it.");
+            }
+            // Layout sixteen: the radio workstation (urban milestone 20).
+            case RADIO -> {
+                d.on = !d.on;
+                ledger().settle(game.world);
+                game.audio.playClick();
+                refuges.comms.radioSwitched(d);
             }
         }
         return true;
@@ -268,6 +280,7 @@ final class UtilitySystem {
                     : d.on ? "[F] Switch off: " + (d.treating() ? "treating" : d.powered() ? "pumping" : "no power")
                     + ", " + litres(d.untreated) + " in, " + litres(d.clean) + " clean"
                     : "[F] Switch on (" + litres(d.untreated) + " in, " + litres(d.clean) + " clean)";
+            case RADIO -> refuges.comms.radioPrompt(d);
         };
     }
 
@@ -477,6 +490,7 @@ final class UtilitySystem {
         UrbanUtilities u = ledger();
         List<Device> all = u.devices();
         boolean changed = false;
+        refuges.comms.beginTick();
         for (int i = 0; i < all.size(); i++) {
             Device g = all.get(i);
             if (!g.running() || dormant(g)) { continue; }
@@ -486,6 +500,8 @@ final class UtilitySystem {
             if (g.fuel < 1e-3f) { g.fuel = 0; }
             g.condition = Math.max(0f, g.condition - run / UrbanUtilities.WEAR_SECONDS);
             if (feedPurifiers(u, g, run)) { changed = true; }
+            // Layout sixteen: a radio on this generator transmits for the seconds it ran (urban milestone 20).
+            refuges.comms.broadcast(g, run, all);
             float x = g.pos.x() + .5f, y = g.pos.y() + .5f, z = g.pos.z() + .5f;
             if ((g.noiseTimer -= dt) <= 0) {
                 g.noiseTimer += NOISE_INTERVAL;

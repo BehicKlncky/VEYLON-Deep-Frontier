@@ -239,8 +239,10 @@ public class Hud {
                         : "Camp / " + g.faction.standing() + " (" + (int) g.faction.trust + ")",
                 g.faction.hostile ? RED_TEXT : TEXT);
         rect(ui, x, box.y() + 79, width, 1, LINE, 0.65f);
-        fitted(ui, x, box.y() + 89, width, BODY,
-                g.faction.quest == null ? "No active request" : g.faction.quest.describe(), TEXT);
+        // Layout sixteen: the communications objective's next step stands in for the legacy request (urban 20).
+        String comms = com.veylon.settlement.UrbanComms.hudLine(g);
+        fitted(ui, x, box.y() + 89, width, BODY, comms != null ? comms
+                : g.faction.quest == null ? "No active request" : g.faction.quest.describe(), TEXT);
         String navigation = QuestObjectiveView.navigationLabel(g);
         fitted(ui, x, box.y() + 120, width, SMALL,
                 navigation.isEmpty() ? "[M] Map & navigation" : navigation, CYAN);

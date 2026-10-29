@@ -98,6 +98,9 @@ public final class SalvageTable {
                     stacks(ItemType.SPARE_PARTS, 1)) : null;
             case WATER_PURIFIER -> w.urban.hasUtilities() ? metal("water purifier", 4f, ItemType.SHEET_METAL, 1,
                     ItemType.SPARE_PARTS, 1, ItemType.SCRAP, 1) : null;
+            // Layout sixteen's radio (milestone 20) gives its transmitter module back, first so wear never takes it.
+            case RADIO -> w.urban.hasMissions() ? metal("radio workstation", 4f, ItemType.TRANSMITTER_MODULE, 1,
+                    ItemType.SCRAP, 1) : null;
             default -> null;
         };
     }

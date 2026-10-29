@@ -50,16 +50,29 @@ final class RefugeSystem {
     private double pendingUntil;
     /** The water and power of a layout-fifteen city's refuges (urban milestone 19). */
     final UtilitySystem utilities;
+    /** The relay repaired and the broadcast made, in a layout-sixteen city (urban milestone 20). */
+    final CommsObjective comms;
 
     RefugeSystem(Game game) {
         this.game = game;
         this.utilities = new UtilitySystem(game, this);
+        this.comms = new CommsObjective(game);
     }
 
     void reset() {
         pendingGiveUp = UrbanIds.NONE;
         pendingUntil = 0;
         utilities.reset();
+        comms.reset();
+    }
+
+    /**
+     * The medium tick of a city's refuges: their utilities (milestone 19) and, in layout sixteen, the
+     * communications objective (milestone 20).
+     */
+    void mediumTick(float dt) {
+        utilities.mediumTick(dt);
+        com.veylon.settlement.UrbanComms.mediumTick(game, dt);
     }
 
     static boolean applies(World w) {

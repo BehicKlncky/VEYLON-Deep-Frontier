@@ -83,6 +83,8 @@ public final class UrbanWorldState {
     public final UrbanRefuges refuges = new UrbanRefuges();
     /** Layout fifteen: the water drawn from each building's taps (milestone 19). */
     public final UrbanUtilities utilities = new UrbanUtilities();
+    /** Layout sixteen: what the survivor has learned and done toward the city's communications (milestone 20). */
+    public final UrbanMissions missions = new UrbanMissions();
     /** Layout sixteen: the world's relay mast, planned once on first need (milestone 20). */
     private RelaySites.Site relay;
     private boolean relayPlanned;

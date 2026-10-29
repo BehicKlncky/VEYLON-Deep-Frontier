@@ -31,7 +31,7 @@ import java.util.Set;
  * {@value UrbanUtilities#MAX_DEVICES}), then per device, in the order they were put down, a byte
  * kind code, its int x, y, z, a byte switch (0 off, 1 on), float condition (a generator's wear, a
  * purifier's filter), float a and float b: a generator's fuel and zero, a purifier's untreated and
- * clean litres, zero and zero for a lamp.
+ * clean litres, zero and zero for a lamp or (layout sixteen) a radio workstation.
  *
  * <p>A tap row must name a planned building whose taps held something, with at least one litre and
  * no more than they held drawn, once. A device row must stand on a recorded edit of its own block
@@ -142,6 +142,12 @@ final class UrbanUtilitiesSection {
                         d.clean = b;
                         if (a < 0 || a > UrbanUtilities.PURIFIER_LITRES || b < 0 || b > UrbanUtilities.PURIFIER_LITRES) {
                             throw new IOException("invalid " + ID + " purifier row");
+                        }
+                    }
+                    // Layout sixteen: a radio keeps only its switch; its broadcast is the objective's.
+                    case RADIO -> {
+                        if (!g.world.urban.hasMissions() || condition != UrbanUtilities.SOUND || a != 0f || b != 0f) {
+                            throw new IOException("invalid " + ID + " radio row");
                         }
                     }
                 }

@@ -152,7 +152,11 @@ public enum BlockType {
     // Urban milestone 20: the cabinet of the old relay mast on one precinct roof (RelaySites), which
     // the communications objective repairs. It cannot be broken or blasted; what has been fitted into
     // it is kept by the missions ledger, never as a block state.
-    RELAY("Relay Mast", Shape.CUBE, true, true, false, -1f, ToolKind.NONE, false, null, 0, 0, 0f, 0.40f, 0.45f, 0.48f);
+    RELAY("Relay Mast", Shape.CUBE, true, true, false, -1f, ToolKind.NONE, false, null, 0, 0, 0f, 0.40f, 0.45f, 0.48f),
+    // A radio workstation built round a transmitter module: on a generator's wiring in a refuge it carries
+    // a broadcast through the repaired relay. Its switch is in UrbanUtilities, like a lamp's; taking it
+    // apart (SalvageTable) gives the module back.
+    RADIO("Radio Workstation", Shape.CUBE, true, true, false, 2.5f, ToolKind.PICKAXE, false, null, 0, 0, 0f, 0.34f, 0.38f, 0.33f);
 
     /**
      * How a block is meshed. Not persisted: only {@link BlockType} ordinals are

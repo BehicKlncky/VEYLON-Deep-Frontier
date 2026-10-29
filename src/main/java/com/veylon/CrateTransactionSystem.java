@@ -364,6 +364,8 @@ final class CrateTransactionSystem {
             if (openEntry != null) {
                 game.world.urban.containers.compact(game.world,openEntry);
                 game.openCrate = game.world.crateContents.get(openEntry.position);
+                // Layout sixteen: a part of the old relay, recovered (urban milestone 20).
+                com.veylon.settlement.UrbanComms.onTaken(game, type, taken);
             }
         }
         if (leftover > 0) { game.log(taken > 0 ? "Some supplies remain: your inventory is full." : "Your inventory is full."); }
