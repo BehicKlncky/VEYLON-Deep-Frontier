@@ -473,6 +473,25 @@ public final class IconAtlas {
                 c.circle(7, 22, 4, 0xFFC5A66D);
                 c.line(9, 19, 9, 26, 1, 0xFF4A392A);
             }
+            // Milestone 19 utilities read by their silhouette too.
+            case GENERATOR -> {
+                c.clear();
+                c.rect(5, 9, 27, 27, 0xFF1C1D20);
+                c.rect(7, 11, 25, 16, 0xFF8A3426);
+                c.circle(16, 12, 2, 0xFF262628);
+                c.rect(8, 18, 20, 25, 0xFF4A4C4E);
+                for (int y = 19; y <= 24; y += 2) { c.line(8, y, 20, y, 1, 0xFF2E3032); }
+                c.circle(23, 21, 3, 0xFF2A2A2C);
+                c.circle(23, 21, 1, 0xFFB0A890);
+            }
+            case WORK_LAMP -> {
+                c.clear();
+                c.rect(11, 25, 21, 28, 0xFF3A3D42);
+                c.line(16, 25, 16, 16, 2, 0xFF56606A);
+                c.circle(16, 11, 7, 0xFFE8D27A);
+                c.circle(16, 11, 4, 0xFFFFF2B8);
+                c.line(9, 5, 23, 5, 2, 0xFF3A3D42);
+            }
             // Urban fixtures read by their silhouette, not as a cube of their texture.
             case WOOD_DOOR -> {
                 c.clear();
@@ -764,6 +783,14 @@ public final class IconAtlas {
                 c.line(13, 20, 18, 15, 3, 0xFF5A5E62);
                 c.circle(8, 25, 1, 0xFFC8C4B8);
                 c.circle(24, 7, 1, 0xFFC8C4B8);
+            }
+            case FUEL_CAN -> {
+                // A red jerrycan with its handle and spout.
+                c.rect(8, 9, 24, 29, 0xFF5A1A12);
+                c.rect(9, 10, 23, 28, 0xFFA8382A);
+                c.line(9, 19, 23, 19, 1, 0xFF7A2418);
+                c.rect(11, 5, 19, 9, 0xFF5A1A12);
+                c.line(20, 7, 25, 3, 2, 0xFF7A7A72);
             }
             case SPARE_PARTS -> {
                 // A toothed gear beside a coiled spring and a twist of copper wire.

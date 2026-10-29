@@ -98,6 +98,18 @@ public class ChunkMesher {
                                         lit ? 1f : 0.58f, lit ? 1f : 0.62f);
                                 box(wx + 0.40f, y + 0.52f, wz + 0.40f, wx + 0.60f, y + 0.62f, wz + 0.60f,
                                         layer("anvil_metal"), wx, y, wz, 1f, 1f, 1f);
+                            } else if (t == BlockType.ELECTRIC_LAMP) {
+                                // Milestone 19: a work lamp on a short stand, its dome lit only while fed.
+                                boolean lit = world.isLampLit(wx, y, wz);
+                                box(wx + 0.34f, y, wz + 0.34f, wx + 0.66f, y + 0.08f, wz + 0.66f,
+                                        layer("anvil_metal"), wx, y, wz, 1f, 1f, 1f);
+                                box(wx + 0.47f, y + 0.08f, wz + 0.47f, wx + 0.53f, y + 0.34f, wz + 0.53f,
+                                        layer("anvil_metal"), wx, y, wz, 1f, 1f, 1f);
+                                box(wx + 0.32f, y + 0.34f, wz + 0.32f, wx + 0.68f, y + 0.62f, wz + 0.68f,
+                                        layer(lit ? "lantern_glass" : "lantern_glass_unlit"),
+                                        wx, y, wz, lit ? 1f : 0.55f, lit ? 1f : 0.58f, lit ? 1f : 0.62f);
+                                box(wx + 0.30f, y + 0.62f, wz + 0.30f, wx + 0.70f, y + 0.67f, wz + 0.70f,
+                                        layer("anvil_metal"), wx, y, wz, 1f, 1f, 1f);
                             } else if (t == BlockType.TRAIL_MARKER) {
                                 box(wx + 0.46f, y, wz + 0.46f, wx + 0.54f, y + 0.55f, wz + 0.54f,
                                         layer("log_side"), wx, y, wz, 1f, 1f, 1f);

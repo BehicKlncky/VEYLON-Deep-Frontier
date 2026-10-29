@@ -161,6 +161,9 @@ public final class CraftingSystem {
     }
 
     public static List<Recipe> recipesFor(com.veylon.world.World world) {
+        if (world.urban != null && world.urban.hasUtilities()) {
+            return UrbanCrafting.UTILITY_RECIPES;
+        }
         if (world.urban != null && world.urban.hasRefuges()) {
             return UrbanCrafting.REFUGE_RECIPES;
         }

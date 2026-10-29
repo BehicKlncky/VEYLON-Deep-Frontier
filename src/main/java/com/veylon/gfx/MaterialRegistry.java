@@ -235,6 +235,12 @@ public final class MaterialRegistry {
                     1, TintMode.NONE, false, 0f, 0.9f);
             register("barricade_metal", BlockType.BARRICADE_METAL, "barricade_metal", "barricade_metal",
                     "barricade_metal", 1, TintMode.NONE, false, 0f, 0.4f);
+            // Milestone 19 utilities: a salvaged generator's frame, tank and engine, and the work lamp,
+            // which the mesher builds from the lantern's glass and metal like the lantern itself.
+            register("generator", BlockType.GENERATOR, "generator_top", "generator_side", "generator_top",
+                    1, TintMode.NONE, false, 0f, 0.45f);
+            register("work_lamp", BlockType.ELECTRIC_LAMP, "lantern_glass", "anvil_metal", "anvil_metal",
+                    1, TintMode.NONE, false, 0.85f, 0.4f);
 
             // Standalone prop tiles used by special shapes (torch flame, campfire, basin water...).
             propTile("torch_head", 1.0f, 0.9f);

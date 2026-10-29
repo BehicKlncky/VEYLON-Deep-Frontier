@@ -63,6 +63,8 @@ final class UrbanTextures {
             case "car_wreck_top" -> carWreck(p, true);
             case "barricade" -> barricade(p);
             case "barricade_metal" -> metalBarricade(p);
+            case "generator_side" -> generator(p, false);
+            case "generator_top" -> generator(p, true);
             default -> {
                 return false;
             }
@@ -764,6 +766,44 @@ final class UrbanTextures {
             p.blob(bolt[0], bolt[1], 1, 0xa8b0b4);
         }
         p.grain(0.04f);
+    }
+
+    /**
+     * A small petrol generator rebuilt from salvage (milestone 19): a black tubular frame round a
+     * dark engine block with cooling fins, a faded red fuel tank over it and a pull-cord housing,
+     * so it reads as a machine rather than a sheet of metal. Red is its one accent.
+     */
+    private static void generator(Painter p, boolean top) {
+        int n = p.size, rim = Math.max(1, n / 14);
+        p.fillFbm(0x3a3c3e, 0.08f, 5, 1901);
+        if (top) {
+            int m = n / 6;
+            for (int y = m; y < n - m; y++) {
+                for (int x = m; x < n - m; x++) {
+                    p.set(x, y, p.shade(0x8a3426, 0.82f + p.noise(x, y, 6, 1902) * 0.28f));
+                }
+            }
+            p.blob(n / 2, n / 2, Math.max(1, n / 10), 0x262628); // the filler cap
+            p.dot(n / 2, n / 2, 0x8a8a84);
+        } else {
+            for (int y = 0; y < n / 4; y++) {
+                for (int x = 0; x < n; x++) {
+                    p.set(x, y, p.shade(0x8a3426, 0.78f + p.noise(x, y, 5, 1903) * 0.3f));
+                }
+            }
+            int fin = Math.max(1, n / 16);
+            for (int y = n / 3; y < n - n / 6; y++) {
+                boolean ridge = (y / fin) % 2 == 0;
+                for (int x = n / 6; x < n - n / 3; x++) {
+                    p.set(x, y, p.shade(0x4a4c4e, ridge ? 1.05f : 0.68f));
+                }
+            }
+            p.blob(n - n / 5, n / 2 + n / 12, Math.max(1, n / 11), 0x1e1e20); // the pull-cord recoil
+            p.dot(n - n / 5, n / 2 + n / 12, 0xb0a890);
+        }
+        p.box(0, 0, n - 1, n - 1, rim, 0x161618); // the tubular frame
+        p.fillFbmBlend(0x6a4028, 0.72f, 5, 1904, 0.25f);
+        p.grain(0.05f);
     }
 
     private static void railingTop(Painter p) {

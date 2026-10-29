@@ -968,6 +968,7 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
         environment.mediumTick(dt);
         ambience.updateAmbienceMix();
         settlementManager.urbanSites.listen(this, dt);
+        refuges.utilities.mediumTick(dt);
     }
 
     @Override

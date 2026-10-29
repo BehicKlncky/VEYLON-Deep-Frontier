@@ -214,7 +214,14 @@ public enum ItemType {
     // Fortification: boards or sheet metal to fix across an opening, and a beam to brace a barred door.
     BARRICADE("Plank Barricade", p().stack(8).places("BARRICADE").weight(3.2f).color(0.56f, 0.42f, 0.26f)),
     BARRICADE_METAL("Sheet-Metal Barricade", p().stack(4).places("BARRICADE_METAL").weight(4.5f).color(0.44f, 0.47f, 0.48f)),
-    DOOR_BRACE("Door Brace", p().stack(4).weight(2.4f).color(0.50f, 0.38f, 0.24f));
+    DOOR_BRACE("Door Brace", p().stack(4).weight(2.4f).color(0.50f, 0.38f, 0.24f)),
+
+    // ---- Refuge utilities (urban package 19; append-only) ----
+    // What was left in the tank of a car that did not burn: a can runs a generator five minutes.
+    FUEL_CAN("Fuel Can", p().stack(4).weight(1.4f).color(0.66f, 0.22f, 0.16f)),
+    // A small petrol generator rebuilt from engine parts, and the wired lamp it lights.
+    GENERATOR("Generator", p().stack(1).places("GENERATOR").weight(16f).color(0.55f, 0.24f, 0.18f)),
+    WORK_LAMP("Work Lamp", p().stack(4).places("ELECTRIC_LAMP").weight(0.8f).color(0.86f, 0.84f, 0.70f));
 
     public final String displayName;
     public final int maxStack;

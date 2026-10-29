@@ -80,6 +80,7 @@ final class ProceduralAudio {
         InfectedSounds.synthesize(sink);
         EcologySounds.synthesize(sink);
         SurvivorSounds.synthesize(sink);
+        UtilitySounds.synthesize(sink);
     }
 
     // ---- 0.3.0 combat & settlement synthesis ----

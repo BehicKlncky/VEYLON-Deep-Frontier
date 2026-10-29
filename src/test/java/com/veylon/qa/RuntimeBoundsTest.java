@@ -494,7 +494,7 @@ class RuntimeBoundsTest {
         int cap = com.veylon.world.urban.UrbanUtilities.MAX_TAPPED;
         java.util.Map<Long, Integer> rows = new java.util.HashMap<>();
         for (int i = 0; i < cap; i++) { rows.put(farBuilding(i), 1); }
-        u.restore(rows);
+        u.restore(game.world, rows, java.util.List.of());
         var neighbour = com.veylon.RefugeWorldArena.neighbour(game);
         var tap = com.veylon.UtilityWorldArena.basins(neighbour).getFirst();
         game.player.inventory.clear();
@@ -510,8 +510,34 @@ class RuntimeBoundsTest {
         assertTrue(RuntimeBudgetSnapshot.hardLimitSummary().contains("tapped=" + cap));
         assertThrows(IllegalArgumentException.class, () -> {
             rows.put(farBuilding(cap), 1);
-            u.restore(rows);
+            u.restore(game.world, rows, java.util.List.of());
         });
+    }
+
+    @Test
+    void theDeviceLedgerStopsAtItsCapAndAFullOneTakesNoNewDevice() {
+        com.veylon.Game game = com.veylon.UtilityWorldArena.session(com.veylon.entity.GameMode.SURVIVAL);
+        var u = game.world.urban.utilities;
+        int cap = com.veylon.world.urban.UrbanUtilities.MAX_DEVICES;
+        var neighbour = com.veylon.RefugeWorldArena.neighbour(game);
+        java.util.List<com.veylon.world.urban.UrbanUtilities.Device> devices = new java.util.ArrayList<>();
+        for (int i = 0; i < cap; i++) {
+            devices.add(new com.veylon.world.urban.UrbanUtilities.Device(com.veylon.world.urban.UrbanUtilities.Kind.LAMP,
+                    new com.veylon.util.Vec3i(200_000 + i, 50, 0), neighbour.id()));
+        }
+        u.restore(game.world, java.util.Map.of(), devices);
+        var room = com.veylon.RefugeWorldArena.piece(neighbour, 1, BlockType.CAMP_BED).target();
+        com.veylon.SurvivorWorldArena.standAt(game, room);
+        assertEquals("Too many devices are wired up already (" + cap + ")",
+                u.placementRefusal(game.world, room.offset(0, 1, 0), BlockType.ELECTRIC_LAMP));
+        assertNull(u.add(game.world, room.offset(0, 1, 0), BlockType.ELECTRIC_LAMP), "a full ledger takes no device");
+        RuntimeBudgetSnapshot full = RuntimeBudgetSnapshot.capture(game);
+        assertEquals(cap, full.utilityDevices());
+        assertTrue(full.withinHardLimits(), full.occupancySummary());
+        assertTrue(RuntimeBudgetSnapshot.hardLimitSummary().contains("devices=" + cap));
+        devices.add(new com.veylon.world.urban.UrbanUtilities.Device(com.veylon.world.urban.UrbanUtilities.Kind.LAMP,
+                new com.veylon.util.Vec3i(300_000, 50, 0), neighbour.id()));
+        assertThrows(IllegalArgumentException.class, () -> u.restore(game.world, java.util.Map.of(), devices));
     }
 
     /** A building id in a far region, distinct for every index; no plan is ever built for it. */

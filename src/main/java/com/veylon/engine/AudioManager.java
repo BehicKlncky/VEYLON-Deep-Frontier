@@ -52,6 +52,8 @@ public class AudioManager {
     private final int[] ecologyBuffers = new int[EcologySounds.Cue.values().length];
     // Milestone 16: people hiding behind a wall (SurvivorSounds).
     private final int[] survivorBuffers = new int[SurvivorSounds.Cue.values().length];
+    // Milestone 19: a salvaged generator starting, running and dying (UtilitySounds).
+    private final int[] utilityBuffers = new int[UtilitySounds.Cue.values().length];
 
     /** Positioned gameplay cues; presentation never emits AI noise or changes simulation. */
     public void playInfected(InfectedSounds.Cue cue, float x, float y, float z) {
@@ -66,6 +68,11 @@ public class AudioManager {
     /** Milestone 16: a quiet sound of people in hiding, carrying only a short way; presentation only. */
     public void playSurvivor(SurvivorSounds.Cue cue, float x, float y, float z) {
         if (enabled) { playAt(survivorBuffers[cue.ordinal()], x, y, z, 0.6f, pitchVar(0.06f), 2f, 18f); }
+    }
+
+    /** Milestone 19: a generator's engine, heard down a street; presentation only, its AI noise is separate. */
+    public void playUtility(UtilitySounds.Cue cue, float x, float y, float z) {
+        if (enabled) { playAt(utilityBuffers[cue.ordinal()], x, y, z, 0.7f, pitchVar(0.03f), 3f, 40f); }
     }
 
     // Ambience loops.
@@ -313,7 +320,7 @@ public class AudioManager {
             case STONE, GRAVEL, COAL_ORE, COPPER_ORE, IRON_ORE, RUIN_STONE, FURNACE, ASH,
                  SCRAP_BLOCK, POD_HULL, ICE, STONE_BRICK, BASALT, ASPHALT, PAVING, CONCRETE,
                  BRICK, PLASTER, SHEET_METAL, RUBBLE, STAIRS, LOCKER, METAL_DOOR, RAILING,
-                 HIDDEN_PANEL, CAR_WRECK, BARRICADE_METAL -> bFootStone;
+                 HIDDEN_PANEL, CAR_WRECK, BARRICADE_METAL, GENERATOR -> bFootStone;
             case PLANK, LOG, WORKBENCH, CRATE, WALL, MAP_TABLE, HERB_STATION, WOOD_DOOR, SHELF,
                  CABINET, TABLE, SIGN, BARRICADE -> bFootWood;
             case SNOW -> bFootSnow;
@@ -771,6 +778,9 @@ public class AudioManager {
         }
         for (SurvivorSounds.Cue cue : SurvivorSounds.Cue.values()) {
             survivorBuffers[cue.ordinal()] = bank.get(SurvivorSounds.key(cue));
+        }
+        for (UtilitySounds.Cue cue : UtilitySounds.Cue.values()) {
+            utilityBuffers[cue.ordinal()] = bank.get(UtilitySounds.key(cue));
         }
         bBodyCrackle = bank.get(BodyFireSounds.CRACKLE);
         bBodyFlare = bank.get(BodyFireSounds.FLARE);

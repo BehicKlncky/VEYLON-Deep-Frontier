@@ -101,8 +101,8 @@ public class Chunk {
             for (int z = 0; z < SZ; z++) {
                 for (int x = 0; x < SX; x++) {
                     BlockType t = BlockType.byId(blocks[idx(x, y, z)]);
-                    boolean enabled = t != BlockType.LANTERN || world != null
-                            && world.isLanternLit(cx * SX + x, y, cz * SZ + z);
+                    boolean enabled = world != null ? world.emitterOn(t, cx * SX + x, y, cz * SZ + z)
+                            : t != BlockType.LANTERN && t != BlockType.ELECTRIC_LAMP;
                     if (t.light > 0 && enabled) {
                         lights.add(new int[]{cx * SX + x, y, cz * SZ + z, t.light});
                     }
@@ -126,8 +126,7 @@ public class Chunk {
             }
         }
         BlockType type = world.getBlock(worldX, y, worldZ);
-        boolean enabled = type.light > 0 && (type != BlockType.LANTERN
-                || world.isLanternLit(worldX, y, worldZ));
+        boolean enabled = type.light > 0 && world.emitterOn(type, worldX, y, worldZ);
         if (!enabled) {
             if (found >= 0) {
                 lights.remove(found);

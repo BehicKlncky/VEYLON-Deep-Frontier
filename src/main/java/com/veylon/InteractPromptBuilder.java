@@ -60,6 +60,11 @@ final class InteractPromptBuilder {
         if (game.interactPrompt != null) {
             return;
         }
+        // Layout fifteen: what the use button does with fuel, parts or water at a device (milestone 19).
+        game.interactPrompt = game.refuges.utilities.rightClickPrompt(game.player.selected());
+        if (game.interactPrompt != null) {
+            return;
+        }
         boolean fixture = fixturePrompt();
         if (!fixture && (npcPrompt() || stuckArrowPrompt() || carcassPrompt() || fallingBodyPrompt())) {
             return;
@@ -272,6 +277,9 @@ final class InteractPromptBuilder {
             case SIGN -> game.interactPrompt = signPrompt(targetX, targetZ);
             case BARRICADE, BARRICADE_METAL -> game.interactPrompt = Fortification.barricadeInfo(game,
                     new Vec3i(targetX, targetY, targetZ), game.targetHit.type());
+            // Milestone 19: a device's switch and state.
+            case GENERATOR, ELECTRIC_LAMP -> game.interactPrompt = game.refuges.utilities.devicePrompt(
+                    new Vec3i(targetX, targetY, targetZ));
             // Milestone 15: the growth teaches its own counters.
             case GROWTH_NODE -> game.interactPrompt = "Growth node: a torch set beside it burns it out";
             case VEIL_MEMBRANE -> game.interactPrompt = "Veil membrane: it wakes to footsteps and light";

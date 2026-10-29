@@ -93,6 +93,17 @@ public final class VehicleSites {
             return y == FEET + 1 && a >= 1 && a <= LENGTH - 2 ? Part.CABIN : null;
         }
 
+        /**
+         * True on the cell over the wreck's fuel tank: the lower course at the end away from the
+         * engine, on the wreck's low side. A generator-18 rule (milestone 19) reads it; the plan is
+         * unchanged.
+         */
+        public boolean isTank(int x, int y, int z) {
+            if (y != FEET || !covers(x, z)) { return false; }
+            int lateral = alongZ ? x - x0 : z - z0;
+            return lateral == 0 && along(x, z) == (frontLow ? LENGTH - 1 : 0);
+        }
+
         /** Every cell of the wreck: the lower course, then the cabin. */
         public List<Vec3i> cells() {
             List<Vec3i> out = new ArrayList<>(WIDTH * LENGTH + WIDTH * (LENGTH - 2));

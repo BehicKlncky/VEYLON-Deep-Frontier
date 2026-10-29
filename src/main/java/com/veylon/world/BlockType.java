@@ -137,7 +137,14 @@ public enum BlockType {
     // the wall plane over a solid cell. Their strength is in UrbanFortifications, and holding the
     // attack button on one takes it down, returning most of what it cost (SalvageTable).
     BARRICADE("Plank Barricade", Shape.PANE, true, true, true, 2.5f, ToolKind.AXE, false, null, 0, 0, 0f, 0.56f, 0.42f, 0.26f),
-    BARRICADE_METAL("Sheet-Metal Barricade", Shape.PANE, true, true, false, 6.0f, ToolKind.PICKAXE, false, null, 0, 0, 0f, 0.44f, 0.47f, 0.48f);
+    BARRICADE_METAL("Sheet-Metal Barricade", Shape.PANE, true, true, false, 6.0f, ToolKind.PICKAXE, false, null, 0, 0, 0f, 0.44f, 0.47f, 0.48f),
+
+    // Milestone 19 refuge utilities: a small petrol generator rebuilt from salvage and the work lamp
+    // it lights. Their fuel, wear and switches are in UrbanUtilities; nothing carries one away whole,
+    // so taking one apart (SalvageTable) is how it comes down. A lamp's light is registered in its
+    // chunk only while it is switched on and fed, like a lantern's while it burns.
+    GENERATOR("Generator", Shape.CUBE, true, true, false, 3.0f, ToolKind.PICKAXE, false, null, 0, 0, 0f, 0.55f, 0.24f, 0.18f),
+    ELECTRIC_LAMP("Work Lamp", Shape.TORCH, false, false, false, 0.4f, ToolKind.NONE, false, null, 0, 14, 0f, 0.86f, 0.84f, 0.70f);
 
     /**
      * How a block is meshed. Not persisted: only {@link BlockType} ordinals are

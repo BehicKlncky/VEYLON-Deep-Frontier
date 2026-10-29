@@ -497,6 +497,9 @@ public class World implements VoxelAccess {
         if (urban != null && com.veylon.world.urban.UrbanFortifications.isBarricade(old)) {
             urban.fortifications.barricadeGone(pos); // taken down, smashed, burnt or blown out
         }
+        if (urban != null && com.veylon.world.urban.UrbanUtilities.isDevice(old)) {
+            urban.utilities.removed(this, pos); // taken apart, broken or blown out: its circuit loses it
+        }
         if (Fixtures.isUrbanContainer(old)) {
             // One owner for the contents: a hand break has already moved them
             // out; a blast or a fire destroys them with the furniture, so they
@@ -589,6 +592,21 @@ public class World implements VoxelAccess {
     public boolean isLanternLit(int x, int y, int z) {
         LanternState state = lanterns.get(new Vec3i(x, y, z));
         return state != null && state.lit && state.fuelSeconds > 0;
+    }
+
+    /** Whether a layout-fifteen work lamp at a cell gives light: switched on and fed (urban milestone 19). */
+    public boolean isLampLit(int x, int y, int z) {
+        return urban != null && urban.utilities.lampLit(x, y, z);
+    }
+
+    /**
+     * Whether a light block at a cell is giving light: a lantern only while it burns, a work lamp
+     * only while it is fed, everything else always.
+     */
+    public boolean emitterOn(BlockType t, int x, int y, int z) {
+        if (t == BlockType.LANTERN) { return isLanternLit(x, y, z); }
+        if (t == BlockType.ELECTRIC_LAMP) { return isLampLit(x, y, z); }
+        return true;
     }
 
     /** Adds fuel without implicitly igniting the lantern. Returns its new fuel level. */

@@ -56,6 +56,7 @@ public record RuntimeBudgetSnapshot(
         int urbanEncounterRecords,
         int urbanEcologyPlans, int activeAliens, int activeWildlife, int urbanSitePlans, int urbanSiteRecords,
         int urbanVehiclePlans, int damagedBarricades, int doorBraces, int refugeClaims, int tappedBuildings,
+        int utilityDevices,
         int navigationRoutes, int pathQueries, int pathExpansions, int pathDeferred,
         int pathFailures, int unsupportedEntries, int hearingSamples) {
 
@@ -115,6 +116,7 @@ public record RuntimeBudgetSnapshot(
                 game.world.urban == null ? 0 : game.world.urban.fortifications.braceCount(),
                 game.world.urban == null ? 0 : game.world.urban.refuges.size(),
                 game.world.urban == null ? 0 : game.world.urban.utilities.tappedCount(),
+                game.world.urban == null ? 0 : game.world.urban.utilities.deviceCount(),
                 game.world.navigation.size(), game.world.navigation.budget.queries(),
                 game.world.navigation.budget.expansions(), game.world.navigation.budget.deferred(),
                 game.world.navigation.budget.failures(), game.world.navigation.budget.unsupportedEntries(),
@@ -139,6 +141,7 @@ public record RuntimeBudgetSnapshot(
                 && doorBraces <= com.veylon.world.urban.UrbanFortifications.MAX_BRACES
                 && refugeClaims <= com.veylon.world.urban.UrbanRefuges.MAX_CLAIMS
                 && tappedBuildings <= com.veylon.world.urban.UrbanUtilities.MAX_TAPPED
+                && utilityDevices <= com.veylon.world.urban.UrbanUtilities.MAX_DEVICES
                 && urbanSiteRecords <= com.veylon.settlement.UrbanSiteDirector.MAX_SITES
                 && activeAliens <= com.veylon.entity.UrbanEncounterDirector.MAX_ACTIVE_ALIENS
                 && activeWildlife <= com.veylon.entity.UrbanEncounterDirector.MAX_ACTIVE_WILDLIFE
@@ -212,7 +215,7 @@ public record RuntimeBudgetSnapshot(
                 + ",wildlife=" + activeWildlife + "} sitePlans=" + urbanSitePlans + " sites=" + urbanSiteRecords
                 + " vehiclePlans=" + urbanVehiclePlans
                 + " fortifications={damaged=" + damagedBarricades + ",braces=" + doorBraces + "}"
-                + " refuges=" + refugeClaims + " tapped=" + tappedBuildings
+                + " refuges=" + refugeClaims + " tapped=" + tappedBuildings + " devices=" + utilityDevices
                 + " fixtures={states=" + fixtureStates + ",residentDoors=" + residentDoors + "}";
     }
 
@@ -229,6 +232,7 @@ public record RuntimeBudgetSnapshot(
                 + " braces=" + com.veylon.world.urban.UrbanFortifications.MAX_BRACES
                 + " refuges=" + com.veylon.world.urban.UrbanRefuges.MAX_CLAIMS
                 + " tapped=" + com.veylon.world.urban.UrbanUtilities.MAX_TAPPED
+                + " devices=" + com.veylon.world.urban.UrbanUtilities.MAX_DEVICES
                 + " sites=" + com.veylon.settlement.UrbanSiteDirector.MAX_SITES
                 + " resident=" + SettlementManager.MAX_ACTIVE_RESIDENTS
                 + " party=" + SettlementManager.MAX_ACTIVE_WAR_PARTY_NPCS

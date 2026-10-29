@@ -90,6 +90,12 @@ public final class SalvageTable {
             case BARRICADE -> wood("plank barricade", 1.5f, ItemType.PLANK, 2);
             case BARRICADE_METAL -> new Entry("sheet-metal barricade", 3f, ToolKind.PICKAXE, false, true,
                     stacks(ItemType.SHEET_METAL, 1, ItemType.SCRAP, 1));
+            // Layout fifteen's devices (milestone 19) come apart for most of what they cost; nothing
+            // carries one away whole, so its fuel and wear never ride along on an item.
+            case GENERATOR -> w.urban.hasUtilities() ? metal("generator", 6f, ItemType.SPARE_PARTS, 2,
+                    ItemType.SCRAP, 2, ItemType.SHEET_METAL, 1) : null;
+            case ELECTRIC_LAMP -> w.urban.hasUtilities() ? new Entry("work lamp", 1.5f, ToolKind.PICKAXE, false, true,
+                    stacks(ItemType.SPARE_PARTS, 1)) : null;
             default -> null;
         };
     }
@@ -104,7 +110,11 @@ public final class SalvageTable {
             case ENGINE -> metal("wrecked car's engine", 7f, ItemType.SPARE_PARTS, 2, ItemType.SCRAP, 1);
             case CABIN -> wreck.burnt() ? metal("burnt-out car cabin", 4f, ItemType.SCRAP, 2)
                     : metal("wrecked car cabin", 4f, ItemType.FIBER, 3, ItemType.SCRAP, 1);
-            case BODY -> metal("wrecked car body", 5f, ItemType.SCRAP, 3);
+            // Layout fifteen (milestone 19): a car that did not burn still has a little fuel in its
+            // tank, the city's one source of it; the can comes first, so wear never takes it.
+            case BODY -> !wreck.burnt() && w.urban.hasUtilities() && wreck.isTank(p.x(), p.y(), p.z())
+                    ? metal("car's fuel tank", 5f, ItemType.FUEL_CAN, 1, ItemType.SCRAP, 2)
+                    : metal("wrecked car body", 5f, ItemType.SCRAP, 3);
         };
     }
 
@@ -188,6 +198,10 @@ public final class SalvageTable {
             if (i == 0) { count = Math.max(1, count); }
             if (count > 0) { out.add(new ItemStack(base.type, count)); }
         }
+        // A generator taken apart gives back the whole cans left in its tank; the one it was burning is lost.
+        UrbanUtilities.Device device = t == BlockType.GENERATOR ? w.urban.utilities.device(p) : null;
+        int cans = device == null ? 0 : (int) Math.floor(device.fuel / UrbanUtilities.CAN_SECONDS + 1e-4f);
+        if (cans > 0) { out.add(new ItemStack(ItemType.FUEL_CAN, cans)); }
         return out;
     }
 

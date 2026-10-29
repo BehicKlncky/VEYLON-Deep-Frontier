@@ -464,6 +464,12 @@ final class PlayerBlockActions {
         if (door && (!FixtureActions.doorFits(game.world, px, py, pz) || wouldCollide(px, py + 1, pz))) {
             return false;
         }
+        // Layout fifteen: a device goes on a building's wiring, one generator to a building (urban 19).
+        String wiring = game.refuges.utilities.placementRefusal(new Vec3i(px, py, pz), place);
+        if (wiring != null) {
+            game.log(wiring + ".");
+            return false;
+        }
         game.world.setBlock(px, py, pz, place, true);
         if (game.world.getBlock(px, py, pz) != place) {
             return false; // the world rejected it (protected region, chunk edge)
@@ -485,6 +491,7 @@ final class PlayerBlockActions {
             case RAIN_COLLECTOR -> game.world.collectorWater.put(pos, 0f);
             case LANTERN -> game.log(
                     "Lantern placed empty. Hold charcoal and press [F] to refuel it.");
+            case GENERATOR, ELECTRIC_LAMP -> game.refuges.utilities.placed(pos, place);
             case BEACON -> {
                 game.world.beaconPos = pos;
                 game.world.beaconStage = 0;

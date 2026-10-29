@@ -50,7 +50,9 @@ class SerializedEnumOrderTest {
             // Milestone 15 alien growth: a node and its membrane floor.
             "GROWTH_NODE", "VEIL_MEMBRANE",
             // Milestone 18 static salvage: a cell of a burnt-out car; fortification panels.
-            "CAR_WRECK", "BARRICADE", "BARRICADE_METAL");
+            "CAR_WRECK", "BARRICADE", "BARRICADE_METAL",
+            // Urban milestone 19: refuge utilities.
+            "GENERATOR", "ELECTRIC_LAMP");
 
     private static final List<String> ITEM_TYPE_ORDER = List.of(
             "DIRT", "STONE", "SAND", "GRAVEL", "CLAY", "SNOW", "LOG", "PLANK", "WALL", "STICK",
@@ -83,7 +85,9 @@ class SerializedEnumOrderTest {
             // Milestone 15 alien ecology.
             "MEMBRANE_SAC",
             // Milestone 18 salvage and fortification.
-            "SPARE_PARTS", "BARRICADE", "BARRICADE_METAL", "DOOR_BRACE");
+            "SPARE_PARTS", "BARRICADE", "BARRICADE_METAL", "DOOR_BRACE",
+            // Urban milestone 19: refuge utilities.
+            "FUEL_CAN", "GENERATOR", "WORK_LAMP");
 
     private static final List<String> QUEST_TYPE_ORDER = List.of(
             "FETCH", "HUNT_PREDATOR", "INVESTIGATE",

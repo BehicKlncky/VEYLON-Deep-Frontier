@@ -1,15 +1,25 @@
 package com.veylon;
 
+import com.veylon.engine.UtilitySounds;
+import com.veylon.item.ItemStack;
 import com.veylon.item.ItemType;
+import com.veylon.item.ToolKind;
 import com.veylon.util.Vec3i;
+import com.veylon.world.BlockType;
 import com.veylon.world.World;
 import com.veylon.world.urban.BuildingPlan;
 import com.veylon.world.urban.UrbanIndoorQueries;
 import com.veylon.world.urban.UrbanUtilities;
+import com.veylon.world.urban.UrbanUtilities.Device;
+import com.veylon.world.urban.UrbanUtilities.Kind;
+
+import java.util.List;
+import java.util.Locale;
 
 /**
  * The water and power of a layout-fifteen city's refuges (urban milestone 19), as the player works
- * them. The world's side, what is left and what was drawn, is {@link UrbanUtilities}.
+ * them. The world's side, what is left, what was drawn and every device's state, is
+ * {@link UrbanUtilities}.
  *
  * <h2>Taps</h2>
  *
@@ -18,8 +28,42 @@ import com.veylon.world.urban.UrbanUtilities;
  * safe. With no waterskin, F drinks from the tap as from any untreated water, and risks the same
  * sickness. Either way the building's pipes hold one litre less, and once they are dry every tap
  * of the building is. Taps on a storey survivors hold are theirs, and do not run for the player.
+ *
+ * <h2>Power</h2>
+ *
+ * <p>A generator rebuilt from salvage is put down inside a building, whose wiring it feeds; work
+ * lamps put down in the same building light while it runs (see {@link UrbanUtilities} for the
+ * circuit). The use button pours a fuel can into it or, with a pry tool in the pack, rebuilds its
+ * worn parts with spare parts; F starts and stops it and switches a lamp. While it runs:
+ * <ul>
+ *   <li><b>Noise.</b> Every {@value #NOISE_INTERVAL} seconds it is a real {@code WorldNoise} event of
+ *       {@value #RUN_NOISE_RADIUS} blocks, starting it louder still, losing through walls as any
+ *       sound does: whatever hears it comes to look. A Creative builder's is heard by nobody.</li>
+ *   <li><b>Cost.</b> It burns fuel and wears for every second it runs, and stops when the tank is
+ *       dry or it seizes; its lamps go dark at once.</li>
+ *   <li><b>Time.</b> It runs only while the world does: never while paused or in a pausing
+ *       screen, by the world's own seconds through a sleep, and not at all while it is more than
+ *       {@value #DORMANT_RANGE} blocks from the player or its column is not loaded, when it, its
+ *       fuel and its lamps hold still. Nothing is caught up afterwards, and a load restores exactly
+ *       what was saved.</li>
+ * </ul>
+ * Creative pours, rebuilds and puts down without spending anything and needs no tool; the world's
+ * fuel, wear and water run as in Survival.
  */
 final class UtilitySystem {
+    /** Seconds between a running generator's noise events. */
+    static final float NOISE_INTERVAL = 3f;
+    /** A running generator's noise. */
+    static final float RUN_NOISE_RADIUS = 28f, RUN_NOISE = 0.5f;
+    /** A generator pulled into life. */
+    static final float START_NOISE_RADIUS = 34f, START_NOISE = 0.6f;
+    /** Working on one with a pry tool. */
+    static final float REPAIR_NOISE_RADIUS = 16f, REPAIR_NOISE = 0.35f;
+    /** Blocks from the player beyond which a circuit holds still. */
+    static final float DORMANT_RANGE = 128f;
+    /** Condition one spare part puts back into a generator. */
+    static final float PART_REPAIR = 50f;
+
     private final Game game;
     private final RefugeSystem refuges;
 
@@ -34,6 +78,10 @@ final class UtilitySystem {
     /** True in a world whose rules include refuge utilities: layout fifteen. */
     static boolean applies(World w) {
         return w != null && w.urban != null && w.urban.hasUtilities();
+    }
+
+    private UrbanUtilities ledger() {
+        return game.world.urban.utilities;
     }
 
     // ------------------------------------------------------------------
@@ -53,7 +101,7 @@ final class UtilitySystem {
             game.log(refusal + ".");
             return true;
         }
-        UrbanUtilities u = game.world.urban.utilities;
+        UrbanUtilities u = ledger();
         if (!u.canRecord(b)) {
             game.log("The taps will not run: the world's water record is full.");
             return true;
@@ -77,7 +125,7 @@ final class UtilitySystem {
         if (here != null && refuges.heldBy(b, here.floor()) != null) {
             return "These taps are the survivors' who hold this building";
         }
-        if (game.world.urban.utilities.left(b) <= 0) {
+        if (ledger().left(b) <= 0) {
             return "The tap is dry: the stale water left in this building's pipes is gone";
         }
         return null;
@@ -92,9 +140,265 @@ final class UtilitySystem {
             return refusal.startsWith("The tap is dry") ? "Tap: dry, its building's pipes are empty"
                     : "Tap: the survivors' water";
         }
-        int left = game.world.urban.utilities.left(b);
+        int left = ledger().left(b);
         return game.player.inventory.count(ItemType.WATERSKIN_EMPTY) > 0
                 ? "[F] Fill a waterskin: stale tap water, " + left + " L left"
                 : "[F] Drink stale tap water (untreated, " + left + " L left)";
+    }
+
+    // ------------------------------------------------------------------
+    // Putting devices down
+    // ------------------------------------------------------------------
+
+    /** Why a device may not be put down at a cell, or null when it may (or the block is none). */
+    String placementRefusal(Vec3i pos, BlockType t) {
+        return applies(game.world) ? ledger().placementRefusal(game.world, pos, t) : null;
+    }
+
+    /** Registers a device just put down and says how to get it going. */
+    void placed(Vec3i pos, BlockType t) {
+        if (!applies(game.world) || !UrbanUtilities.isDevice(t)) { return; }
+        Device d = ledger().add(game.world, pos, t);
+        if (d == null) { return; }
+        game.log(switch (d.kind) {
+            case GENERATOR -> "Generator put down. Pour in a fuel can, then press [F] to start it.";
+            case LAMP -> d.powered() ? "Work lamp put down on the running generator's wiring."
+                    : "Work lamp put down: it lights while a generator in this building runs.";
+        });
+    }
+
+    // ------------------------------------------------------------------
+    // F: switches
+    // ------------------------------------------------------------------
+
+    /**
+     * F on a device: start or stop a generator, switch a lamp.
+     *
+     * @return true when the cell is a device of a utility city, whatever came of it
+     */
+    boolean toggle(Vec3i pos) {
+        if (!applies(game.world) || !UrbanUtilities.isDevice(game.world.getBlock(pos.x(), pos.y(), pos.z()))) {
+            return false;
+        }
+        Device d = ledger().ensure(game.world, pos);
+        if (d == null) {
+            game.log("It is not wired to anything.");
+            return true;
+        }
+        switch (d.kind) {
+            case GENERATOR -> generatorSwitch(d);
+            case LAMP -> {
+                d.on = !d.on;
+                ledger().settle(game.world);
+                game.audio.playClick();
+                game.log(!d.on ? "You switch the work lamp off."
+                        : d.powered() ? "The work lamp comes on." : "You switch the work lamp on, but nothing feeds it.");
+            }
+        }
+        return true;
+    }
+
+    private void generatorSwitch(Device g) {
+        float x = g.pos.x() + .5f, y = g.pos.y() + .5f, z = g.pos.z() + .5f;
+        if (g.on) {
+            g.on = false;
+            ledger().settle(game.world);
+            game.audio.playUtility(UtilitySounds.Cue.STOP, x, y, z);
+            game.log("You switch the generator off.");
+            return;
+        }
+        if (g.condition <= 0) {
+            game.log("The generator is seized: rebuild it with spare parts and a pry tool.");
+            return;
+        }
+        if (g.fuel <= 0) {
+            game.log("The generator's tank is dry: pour in a fuel can.");
+            return;
+        }
+        g.on = true;
+        g.noiseTimer = NOISE_INTERVAL;
+        g.soundTimer = UtilitySounds.seconds(UtilitySounds.Cue.START);
+        ledger().settle(game.world);
+        game.audio.playUtility(UtilitySounds.Cue.START, x, y, z);
+        game.particles.smoke(x, y + .7f, z, 1f);
+        game.noise.emit(game, x, y, z, START_NOISE_RADIUS, START_NOISE, "generator", true, game.player);
+        game.log("The generator coughs into life (" + cans(g) + " in the tank).");
+    }
+
+    /** The HUD line for an aimed device, or null for anything else. */
+    String devicePrompt(Vec3i pos) {
+        if (!applies(game.world)) { return null; }
+        BlockType t = game.world.getBlock(pos.x(), pos.y(), pos.z());
+        if (!UrbanUtilities.isDevice(t)) { return null; }
+        Device d = ledger().device(pos);
+        if (d == null) { return "[F] Wire it up"; }
+        return switch (d.kind) {
+            case GENERATOR -> d.on ? "[F] Switch off: running, " + cans(d) + " left"
+                    : d.condition <= 0 ? "Generator seized: rebuild it with spare parts"
+                    : d.fuel <= 0 ? "Generator: tank dry, pour in a fuel can"
+                    : "[F] Start the generator (" + cans(d) + ", " + percent(d.condition) + ")";
+            case LAMP -> d.on ? "[F] Switch the work lamp off" + (d.powered() ? "" : " (no power)")
+                    : "[F] Switch the work lamp on" + (d.powered() ? "" : " (no power)");
+        };
+    }
+
+    // ------------------------------------------------------------------
+    // The use button: fuel and repairs
+    // ------------------------------------------------------------------
+
+    /**
+     * The use button with an item held, aimed at a device: pour fuel into a generator, rebuild its
+     * worn parts.
+     *
+     * @return true when the press was a utility action, done or refused with a reason
+     */
+    boolean rightClick(ItemStack held) {
+        Device d = aimed(true);
+        if (d == null || held == null) { return false; }
+        if (d.kind == Kind.GENERATOR && held.type == ItemType.FUEL_CAN) {
+            refuel(d);
+            return true;
+        }
+        if (d.kind == Kind.GENERATOR && held.type == ItemType.SPARE_PARTS) {
+            repair(d);
+            return true;
+        }
+        return false;
+    }
+
+    /** What the use button would do with the held item at the aimed device, or null. */
+    String rightClickPrompt(ItemStack held) {
+        Device d = aimed(false);
+        if (d == null || held == null) { return null; }
+        if (d.kind == Kind.GENERATOR && held.type == ItemType.FUEL_CAN) {
+            return d.fuel + UrbanUtilities.CAN_SECONDS > UrbanUtilities.TANK_SECONDS + 1e-3f
+                    ? "The generator's tank is full (" + cans(d) + ")"
+                    : "[RMB] Pour in the fuel can (" + cans(d) + " in the tank)";
+        }
+        if (d.kind == Kind.GENERATOR && held.type == ItemType.SPARE_PARTS) {
+            if (d.condition >= UrbanUtilities.SOUND) { return null; }
+            return !game.player.abilities.unlimitedItems() && !hasPryTool()
+                    ? "Rebuilding it needs a pry tool in your pack"
+                    : "[RMB] Rebuild its worn parts (" + percent(d.condition) + ")";
+        }
+        return null;
+    }
+
+    /**
+     * The device the player aims at in a utility city, or null; an action registers a device block
+     * that has no record yet, a prompt only reads.
+     */
+    private Device aimed(boolean register) {
+        if (!applies(game.world) || game.targetHit == null) { return null; }
+        Vec3i pos = new Vec3i(game.targetHit.x(), game.targetHit.y(), game.targetHit.z());
+        return UrbanUtilities.isDevice(game.world.getBlock(pos.x(), pos.y(), pos.z()))
+                ? register ? ledger().ensure(game.world, pos) : ledger().device(pos) : null;
+    }
+
+    private void refuel(Device g) {
+        if (g.fuel + UrbanUtilities.CAN_SECONDS > UrbanUtilities.TANK_SECONDS + 1e-3f) {
+            game.log("The generator's tank is full.");
+            return;
+        }
+        g.fuel = Math.min(UrbanUtilities.TANK_SECONDS, g.fuel + UrbanUtilities.CAN_SECONDS);
+        spend();
+        game.audio.playDrink();
+        game.log("You pour a fuel can into the generator (" + cans(g) + " in the tank).");
+    }
+
+    private void repair(Device g) {
+        if (g.condition >= UrbanUtilities.SOUND) {
+            game.log("The generator runs sound.");
+            return;
+        }
+        boolean free = game.player.abilities.unlimitedItems();
+        if (!free && !hasPryTool()) {
+            game.log("You need a pry tool in your pack to strip and rebuild it.");
+            return;
+        }
+        boolean seized = g.condition <= 0;
+        g.condition = Math.min(UrbanUtilities.SOUND, g.condition + PART_REPAIR);
+        spend();
+        float x = g.pos.x() + .5f, y = g.pos.y() + .5f, z = g.pos.z() + .5f;
+        game.audio.playBlockHit(BlockType.GENERATOR, x, y, z);
+        game.noise.emit(game, x, y, z, REPAIR_NOISE_RADIUS, REPAIR_NOISE, "repair", true, game.player);
+        game.log((seized ? "You free the seized generator" : "You rebuild the generator's worn parts")
+                + " (" + percent(g.condition) + ").");
+    }
+
+    private boolean hasPryTool() {
+        var inv = game.player.inventory;
+        for (int i = 0; i < inv.size(); i++) {
+            ItemStack s = inv.get(i);
+            if (s != null && s.type.tool == ToolKind.PICKAXE) { return true; }
+        }
+        return false;
+    }
+
+    /** One of the held item, unless Creative's unlimited items keep it. */
+    private void spend() {
+        if (!game.player.abilities.unlimitedItems()) { game.player.inventory.shrink(game.player.hotbarSel, 1); }
+    }
+
+    static String cans(Device g) {
+        float cans = g.fuel / UrbanUtilities.CAN_SECONDS;
+        return String.format(Locale.ROOT, "%.1f %s", cans, Math.abs(cans - 1f) < .05f ? "can" : "cans");
+    }
+
+    static String percent(float condition) {
+        return "condition " + Math.round(condition) + "%";
+    }
+
+    // ------------------------------------------------------------------
+    // The medium tick
+    // ------------------------------------------------------------------
+
+    /**
+     * Runs every generator that is on and awake for one medium tick: its fuel and wear, its noise
+     * and sound, and stopping it when the tank is dry or it seizes.
+     */
+    void mediumTick(float dt) {
+        if (!applies(game.world)) { return; }
+        UrbanUtilities u = ledger();
+        List<Device> all = u.devices();
+        boolean changed = false;
+        for (int i = 0; i < all.size(); i++) {
+            Device g = all.get(i);
+            if (!g.running() || dormant(g)) { continue; }
+            float rate = 1f + UrbanUtilities.LOAD_BURN * u.load(g);
+            float run = Math.min(dt, g.fuel / rate);
+            g.fuel -= rate * run;
+            if (g.fuel < 1e-3f) { g.fuel = 0; }
+            g.condition = Math.max(0f, g.condition - run / UrbanUtilities.WEAR_SECONDS);
+            float x = g.pos.x() + .5f, y = g.pos.y() + .5f, z = g.pos.z() + .5f;
+            if ((g.noiseTimer -= dt) <= 0) {
+                g.noiseTimer += NOISE_INTERVAL;
+                game.noise.emit(game, x, y, z, RUN_NOISE_RADIUS, RUN_NOISE, "generator", true, game.player);
+                game.particles.smoke(x, y + .7f, z, .4f);
+            }
+            if ((g.soundTimer -= dt) <= 0) {
+                g.soundTimer += UtilitySounds.seconds(UtilitySounds.Cue.RUN);
+                game.audio.playUtility(UtilitySounds.Cue.RUN, x, y, z);
+            }
+            if (g.fuel <= 0) {
+                g.on = false;
+                changed = true;
+                game.audio.playUtility(UtilitySounds.Cue.STOP, x, y, z);
+                game.log("The generator sputters and dies: its tank is dry.");
+            } else if (g.condition <= 0) {
+                g.on = false;
+                changed = true;
+                game.audio.playUtility(UtilitySounds.Cue.STOP, x, y, z);
+                game.log("The generator seizes: it needs rebuilding with spare parts.");
+            }
+        }
+        if (changed) { u.settle(game.world); }
+    }
+
+    /** A circuit holds still while its generator is far from the player or its column is not loaded. */
+    boolean dormant(Device g) {
+        if (!game.world.isColumnLoaded(g.pos.x(), g.pos.z())) { return true; }
+        float dx = g.pos.x() + .5f - game.player.pos.x, dz = g.pos.z() + .5f - game.player.pos.z;
+        return dx * dx + dz * dz > DORMANT_RANGE * DORMANT_RANGE;
     }
 }
