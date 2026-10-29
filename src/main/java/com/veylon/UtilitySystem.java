@@ -47,8 +47,20 @@ import java.util.Locale;
  *       fuel and its lamps hold still. Nothing is caught up afterwards, and a load restores exactly
  *       what was saved.</li>
  * </ul>
- * Creative pours, rebuilds and puts down without spending anything and needs no tool; the world's
- * fuel, wear and water run as in Survival.
+ *
+ * <h2>Treated water</h2>
+ *
+ * <p>A water purifier is put down on a building's wiring like a lamp, with its filter spent: the
+ * use button with fibre packs it, its repair, which every litre treated wears again. With a dirty
+ * waterskin the use button pours a litre into its untreated tank, with an empty one it fills the
+ * skin from its clean tank, and F switches it. Switched on and fed, its pump draws its building's
+ * stale tap water a litre at a time while the untreated tank has room, and it treats what is there
+ * into clean water, both by the seconds its generator runs, so power, filter and fuel are what
+ * clean water costs. Water only moves between the pipes, its two tanks and the player's skins;
+ * taking it apart spills what it held.
+ *
+ * <p>Creative pours, rebuilds, packs and puts down without spending anything and needs no tool; the
+ * world's fuel, wear and water run as in Survival.
  */
 final class UtilitySystem {
     /** Seconds between a running generator's noise events. */
@@ -63,6 +75,8 @@ final class UtilitySystem {
     static final float DORMANT_RANGE = 128f;
     /** Condition one spare part puts back into a generator. */
     static final float PART_REPAIR = 50f;
+    /** Rounding slack for litres moved a sliver at a time. */
+    static final float LITRE_SLACK = 1e-3f;
 
     private final Game game;
     private final RefugeSystem refuges;
@@ -164,6 +178,8 @@ final class UtilitySystem {
             case GENERATOR -> "Generator put down. Pour in a fuel can, then press [F] to start it.";
             case LAMP -> d.powered() ? "Work lamp put down on the running generator's wiring."
                     : "Work lamp put down: it lights while a generator in this building runs.";
+            case PURIFIER -> "Water purifier put down. Its filter is spent: pack it with "
+                    + UrbanUtilities.FILTER_FIBRE + " fibre.";
         });
     }
 
@@ -193,6 +209,15 @@ final class UtilitySystem {
                 game.audio.playClick();
                 game.log(!d.on ? "You switch the work lamp off."
                         : d.powered() ? "The work lamp comes on." : "You switch the work lamp on, but nothing feeds it.");
+            }
+            case PURIFIER -> {
+                d.on = !d.on;
+                ledger().settle(game.world);
+                game.audio.playClick();
+                game.log(!d.on ? "You switch the water purifier off."
+                        : d.condition <= 0 ? "You switch the water purifier on, but its filter is spent."
+                        : d.powered() ? "The water purifier hums into work."
+                        : "You switch the water purifier on, but nothing feeds it.");
             }
         }
         return true;
@@ -239,6 +264,10 @@ final class UtilitySystem {
                     : "[F] Start the generator (" + cans(d) + ", " + percent(d.condition) + ")";
             case LAMP -> d.on ? "[F] Switch the work lamp off" + (d.powered() ? "" : " (no power)")
                     : "[F] Switch the work lamp on" + (d.powered() ? "" : " (no power)");
+            case PURIFIER -> d.condition <= 0 ? "Purifier: filter spent, pack it with " + UrbanUtilities.FILTER_FIBRE + " fibre"
+                    : d.on ? "[F] Switch off: " + (d.treating() ? "treating" : d.powered() ? "pumping" : "no power")
+                    + ", " + litres(d.untreated) + " in, " + litres(d.clean) + " clean"
+                    : "[F] Switch on (" + litres(d.untreated) + " in, " + litres(d.clean) + " clean)";
         };
     }
 
@@ -247,8 +276,8 @@ final class UtilitySystem {
     // ------------------------------------------------------------------
 
     /**
-     * The use button with an item held, aimed at a device: pour fuel into a generator, rebuild its
-     * worn parts.
+     * The use button with an item held, aimed at a device: pour fuel into a generator or rebuild its
+     * worn parts; pour untreated water into a purifier, fill a waterskin from it or pack its filter.
      *
      * @return true when the press was a utility action, done or refused with a reason
      */
@@ -261,6 +290,15 @@ final class UtilitySystem {
         }
         if (d.kind == Kind.GENERATOR && held.type == ItemType.SPARE_PARTS) {
             repair(d);
+            return true;
+        }
+        if (d.kind == Kind.PURIFIER) {
+            switch (held.type) {
+                case WATERSKIN_DIRTY -> pour(d);
+                case WATERSKIN_EMPTY -> fill(d);
+                case FIBER -> packFilter(d);
+                default -> { return false; }
+            }
             return true;
         }
         return false;
@@ -280,6 +318,23 @@ final class UtilitySystem {
             return !game.player.abilities.unlimitedItems() && !hasPryTool()
                     ? "Rebuilding it needs a pry tool in your pack"
                     : "[RMB] Rebuild its worn parts (" + percent(d.condition) + ")";
+        }
+        if (d.kind == Kind.PURIFIER) {
+            return switch (held.type) {
+                case WATERSKIN_DIRTY -> d.untreated > UrbanUtilities.PURIFIER_LITRES - 1f + LITRE_SLACK
+                        ? "The purifier's untreated tank is full"
+                        : "[RMB] Pour in untreated water (" + litres(d.untreated) + " of "
+                        + litres(UrbanUtilities.PURIFIER_LITRES) + ")";
+                case WATERSKIN_EMPTY -> d.clean + LITRE_SLACK >= 1f
+                        ? "[RMB] Fill a waterskin with clean water (" + litres(d.clean) + ")" : null;
+                case FIBER -> d.condition >= UrbanUtilities.SOUND ? null
+                        : !game.player.abilities.unlimitedItems()
+                        && game.player.inventory.count(ItemType.FIBER) < UrbanUtilities.FILTER_FIBRE
+                        ? "Packing the filter takes " + UrbanUtilities.FILTER_FIBRE + " fibre"
+                        : "[RMB] Pack the filter with " + UrbanUtilities.FILTER_FIBRE + " fibre (filter "
+                        + Math.round(d.condition) + "%)";
+                default -> null;
+            };
         }
         return null;
     }
@@ -326,6 +381,66 @@ final class UtilitySystem {
                 + " (" + percent(g.condition) + ").");
     }
 
+    /** A dirty waterskin emptied into a purifier's untreated tank. */
+    private void pour(Device p) {
+        if (p.untreated > UrbanUtilities.PURIFIER_LITRES - 1f + LITRE_SLACK) {
+            game.log("The purifier's untreated tank is full.");
+            return;
+        }
+        if (!SurvivalTransfers.exchange(game, ItemType.WATERSKIN_DIRTY, ItemType.WATERSKIN_EMPTY)) { return; }
+        p.untreated = Math.min(UrbanUtilities.PURIFIER_LITRES, p.untreated + 1f);
+        ledger().settle(game.world);
+        game.audio.playDrink();
+        game.log("You pour the untreated water into the purifier (" + litres(p.untreated) + " to treat).");
+    }
+
+    /** An empty waterskin filled from a purifier's clean tank. */
+    private void fill(Device p) {
+        if (p.clean + LITRE_SLACK < 1f) {
+            game.log("Nothing treated yet: the purifier has " + litres(p.clean) + " of clean water.");
+            return;
+        }
+        if (!SurvivalTransfers.exchange(game, ItemType.WATERSKIN_EMPTY, ItemType.WATERSKIN_CLEAN)) { return; }
+        p.clean = Math.max(0f, p.clean - 1f);
+        ledger().settle(game.world);
+        game.audio.playDrink();
+        game.log("You fill a waterskin with clean water from the purifier (" + litres(p.clean) + " left).");
+    }
+
+    /** A spent or worn filter packed with fresh fibre: the purifier's repair. */
+    private void packFilter(Device p) {
+        if (p.condition >= UrbanUtilities.SOUND) {
+            game.log("The purifier's filter is fresh.");
+            return;
+        }
+        boolean free = game.player.abilities.unlimitedItems();
+        if (!free && game.player.inventory.count(ItemType.FIBER) < UrbanUtilities.FILTER_FIBRE) {
+            game.log("Packing the filter takes " + UrbanUtilities.FILTER_FIBRE + " fibre.");
+            return;
+        }
+        if (!free) { game.player.inventory.remove(ItemType.FIBER, UrbanUtilities.FILTER_FIBRE); }
+        p.condition = UrbanUtilities.SOUND;
+        ledger().settle(game.world);
+        game.audio.playClick();
+        game.log("You pack the purifier's filter with fresh fibre.");
+    }
+
+    /** "3.0 L". */
+    static String litres(float l) {
+        return String.format(Locale.ROOT, "%.1f L", l);
+    }
+
+    /**
+     * What taking a purifier apart spills, for the log, or null: its tanks' water runs away with it.
+     * Read before the piece goes.
+     */
+    String spillNote(Vec3i pos) {
+        if (!applies(game.world)) { return null; }
+        Device d = ledger().device(pos);
+        float water = d == null || d.kind != Kind.PURIFIER ? 0f : d.untreated + d.clean;
+        return water > LITRE_SLACK ? "Its " + litres(water) + " of water run away." : null;
+    }
+
     private boolean hasPryTool() {
         var inv = game.player.inventory;
         for (int i = 0; i < inv.size(); i++) {
@@ -370,6 +485,7 @@ final class UtilitySystem {
             g.fuel -= rate * run;
             if (g.fuel < 1e-3f) { g.fuel = 0; }
             g.condition = Math.max(0f, g.condition - run / UrbanUtilities.WEAR_SECONDS);
+            if (feedPurifiers(u, g, run)) { changed = true; }
             float x = g.pos.x() + .5f, y = g.pos.y() + .5f, z = g.pos.z() + .5f;
             if ((g.noiseTimer -= dt) <= 0) {
                 g.noiseTimer += NOISE_INTERVAL;
@@ -393,6 +509,54 @@ final class UtilitySystem {
             }
         }
         if (changed) { u.settle(game.world); }
+    }
+
+    /**
+     * The purifiers a running generator feeds work for exactly the seconds it ran this tick: each
+     * pumps its building's stale water into its untreated tank while there is room, and treats what
+     * is there into its clean tank, wearing its filter for every litre. Water only moves: nothing is
+     * made or lost on the way.
+     *
+     * @return true when a filter clogged, so the circuits settle again
+     */
+    private boolean feedPurifiers(UrbanUtilities u, Device g, float run) {
+        boolean clogged = false;
+        List<Device> all = u.devices();
+        for (int i = 0; i < all.size(); i++) {
+            Device p = all.get(i);
+            if (p.kind != Kind.PURIFIER || p.feeder() != g || !p.working()) { continue; }
+            if (p.untreated <= UrbanUtilities.PURIFIER_LITRES - 1f + LITRE_SLACK
+                    && (p.pumped += run) >= UrbanUtilities.PUMP_SECONDS) {
+                p.pumped -= UrbanUtilities.PUMP_SECONDS;
+                pump(u, p);
+            }
+            if (!p.treating()) { continue; }
+            float litres = Math.min(run / UrbanUtilities.TREAT_SECONDS,
+                    Math.min(p.untreated, UrbanUtilities.PURIFIER_LITRES - p.clean));
+            litres = Math.min(litres, p.condition / UrbanUtilities.FILTER_WEAR);
+            p.untreated -= litres;
+            p.clean += litres;
+            p.condition = Math.max(0f, p.condition - litres * UrbanUtilities.FILTER_WEAR);
+            if (p.condition <= LITRE_SLACK) {
+                p.condition = 0;
+                clogged = true;
+                game.log("The water purifier's filter clogs: pack it with fresh fibre.");
+            }
+        }
+        return clogged;
+    }
+
+    /**
+     * One litre of a purifier's building's stale water drawn up into its untreated tank, as a tap
+     * would give it; dry pipes, or pipes on a storey survivors hold, give nothing and the pump runs
+     * dry.
+     */
+    private void pump(UrbanUtilities u, Device p) {
+        BuildingPlan b = game.world.urban.buildingById(p.building);
+        if (b == null || u.left(b) <= 0 || !u.canRecord(b)) { return; }
+        UrbanIndoorQueries.Location here = UrbanIndoorQueries.location(game.world, p.pos.x(), p.pos.y(), p.pos.z());
+        if (here != null && refuges.heldBy(b, here.floor()) != null) { return; }
+        if (u.draw(b)) { p.untreated = Math.min(UrbanUtilities.PURIFIER_LITRES, p.untreated + 1f); }
     }
 
     /** A circuit holds still while its generator is far from the player or its column is not loaded. */

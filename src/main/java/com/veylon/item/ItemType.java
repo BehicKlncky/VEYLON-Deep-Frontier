@@ -221,7 +221,9 @@ public enum ItemType {
     FUEL_CAN("Fuel Can", p().stack(4).weight(1.4f).color(0.66f, 0.22f, 0.16f)),
     // A small petrol generator rebuilt from engine parts, and the wired lamp it lights.
     GENERATOR("Generator", p().stack(1).places("GENERATOR").weight(16f).color(0.55f, 0.24f, 0.18f)),
-    WORK_LAMP("Work Lamp", p().stack(4).places("ELECTRIC_LAMP").weight(0.8f).color(0.86f, 0.84f, 0.70f));
+    WORK_LAMP("Work Lamp", p().stack(4).places("ELECTRIC_LAMP").weight(0.8f).color(0.86f, 0.84f, 0.70f)),
+    // A pump and filter unit that treats untreated water on a generator's power.
+    WATER_PURIFIER("Water Purifier", p().stack(1).places("WATER_PURIFIER").weight(9f).color(0.55f, 0.60f, 0.64f));
 
     public final String displayName;
     public final int maxStack;

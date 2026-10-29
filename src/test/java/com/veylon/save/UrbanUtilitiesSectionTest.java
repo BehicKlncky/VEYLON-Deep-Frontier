@@ -36,11 +36,13 @@ import static org.junit.jupiter.api.Assertions.*;
 class UrbanUtilitiesSectionTest {
     @TempDir Path directory;
 
-    private record History(Game game, BuildingPlan building, Vec3i generator, Vec3i lamp, Vec3i spare, Vec3i street) { }
+    private record History(Game game, BuildingPlan building, Vec3i generator, Vec3i lamp, Vec3i purifier, Vec3i spare,
+                           Vec3i street) { }
 
     /**
      * Two litres drawn from the neighbour's taps; a running generator with one and a half cans at
-     * condition 70 and a lamp it lights on the first floor; a second generator's block standing in
+     * condition 70, a lamp it lights and a purifier it feeds on the first floor, the purifier's filter at
+     * 60 with 2.5 litres to treat and 1.25 clean; a second generator's block standing in
      * the building and a lamp's out in the street, neither with a record of its own.
      */
     private static History history() {
@@ -56,24 +58,32 @@ class UrbanUtilitiesSectionTest {
 
         Vec3i generator = RefugeWorldArena.piece(b, 1, BlockType.CAMP_BED).target();
         Vec3i lamp = RefugeWorldArena.piece(b, 1, BlockType.CABINET).target();
+        Vec3i purifier = UtilityWorldArena.basins(b).stream().filter(f -> UrbanIds.floorIndex(f.id()) == 1)
+                .findFirst().orElseThrow().target();
         Vec3i spare = RefugeWorldArena.piece(b, 2, BlockType.CAMP_BED).target();
         Vec3i street = new Vec3i(b.parcel().x0() + 3, 41, b.parcel().z0() - 3);
         SurvivorWorldArena.standAt(g, RefugeWorldArena.piece(b, 1, BlockType.LOCKER).target());
         UrbanUtilities u = g.world.urban.utilities;
         g.world.setBlock(generator.x(), generator.y(), generator.z(), BlockType.GENERATOR, true);
         g.world.setBlock(lamp.x(), lamp.y(), lamp.z(), BlockType.ELECTRIC_LAMP, true);
+        g.world.setBlock(purifier.x(), purifier.y(), purifier.z(), BlockType.WATER_PURIFIER, true);
         g.world.setBlock(spare.x(), spare.y(), spare.z(), BlockType.GENERATOR, true);
         assertSame(BlockType.AIR, g.world.getBlock(street.x(), street.y(), street.z()), "a street cell");
         g.world.setBlock(street.x(), street.y(), street.z(), BlockType.ELECTRIC_LAMP, true);
         Device gen = u.add(g.world, generator, BlockType.GENERATOR);
         Device light = u.add(g.world, lamp, BlockType.ELECTRIC_LAMP);
+        Device water = u.add(g.world, purifier, BlockType.WATER_PURIFIER);
         gen.fuel = 1.5f * UrbanUtilities.CAN_SECONDS;
         gen.condition = 70f;
         gen.on = true;
         light.on = true;
+        water.on = true;
+        water.condition = 60f;
+        water.untreated = 2.5f;
+        water.clean = 1.25f;
         u.settle(g.world);
         assertTrue(light.lit());
-        return new History(g, b, generator, lamp, spare, street);
+        return new History(g, b, generator, lamp, purifier, spare, street);
     }
 
     @Test
@@ -88,13 +98,18 @@ class UrbanUtilitiesSectionTest {
             assertEquals(2, u.drawn(h.building().id()), "loading puts no water back");
             assertEquals(1, u.tappedCount());
             assertEquals(2, g.player.inventory.count(ItemType.WATERSKIN_DIRTY));
-            assertEquals(2, u.deviceCount(), "the unrecorded block is no device until it is used");
+            assertEquals(3, u.deviceCount(), "the unrecorded blocks are no devices until they are used");
             Device gen = u.device(h.generator());
             assertEquals(1.5f * UrbanUtilities.CAN_SECONDS, gen.fuel, 1e-3f, "no fuel burnt or added by a load");
             assertEquals(70f, gen.condition, 1e-4f);
             assertTrue(gen.on && gen.running());
             Device lamp = u.device(h.lamp());
             assertTrue(lamp.on && lamp.lit(), "the lamp is lit again by the generator that was running");
+            Device water = u.device(h.purifier());
+            assertTrue(water.on && water.powered());
+            assertEquals(60f, water.condition, 1e-4f, "its filter as it was");
+            assertEquals(2.5f, water.untreated, 1e-4f, "nothing treated by a load");
+            assertEquals(1.25f, water.clean, 1e-4f);
             g.world.ensureChunks(h.lamp().x(), h.lamp().z(), 1, 100);
             Chunk c = g.world.getChunk(Math.floorDiv(h.lamp().x(), Chunk.SX), Math.floorDiv(h.lamp().z(), Chunk.SZ));
             assertTrue(c.lights.stream().anyMatch(l -> l[0] == h.lamp().x() && l[1] == h.lamp().y() && l[2] == h.lamp().z()),
@@ -139,8 +154,8 @@ class UrbanUtilitiesSectionTest {
         assertFalse(SaveSystem.load(earlier, appended), "generator 17 has no utilities to restore");
     }
 
-    /** Offsets of the payload as written: a tap row, then the generator's row and the lamp's. */
-    private static final int GEN = 24, LAMP = 50, KIND = 0, X = 1, Y = 5, Z = 9, ON = 13, CONDITION = 14, FUEL = 18, SPARE = 22;
+    /** Offsets of the payload as written: a tap row, then the generator's, the lamp's and the purifier's rows. */
+    private static final int GEN = 24, LAMP = 50, PURIFIER = 76, KIND = 0, X = 1, Y = 5, Z = 9, ON = 13, CONDITION = 14, FUEL = 18, SPARE = 22;
 
     @Test
     void everyMalformedRowFailsTheWholeLoad() throws IOException {
@@ -150,7 +165,7 @@ class UrbanUtilitiesSectionTest {
         Path file = directory.resolve("good.sav");
         assertTrue(SaveSystem.save(g, file));
         byte[] good = UrbanUtilitiesSection.write(g);
-        assertEquals(76, good.length, "a version, one tapped building and two devices");
+        assertEquals(102, good.length, "a version, one tapped building and three devices");
         List<byte[]> bad = List.of(
                 withInt(good, 0, 2),                                              // another version
                 withInt(good, 4, 2),                                              // a count the bytes do not hold
@@ -161,7 +176,7 @@ class UrbanUtilitiesSectionTest {
                 withInt(good, 16, 0),                                             // nothing drawn is never written
                 withInt(good, 16, UrbanUtilities.capacity(b) + 1),                // more than the pipes held
                 withInt(good, 16, -3),
-                withInt(good, 20, 3),                                             // a device the bytes do not hold
+                withInt(good, 20, 4),                                             // a device the bytes do not hold
                 withInt(good, 20, UrbanUtilities.MAX_DEVICES + 1),                // past the device cap
                 withByte(good, GEN + KIND, 9),                                    // no kind of device
                 withByte(good, GEN + KIND, 2),                                    // a lamp where a generator stands
@@ -178,6 +193,10 @@ class UrbanUtilitiesSectionTest {
                 withFloat(good, GEN + SPARE, 1f),
                 withFloat(good, LAMP + CONDITION, 50f),                           // a lamp never wears
                 withFloat(good, LAMP + FUEL, 1f),                                 // nor holds fuel
+                withFloat(good, PURIFIER + FUEL, UrbanUtilities.PURIFIER_LITRES + 1), // more than its tank holds
+                withFloat(good, PURIFIER + SPARE, -1f),                           // less than no clean water
+                withFloat(good, PURIFIER + SPARE, Float.POSITIVE_INFINITY),
+                withFloat(good, PURIFIER + CONDITION, UrbanUtilities.SOUND + 1),  // a filter past fresh
                 moved(good, LAMP, h.spare(), 1),                                  // a second generator in the building
                 moved(good, LAMP, h.street(), 2),                                     // a lamp out in the street
                 Arrays.copyOf(good, good.length + 1));                            // trailing byte

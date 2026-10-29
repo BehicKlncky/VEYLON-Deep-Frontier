@@ -34,8 +34,8 @@ import java.util.Map;
  *
  * <h2>Devices and circuits</h2>
  *
- * <p>Generators and work lamps are put down by the player from salvage, inside a building: a
- * device's building is its circuit, the building's wiring. A circuit has at most one generator,
+ * <p>Generators, work lamps and water purifiers are put down by the player from salvage, inside a
+ * building: a  * device's building is its circuit, the building's wiring. A circuit has at most one generator,
  * and a running generator feeds the {@value #MAX_LOAD} consumers of its building nearest to it
  * within {@value #REACH} blocks; anything farther, outside or beyond that load is dark. There is no
  * wire, cable or network to lay or solve: the building is the service area.
@@ -47,6 +47,12 @@ import java.util.Map;
  *   <li><b>Light.</b> A work lamp gives light only while it is switched on and fed; its light is
  *       registered in its chunk exactly then, and every change of feed refreshes the lamp's light
  *       and the meshes its glow reaches.</li>
+ *   <li><b>Water.</b> A purifier is built with its filter spent; packed with fibre, switched on
+ *       and fed, it treats a litre of untreated water every {@value #TREAT_SECONDS} seconds from
+ *       its untreated tank into its clean one, each {@value #PURIFIER_LITRES} litres, and its pump
+ *       draws a litre of its building's stale tap water every {@value #PUMP_SECONDS} seconds while the
+ *       untreated tank has room. Every litre treated wears {@value #FILTER_WEAR} points off the filter.
+ *       Nothing is made: what goes in is what comes out.</li>
  *   <li><b>Bounded.</b> At most {@value #MAX_DEVICES} devices in the world.</li>
  * </ul>
  * Persistent through {@code urban.utilities} version 1; a new or loaded world gets a fresh ledger
@@ -76,11 +82,22 @@ public final class UrbanUtilities {
     public static final float WEAR_SECONDS = 15f;
     /** Extra burn, as a share of idle, for each consumer drawing from a generator. */
     public static final float LOAD_BURN = 0.25f;
+    /** Litres a purifier's untreated tank and its clean tank each hold. */
+    public static final float PURIFIER_LITRES = 8f;
+    /** Seconds of power a purifier takes to treat one litre. */
+    public static final float TREAT_SECONDS = 20f;
+    /** Seconds of power its pump takes to draw one litre of its building's stale water. */
+    public static final float PUMP_SECONDS = 10f;
+    /** Filter condition one litre treated wears away: a fresh filter treats twenty-five litres. */
+    public static final float FILTER_WEAR = 4f;
+    /** Fibre packed into a spent filter to renew it. */
+    public static final int FILTER_FIBRE = 2;
 
     /** What a device is. The code is the save's; never reuse one. */
     public enum Kind {
         GENERATOR(1, BlockType.GENERATOR, "generator"),
-        LAMP(2, BlockType.ELECTRIC_LAMP, "work lamp");
+        LAMP(2, BlockType.ELECTRIC_LAMP, "work lamp"),
+        PURIFIER(3, BlockType.WATER_PURIFIER, "water purifier");
 
         public final int code;
         public final BlockType block;
@@ -115,18 +132,22 @@ public final class UrbanUtilities {
         public final Vec3i pos;
         /** The building whose wiring it is on. */
         public final long building;
-        /** Its switch: a generator running, a lamp switched on. */
+        /** Its switch: a generator running, a lamp or a purifier switched on. */
         public boolean on;
-        /** A generator's wear, from {@link #SOUND} down to none. */
+        /** A generator's wear or a purifier's filter, from {@link #SOUND} down to none. */
         public float condition = SOUND;
         /** A generator's fuel, in seconds at idle. */
         public float fuel;
+        /** A purifier's untreated and clean water, in litres. */
+        public float untreated, clean;
         /** Transient: the running generator feeding it this moment, or null. */
         Device feeder;
         /** Transient: whether its chunk's light list shows it lit. */
         boolean shownLit;
         /** Transient: seconds to a running generator's next noise and sound. */
         public float noiseTimer, soundTimer;
+        /** Transient: seconds of power a purifier's pump has run toward its next litre. */
+        public float pumped;
 
         public Device(Kind kind, Vec3i pos, long building) {
             this.kind = kind;
@@ -154,9 +175,22 @@ public final class UrbanUtilities {
             return kind == Kind.LAMP && on && feeder != null;
         }
 
-        /** True while this consumer draws on its feeder: a lamp switched on. */
+        /** A purifier switched on, fed and with a filter that still works. */
+        public boolean working() {
+            return kind == Kind.PURIFIER && on && feeder != null && condition > 0;
+        }
+
+        /** A working purifier with untreated water to treat and room for it. */
+        public boolean treating() {
+            return working() && untreated > 0 && clean < PURIFIER_LITRES;
+        }
+
+        /**
+         * True while this consumer draws on its feeder: a lamp lit, a purifier working with water
+         * to treat or room to pump into.
+         */
         public boolean drawing() {
-            return lit();
+            return lit() || working() && (untreated > 0 && clean < PURIFIER_LITRES || untreated <= PURIFIER_LITRES - 1f);
         }
     }
 
@@ -309,13 +343,15 @@ public final class UrbanUtilities {
     }
 
     /**
-     * Registers a device just put down, switched off, with a sound generator's empty tank.
+     * Registers a device just put down, switched off: a sound generator with an empty tank, a lamp,
+     * or a purifier with empty tanks and its filter spent, to be packed with fibre before it works.
      *
      * @return the device, or null when its placement is refused
      */
     public Device add(World w, Vec3i p, BlockType t) {
         if (placementRefusal(w, p, t) != null || devices.containsKey(p)) { return null; }
         Device d = new Device(Kind.of(t), p, buildingOf(w, p));
+        if (d.kind == Kind.PURIFIER) { d.condition = 0f; }
         devices.put(p, d);
         order.add(d);
         settle(w);

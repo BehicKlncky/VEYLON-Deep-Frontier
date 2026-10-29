@@ -144,7 +144,10 @@ public enum BlockType {
     // so taking one apart (SalvageTable) is how it comes down. A lamp's light is registered in its
     // chunk only while it is switched on and fed, like a lantern's while it burns.
     GENERATOR("Generator", Shape.CUBE, true, true, false, 3.0f, ToolKind.PICKAXE, false, null, 0, 0, 0f, 0.55f, 0.24f, 0.18f),
-    ELECTRIC_LAMP("Work Lamp", Shape.TORCH, false, false, false, 0.4f, ToolKind.NONE, false, null, 0, 14, 0f, 0.86f, 0.84f, 0.70f);
+    ELECTRIC_LAMP("Work Lamp", Shape.TORCH, false, false, false, 0.4f, ToolKind.NONE, false, null, 0, 14, 0f, 0.86f, 0.84f, 0.70f),
+    // A pump and filter unit built from salvage: on a generator's wiring it draws its building's stale
+    // water and treats it. Its tanks and filter are in UrbanUtilities, like a generator's fuel.
+    WATER_PURIFIER("Water Purifier", Shape.CUBE, true, true, false, 2.5f, ToolKind.PICKAXE, false, null, 0, 0, 0f, 0.55f, 0.60f, 0.64f);
 
     /**
      * How a block is meshed. Not persisted: only {@link BlockType} ordinals are

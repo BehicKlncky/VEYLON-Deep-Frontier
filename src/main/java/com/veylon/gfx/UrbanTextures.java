@@ -65,6 +65,8 @@ final class UrbanTextures {
             case "barricade_metal" -> metalBarricade(p);
             case "generator_side" -> generator(p, false);
             case "generator_top" -> generator(p, true);
+            case "purifier_side" -> purifier(p, false);
+            case "purifier_top" -> purifier(p, true);
             default -> {
                 return false;
             }
@@ -804,6 +806,35 @@ final class UrbanTextures {
         p.box(0, 0, n - 1, n - 1, rim, 0x161618); // the tubular frame
         p.fillFbmBlend(0x6a4028, 0.72f, 5, 1904, 0.25f);
         p.grain(0.05f);
+    }
+
+    /**
+     * A water purifier built from salvage (milestone 19): a pale grey steel tank with a sight glass
+     * showing its water, two pipe stubs on top and a small panel with its pilot lamp, the colour of
+     * clean water its only accent.
+     */
+    private static void purifier(Painter p, boolean top) {
+        int n = p.size;
+        p.fillFbm(0x8a9094, 0.07f, 6, 1911);
+        if (top) {
+            p.blob(n / 3, n / 3, Math.max(1, n / 8), 0x50585c);
+            p.blob(2 * n / 3, 2 * n / 3, Math.max(1, n / 8), 0x50585c);
+            p.dot(n / 3, n / 3, 0x2a3034);
+            p.dot(2 * n / 3, 2 * n / 3, 0x2a3034);
+        } else {
+            int x0 = n / 5, x1 = n / 5 + Math.max(2, n / 7);
+            for (int y = n / 5; y < n - n / 5; y++) {
+                boolean water = y > n / 2;
+                for (int x = x0; x <= x1; x++) {
+                    p.set(x, y, water ? p.shade(0x4a7a9a, 0.9f + p.noise(x, y, 4, 1912) * 0.2f) : 0x2a3034);
+                }
+            }
+            p.box(n / 2, n / 4, n - n / 6, n / 2, Math.max(1, n / 20), 0x3a4044);
+            p.dot(n - n / 4, n / 3, 0x9ac8e0);
+        }
+        p.box(0, 0, n - 1, n - 1, Math.max(1, n / 16), 0x5a6064);
+        p.fillFbmBlend(0x6a5a40, 0.75f, 5, 1913, 0.2f);
+        p.grain(0.04f);
     }
 
     private static void railingTop(Painter p) {

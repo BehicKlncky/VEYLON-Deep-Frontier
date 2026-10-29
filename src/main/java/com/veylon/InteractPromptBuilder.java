@@ -278,7 +278,7 @@ final class InteractPromptBuilder {
             case BARRICADE, BARRICADE_METAL -> game.interactPrompt = Fortification.barricadeInfo(game,
                     new Vec3i(targetX, targetY, targetZ), game.targetHit.type());
             // Milestone 19: a device's switch and state.
-            case GENERATOR, ELECTRIC_LAMP -> game.interactPrompt = game.refuges.utilities.devicePrompt(
+            case GENERATOR, ELECTRIC_LAMP, WATER_PURIFIER -> game.interactPrompt = game.refuges.utilities.devicePrompt(
                     new Vec3i(targetX, targetY, targetZ));
             // Milestone 15: the growth teaches its own counters.
             case GROWTH_NODE -> game.interactPrompt = "Growth node: a torch set beside it burns it out";

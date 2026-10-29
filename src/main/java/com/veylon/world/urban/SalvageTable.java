@@ -96,6 +96,8 @@ public final class SalvageTable {
                     ItemType.SCRAP, 2, ItemType.SHEET_METAL, 1) : null;
             case ELECTRIC_LAMP -> w.urban.hasUtilities() ? new Entry("work lamp", 1.5f, ToolKind.PICKAXE, false, true,
                     stacks(ItemType.SPARE_PARTS, 1)) : null;
+            case WATER_PURIFIER -> w.urban.hasUtilities() ? metal("water purifier", 4f, ItemType.SHEET_METAL, 1,
+                    ItemType.SPARE_PARTS, 1, ItemType.SCRAP, 1) : null;
             default -> null;
         };
     }

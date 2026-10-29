@@ -484,6 +484,17 @@ public final class IconAtlas {
                 c.circle(23, 21, 3, 0xFF2A2A2C);
                 c.circle(23, 21, 1, 0xFFB0A890);
             }
+            case WATER_PURIFIER -> {
+                c.clear();
+                c.rect(8, 6, 24, 29, 0xFF5A6064);
+                c.rect(9, 7, 23, 28, 0xFF8A9094);
+                c.rect(11, 12, 13, 25, 0xFF2A3034);
+                c.rect(11, 18, 13, 25, 0xFF4A7A9A);
+                c.rect(16, 10, 21, 15, 0xFF3A4044);
+                c.circle(19, 12, 1, 0xFF9AC8E0);
+                c.line(12, 6, 12, 3, 2, 0xFF50585C);
+                c.line(20, 6, 20, 3, 2, 0xFF50585C);
+            }
             case WORK_LAMP -> {
                 c.clear();
                 c.rect(11, 25, 21, 28, 0xFF3A3D42);

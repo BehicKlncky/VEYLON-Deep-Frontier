@@ -241,6 +241,8 @@ public final class MaterialRegistry {
                     1, TintMode.NONE, false, 0f, 0.45f);
             register("work_lamp", BlockType.ELECTRIC_LAMP, "lantern_glass", "anvil_metal", "anvil_metal",
                     1, TintMode.NONE, false, 0.85f, 0.4f);
+            register("water_purifier", BlockType.WATER_PURIFIER, "purifier_top", "purifier_side", "purifier_top",
+                    1, TintMode.NONE, false, 0f, 0.4f);
 
             // Standalone prop tiles used by special shapes (torch flame, campfire, basin water...).
             propTile("torch_head", 1.0f, 0.9f);

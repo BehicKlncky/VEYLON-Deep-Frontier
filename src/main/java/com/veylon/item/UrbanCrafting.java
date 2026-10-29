@@ -54,7 +54,8 @@ public final class UrbanCrafting {
     /**
      * Generator 18 (urban milestone 19): the refuge recipes, plus the refuge utilities built at a
      * workbench from what salvage recovers. A generator is rebuilt from engine parts in a sheet-metal
-     * frame, and a work lamp is wired from a part and scrap. Fuel is never made: it comes out of the
+     * frame, a work lamp is wired from a part and scrap, and a water purifier is a pump and filter in
+     * a sheet-metal tank; its filter is packed with fibre where it stands. Fuel is never made: it comes out of the
      * tanks of the cars that did not burn. Earlier urban worlds keep their lists.
      */
     public static final List<Recipe> UTILITY_RECIPES = java.util.stream.Stream.concat(REFUGE_RECIPES.stream(),
@@ -62,5 +63,7 @@ public final class UrbanCrafting {
                     new Recipe("Rebuild Generator", ItemType.GENERATOR, 1, Station.WORKBENCH,
                             ItemType.SPARE_PARTS, 3, ItemType.SCRAP, 3, ItemType.SHEET_METAL, 1),
                     new Recipe("Wire Work Lamp", ItemType.WORK_LAMP, 1, Station.WORKBENCH,
-                            ItemType.SPARE_PARTS, 1, ItemType.SCRAP, 1))).toList();
+                            ItemType.SPARE_PARTS, 1, ItemType.SCRAP, 1),
+                    new Recipe("Build Water Purifier", ItemType.WATER_PURIFIER, 1, Station.WORKBENCH,
+                            ItemType.SPARE_PARTS, 1, ItemType.SHEET_METAL, 1, ItemType.SCRAP, 2))).toList();
 }

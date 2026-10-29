@@ -319,7 +319,7 @@ final class WorldInteractions {
             case WOOD_DOOR, WOOD_DOOR_OPEN, METAL_DOOR, METAL_DOOR_OPEN, WINDOW, WINDOW_OPEN ->
                     FixtureActions.interact(game, pos.x(), pos.y(), pos.z());
             // Layout fifteen: a device's switch (urban milestone 19).
-            case GENERATOR, ELECTRIC_LAMP -> game.refuges.utilities.toggle(pos);
+            case GENERATOR, ELECTRIC_LAMP, WATER_PURIFIER -> game.refuges.utilities.toggle(pos);
             default -> false;
         };
     }
@@ -387,7 +387,7 @@ final class WorldInteractions {
             }
             case CAMPFIRE, LANTERN, POWDER_KEG, GATE, ALARM_BELL, BEACON, BEACON_LIT ->
                     interactWithBlockAt(pos);
-            case GENERATOR, ELECTRIC_LAMP -> {
+            case GENERATOR, ELECTRIC_LAMP, WATER_PURIFIER -> {
                 if (!interactWithBlockAt(pos)) {
                     return false;
                 }

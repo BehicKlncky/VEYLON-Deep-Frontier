@@ -177,6 +177,7 @@ final class Dismantling {
             return false;
         }
         long owner = container != null ? UrbanIds.NONE : SalvageTable.survivorOwner(game.world, pos);
+        String spill = game.refuges.utilities.spillNote(pos); // a purifier's water, read before it goes
         if (container != null) {
             game.crates.onContainerSalvaged(container);
             game.world.urban.containers.moved(container);
@@ -205,7 +206,8 @@ final class Dismantling {
         game.particles.blockDust(t, x, y, z, DUST * 2);
         game.noise.emit(game, x, y, z, e.metal() ? METAL_DONE_NOISE_RADIUS : DONE_NOISE_RADIUS,
                 e.metal() ? METAL_DONE_NOISE : DONE_NOISE, "structure-break", true, game.player);
-        game.log("You take apart the " + e.noun() + ": " + SalvageTable.describe(yields) + ".");
+        game.log("You take apart the " + e.noun() + ": " + SalvageTable.describe(yields) + "."
+                + (spill == null ? "" : " " + spill));
         return true;
     }
 
