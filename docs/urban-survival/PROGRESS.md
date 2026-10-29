@@ -6,10 +6,10 @@ This is the running record for the 26-package urban-survival roadmap. The pack i
 
 | Item | Value |
 | --- | --- |
-| Last completed package | **18 — Safehouses, salvage and fortification** (2026-10-27). Generator 17 lets the player claim up to three refuges, each one storey claimed at a bed, with home, storage and respawn there; take furniture, doors, rails and the burnt-out cars of the local streets apart for materials by time, tool, wear and noise; and board up openings and brace doors with what salvage gives. A Breacher hammers plank barricades and braces down, every other threat walks round, and a refuge's real ways in and light decide what its night draws. Claims, storage, depletion and battle damage survive saves and loads; survivors' rooms cannot be claimed while their people are there. Native refuge tours pass in both modes. Human-only checks are deferred by D-80. |
-| Source revision | 18: `c771b14` wrecks → `4fa6057` salvage → `746d896` fortification → `47abd8b` claims → `414c248` the night → `ab1f4bc` the sleep gate → `ed8999d` the short salvage hint → `f084ff6` refuge tour. Records follow separately. |
-| Default new world | Legacy (`World.DEFAULT_NEW_WORLD_GENERATOR = GEN_CAVE_IDENTITIES`), unchanged until 26 passes. Isolated `VEYLON_GENERATOR=urban-dev` creates generator 17 (`GEN_URBAN_REFUGES`, layout 14 / template 7 / content 3, encounter catalogue 5). Generators 1–16 stay loadable with their original geometry and encounters. |
-| Next package | **19 — Water, power and refuge utilities, NOT STARTED.** Keep `UrbanSliceRouteTest` (generators 10–17), `UrbanCatalogueQaSceneTest`, `UrbanDistrictQaSceneTest`, `UrbanUndergroundQaSceneTest`, `UrbanEcologyQaSceneTest`, `UrbanSurvivorQaSceneTest`, `UrbanStrongholdQaSceneTest` and `UrbanRefugeQaSceneTest` as regression gates. Owner question P-15 (the inverted day/night temperature curve) is open. |
+| Last completed package | **18 — Safehouses, salvage and fortification** (2026-10-27). **19 — Water, power and refuge utilities is PARTIAL** (2026-10-29): generator 18 gives a building's taps only the stale water left in its pipes, and a generator rebuilt from salvage, fuelled from the tanks of cars that did not burn, lights its building's work lamps and runs a water purifier that pumps and treats that water, all kept by `urban.utilities` v1. Implementation, headless gates and four exact-tree portable builds are done; the final portable build on the tour commit and the native tour to completion in both modes are pending, because the owner stopped testing. Human-only checks are deferred by D-80. |
+| Source revision | 19: `7258c34` taps → `d4c5d7b` power → `4c93639` purifier → `640bf67` sustainability check → `def0278` utility tour. Records follow separately. 18: `c771b14` … `f084ff6`. |
+| Default new world | Legacy (`World.DEFAULT_NEW_WORLD_GENERATOR = GEN_CAVE_IDENTITIES`), unchanged until 26 passes. Isolated `VEYLON_GENERATOR=urban-dev` creates generator 18 (`GEN_URBAN_UTILITIES`, layout 15 / template 7 / content 3, encounter catalogue 5). Generators 1–17 stay loadable with their original geometry and encounters. |
+| Next package | **Finish 19 first:** run the portable build on the tour commit's tree or later, then `VEYLON_SCENE=urban_utilities` natively to its `pass=true` line in Survival and Creative (commands in [VALIDATION.md](VALIDATION.md#native-utility-tour-partial)). Then **20 — Urban missions and long-term purpose, NOT STARTED.** Keep `UrbanSliceRouteTest` (generators 10–18), `UrbanCatalogueQaSceneTest`, `UrbanDistrictQaSceneTest`, `UrbanUndergroundQaSceneTest`, `UrbanEcologyQaSceneTest`, `UrbanSurvivorQaSceneTest`, `UrbanStrongholdQaSceneTest`, `UrbanRefugeQaSceneTest` and `UrbanUtilityQaSceneTest` as regression gates. Owner question P-15 (the inverted day/night temperature curve) is open. |
 | Human testing schedule | Owner instruction (2026-10-11, D-80): consolidated human playtesting/listening after milestone 22. Through 22, run automated and scripted native validation and record human-only checks as deferred; do not request interim human walks. |
 | Commits | Separate `feat`, `test`, `docs` and `chore` commits on `feature/urban-survival`; see the reconstruction ledger below. `main` stays at `923345f`. Original combined commit retained at `backup/urban-m01-m04-before-split`. No merge, push, tag or publication. |
 
@@ -37,7 +37,7 @@ The status vocabulary is NOT STARTED, IN PROGRESS, PARTIAL, BLOCKED or COMPLETE.
 | 16 | Survivor camps and hidden civilians | 15, 06, 14, 10 | Urban site registry over `settlement/Settlement`, `SettlementManager`, `DormantSettlementSimulation` (D-21); `ai/SettledNpcAI`; aid interaction | A generated camp and a secret basement refuge are found through play. Helping or stealing has a consequence. The same people, needs and deaths remain after save and dormancy. | **COMPLETE** (2026-10-22; human-only validation deferred by D-80) |
 | 17 | Guarded strongholds and hostile factions | 16 | `SettlementManager` guards, reputation, theft and counterattacks; urban faction ids | Approach, access rules, entry, trade and exploration. Guards react fairly. A hostile site with an alternative route. State persists without duplicate guards or infinite counterattacks. | **COMPLETE** (2026-10-23; human-only validation deferred by D-80) |
 | 18 | Safehouses, salvage and fortification | 17, 07, 04 | New `RefugeSystem`, `urban.refuges`; salvage in `PlayerBlockActions`; barricades; `SleepSystem` safety | Claim, store, dismantle, barricade from salvage and sleep. Threats attack or route around defences. Claims, salvage and defences persist. Survivor property has consequences. | **COMPLETE** (2026-10-27; human-only validation deferred by D-80) |
-| 19 | Water, power and refuge utilities | 18 | New `UtilitySystem` (`MediumTickSystem`), `urban.utilities`; `simulation/WaterSystem`; light emitters | One water utility and one power source and consumer run from urban supplies, conserve resources, persist, follow the pause and dormancy policy and respect Creative. | NOT STARTED |
+| 19 | Water, power and refuge utilities | 18 | `world/urban/UrbanUtilities` (taps, devices, circuits), `UtilitySystem` (owned by `RefugeSystem`, one medium-tick line in `Game`), `urban.utilities` v1; `World.emitterOn` and `Chunk` light lists for lamps; `SalvageTable` (fuel tanks, devices); `UtilitySounds` | One water utility and one power source and consumer run from urban supplies, conserve resources, persist, follow the pause and dormancy policy and respect Creative. | **PARTIAL** (2026-10-29; implementation and headless gates complete; the final portable build and the native tour in both modes pending) |
 | 20 | Urban missions and long-term purpose | 19, 16–17, 02 | New `UrbanMissions`, `CommsObjective`, `urban.missions`; `ai/Quest`, `ai/FactionSystem` model; `ui/QuestObjectiveView`; victory flow | An integration route advances C1–C5 without trees or ore. A hidden-refuge mission and a guarded-access mission. Failure alternatives. Rewards exactly once. The legacy beacon is intact. | NOT STARTED |
 | 21 | Map, HUD and onboarding | 20 | `ui/MapScreen` plan layer, `ui/Hud`, `InteractPromptBuilder`, `ui/NewFrontierScreen`, `ui/PauseMenu` | A new player finds supplies, floors, the refuge and the next step through ordinary UI. Secrets stay secret. `docs/graphics/HUD_VALIDATION.md` captures. | NOT STARTED |
 | 22 | Ruined-city visuals and sound | 21 | Materials, lighting (D-19), `AmbienceSystem`, `AudioSceneState`, `engine/ReverbPresets`, `engine/AudioManager` | Districts, sites and threats are recognisable in day, night and fog. Props, lights and audio stay bounded. Dry fallback works. A manual listening pass. | NOT STARTED |
@@ -2503,6 +2503,206 @@ was performed.
 
 **Next:** package 19, water, power and refuge utilities: one water utility and
 one power source with a consumer, run from urban supplies in a claimed refuge,
+under a new generator.
+
+## Milestone 19 — water, power and refuge utilities (2026-10-29)
+
+**Status: PARTIAL: implementation and headless gates complete; the final portable
+build and the native tour in both modes are pending.** Generator 18 gives
+scavenging a practical long-term use in the refuge. A building's taps now hold
+only the stale, untreated water left in its pipes, shared by every tap and never
+refilled. A generator rebuilt from
+salvage runs on fuel siphoned from the tanks of cars that did not burn, feeds the
+work lamps and the water purifier of its own building, burns fuel for every
+second and every load, wears and is rebuilt with spare parts, and is a real
+noise that draws whatever hears it through the walls. A lamp gives light exactly
+while it is fed. The purifier, built with its filter spent and repaired by
+packing it with fibre, pumps the building's stale water up and treats it into
+clean water on the generator's power; water only ever moves. Everything is kept
+by `urban.utilities` v1 and survives saves and loads exactly, with no catch-up
+or refill. Rain alone keeps a survivor in water, so power is never a condition
+of survival. The tour passes headlessly in both modes; one native Survival run
+reached its tenth capture of thirteen and ended there with a clean exit, and
+the owner then asked to stop testing, so the native runs to completion and the
+final portable build remain to do. Human-only validation remains deferred by
+D-80. Decisions D-183–D-196; P-15 is still open.
+
+### Start state
+
+- Branch `feature/urban-survival` at `666dd9c` (the 18 records), clean tree;
+  the 18 gate met.
+- Read the revised base, the prompt, `AGENTS.md`, `docs/COMMIT_WORKFLOW.md` and
+  these records. The work and its commits ran on 2026-10-29 in one session.
+
+### Utilities and behaviour
+
+- **Generator 18 (D-183).** Layout 15 is layout 14 exactly, every block, plan
+  and id; the rules below are gated on it. `urban-dev` now creates it.
+- **Taps (D-184, D-185).** A building's planned basins share one finite store
+  of stale, untreated water: two litres a basin when intact or held, one when
+  picked clean, one for every two when damaged. F fills an empty waterskin with
+  it or drinks it as untreated water. It never refills; survivors' taps are
+  theirs; a basin put down by hand is still a rain collector.
+- **The circuit (D-186).** A building is the service area: one generator to a
+  building feeds its four nearest consumers within 16 blocks. Devices go down
+  only inside buildings, at most 64 in the world. Nothing is wired by hand and
+  nothing is solved city-wide.
+- **The generator (D-187, D-188).** Rebuilt at a workbench from three spare
+  parts, three scrap and a sheet of metal; three cans of 300 seconds, a quarter
+  more burn for each consumer drawing; a point of wear every 15 seconds, seized
+  at none, rebuilt 50 a spare part with a pry tool in the pack. Fuel comes only
+  from the tank of a car that did not burn. Running, it is a player-attributed
+  noise of 28 blocks every three seconds, heard through walls by the existing
+  rules; a Creative builder's is heard by nobody. New cues play it starting,
+  running and dying.
+- **Light (D-189).** A work lamp is registered as a light, and drawn lit, only
+  while it is switched on and fed; every change refreshes its light and meshes.
+- **The purifier (D-190).** Built with its filter spent; two fibre pack it, its
+  repair, worn four points a litre. Fed and switched on, it pumps its building's
+  stale water a litre every 10 seconds and treats a litre every 20, tanks of
+  eight litres; poured water and filled skins go through the use button.
+- **Removal, time and Creative (D-191–D-193).** Nothing carries a device away:
+  taking one apart returns most of its parts and a generator's whole cans, and
+  any removal leaves its lamps dark at once. Utilities run on the world's own
+  seconds, never paused, by real seconds through a sleep, and hold still beyond
+  128 blocks or in an unloaded column; nothing is caught up and a load restores
+  exactly. Creative spends nothing and is unheard; the world's fuel, wear and
+  water run as ever.
+- **Saves (D-194).** `urban.utilities` v1, required for generator 18: the tap
+  ledger and the devices, every row validated.
+- **Scope and sustainability (D-195).** Two consumer kinds, the lamp and the
+  purifier-pump; the radio workstation is package 20's, a refrigerator is not
+  added. One rain collector emptied once a day keeps a survivor in water on
+  every design seed.
+- **QA (D-196).** `VEYLON_SCENE=urban_utilities` plays it all in the starter
+  refuge with ordinary controls in both modes.
+- **Found while writing the tour.** The tour first left the lamps as put down,
+  switched off, so starting the generator lit nothing; lamps are now switched on
+  with F as soon as they are down, still dark until fed.
+
+### Changed paths
+
+**Production** (`src/main/java/com/veylon/`):
+
+- New: `world/urban/UrbanUtilities.java`, `UtilitySystem.java`,
+  `save/UrbanUtilitiesSection.java`, `engine/UtilitySounds.java`,
+  `UrbanUtilityQaScene.java`, `UrbanUtilityTourPlan.java`.
+- Edited: `world/{World,BlockType,Chunk,ChunkMesher}.java`,
+  `world/urban/{UrbanRevision,UrbanWorldState,SalvageTable,VehicleSites}.java`,
+  `item/{ItemType,UrbanCrafting,CraftingSystem}.java`,
+  `gfx/{MaterialRegistry,UrbanTextures,IconAtlas}.java`,
+  `engine/{AudioManager,ProceduralAudio}.java`,
+  `save/{SaveSystem,V3ExtensionSections}.java`, `qa/RuntimeBudgetSnapshot.java`,
+  `{Game,RefugeSystem,WorldInteractions,InteractPromptBuilder,PlayerBlockActions,
+  Dismantling,PlayerConsumables,UrbanQaScenes}.java`, `QaHarness.java` (one label
+  on an existing line).
+
+**Tests** (`src/test/java/com/veylon/`):
+
+- New: `UrbanTapsTest`, `UrbanPowerTest`, `UrbanPurifierTest`,
+  `UrbanUtilitySustainabilityTest`, `UrbanUtilityQaSceneTest`,
+  `save/UrbanUtilitiesSectionTest`, `engine/UtilitySoundsTest`, and the fixture
+  `UtilityWorldArena`.
+- Extended: `world/WorldGeneratorFingerprintTest` (generator 18),
+  `UrbanSliceRouteTest` (generator 18), `qa/RuntimeBoundsTest` (the tap and
+  device ledgers), `qa/SerializedEnumOrderTest` (the appended blocks and items).
+- Expectations: `world/urban/UrbanRevisionTest`,
+  `world/UrbanGeneratorDispatchTest` and `UrbanDevelopmentSelectorTest` name
+  generator 18.
+
+**Documents:** `docs/ARCHITECTURE.md`, `docs/DEVELOPING.md`,
+`docs/audio/AUDIO_DESIGN.md` and the urban DESIGN, DECISIONS, PROGRESS and
+VALIDATION records.
+
+### Compatibility
+
+- Generators 1–17 are unchanged: their absolute pins pass; none of them has
+  taps, devices, fuel in a wreck or `urban.utilities`. A generator, lamp or
+  purifier block a Creative player sets down in an earlier world is an inert
+  block, and a lamp there never lights.
+- New: generator 18, layout 15, the blocks `GENERATOR`, `ELECTRIC_LAMP` and
+  `WATER_PURIFIER` (ids 92–94), the items Fuel Can, Generator, Work Lamp and Water
+  Purifier (appended), the section `urban.utilities` v1 (required for, and
+  accepted only with, generator 18), four texture layers (126 of 160) and three
+  audio buffers. Every enum was appended; no ordinal moved.
+- Unchanged: the v3 base, every other section id and version, content revision
+  3, template 7, encounter catalogue 5, and the default new world (generator 3).
+- An older build rejects a generator-18 save before replacing its live world;
+  no older binary was run, and there is no downgrade promise.
+
+### Commands and results
+
+Exact commands and outputs are in
+[VALIDATION.md](VALIDATION.md#milestone-19--water-power-and-refuge-utilities-2026-10-29).
+In short:
+
+- The first four code commits were validated with the full portable build on
+  their exact trees: `7258c34` 2,139 tests in 250 classes, `d4c5d7b` 2,155 in
+  252, `4c93639` 2,163 in 253 (each in the main tree while it held exactly that
+  commit) and `640bf67` 2,165 in 254 (in the isolated worktree
+  `build/m14-check`), each with no failures and the existing Windows skip.
+- The tour commit `def0278` was checked only by `UrbanUtilityQaSceneTest`
+  (Survival and Creative pass, 13 captures each, and generator 17 refused); its
+  portable build was not run. **Pending.**
+- Native `urban_utilities`, Survival, seed `20260731`: ten of thirteen captures
+  (through the shutdown) with `glErrors=0 khrErrors=0` on each, then a clean exit
+  during the run-dry leg with no failure logged. The Creative run was not made.
+  **Pending:** both runs to their `pass=true` line.
+- `graphify update . --no-cluster` on the final code: 10,769 nodes and 44,168
+  edges, with an extractor warning for `settings.gradle`.
+- No reviewer subagents ran.
+
+The commits:
+
+| Commit | Subject |
+| --- | --- |
+| `7258c34` | `feat(water): keep a utility city's taps to the stale water left in their pipes` |
+| `d4c5d7b` | `feat(power): run a refuge's work lamps from a salvaged generator` |
+| `4c93639` | `feat(water): treat a refuge's stale water in a powered purifier` |
+| `640bf67` | `test(utilities): prove a utility city's rain keeps a survivor in water` |
+| `def0278` | `feat(qa): tour a refuge powered, lit and supplied with treated water` |
+
+These records follow in their own commit. No push, merge, tag or publication
+was performed.
+
+### Limitations and next concrete step
+
+- **Evidence types.** The tour stages poses between legs, a forward-only
+  clock, the weather, one infected and a kit (salvage for the bench, a spare
+  part, a pry tool, fibre and empty waterskins, and in Creative the fuel can
+  salvage would have given), and builds through the crafting screen's own
+  command; it is not the human playtest D-80 defers until after 22. Whether
+  power is worth its noise, the purifier worth its fibre and the taps' water
+  worth boiling was checked by script, logs and captures, not judged by a
+  person.
+- **Tour coverage.** The native tour shows the wear rebuilt after an evening's
+  running, not a seized generator; seizing, the load cap, reach, a second
+  generator refused, removal leaving lamps dark, dormancy, pause, clogged
+  filters, spills and survivors' pipes rest on the headless tests
+  (`UrbanPowerTest`, `UrbanPurifierTest`, `UrbanTapsTest`).
+- **Moving devices.** Nothing carries a device away whole; moving one costs
+  part of its salvage.
+- **Noise model.** The generator's noise is the existing direct-ray hearing:
+  walls cost eight blocks each, and it is not propagated round a building.
+- **Sleep.** A night's sleep costs only its few real seconds of fuel, as for
+  lanterns and fires; a generator left running through the night lights the
+  refuge and shows in its night rule.
+- **The Veilmaw's lure** seeks torches, lanterns and fires, not lamps, though a
+  lit lamp's light wakes it.
+- **Balance for 23.** Fuel per can, burn, wear, repair, filter life, pump and
+  treatment rates, tap stores and recipe costs are initial values; rain water is
+  plentiful.
+- **Presentation.** The lamp reuses the lantern's glass; the generator and
+  purifier have their first tiles; machinery ambience is 22.
+- **Day/night temperature (P-15).** Still inverted in every world; unchanged.
+- **Default.** The ordinary new world stays generator 3 until 26.
+
+**Next:** finish 19. Run the portable build on `def0278` or later, then the
+native tour to its `pass=true` line in Survival and Creative with the commands
+in [VALIDATION.md](VALIDATION.md#native-utility-tour-partial), each in a fresh QA
+directory, and look at the thirteen captures; mark 19 COMPLETE only then. After
+that, package 20, urban missions and long-term purpose: the communications chain
+and its radio workstation on the refuge circuit, and a modest mission catalogue,
 under a new generator.
 
 ## Resume rules

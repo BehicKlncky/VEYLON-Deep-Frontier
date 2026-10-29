@@ -2990,3 +2990,106 @@ are local ignored artifacts under `build/`.
   native tours and the inspected captures.
 
 Next: package 19.
+
+## Milestone 19 — water, power and refuge utilities (2026-10-29)
+
+### Scope and baseline
+
+- Branch `feature/urban-survival` at `666dd9c` (the 18 records), clean tree.
+  Read the revised base, the prompt, `AGENTS.md`, `docs/COMMIT_WORKFLOW.md` and
+  these records.
+- Generator 18 (layout 15, template 7, content 3, encounter catalogue 5) is new,
+  with three appended blocks (`GENERATOR`, `ELECTRIC_LAMP`, `WATER_PURIFIER`, ids
+  92–94), four appended items (Fuel Can, Generator, Work Lamp, Water Purifier),
+  three audio buffers and the section `urban.utilities` v1. No existing ordinal,
+  persisted id or other section version changed, and no earlier generator's
+  behaviour. The default new world is unchanged.
+- Generators 1–17 keep their absolute pins. Generator 18 was pinned at
+  introduction to generator 17's city: its terrain, wreck, site and compound
+  plans and the stamped chunks under the nearest wreck equal generator 17's pins
+  on three seeds (D-183).
+
+### Behaviour, persistence and utility evidence
+
+The first three commits were validated in the main checkout while it held
+exactly that commit's tree, with nothing else changed, the build log written
+under `build/`; the sustainability check was validated in the detached worktree
+`build/m14-check` checked out at its commit. The tour commit was not built (see
+the next gate).
+
+| Commit | Checks on the exact tree | What they prove |
+| --- | --- | --- |
+| `7258c34` | Full portable build: 2,139 tests in 250 classes, one existing skip (`m19-c1-build.log`) | `UrbanTapsTest` (6): a building's taps sharing the stale water left in its pipes, drawn dry and never refilled by rain or time; drinking straight from a tap as untreated water; a basin set down by hand and the starter courtyard's collector staying rain collectors; generator 17's basins the empty collectors they were; survivors' taps running only once nobody of theirs is left; worn buildings holding less. `UrbanUtilitiesSectionTest` (4): an exact round trip with nothing refilled, a missing section failing the load and keeping the live world, the section refused in generator 17, and every malformed row failing the whole load. The tap-ledger cap in `RuntimeBoundsTest`, the generator-18 pins, the slice loop on generator 18 and the dispatch, revision and selector expectations, with every earlier pin |
+| `d4c5d7b` | Full portable build: 2,155 tests in 252 classes, one existing skip (`m19-c2-build.log`) | `UrbanPowerTest` (10): a running generator lighting its building's lamps, its light registered and its fuel burnt by time and load, worn and heard, one lamp switched off lightening the load, F stopping it and darkening every lamp and the meshes; the tank running dry through the game loop; the circuit as one building's four nearest loads within reach, a second generator and a lamp in the street refused; taking the generator away leaving the lamps dark and giving back its whole cans; seizing and a rebuild needing spare parts and a pry tool; pause and distance holding the circuit still with nothing caught up; Creative spending nothing and heard by nobody while the world's fuel burns the same; a body in the generator's room drawn to it and one far down the street not; fuel only from the tank of a car that did not burn, once, under generator 18. The section's device rows and their corruption cases, the device cap, `UtilitySoundsTest` (2) and the appended enum order |
+| `4c93639` | Full portable build: 2,163 tests in 253 classes, one existing skip (`m19-c3-build.log`) | `UrbanPurifierTest` (8): a purifier built with its filter spent working only once packed with two fibre; water moving from the pipes and skins through its tanks into clean skins with nothing made or lost and the filter worn by the litre; no treatment without power and its work weighing on the fuel; a clogged filter stopping it until fresh fibre; taking it apart spilling its water and giving back its parts; survivors' pipes not pumped; Creative packing the filter for nothing. The section's purifier rows and their corruption cases |
+| `640bf67` | Full portable build in `build/m14-check`: 2,165 tests in 254 classes, one existing skip (`m19-c4-build.log`) | `UrbanUtilitySustainabilityTest` (2): twenty days of each design seed's own weather filling the starter courtyard's collector, emptied once a day, giving 2.40–3.00 litres a day against a waking day's 1.13, the survivor never below 1.88 litres in hand; a can treating twelve litres, a filter more than a week's water, and 22–32 wrecks with fuel within a region of the spawn |
+| `def0278` | `UrbanUtilityQaSceneTest` only (`m19-tour2.log`): Survival and Creative pass, 13 captures each, about 205 simulated seconds; generator 17 refused. **The portable build was not run** | The tour, headlessly: built, wired and dark; fuel from the wreck; two litres from the tap; lights on; the filter packed and a litre treated; the Veilbound drawn (heard by nobody in Creative); shut down; run dry; rebuilt from 88.5 to 100; the same utilities after F5 and F9 (the purifier holding 7.00 clean litres after 8 litres in, 1 drawn off, its filter at 68) |
+
+### Native utility tour (partial)
+
+GPU and driver from the run's `[gl]` line: NVIDIA GeForce RTX 3060 Ti, driver
+610.88, OpenGL 3.3.0 with KHR_debug; 1280 × 720.
+
+```bash
+export VEYLON_GENERATOR=urban-dev VEYLON_SEED=20260731 VEYLON_GAME_MODE=survival
+export VEYLON_SCENE=urban_utilities VEYLON_RESOLUTION=1280x720 VEYLON_CAPTURE_TAG=m19-utilities-survival
+./gradlew.bat run -PveylonDataDir=build/qa/m19-utilities-survival --console=plain
+```
+
+The QA directory was checked not to exist beforehand. Seed `20260731` gives
+these cells (from the `plan` line): the starter refuge
+`urban:building:0,0:44:0`, the bench (73, 41, 82) worked from (73, 41, 83), the
+kitchen tap (74, 41, 82), the generator at (79, 41, 94) put down from (78, 41,
+92), lamps at (76, 41, 88) and (67, 41, 88), the purifier at (75, 41, 82) put
+down from (75, 41, 84), the wreck at (58, 43) with its tank at (58, 41, 46)
+worked from (58, 41, 47), and the staged Veilbound at (85, 41, 96).
+
+Result (`qa-m19-utilities-survival.log`, on the tour code of `def0278`): ten of
+the thirteen captures, `01-generator-rebuilt` to `10-shut-down`, each with
+`glErrors=0 khrErrors=0` and only the driver's medium-severity performance
+notices; the Veilbound was drawn from (85, 41, 96) to (83, 41, 96) before it was
+taken away. The process then exited cleanly during the run-dry leg (`11` would
+follow about 140 seconds later), with no `pass=false` line or exception logged,
+and the owner asked to stop testing. The captures were not yet reviewed, and
+the Creative twin was not run.
+
+### Commands and portable builds
+
+The JDK is the repository-local Temurin 25.0.4.1 in `build/tools/jdk25`:
+
+```bash
+export JAVA_HOME="$PWD/build/tools/jdk25/jdk-25.0.4.1+1" PATH="$JAVA_HOME/bin:$PATH"
+./gradlew.bat build --console=plain > build/m19-c1-build.log 2>&1   # c2, c3 likewise
+(cd build/m14-check && ./gradlew.bat build --console=plain) > build/m19-c4-build.log 2>&1
+./gradlew.bat test --tests "com.veylon.UrbanUtilityQaSceneTest" -i --console=plain > build/m19-tour2.log 2>&1
+graphify update . --no-cluster > build/m19-graphify.log 2>&1
+```
+
+- Focused classes while iterating: `UrbanTapsTest`, `UrbanPowerTest`,
+  `UrbanPurifierTest`, `UrbanUtilitiesSectionTest`, `UtilitySoundsTest`,
+  `UrbanUtilitySustainabilityTest`, `RuntimeBoundsTest`,
+  `SerializedEnumOrderTest`, `UrbanMaterialsTest` (126 of 160 layers),
+  `WorldGeneratorFingerprintTest` and the dispatch, revision and selector tests.
+- The portable builds above, each `BUILD SUCCESSFUL` with no failures.
+- `graphify update . --no-cluster` on the final code: 10,769 nodes and 44,168
+  edges, with an extractor warning for `settings.gradle`
+  (`m19-graphify.log`). No clustering or semantic extraction ran.
+
+### Limits and next gate
+
+- **Pending, required:** the portable build on `def0278` or later, and
+  `urban_utilities` natively to its `pass=true` line in Survival and in
+  Creative (`VEYLON_GAME_MODE=creative`), each in a fresh QA directory such as
+  `build/qa/m19-utilities-survival-2` and `build/qa/m19-utilities-creative`, with
+  the thirteen captures inspected. Package 19 stays PARTIAL until then.
+- The tour stages poses between legs, a forward-only clock, the weather, one
+  infected and a kit, and builds through the crafting screen's own command; it
+  is scripted evidence, not the human playtest deferred by D-80.
+- The native tour shows the evening's wear rebuilt, not a seized generator;
+  seizing, the load cap, reach, removal, dormancy, pause, clogging, spills and
+  survivors' pipes rest on the headless tests above.
+- Balance values are initial values for 23; the radio workstation is 20;
+  machinery ambience is 22.
+- No reviewer subagents ran.
+
+Next: finish package 19's native and portable-build gate, then package 20.

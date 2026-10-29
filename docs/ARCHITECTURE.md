@@ -279,7 +279,7 @@ supported version and rejects the rest, including anything above
 `MAX_SUPPORTED_GENERATOR`, before it replaces the live world. Feature gates name
 their versions (`hasDeepFrontier`, `hasCaveIdentities`, `isUrbanGenerator`) instead
 of comparing with `>=`, so a new generator inherits nothing by accident, and
-`WorldGeneratorFingerprintTest` pins versions 1–17 absolutely. `ShapedStairGenerationTest`
+`WorldGeneratorFingerprintTest` pins versions 1–18 absolutely. `ShapedStairGenerationTest`
 checks version 8 against frozen version 7 outside stair cells and across chunk orders.
 
 An urban world's layout revision follows from its generator, so it is known
@@ -287,20 +287,21 @@ before bootstrap generates a chunk; a geometry change means a new generator
 version, never a change under an old one (`UrbanRevision`). Its content revision
 (the rolled loot, encounter and trade tables) is saved in `urban.meta`, which
 only urban worlds write. It is optional for older layouts and required for
-generators 9–17. Until that section, or its
+generators 9–18. Until that section, or its
 absent default, has been read, a loading world's content revision cannot be read
 at all. Fresh worlds use content revision 3; revisions 1 and 2 remain supported.
 Revision 1 is the absent-metadata default. The tables and their hash inputs are frozen
-under each revision. Generators 9–17 require content 3. Encounter catalogues are
+under each revision. Generators 9–18 require content 3. Encounter catalogues are
 additive and versioned separately in `urban.population` (1 for generator 10, 2 for
-11, 3 for 12, 4 for 13, 5 for 14–17, which write codec 2); they do not reroll
-content-3 loot or add encounters to older generators. Generators 13–17 also write
+11, 3 for 12, 4 for 13, 5 for 14–18, which write codec 2); they do not reroll
+content-3 loot or add encounters to older generators. Generators 13–18 also write
 `urban.discovery` v1 (a count capped at 4,096,
 then ascending observed site ids, each checked against the plan); absence means
-nothing found. Generators 15–17 also require `urban.sites` v1, their survivor
-sites and people, generators 16 and 17 `urban.compounds` v1, what their compounds
-remember, and generator 17 `urban.refuges` v2, its claimed refuges, and
-`urban.fortifications` v1, its damaged barricades and braces. Compatibility
+nothing found. Generators 15–18 also require `urban.sites` v1, their survivor
+sites and people, generators 16–18 `urban.compounds` v1, what their compounds
+remember, generators 17 and 18 `urban.refuges` v2, their claimed refuges, and
+`urban.fortifications` v1, their damaged barricades and braces, and generator 18
+`urban.utilities` v1, its taps' ledger and devices. Compatibility
 directions:
 
 - this build, a legacy save: unchanged, and no urban state is created;
@@ -617,7 +618,7 @@ Scripted urban QA routes extend `UrbanRouteScene`: a task queue played through t
 production input seam, mouse-look turns, bounded walking that opens doors with F,
 threat handling, forcing and captures. `urban_slice`, `urban_catalogue`,
 `urban_districts`, `urban_underground`, `urban_ecology`, `urban_survivors`,
-`urban_strongholds` and `urban_refuge` use it; the last three extend
+`urban_strongholds`, `urban_refuge` and `urban_utilities` use it; the last four extend
 `UrbanPeopleScene`, which adds the staged clock and poses, walking up to someone and
 talking, conversation choices through the screen's command, a trade and F5 and F9.
 
@@ -672,8 +673,57 @@ claimed storey's windows) and its light from the live world. `SleepSystem` asks
 `RefugeSystem.settleForNight` once as sleep begins, which may send the nearest real
 infected to an open way and sets the minute it wakes the sleeper, and
 `RefugeSystem.keepsOut` lets a refuge shut tight keep out a body beyond its walls.
-`urban.refuges` v2 holds the claims and home for generator 17; generators 9–16 keep
-version 1.
+`urban.refuges` v2 holds the claims and home for generators 17 and 18; generators 9–16
+keep version 1.
+
+### Refuge utilities
+
+Generator 18 plans layout 15: layout 14 exactly, every block, plan and id, with the
+rules below gated on `UrbanWorldState.hasUtilities()` (`hasRefuges()` and every
+earlier predicate also hold for it). `UrbanUtilities`, on `UrbanWorldState`, is the
+world's side: pure plan queries and the persistent ledger.
+
+- **Taps.** `UrbanUtilities.tapBuilding` makes a planned basin, standing where the plan
+  put it with no recorded edit, a tap on its building's pipes; `capacity` derives the
+  building's stale litres from its planned basins and variant. The ledger keeps the
+  litres drawn per building id (at most 1,024). `UtilitySystem.tap`, reached from the
+  rain-collector branch of `WorldInteractions`, fills an empty waterskin with untreated
+  water or drinks it through `WorldInteractions.drinkUntreated`, the open-water rule
+  and its seeded stream. `WaterSystem` is untouched: no voxel water moves.
+- **Devices and circuits.** A `Device` (generator, work lamp or purifier, with a
+  stable kind code) is keyed by its cell and remembers its building, read from the
+  plan over its column. `placementRefusal` keeps devices inside buildings, one
+  generator to a building and 64 in the world; `PlayerBlockActions` asks it before a
+  placement and registers the device after. `settle` recomputes every circuit, the
+  four nearest consumers of a running generator's building within 16 blocks, after
+  any change of device, switch, fuel or wear, and refreshes the light of each lamp
+  whose state changed. `World.setBlock` drops a device whenever its block is
+  replaced, by any path, and settles at once.
+- **Light.** `World.emitterOn` answers for every light block: a lantern by its fuel,
+  a work lamp by `UrbanUtilities.lampLit`, anything else always. `Chunk.rebuildLights`
+  and `Chunk.updateLightAt` ask it, so a lamp is in its chunk's light list exactly
+  while it is switched on and fed, and `ChunkMesher` draws its dome lit or dark.
+- **The game side.** `UtilitySystem`, owned by `RefugeSystem` and reset with it, holds
+  the actions and prompts: F switches a device (`WorldInteractions.interactWithBlockAt`),
+  the use button pours fuel, rebuilds a generator with spare parts and a pry tool,
+  pours and draws water and packs a purifier's filter (`WorldInteractions.rightClick`
+  asks it first), and `InteractPromptBuilder` reads its lines. Its medium tick, one
+  line in `Game.mediumTick`, burns each running generator's fuel by time and load,
+  wears it, emits its player-attributed `WorldNoise` and its `UtilitySounds` cues,
+  runs the purifiers it feeds for exactly the seconds it ran (the pump draws the
+  building's tap water into the untreated tank, the filter treats it into the clean
+  tank), and stops it when its tank is dry or it seizes. It runs only while the world
+  is simulated, and a generator more than 128 blocks from the player or in an
+  unloaded column is dormant: nothing about its circuit changes.
+- **Salvage.** `SalvageTable` gives the tank cell of a car that did not burn a fuel
+  can, and takes devices apart for most of their parts and a generator's whole cans;
+  device blocks have no drop, so nothing carries one away whole.
+
+`urban.utilities` v1, required for generator 18 and rejected elsewhere, holds the tap
+ledger and the devices in placement order, validated against the block edits and the
+plans once every other section is in (`UrbanUtilitiesSection.finishLoad` rejects a
+generator-18 save without it). The noise and sound timers and the pump's part-litre
+are transient.
 
 ### Doors, windows and urban fixtures
 
@@ -844,9 +894,9 @@ the pure ground-floor plan. Load replaces it without restocking, and
 missing/corrupt sections reject before publication. Respawn checks actual loaded
 colliders/support at y=41 in at most 4,225 cells within 32 blocks of the saved
 anchor, refusing if none is safe. It retains the existing carried-inventory death
-policy. Generator 17 writes version 2, which adds the claims and home of milestone
-18, and wakes the survivor at home first (see "Refuges, salvage and fortification");
-utilities remain 19.
+policy. Generators 17 and 18 write version 2, which adds the claims and home of
+milestone 18, and wakes the survivor at home first (see "Refuges, salvage and
+fortification"); utilities are under "Refuge utilities".
 
 ### Urban infected encounters
 
