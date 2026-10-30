@@ -182,10 +182,10 @@ final class UrbanAtmosphereQaScene extends UrbanRouteScene {
         float depth = game.world.environmentDepth(fx, game.player.pos.y, fz);
         float[] mix = game.ambience.lastMix;
         return String.format(Locale.ROOT, "zone=%s indoor=%b exposed=%b depth=%.1f sky=%.2f block=%.2f"
-                        + " rain=%.2f wind=%.2f fire=%.2f cave=%.2f crickets=%.2f",
+                        + " rain=%.2f wind=%.2f fire=%.2f cave=%.2f crickets=%.2f reach=%.2f",
                 AudioSceneState.environment(game, depth), game.player.shelter.indoor(), game.player.exposedToSky,
                 depth, game.world.skyLight(x, y, z), game.world.blockLight(x, y, z),
-                mix[0], mix[1], mix[2], mix[3], mix[4]);
+                mix[0], mix[1], mix[2], mix[3], mix[4], game.ambience.lastReach);
     }
 
     private final class Report extends Task {

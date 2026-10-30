@@ -98,7 +98,7 @@ class UrbanIndoorEnvironmentTest {
     }
 
     @Test
-    void realApartmentShelterKeepsClimateAndUsesStructureAudioInsteadOfDeepCaves() {
+    void realApartmentShelterKeepsClimateAndUsesRoomAudioInsteadOfDeepCaves() {
         Game game = scene();
         BuildingPlan building = apartment(game.world);
         loadBuilding(game.world, building);
@@ -108,7 +108,8 @@ class UrbanIndoorEnvironmentTest {
                 game.player.pos.y, game.player.pos.z);
         assertTrue(game.player.shelter.indoor());
         game.player.exposedToSky = false;
-        assertEquals(AudioEnvironment.Zone.STONE_STRUCTURE, AudioSceneState.environment(game, 30));
+        // Since milestone 22 a generated room rings as a furnished room, not a stone hall.
+        assertEquals(AudioEnvironment.Zone.ROOM, AudioSceneState.environment(game, 30));
         assertEquals(MusicMood.CALM, AudioSceneState.music(game, 30), "a tall roof cannot choose deep-cave music");
 
         game.time.totalMinutes = 12 * 60;

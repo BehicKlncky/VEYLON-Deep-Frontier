@@ -1,5 +1,6 @@
 package com.veylon;
 
+import com.veylon.engine.AudioEnvironment;
 import com.veylon.engine.ParticleSystem;
 import com.veylon.entity.Affliction;
 import com.veylon.simulation.LiquidFireSystem;
@@ -7,6 +8,7 @@ import com.veylon.simulation.WeatherSystem;
 import com.veylon.util.Vec3i;
 import com.veylon.world.Biome;
 import com.veylon.world.BlockType;
+import com.veylon.world.urban.UrbanDistrict;
 import org.joml.Vector3f;
 
 import java.util.List;
@@ -75,6 +77,8 @@ final class AmbienceSystem {
     /** Blocks below the surface at which cave ambience takes over. */
     private static final float CAVE_DEPTH = 5f;
     private static final float CAVE_GAIN = 0.9f;
+    /** A city cellar's low room tone, on the cave channel (urban milestone 22). */
+    private static final float CELLAR_GAIN = 0.45f;
     private static final float CRICKET_GAIN = 0.8f;
     /** Blocks within which the lit beacon is audible. */
     private static final double BEACON_AUDIO_RANGE = 22.0;
@@ -84,6 +88,9 @@ final class AmbienceSystem {
     final BodyFireEffects bodyFire;
     /** The last ambient mix computed, for QA reports: rain, wind, fire, cave, crickets, beacon. */
     final float[] lastMix = new float[6];
+    /** The acoustic zone of the last mix, and how much of the weather outside reached the listener. */
+    AudioEnvironment.Zone lastZone = AudioEnvironment.Zone.OPEN;
+    float lastReach = 1f;
     private final Vector3f firePosition = new Vector3f();
     private final Random emitterRng = new Random();
     private float emitterTimer;
@@ -100,6 +107,8 @@ final class AmbienceSystem {
         emitterRng.setSeed(seed);
         rainField.reset();
         bodyFire.reset();
+        lastZone = AudioEnvironment.Zone.OPEN;
+        lastReach = 1f;
         emitterTimer = breathTimer = coughTimer = 0;
     }
 
@@ -292,14 +301,35 @@ final class AmbienceSystem {
         int pz = generatedUrban ? (int) Math.floor(game.player.pos.z) : (int) game.player.pos.z;
         float depth = game.world.environmentDepth(px, game.player.pos.y, pz);
         float caveGain = depth > CAVE_DEPTH ? CAVE_GAIN : 0f;
-        if (game.audio.isEnabled()) game.audio.setEnvironment(
-                AudioSceneState.environment(game, depth));
+        AudioEnvironment.Zone zone = generatedUrban || game.audio.isEnabled()
+                ? AudioSceneState.environment(game, depth) : AudioEnvironment.Zone.OPEN;
+        if (game.audio.isEnabled()) game.audio.setEnvironment(zone);
+        float reach = 1f;
+        if (generatedUrban) {
+            // Urban milestone 22: the weather a listener hears follows where they stand: all of it
+            // in the street, less under a porch, a little deep in a room and more beside its
+            // window, a trace in a cellar. A cellar has its own low room tone and drips.
+            reach = game.player.exposedToSky ? 1f : AudioSceneState.weatherReach(zone, game.world.skyLight(px,
+                    (int) Math.floor(game.player.pos.y + game.player.eyeHeight()), pz));
+            rainGain = game.weather.isPrecip() && !snow ? game.weather.intensity() * reach : 0f;
+            windGain *= reach;
+            if (zone == AudioEnvironment.Zone.BASEMENT && caveGain == 0f) { caveGain = CELLAR_GAIN; }
+        }
 
         boolean cricketBiome = game.player.biome == Biome.MEADOW
                 || game.player.biome == Biome.PINE_FOREST
                 || game.player.biome == Biome.MARSH;
         float cricketGain = game.time.isNight() && !game.weather.isPrecip()
                 && caveGain == 0 && cricketBiome ? CRICKET_GAIN : 0f;
+        if (generatedUrban) {
+            // Night insects keep to the overgrown housing and the flooded quarter, and are heard
+            // indoors only as much as the weather is.
+            UrbanDistrict district = game.player.district;
+            boolean insects = district == null || district == UrbanDistrict.RESIDENTIAL || district == UrbanDistrict.FLOODED;
+            cricketGain = insects ? cricketGain * reach : 0f;
+        }
+        lastZone = zone;
+        lastReach = reach;
 
         float beaconGain = 0f;
         if (game.world.beaconStage >= 3 && game.world.beaconPos != null) {

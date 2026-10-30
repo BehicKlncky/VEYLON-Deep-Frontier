@@ -9,7 +9,13 @@ final class ReverbPresets {
             {1.65f, 0.28f, 0.60f, 0.65f, 0.85f, 0.90f}, // shallow rock
             {3.80f, 0.40f, 0.50f, 0.55f, 1.00f, 1.00f}, // deep cave
             {0.65f, 0.22f, 0.35f, 0.50f, 0.60f, 0.70f}, // small shelter
-            {2.60f, 0.35f, 0.70f, 0.80f, 1.00f, 1.00f}  // large stone structure
+            {2.60f, 0.35f, 0.70f, 0.80f, 1.00f, 1.00f}, // large stone structure
+            // Urban milestone 22: short and soft among furniture; long and bright off hard walls;
+            // a dark concrete cellar; a long tube that flutters rather than blooms.
+            {0.45f, 0.20f, 0.55f, 0.60f, 0.55f, 0.70f}, // furnished room
+            {1.40f, 0.28f, 0.65f, 0.70f, 0.85f, 0.90f}, // hall: shop floor, warehouse, office, concourse
+            {1.05f, 0.30f, 0.45f, 0.55f, 0.90f, 0.85f}, // basement or cellar
+            {2.30f, 0.34f, 0.55f, 0.65f, 1.00f, 0.75f}  // transit tunnel or service passage
     };
     /** Per-second convergence speed; avoids abrupt changes at zone boundaries. */
     static final float BLEND_SPEED = 1.2f;

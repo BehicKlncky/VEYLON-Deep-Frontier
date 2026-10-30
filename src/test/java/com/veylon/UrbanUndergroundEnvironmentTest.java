@@ -32,13 +32,13 @@ class UrbanUndergroundEnvironmentTest {
         observe(g, platform);
         assertFalse(g.player.exposedToSky);
         assertTrue(g.player.shelter.roofed() && g.player.shelter.indoor(), "a station is indoors: " + g.player.shelter);
-        assertSame(AudioEnvironment.Zone.SHALLOW, AudioSceneState.environment(g, 0));
+        assertSame(AudioEnvironment.Zone.HALL, AudioSceneState.environment(g, 0), "a concourse rings like a hall (22)");
         assertTrue(g.world.skyLight(platform.x(), platform.y(), platform.z()) <= 0.12f, "no daylight on the platform");
 
         Vec3i track = new Vec3i(-2, TransitNetwork.FEET_Y, station.low() - 3);
         observe(g, track);
         assertTrue(g.player.shelter.roofed());
-        assertSame(AudioEnvironment.Zone.SHALLOW, AudioSceneState.environment(g, 0));
+        assertSame(AudioEnvironment.Zone.TUNNEL, AudioSceneState.environment(g, 0), "the tunnel rings long (22)");
         assertEquals(0.04f, g.world.skyLight(track.x(), track.y(), track.z()), 1e-6f, "the tunnel is dark");
     }
 
@@ -49,8 +49,8 @@ class UrbanUndergroundEnvironmentTest {
         BuildingPlan plan = g.world.urban.buildingAt(c.west().first().x(), c.west().first().z());
         observe(g, c.west().firstInside());
         assertFalse(g.player.exposedToSky);
-        assertSame(AudioEnvironment.Zone.STONE_STRUCTURE, AudioSceneState.environment(g, 0),
-                "a basement hall is a stone structure: " + g.player.shelter);
+        assertSame(AudioEnvironment.Zone.BASEMENT, AudioSceneState.environment(g, 0),
+                "below the street is a basement (22): " + g.player.shelter);
 
         // The roof's own reservation cell, out in the open beyond the bulkhead.
         Vec3i roof = plan.fixtures().stream().filter(f -> f.kind() == BuildingPlan.FixtureKind.QUEST
