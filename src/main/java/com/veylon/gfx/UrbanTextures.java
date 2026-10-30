@@ -71,6 +71,16 @@ final class UrbanTextures {
             case "relay_top" -> relay(p, true);
             case "radio_side" -> radio(p, false);
             case "radio_top" -> radio(p, true);
+            case "decal_ivy" -> ivy(p, true);
+            case "decal_ivy_top" -> ivy(p, false);
+            case "decal_veil" -> veilCreep(p, true);
+            case "decal_veil_top" -> veilCreep(p, false);
+            case "decal_poster" -> poster(p);
+            case "decal_notice" -> notice(p);
+            case "decal_cordon" -> cordonMark(p);
+            case "decal_mould" -> mould(p);
+            case "decal_photo" -> photo(p);
+            case "decal_drawing" -> drawing(p);
             default -> {
                 return false;
             }
@@ -198,14 +208,15 @@ final class UrbanTextures {
             // Water stain: a yellowed tide mark.
             p.fillFbmBlend(0xa89a78, 0.6f, 3, 1143, 0.55f);
         } else if (variant == 2) {
-            // Peeling: patches where the coat has fallen away to grey render.
+            // Peeling: patches where the coat has fallen away to grey render, edged by a soft
+            // shadow of the lifted coat rather than a hard dark outline (softened in milestone 22).
             for (int y = 0; y < p.size; y++) {
                 for (int x = 0; x < p.size; x++) {
                     float n = p.fbm(x, y, 4, 1144);
                     if (n > 0.66f) {
-                        p.set(x, y, p.shade(0x8e8a82, 0.9f + p.noise(x, y, 14, 1145) * 0.2f));
-                    } else if (n > 0.63f) {
-                        p.set(x, y, 0x6e6a62);
+                        p.set(x, y, p.shade(0xa39e94, 0.92f + p.noise(x, y, 14, 1145) * 0.16f));
+                    } else if (n > 0.635f) {
+                        p.mulAt(x, y, 0.84f);
                     }
                 }
             }
@@ -949,5 +960,268 @@ final class UrbanTextures {
             p.line(x0 - 2, y0 + h, x0 + 9, y0, 0xe6e3da);
         }
         p.grain(0.02f);
+    }
+
+    // ------------------------------------------------------------------
+    // Milestone 22 wall decals (cutout over the wall face; see UrbanDressing)
+    // ------------------------------------------------------------------
+
+    /** Where the three ivy stems cross a cell's top and bottom edges, as fractions of its width. */
+    private static final float[] IVY_STEMS = {0.22f, 0.47f, 0.74f};
+
+    /**
+     * Ivy climbing a facade. Its three stems cross the top and bottom edges at the same places
+     * on every cell, so a column of cells reads as one plant; the rooted cell is thick with leaves
+     * at its foot, the cells above thin out toward their top.
+     */
+    private static void ivy(Painter p, boolean rooted) {
+        int n = p.size;
+        p.clearAlpha();
+        int[] greens = {0x3e5a2c, 0x4f6b35, 0x5d7a3c, 0x6b8a44, 0x355026};
+        for (int s = 0; s < IVY_STEMS.length; s++) {
+            float base = IVY_STEMS[s] * n;
+            for (int y = 0; y < n; y++) {
+                // A full sine period per cell keeps the stem's x at the edges where it began.
+                int x = (int) (base + Math.sin(2 * Math.PI * y / n + s * 2.1) * n * 0.05f);
+                p.set(x, y, 0x3a3020);
+                p.set(x + 1, y, 0x2e271a);
+            }
+            int leaves = rooted ? 22 : 12;
+            for (int i = 0; i < leaves; i++) {
+                float t = p.rf(s * 97 + i * 3 + (rooted ? 2201 : 2301));
+                // Rooted: leaves crowd the foot; above: they thin toward the top.
+                float along = rooted ? 1f - t * t : 1f - (float) Math.sqrt(t);
+                int y = Math.min(n - 1, (int) (along * n));
+                int x = (int) (base + Math.sin(2 * Math.PI * y / n + s * 2.1) * n * 0.05f
+                        + (p.rf(s * 97 + i * 3 + 2202) - 0.5f) * n * 0.16f);
+                int r = Math.max(2, n / 22 + (int) (p.rf(s * 97 + i * 3 + 2203) * 2));
+                int green = greens[(int) (p.rf(s * 97 + i * 3 + 2204) * greens.length) % greens.length];
+                p.blob(x, y, r, green);
+                p.dot(x - r / 2, y - r / 2, p.shade(green, 1.25f));
+            }
+        }
+    }
+
+    /**
+     * The veil's growth climbing a quarantine facade: the membrane of the growth sites, purple-grey
+     * with pale veins, spreading in flat lobes along the same three stems as ivy so a column joins.
+     */
+    private static void veilCreep(Painter p, boolean rooted) {
+        int n = p.size;
+        p.clearAlpha();
+        int[] skins = {0x4a4058, 0x5a4d6a, 0x3b3346, 0x544762};
+        for (int s = 0; s < IVY_STEMS.length; s++) {
+            float base = IVY_STEMS[s] * n;
+            int lobes = rooted ? 14 : 8;
+            for (int i = 0; i < lobes; i++) {
+                float t = p.rf(s * 89 + i * 5 + (rooted ? 3101 : 3201));
+                float along = rooted ? 1f - t * t : 1f - (float) Math.sqrt(t);
+                int y = Math.min(n - 1, (int) (along * n));
+                int x = (int) (base + Math.sin(2 * Math.PI * y / n + s * 1.7) * n * 0.06f
+                        + (p.rf(s * 89 + i * 5 + 3102) - 0.5f) * n * 0.2f);
+                int r = Math.max(3, n / 14 + (int) (p.rf(s * 89 + i * 5 + 3103) * 3));
+                p.blob(x, y, r, skins[(int) (p.rf(s * 89 + i * 5 + 3104) * skins.length) % skins.length]);
+            }
+            for (int y = 0; y < n; y++) { // the stem and its pale vein, crossing the edges where ivy's do
+                int x = (int) (base + Math.sin(2 * Math.PI * y / n + s * 1.7) * n * 0.06f);
+                p.set(x, y, 0x2f2838);
+                p.set(x + 1, y, 0xb9a9c8);
+            }
+        }
+    }
+
+    /** A pasted paper poster, sun-faded: a coloured band, a pictogram, illegible lines and a torn corner. */
+    private static void poster(Painter p) {
+        int n = p.size;
+        p.clearAlpha();
+        int x0 = n / 5, y0 = n / 8, x1 = n - n / 5, y1 = n - n / 10;
+        for (int y = y0; y <= y1; y++) {
+            for (int x = x0; x <= x1; x++) {
+                // The torn lower right corner.
+                if (x - x0 + (y1 - y) < (x1 - x0) / 5 && x > (x0 + x1) / 2 && y > (y0 + y1) / 2) { continue; }
+                if ((x1 - x) + (y1 - y) < (x1 - x0) / 4) { continue; }
+                float fade = 0.9f + p.noise(x, y, 10, 2401) * 0.12f;
+                p.set(x, y, p.shade(0xd9d2bf, fade));
+            }
+        }
+        int band = y0 + (y1 - y0) / 5;
+        for (int y = y0 + 2; y < band; y++) {
+            for (int x = x0 + 2; x <= x1 - 2; x++) { p.set(x, y, p.shade(0x8c4a3e, 0.85f + p.noise(x, y, 8, 2402) * 0.2f)); }
+        }
+        // A pictogram: a mast with three arcs, the shape of the relay the city once listened to.
+        int cx = (x0 + x1) / 2, top = band + (y1 - y0) / 10, foot = band + (y1 - y0) / 2;
+        p.line(cx, top, cx, foot, 0x3d3a34);
+        p.line(cx - (foot - top) / 3, foot, cx, top + (foot - top) / 3, 0x3d3a34);
+        p.line(cx + (foot - top) / 3, foot, cx, top + (foot - top) / 3, 0x3d3a34);
+        for (int a = 1; a <= 3; a++) {
+            int r = a * n / 16;
+            for (int deg = -50; deg <= 50; deg += 4) {
+                double rad = Math.toRadians(deg - 90);
+                p.dot(cx + (int) (Math.cos(rad) * r), top + (int) (Math.sin(rad) * r), 0x55514a);
+            }
+        }
+        for (int line = 0; line < 4; line++) {
+            int y = foot + n / 14 + line * n / 18;
+            int len = (x1 - x0) * (line == 3 ? 2 : 3) / 4;
+            for (int x = x0 + n / 16; x < x0 + n / 16 + len && x < x1 - 2; x++) {
+                if ((x / 3 + line) % 5 != 0) { p.set(x, y, 0x6f6a60); }
+            }
+        }
+        p.fillFbmBlend(0x9a8a66, 0.7f, 6, 2403, 0.35f); // water stain
+    }
+
+    /** An official notice: pale paper with a black heading bar, columns of small type and a red stamp. */
+    private static void notice(Painter p) {
+        int n = p.size;
+        p.clearAlpha();
+        int x0 = n / 4, y0 = n / 6, x1 = n - n / 4, y1 = n - n / 6;
+        for (int y = y0; y <= y1; y++) {
+            for (int x = x0; x <= x1; x++) { p.set(x, y, p.shade(0xe4dcb4, 0.88f + p.noise(x, y, 9, 2501) * 0.14f)); }
+        }
+        for (int y = y0 + 3; y < y0 + 3 + n / 12; y++) {
+            for (int x = x0 + 3; x <= x1 - 3; x++) { p.set(x, y, 0x24231f); }
+        }
+        for (int row = 0; row < 7; row++) {
+            int y = y0 + n / 6 + row * n / 16;
+            for (int x = x0 + 4; x < x1 - 4; x++) {
+                if ((x * 7 + row * 13) % 11 > 2) { p.set(x, y, 0x4a4740); }
+            }
+        }
+        int sx = x1 - n / 9, sy = y1 - n / 9, r = n / 12;
+        for (int deg = 0; deg < 360; deg += 6) {
+            double rad = Math.toRadians(deg);
+            p.dot(sx + (int) (Math.cos(rad) * r), sy + (int) (Math.sin(rad) * r), 0x9a2a22);
+        }
+        p.line(sx - r / 2, sy, sx + r / 2, sy, 0x9a2a22);
+        p.dot(x0 + 2, y0 + 2, 0x7a7a74);
+        p.dot(x1 - 2, y0 + 2, 0x7a7a74);
+    }
+
+    /**
+     * The quarantine's cordon mark, sprayed in the hazard yellow-green kept for danger: a hexagon
+     * with three tendrils closing on its centre, a bar beneath, overspray and runs. Original to
+     * VEYLON; it marks walls and fences inside the cordon, where the fog and the ground sicken.
+     */
+    private static void cordonMark(Painter p) {
+        int n = p.size;
+        p.clearAlpha();
+        int hazard = 0xa8c832;
+        int cx = n / 2, cy = n * 9 / 20;
+        float radius = n * 0.33f;
+        for (int y = 0; y < n; y++) {
+            for (int x = 0; x < n; x++) {
+                float dx = x - cx, dy = y - cy;
+                float hex = hexDistance(dx, dy) / radius;
+                boolean ring = hex > 0.86f && hex < 1.0f;
+                double angle = Math.atan2(dy, dx), r = Math.hypot(dx, dy) / radius;
+                // Three tendrils, a third of a turn apart, curling inward to the centre.
+                boolean tendril = false;
+                for (int k = 0; k < 3; k++) {
+                    double a = angle - (k * 2 * Math.PI / 3 - Math.PI / 2) + r * 1.4;
+                    a = Math.atan2(Math.sin(a), Math.cos(a));
+                    if (r < 0.82 && r > 0.12 && Math.abs(a) < 0.16 + 0.12 * (1 - r)) { tendril = true; }
+                }
+                boolean core = r < 0.13;
+                float spray = p.noise(x, y, 4, 2601);
+                if ((ring || tendril || core) && spray > 0.18f) { p.set(x, y, p.shade(hazard, 0.85f + spray * 0.25f)); }
+            }
+        }
+        int barY = (int) (cy + radius + n * 0.08f);
+        for (int y = barY; y < barY + n / 14; y++) {
+            for (int x = cx - (int) radius; x <= cx + (int) radius; x++) {
+                if (p.noise(x, y, 4, 2602) > 0.15f) { p.set(x, y, p.shade(hazard, 0.9f)); }
+            }
+        }
+        for (int d = 0; d < 4; d++) { // runs of paint from the bar
+            int x = cx - (int) radius + (int) (p.rf(2603 + d) * 2 * radius);
+            int len = n / 16 + (int) (p.rf(2607 + d) * n / 6);
+            for (int y = barY + n / 14; y < barY + n / 14 + len && y < n; y++) { p.set(x, y, p.shade(hazard, 0.8f)); }
+        }
+        for (int i = 0; i < 40; i++) { // overspray
+            int x = p.ri(2611 + i), y = p.ri(2711 + i);
+            if (hexDistance(x - cx, y - cy) < radius * 1.25f) { p.dot(x, y, p.shade(hazard, 0.75f)); }
+        }
+    }
+
+    /** Distance to a flat-topped hexagon's centre in its own metric: its edge is where this equals the radius. */
+    private static float hexDistance(float dx, float dy) {
+        float ax = Math.abs(dx), ay = Math.abs(dy);
+        return Math.max(ax * 0.866f + ay * 0.5f, ay);
+    }
+
+    /** Black mould creeping up from the floor of a damp room, densest at the skirting. */
+    private static void mould(Painter p) {
+        int n = p.size;
+        p.clearAlpha();
+        for (int y = 0; y < n; y++) {
+            float height = y / (float) n; // 0 top, 1 the floor
+            for (int x = 0; x < n; x++) {
+                float f = p.fbm(x, y, 6, 2801) + height * 0.55f;
+                if (f > 0.98f) { p.set(x, y, p.shade(0x2c3326, 0.8f + p.noise(x, y, 5, 2802) * 0.3f)); }
+                else if (f > 0.93f && p.noise(x, y, 3, 2803) > 0.5f) { p.set(x, y, 0x3f4636); }
+            }
+        }
+    }
+
+    /** A framed photograph left on a wall: two faded figures before a pale sky, the frame a little askew. */
+    private static void photo(Painter p) {
+        int n = p.size;
+        p.clearAlpha();
+        int x0 = n * 11 / 32, y0 = n * 10 / 32, x1 = n * 21 / 32, y1 = n * 19 / 32;
+        for (int y = y0; y <= y1; y++) {
+            int lean = (y - y0) / 9; // askew
+            for (int x = x0; x <= x1; x++) {
+                boolean frame = x <= x0 + 2 || x >= x1 - 2 || y <= y0 + 2 || y >= y1 - 2;
+                int colour;
+                if (frame) {
+                    colour = p.shade(0x4a3424, 0.9f + p.noise(x, y, 6, 2901) * 0.2f);
+                } else if (y < (y0 + y1) / 2) {
+                    colour = p.shade(0xb8b0a0, 0.95f + p.noise(x, y, 8, 2902) * 0.1f); // a bleached sky
+                } else {
+                    colour = p.shade(0x8a7a62, 0.92f + p.noise(x, y, 8, 2903) * 0.12f); // ground
+                }
+                p.set(x + lean, y, colour);
+            }
+        }
+        int ground = (y0 + y1) / 2 + 3;
+        for (int f = 0; f < 2; f++) { // two figures, one taller
+            int fx = x0 + (x1 - x0) * (f + 1) / 3 + 1, h = f == 0 ? n / 8 : n / 10;
+            for (int y = ground - h; y <= ground; y++) { p.set(fx, y, 0x4e463c); p.set(fx + 1, y, 0x4e463c); }
+            p.blob(fx, ground - h - 2, 2, 0x5a5044);
+        }
+        p.dot((x0 + x1) / 2, y0 - 3, 0x6a6a64); // the nail
+    }
+
+    /** A child's drawing taped to a wall: a house, a sun and a figure in crayon on white paper. */
+    private static void drawing(Painter p) {
+        int n = p.size;
+        p.clearAlpha();
+        int x0 = n * 9 / 32, y0 = n * 9 / 32, x1 = n * 23 / 32, y1 = n * 21 / 32;
+        for (int y = y0; y <= y1; y++) {
+            for (int x = x0; x <= x1; x++) { p.set(x, y, p.shade(0xe8e4d8, 0.94f + p.noise(x, y, 9, 3001) * 0.08f)); }
+        }
+        for (int t = 0; t < 2; t++) { // two strips of tape
+            int tx = t == 0 ? x0 + 2 : x1 - 7;
+            for (int y = y0 - 2; y < y0 + 2; y++) {
+                for (int x = tx; x < tx + 6; x++) { p.set(x, y, 0xcfc6a2); }
+            }
+        }
+        int hx0 = x0 + (x1 - x0) / 5, hx1 = x0 + (x1 - x0) / 2, hy0 = y0 + (y1 - y0) / 2, hy1 = y1 - 4;
+        p.box(hx0, hy0, hx1, hy1, 1, 0xb03a2e); // the house
+        p.line(hx0, hy0, (hx0 + hx1) / 2, hy0 - (hx1 - hx0) / 2, 0x3a5aa8); // the roof
+        p.line((hx0 + hx1) / 2, hy0 - (hx1 - hx0) / 2, hx1, hy0, 0x3a5aa8);
+        int sx = x1 - (x1 - x0) / 4, sy = y0 + (y1 - y0) / 4;
+        p.blob(sx, sy, Math.max(2, n / 24), 0xe0b030); // the sun
+        for (int ray = 0; ray < 8; ray++) {
+            double a = ray * Math.PI / 4;
+            p.dot(sx + (int) (Math.cos(a) * n / 12), sy + (int) (Math.sin(a) * n / 12), 0xe0b030);
+        }
+        int fx = x1 - (x1 - x0) / 4, fy = hy1;
+        p.line(fx, fy, fx, fy - n / 12, 0x2e7a3a); // a figure
+        p.line(fx - 3, fy, fx, fy - n / 24, 0x2e7a3a);
+        p.line(fx + 3, fy, fx, fy - n / 24, 0x2e7a3a);
+        p.line(fx - 3, fy - n / 16, fx + 3, fy - n / 16, 0x2e7a3a);
+        p.blob(fx, fy - n / 12 - 2, 2, 0x2e7a3a);
+        p.line(x0 + 2, y1 - 2, x1 - 2, y1 - 2, 0x3c8a3c); // grass
     }
 }

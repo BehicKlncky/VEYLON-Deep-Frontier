@@ -268,6 +268,11 @@ public final class MaterialRegistry {
             // Upper door panels, chosen by the mesher when the cell below is the same door.
             propTile("door_wood_upper", 0f, 0.85f);
             propTile("door_metal_upper", 0f, 0.4f);
+            // Milestone 22 wall decals: cutout tiles the mesher lays over generated city walls
+            // (UrbanDressing). Paint and paper reflect light; none of them glows.
+            for (com.veylon.world.urban.UrbanDressing.Decal decal : com.veylon.world.urban.UrbanDressing.Decal.values()) {
+                propTile(decal.tile(), 0f, 0.9f);
+            }
         }
 
         private void register(String id, BlockType block, String top, String side, String bottom,

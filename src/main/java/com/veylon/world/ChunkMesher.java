@@ -5,6 +5,9 @@ import com.veylon.gfx.MaterialRegistry;
 import com.veylon.gfx.MaterialRegistry.BlockMaterial;
 import com.veylon.gfx.MaterialRegistry.TintMode;
 import com.veylon.util.FloatList;
+import com.veylon.world.urban.UrbanDatum;
+import com.veylon.world.urban.UrbanDistrict;
+import com.veylon.world.urban.UrbanDressing;
 
 /**
  * Builds chunk meshes with hidden-face removal, per-vertex ambient occlusion,
@@ -67,6 +70,15 @@ public class ChunkMesher {
     private int baseX, baseZ;
     private World world;
 
+    // Urban milestone 22 dressing: district grade and wall decals in generated cities.
+    private boolean dressing;
+    private int decals;
+    private final float[] grade = new float[3];
+    private final UrbanDistrict[] districts = new UrbanDistrict[Chunk.SX * Chunk.SZ];
+    private final boolean[] districtKnown = new boolean[Chunk.SX * Chunk.SZ];
+    /** How far a decal stands off its wall, in blocks: clear of depth fighting, too thin to see edge-on. */
+    private static final float DECAL_OFFSET = 0.012f;
+
     public void buildChunk(World world, Chunk c) {
         this.world = world;
         opaque.clear();
@@ -75,6 +87,9 @@ public class ChunkMesher {
         baseZ = c.cz * Chunk.SZ;
         java.util.Arrays.fill(solidCache, (byte) 0);
         java.util.Arrays.fill(lightSet, (byte) 0);
+        dressing = world.urban != null && world.urban.hasGeneratedBuildings();
+        decals = 0;
+        java.util.Arrays.fill(districtKnown, false);
 
         for (int y = 0; y < Chunk.SY; y++) {
             for (int lz = 0; lz < Chunk.SZ; lz++) {
@@ -270,6 +285,8 @@ public class ChunkMesher {
         int variant = m.variantOf(x, y, z);
         // Subtle per-block value jitter breaks up large same-material areas.
         float jitter = 0.95f + hash(x, y, z) * 0.1f;
+        boolean dress = dressing && UrbanDressing.dressed(t);
+        UrbanDistrict district = dress ? districtAt(x, z) : null;
         for (int d = 0; d < 6; d++) {
             int[] n = NORMAL[d];
             int nx = x + n[0], ny = y + n[1], nz = z + n[2];
@@ -291,7 +308,48 @@ public class ChunkMesher {
             if (m.tint == TintMode.FOLIAGE || (m.tint == TintMode.GRASS_TOP && d == 0)) {
                 flags |= FLAG_FOLIAGE;
             }
-            emitFace(d, x, y, z, layer, flags, jitter, jitter, jitter);
+            if (!dress) {
+                emitFace(d, x, y, z, layer, flags, jitter, jitter, jitter);
+                continue;
+            }
+            // A generated city's surfaces wear their district (urban milestone 22): a grade on
+            // the face, and now and then a decal laid over a wall. Presentation only.
+            boolean exterior = skyAt(nx, ny, nz) >= 0.99f;
+            UrbanDressing.grade(district, t, d, y, exterior, grade);
+            emitFace(d, x, y, z, layer, flags, jitter * grade[0], jitter * grade[1], jitter * grade[2]);
+            if (decals < UrbanDressing.MAX_DECALS_PER_CHUNK) {
+                UrbanDressing.Decal decal = UrbanDressing.decal(district, t, d, x, y, z, exterior,
+                        opaqueAt(nx, UrbanDatum.STREET_Y, nz));
+                if (decal != null) {
+                    emitDecal(d, layer(decal.tile()), jitter);
+                    decals++;
+                }
+            }
+        }
+    }
+
+    /** The district of a column of this chunk, read once per build from the pure plan. */
+    private UrbanDistrict districtAt(int x, int z) {
+        int i = (z - baseZ) * Chunk.SX + (x - baseX);
+        if (!districtKnown[i]) {
+            districts[i] = world.urban.districtAt(x, z);
+            districtKnown[i] = true;
+        }
+        return districts[i];
+    }
+
+    /**
+     * A decal over the face {@link #emitFace} just wrote, standing {@value #DECAL_OFFSET} blocks
+     * off it with the same corners, texture coordinates, light and occlusion.
+     */
+    private void emitDecal(int d, int layer, float shade) {
+        int[] n = NORMAL[d];
+        float ox = n[0] * DECAL_OFFSET, oy = n[1] * DECAL_OFFSET, oz = n[2] * DECAL_OFFSET;
+        boolean flip = faceAo[0] + faceAo[2] < faceAo[1] + faceAo[3];
+        int[] order = flip ? FLIPPED_QUAD_ORDER : QUAD_ORDER;
+        for (int oi : order) {
+            vertex(faceX[oi] + ox, faceY[oi] + oy, faceZ[oi] + oz, faceU[oi], faceV[oi], layer, d,
+                    faceSky[oi], faceBlock[oi], faceAo[oi], shade, shade, shade, 0);
         }
     }
 
