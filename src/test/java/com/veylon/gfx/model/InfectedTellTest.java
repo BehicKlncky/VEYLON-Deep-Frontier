@@ -25,7 +25,8 @@ class InfectedTellTest {
             EntityModel model = NpcModels.get();
             Animator.poseNpc(model, n, 0);
             float rest = model.part("veilRibs").emissive;
-            assertEquals(Animator.VEIL_GLOW, rest, 1e-6f, archetype + " glows faintly at rest");
+            assertEquals(Animator.VEIL_GLOW, rest, 1e-6f, archetype + " glows at rest");
+            assertTrue(rest > 0f && rest <= 0.1f, "faintly: by day the entity shader multiplies emissive by 2.6");
             float windup = archetype == NpcArchetype.BREACHER ? com.veylon.ai.BreacherAI.WINDUP : com.veylon.ai.InfectedAI.WINDUP;
             n.strikeWindup = windup * 0.5f;
             Animator.poseNpc(model, n, 0);

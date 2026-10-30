@@ -129,7 +129,7 @@ public final class Animator {
     }
 
     /** A Veilbound's or Breacher's veil glow at rest, and what a strike's full windup adds (urban 22). */
-    public static final float VEIL_GLOW = 0.18f, VEIL_STRIKE_GLOW = 0.62f;
+    public static final float VEIL_GLOW = 0.07f, VEIL_STRIKE_GLOW = 0.5f;
     private static final String[] VEILMAW_LEGS = {"leg_fl", "leg_fr", "leg_bl", "leg_br"};
 
     /**
