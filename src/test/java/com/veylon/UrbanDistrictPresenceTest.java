@@ -103,6 +103,35 @@ class UrbanDistrictPresenceTest {
         assertTrue(sick && g.player.has(Affliction.SICKNESS), "inside the cordon the fog sickens");
     }
 
+    /** Milestone 22: the screen draws the fog as harmful exactly where it sickens. */
+    @Test
+    void toxicFogIsDrawnAsHarmfulOnlyWhereItSickens() {
+        Game g = district();
+        g.events.active.add(new EventSystem.ActiveEvent(EventSystem.EventType.TOXIC_FOG, 10_000, 1));
+        com.veylon.gfx.Environment env = new com.veylon.gfx.Environment();
+        standOnSidewalk(g, UrbanDistrict.COMMERCIAL);
+        g.player.tickNeeds(g, 0.05f);
+        env.update(g, 0.05f);
+        assertFalse(g.player.toxicFogHarmfulHere());
+        assertEquals(0f, env.vigPoison, "no choking vignette where the fog cannot sicken");
+        assertTrue(env.fogEnd > 40f && env.gradeTint.z > 0.9f, "a thin grey haze, not the toxic murk: " + env.fogEnd);
+
+        standOnSidewalk(g, UrbanDistrict.QUARANTINE);
+        g.player.tickNeeds(g, 0.05f);
+        env.update(g, 0.05f);
+        assertTrue(g.player.toxicFogHarmfulHere() && g.player.exposedToSky);
+        assertTrue(env.vigPoison > 0f, "out in the cordon the fog chokes");
+        assertTrue(env.fogEnd <= 40f && env.gradeTint.z < 0.7f, "the sickly murk where it harms: " + env.fogEnd);
+
+        Game wild = new Game();
+        wild.newWorld(SEED, true, World.GEN_CAVE_IDENTITIES, GameMode.SURVIVAL);
+        wild.events.active.add(new EventSystem.ActiveEvent(EventSystem.EventType.TOXIC_FOG, 10_000, 1));
+        wild.player.tickNeeds(wild, 0.05f);
+        env.update(wild, 0.05f);
+        assertTrue(wild.player.toxicFogHarmfulHere());
+        assertTrue(env.fogEnd <= 40f, "other worlds keep the toxic look everywhere");
+    }
+
     @Test
     void otherWorldsKeepTheirBiomeLineAndNoDistrict() {
         for (int generator : new int[]{World.GEN_CAVE_IDENTITIES, World.GEN_URBAN_CIVIC}) {

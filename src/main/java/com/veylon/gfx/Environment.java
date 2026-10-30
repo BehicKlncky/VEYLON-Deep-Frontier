@@ -159,11 +159,22 @@ public class Environment {
 
         // ---- Events ----
         boolean toxic = g.events.toxicFog();
+        // A six-district city's toxic fog sickens only inside the quarantine. Elsewhere it is drawn
+        // as the thin grey haze it is there; the sickly grade, its motes and the choking vignette
+        // mark only the ground where it harms (urban milestone 22).
+        boolean toxicHarm = toxic && g.player.toxicFogHarmfulHere();
         boolean ash = g.events.ashfall();
         gradeTint.set(1, 1, 1);
         saturation = 1.04f;
         contrast = 1.02f;
-        if (toxic) {
+        if (toxic && !toxicHarm) {
+            fogStart = Math.min(fogStart, 30f);
+            fogEnd = Math.min(fogEnd, 95f);
+            desaturate(fogColor, 0.45f);
+            fogColor.mul(0.92f, 0.95f, 0.88f);
+            gradeTint.set(0.97f, 0.99f, 0.94f);
+            saturation = 0.96f;
+        } else if (toxic) {
             fogStart = Math.min(fogStart, 12f);
             fogEnd = Math.min(fogEnd, 40f);
             fogColor.set(fogColor.x * 0.55f, Math.min(1f, fogColor.y * 1.05f + 0.05f), fogColor.z * 0.4f);
@@ -233,7 +244,7 @@ public class Environment {
         }
         vigCold = p.bodyTemp < 34.5f ? clamp((34.5f - p.bodyTemp) / 5f, 0f, 0.8f) : 0f;
         vigPoison = (p.has(Affliction.FOOD_POISONING) || p.has(Affliction.SICKNESS)) ? 0.35f : 0f;
-        if (toxic && p.exposedToSky) {
+        if (toxicHarm && p.exposedToSky && !p.shelter.roofed()) {
             vigPoison = Math.max(vigPoison, 0.3f);
         }
         boolean hot = p.bodyTemp > 40f;

@@ -598,6 +598,16 @@ public class Player extends Entity {
     }
 
     /**
+     * Whether toxic fog sickens where the player stands, should it be about. In a six-district
+     * city the fog is the quarantine's own hazard: it drifts over the whole city but only sickens
+     * inside the cordon (milestone 13). Every other world: everywhere. The screen draws the fog as
+     * harmful only where this holds (milestone 22).
+     */
+    public boolean toxicFogHarmfulHere() {
+        return district == null || district == UrbanDistrict.QUARANTINE;
+    }
+
+    /**
      * Rolls for sickness while a toxic-fog event has the player out in the
      * open. Driven from the medium tick, which is what evaluates shelter.
      *
@@ -609,9 +619,7 @@ public class Player extends Entity {
      * @return true only when this call inflicted sickness
      */
     public boolean tickToxicFogExposure(Game g) {
-        // In a six-district city the fog is the quarantine's own hazard: it drifts over the
-        // whole city but only sickens inside the cordon (milestone 13). Other worlds unchanged.
-        boolean harmless = district != null && district != UrbanDistrict.QUARANTINE;
+        boolean harmless = !toxicFogHarmfulHere();
         if (abilities.invulnerable() || !g.events.toxicFog() || harmless || !exposedToSky || shelter.roofed()
                 || has(Affliction.SICKNESS)
                 || rng.nextDouble() >= TOXIC_FOG_SICKNESS_CHANCE) {

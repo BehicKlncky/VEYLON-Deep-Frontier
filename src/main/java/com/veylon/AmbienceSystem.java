@@ -147,8 +147,8 @@ final class AmbienceSystem {
                         pz + (rng.nextFloat() * 2 - 1) * ASHFALL_RADIUS);
             }
         }
-        // Toxic fog carries slow, sickly motes at eye and ground level.
-        if (game.events.toxicFog()) {
+        // Toxic fog carries slow, sickly motes at eye and ground level, only where it sickens.
+        if (game.events.toxicFog() && game.player.toxicFogHarmfulHere()) {
             for (int i = 0; i < TOXIC_PARTICLES; i++) {
                 game.particles.toxicMote(px + (rng.nextFloat() * 2 - 1) * TOXIC_RADIUS,
                         py + 0.3f + rng.nextFloat() * 2.2f,
