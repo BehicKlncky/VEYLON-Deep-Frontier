@@ -43,6 +43,8 @@ class UrbanAtmosphereQaSceneTest {
         assertTrue(view(tour, "day-apartment-basement").endsWith("/ Basement"), view(tour, "day-apartment-basement"));
         assertEquals("District / Quarantine Zone", view(tour, "day-street-quarantine"));
         assertEquals("District / Flooded Quarter", view(tour, "night-street-flooded"));
+        assertEquals(com.veylon.world.urban.UrbanTraces.Kind.KNOCK_MARK.text(), tour.prompts().get("25-day-refuge-door-mark"),
+                "the chalk mark by the refuge's door reads its words (milestone 22)");
     }
 
     /** The location line a view was captured with, by the view's name without its number. */

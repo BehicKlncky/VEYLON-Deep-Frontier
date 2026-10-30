@@ -5,9 +5,11 @@ import com.veylon.gfx.MaterialRegistry;
 import com.veylon.gfx.MaterialRegistry.BlockMaterial;
 import com.veylon.gfx.MaterialRegistry.TintMode;
 import com.veylon.util.FloatList;
+import com.veylon.world.urban.StreetNetwork;
 import com.veylon.world.urban.UrbanDatum;
 import com.veylon.world.urban.UrbanDistrict;
 import com.veylon.world.urban.UrbanDressing;
+import com.veylon.world.urban.UrbanTraces;
 
 /**
  * Builds chunk meshes with hidden-face removal, per-vertex ambient occlusion,
@@ -73,6 +75,8 @@ public class ChunkMesher {
     // Urban milestone 22 dressing: district grade and wall decals in generated cities.
     private boolean dressing;
     private int decals;
+    /** The traces people left on this chunk's walls (UrbanTraces), gathered once per build. */
+    private final java.util.List<UrbanTraces.Trace> traces = new java.util.ArrayList<>();
     private final float[] grade = new float[3];
     private final UrbanDistrict[] districts = new UrbanDistrict[Chunk.SX * Chunk.SZ];
     private final boolean[] districtKnown = new boolean[Chunk.SX * Chunk.SZ];
@@ -90,6 +94,11 @@ public class ChunkMesher {
         dressing = world.urban != null && world.urban.hasGeneratedBuildings();
         decals = 0;
         java.util.Arrays.fill(districtKnown, false);
+        traces.clear();
+        if (dressing) {
+            UrbanTraces.collect(world.urban, StreetNetwork.regionOf(baseX), StreetNetwork.regionOf(baseZ),
+                    baseX, baseZ, baseX + Chunk.SX - 1, baseZ + Chunk.SZ - 1, traces);
+        }
 
         for (int y = 0; y < Chunk.SY; y++) {
             for (int lz = 0; lz < Chunk.SZ; lz++) {
@@ -318,14 +327,25 @@ public class ChunkMesher {
             UrbanDressing.grade(district, t, d, y, exterior, grade);
             emitFace(d, x, y, z, layer, flags, jitter * grade[0], jitter * grade[1], jitter * grade[2]);
             if (decals < UrbanDressing.MAX_DECALS_PER_CHUNK) {
-                UrbanDressing.Decal decal = UrbanDressing.decal(district, t, d, x, y, z, exterior,
-                        opaqueAt(nx, UrbanDatum.STREET_Y, nz));
-                if (decal != null) {
-                    emitDecal(d, layer(decal.tile()), jitter);
+                UrbanTraces.Trace trace = traceOn(t, x, y, z, d);
+                UrbanDressing.Decal decal = trace != null ? null : UrbanDressing.decal(district, t, d, x, y, z,
+                        exterior, opaqueAt(nx, UrbanDatum.STREET_Y, nz));
+                if (trace != null || decal != null) {
+                    emitDecal(d, layer(trace != null ? trace.kind().tile() : decal.tile()), jitter);
                     decals++;
                 }
             }
         }
+    }
+
+    /** The trace on a wall face of this chunk, or null; walls only, so a broken-out wall loses its mark. */
+    private UrbanTraces.Trace traceOn(BlockType t, int x, int y, int z, int d) {
+        if (traces.isEmpty() || y != UrbanTraces.EYE_Y
+                || (t != BlockType.BRICK && t != BlockType.PLASTER && t != BlockType.CONCRETE)) { return null; }
+        for (int i = 0; i < traces.size(); i++) {
+            if (traces.get(i).on(x, y, z, d)) { return traces.get(i); }
+        }
+        return null;
     }
 
     /** The district of a column of this chunk, read once per build from the pure plan. */

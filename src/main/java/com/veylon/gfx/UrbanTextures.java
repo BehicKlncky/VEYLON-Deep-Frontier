@@ -75,6 +75,9 @@ final class UrbanTextures {
             case "decal_ivy_top" -> ivy(p, false);
             case "decal_veil" -> veilCreep(p, true);
             case "decal_veil_top" -> veilCreep(p, false);
+            case "decal_chalk" -> chalkMark(p);
+            case "decal_arrow" -> campArrow(p);
+            case "decal_warning" -> raiderWarning(p);
             case "decal_poster" -> poster(p);
             case "decal_notice" -> notice(p);
             case "decal_cordon" -> cordonMark(p);
@@ -1027,6 +1030,66 @@ final class UrbanTextures {
                 p.set(x, y, 0x2f2838);
                 p.set(x + 1, y, 0xb9a9c8);
             }
+        }
+    }
+
+    /** Chalk beside a door whose cellar hides people: a ringed dot and two knocks' worth of strokes. */
+    private static void chalkMark(Painter p) {
+        int n = p.size;
+        p.clearAlpha();
+        int chalk = 0xe6e3da, cx = n / 2, cy = n * 2 / 5, r = n / 6;
+        for (int deg = 0; deg < 360; deg += 3) {
+            double a = Math.toRadians(deg);
+            int x = cx + (int) Math.round(Math.cos(a) * r), y = cy + (int) Math.round(Math.sin(a) * r);
+            if (p.noise(x, y, 3, 3301) > 0.25f) { p.set(x, y, chalk); p.set(x, y + 1, chalk); }
+        }
+        p.blob(cx, cy, Math.max(1, n / 32), chalk);
+        for (int k = 0; k < 2; k++) {
+            int x = cx - n / 10 + k * n / 5;
+            p.line(x, cy + r + n / 10, x + n / 32, cy + r + n / 10 + n / 7, chalk);
+        }
+    }
+
+    /** A painted arrow sending callers along the wall and round the corner, with a few strokes of word. */
+    private static void campArrow(Painter p) {
+        int n = p.size;
+        p.clearAlpha();
+        int paint = 0xd8c25a, y = n / 2;
+        for (int x = n / 8; x < n * 6 / 8; x++) {
+            for (int t = -n / 32; t <= n / 32; t++) {
+                if (p.noise(x, y + t, 4, 3401) > 0.15f) { p.set(x, y + t, paint); }
+            }
+        }
+        for (int k = 0; k <= n / 6; k++) { // the head, pointing along the facade
+            int x = n * 6 / 8 - k;
+            for (int t = -k; t <= k; t++) {
+                if (Math.abs(t) > k - 3) { p.set(x + n / 6 - k, y + t, paint); }
+            }
+        }
+        for (int w = 0; w < 4; w++) { // a short word above it, too weathered to read
+            int x0 = n / 6 + w * n / 7;
+            p.line(x0, y - n / 5, x0 + n / 14, y - n / 5 - n / 16, paint);
+            p.line(x0 + n / 14, y - n / 5 - n / 16, x0 + n / 10, y - n / 5, paint);
+        }
+    }
+
+    /** A raider yard's warning, daubed in red: a crossed bar over the door and paint run down the wall. */
+    private static void raiderWarning(Painter p) {
+        int n = p.size;
+        p.clearAlpha();
+        int red = 0x9a2418;
+        for (int t = -2; t <= 2; t++) {
+            p.line(n / 5, n / 5 + t, n * 4 / 5, n * 3 / 5 + t, red);
+            p.line(n / 5, n * 3 / 5 + t, n * 4 / 5, n / 5 + t, red);
+        }
+        for (int d = 0; d < 5; d++) {
+            int x = n / 5 + (int) (p.rf(3501 + d) * n * 3 / 5);
+            int top = n / 3 + (int) (p.rf(3511 + d) * n / 4), len = n / 10 + (int) (p.rf(3521 + d) * n / 4);
+            for (int y = top; y < top + len && y < n; y++) { p.set(x, y, p.shade(red, 0.85f)); }
+        }
+        for (int i = 0; i < 30; i++) {
+            int x = n / 5 + p.ri(3531 + i) * 3 / 5, y = n / 5 + p.ri(3631 + i) * 2 / 5;
+            p.dot(x, y, p.shade(red, 0.9f));
         }
     }
 

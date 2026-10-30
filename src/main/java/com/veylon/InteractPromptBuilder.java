@@ -299,6 +299,14 @@ final class InteractPromptBuilder {
             case VEIL_MEMBRANE -> game.interactPrompt = "Veil membrane: it wakes to footsteps and light";
             // Milestone 20: the old relay mast on the precinct roof.
             case RELAY -> game.interactPrompt = game.refuges.comms.relayPrompt();
+            // Milestone 22: a mark people left beside a street door reads its words.
+            case BRICK, PLASTER, CONCRETE -> {
+                var trace = com.veylon.world.urban.UrbanTraces.at(world.urban, targetX, targetY, targetZ,
+                        faceOf(game.targetHit.nx(), game.targetHit.ny(), game.targetHit.nz()));
+                if (trace != null) {
+                    game.interactPrompt = trace.kind().text();
+                }
+            }
             default -> {
             }
         }
@@ -394,6 +402,13 @@ final class InteractPromptBuilder {
         return state.lit()
                 ? "[F] Extinguish lantern — LIT, " + fuel + "s fuel"
                 : "[F] Light lantern — UNLIT, " + fuel + "s fuel";
+    }
+
+    /** The mesher's face index (0 up, 1 down, 2 north, 3 south, 4 west, 5 east) of a hit's normal. */
+    static int faceOf(int nx, int ny, int nz) {
+        if (ny != 0) { return ny > 0 ? 0 : 1; }
+        if (nz != 0) { return nz < 0 ? 2 : 3; }
+        return nx < 0 ? 4 : 5;
     }
 
     /** A frontage sign reads its building's plan; it never loads a chunk or rolls anything. */

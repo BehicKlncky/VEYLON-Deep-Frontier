@@ -17,16 +17,18 @@ import java.util.Locale;
  * <p>By day it stands in each of the six districts' streets, in a walk-up's entrance, kitchen,
  * upper floor, stairs and basement, in the hidden cellar of the refuge nearest the spawn with its
  * people, at the gate of the nearest stronghold and before the first alien growth; then the
- * street, the kitchen, the gate, the growth and the flooded street at night, two streets in fog,
- * and the upper floor and a street in rain. Every pose, the clock and the weather are staged and
+ * street, the kitchen, the cellar, the gate, the growth and the flooded street at night, two
+ * streets in fog, the upper floor and a street in rain, and by day again the chalk mark beside
+ * that refuge's street door (milestone 22). Every pose, the clock and the weather are staged and
  * printed as staged; no block, item or person is. Each view prints what a listener there is
- * given: the acoustic zone, shelter, depth below the street, the light at the eye and the ambient
- * mix. Exactly {@value #CAPTURES} labelled captures. Failures throw.
+ * given: the acoustic zone, shelter, depth below the street, the light at the eye, the ambient
+ * mix, the city's sounds so far, and the interaction line. Exactly {@value #CAPTURES} labelled
+ * captures; the first 24 frame the same views at every revision. Failures throw.
  */
 final class UrbanAtmosphereQaScene extends UrbanRouteScene {
     /** Wall-clock seconds in a native session, simulated seconds in a headless route. */
     static final double DEADLINE_SECONDS = 300;
-    static final int CAPTURES = 24;
+    static final int CAPTURES = 25;
     /** Seconds a view is held before its capture, so meshes, shelter and the mix settle. */
     private static final float HOLD = 1.2f;
 
@@ -34,6 +36,8 @@ final class UrbanAtmosphereQaScene extends UrbanRouteScene {
     private boolean passed;
     private int poses, captures, number;
     private final List<String> views = new ArrayList<>();
+    /** The interaction line each view was captured with, by its label. */
+    private final java.util.Map<String, String> prompts = new java.util.LinkedHashMap<>();
 
     UrbanAtmosphereQaScene(Game game) {
         super(game);
@@ -45,6 +49,7 @@ final class UrbanAtmosphereQaScene extends UrbanRouteScene {
     boolean passed() { return passed; }
     UrbanAtmosphereTourPlan plan() { return plan; }
     List<String> views() { return views; }
+    java.util.Map<String, String> prompts() { return prompts; }
 
     @Override
     protected void capture(String label) {
@@ -87,6 +92,8 @@ final class UrbanAtmosphereQaScene extends UrbanRouteScene {
         add(new Clock("rain", 14 * 60, Weather.RAIN));
         view("rain-apartment-upper-floor", plan.apartment().get("upper-floor"));
         view("rain-street-commercial", plan.streets().get(UrbanDistrict.COMMERCIAL));
+        add(new Clock("mark", 15 * 60, Weather.CLEAR));
+        view("day-refuge-door-mark", plan.mark());
         add(new Report());
         staged = true;
     }
@@ -166,7 +173,9 @@ final class UrbanAtmosphereQaScene extends UrbanRouteScene {
             if (age < HOLD) { return false; }
             String heard = listener();
             views.add(label + "=" + game.player.locationLine());
-            System.out.println("[urban-atmosphere] view " + label + " place=\"" + game.player.locationLine() + "\" " + heard);
+            prompts.put(label, game.interactPrompt == null ? "" : game.interactPrompt);
+            System.out.println("[urban-atmosphere] view " + label + " place=\"" + game.player.locationLine() + "\" " + heard
+                    + " prompt=\"" + prompts.get(label) + "\"");
             capture(label);
             return true;
         }

@@ -273,6 +273,10 @@ public final class MaterialRegistry {
             for (com.veylon.world.urban.UrbanDressing.Decal decal : com.veylon.world.urban.UrbanDressing.Decal.values()) {
                 propTile(decal.tile(), 0f, 0.9f);
             }
+            // ...and the marks survivors leave beside street doors (UrbanTraces).
+            for (com.veylon.world.urban.UrbanTraces.Kind trace : com.veylon.world.urban.UrbanTraces.Kind.values()) {
+                propTile(trace.tile(), 0f, 0.9f);
+            }
         }
 
         private void register(String id, BlockType block, String top, String side, String bottom,
