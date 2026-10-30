@@ -828,8 +828,14 @@ public class World implements VoxelAccess {
         return Math.max(0.04f, l);
     }
 
-    /** Light contributed by torches/campfires near a cell, 0..1. */
+    /**
+     * Light contributed by torches/campfires near a cell, 0..1. In a generated city a light counts
+     * only where its straight ray reaches the cell without crossing an opaque block, so a lamp lights
+     * its own room and the doorway it faces, never the flat behind the wall (urban milestone 22); the
+     * renderer and every AI that reads light see the same answer. Other worlds keep the open falloff.
+     */
     public float blockLight(int x, int y, int z) {
+        boolean walled = urban != null && urban.hasGeneratedBuildings();
         int ccx = Math.floorDiv(x, 16), ccz = Math.floorDiv(z, 16);
         float best = 0f;
         for (int dx = -1; dx <= 1; dx++) {
@@ -844,7 +850,8 @@ public class World implements VoxelAccess {
                     float range = l[3] * 0.75f;
                     if (dist < range) {
                         float v = (1f - dist / range) * (l[3] / 15f);
-                        if (v > best) {
+                        // The ray is traced only for a light that would brighten the cell.
+                        if (v > best && (!walled || UrbanIndoorQueries.lightReaches(this, l[0], l[1], l[2], x, y, z))) {
                             best = v;
                         }
                     }

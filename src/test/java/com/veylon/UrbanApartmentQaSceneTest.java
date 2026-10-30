@@ -102,8 +102,17 @@ class UrbanApartmentQaSceneTest {
             });
             for (int view = 1; view <= 4; view++) {
                 scene.update(view * 4 + 1);
-                assertTrue(game.world.blockLight((int) game.player.pos.x, (int) game.player.pos.y + 1,
-                        (int) game.player.pos.z) > .15f, "room lighting reaches the camera, view=" + view);
+                float light = game.world.blockLight((int) Math.floor(game.player.pos.x), (int) game.player.pos.y + 1,
+                        (int) Math.floor(game.player.pos.z));
+                // Since milestone 22 a city's walls, floors and closed doors stop lamp light: the porch
+                // torch outside the closed front door lights the porch, not the hall, and each room is
+                // lit by the torch on its own cupboard (dimly where that cupboard is far from the camera,
+                // as in the basement on -4242, which the kitchen torch above used to light through the slab).
+                if (view == 1) {
+                    assertEquals(0f, light, "the porch torch does not light the hall through the closed door");
+                } else {
+                    assertTrue(light > .05f, "the room's own torch reaches the camera, view=" + view + " light=" + light);
+                }
                 assertFalse(VoxelClearance.collides(game.world, game.player.pos.x, game.player.pos.y,
                         game.player.pos.z, .6f, 1.8f, true));
             }

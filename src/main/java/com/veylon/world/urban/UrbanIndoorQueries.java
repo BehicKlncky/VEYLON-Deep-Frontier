@@ -70,6 +70,46 @@ public final class UrbanIndoorQueries {
         return 0;
     }
 
+    /** Cells a light ray may cross; a lamp's full range (11.25 blocks) needs at most 33. */
+    static final int LIGHT_RAY_CELLS = 48;
+
+    /**
+     * Whether a block light at one cell reaches another along the straight line between their
+     * centres without crossing an opaque cell (urban milestone 22). The two end cells never block,
+     * glass and open leaves pass light, closed doors and walls stop it. The traversal visits each
+     * crossed cell once, one axis step at a time, so a ray cannot slip between two blocks that
+     * meet at an edge; it reads loaded voxels only, at most {@value #LIGHT_RAY_CELLS} of them.
+     */
+    public static boolean lightReaches(World world, int lx, int ly, int lz, int x, int y, int z) {
+        int dx = x - lx, dy = y - ly, dz = z - lz;
+        int sx = Integer.signum(dx), sy = Integer.signum(dy), sz = Integer.signum(dz);
+        // Parametric distance, centre to centre, to the first boundary on each axis and between boundaries.
+        double tx = dx == 0 ? Double.MAX_VALUE : 0.5 / Math.abs(dx), stepX = dx == 0 ? 0 : 1.0 / Math.abs(dx);
+        double ty = dy == 0 ? Double.MAX_VALUE : 0.5 / Math.abs(dy), stepY = dy == 0 ? 0 : 1.0 / Math.abs(dy);
+        double tz = dz == 0 ? Double.MAX_VALUE : 0.5 / Math.abs(dz), stepZ = dz == 0 ? 0 : 1.0 / Math.abs(dz);
+        int cx = lx, cy = ly, cz = lz;
+        // A ray rarely leaves its chunk: keep the one it is in rather than looking it up per cell.
+        int chunkX = Integer.MIN_VALUE, chunkZ = Integer.MIN_VALUE;
+        Chunk chunk = null;
+        for (int i = 0; i < LIGHT_RAY_CELLS; i++) {
+            if (cx == x && cy == y && cz == z) { return true; }
+            if (tx < ty && tx < tz) { cx += sx; tx += stepX; }
+            else if (ty < tz) { cy += sy; ty += stepY; }
+            else { cz += sz; tz += stepZ; }
+            if (cx == x && cy == y && cz == z) { return true; }
+            int ncx = Math.floorDiv(cx, Chunk.SX), ncz = Math.floorDiv(cz, Chunk.SZ);
+            if (ncx != chunkX || ncz != chunkZ) {
+                chunkX = ncx;
+                chunkZ = ncz;
+                chunk = world.getChunk(ncx, ncz);
+            }
+            if (chunk != null && chunk.get(Math.floorMod(cx, Chunk.SX), cy, Math.floorMod(cz, Chunk.SZ)).opaque) {
+                return false;
+            }
+        }
+        return false;
+    }
+
     private static float directSky(Chunk chunk, int x, int y, int z) {
         int lx = Math.floorMod(x, Chunk.SX), lz = Math.floorMod(z, Chunk.SZ);
         if (y < chunk.height(lx, lz)) { return 0; }
