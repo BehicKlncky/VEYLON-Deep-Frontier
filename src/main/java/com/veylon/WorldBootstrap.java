@@ -372,6 +372,10 @@ final class WorldBootstrap {
         game.player.inventory.add(ItemType.WATERSKIN_EMPTY, 1);
         game.player.inventory.add(ItemType.BANDAGE, 1);
         game.player.inventory.add(ItemType.TORCH, 1);
+        if (game.world.urban.hasMissions()) {
+            cityHints();
+            return;
+        }
         if (game.gameMode() == GameMode.CREATIVE) {
             game.log("City refuge - Creative mode. Press [E] for the catalog; Esc then [T] for world controls.");
             game.log("Double-tap Space to fly; Space rises and Ctrl descends. Nothing here can hurt you.");
@@ -381,6 +385,24 @@ final class WorldBootstrap {
             game.log("Cross the courtyard to the apartments and corner shop; return here with salvage.");
             game.log("The courtyard collector refills in rain. Burn recovered planks there to cook or boil.");
             game.log("Use [C] by the kitchen workbench: scrap, planks and textiles make a reinforced spear.");
+        }
+    }
+
+    /**
+     * A new layout-sixteen city's first lines (urban milestone 21): home, barring a door, what
+     * searching costs, the map, and where work is. Each is short enough to stay whole on the HUD's
+     * log beside its timestamp; the map's journal says more. Creative's name only what Creative can do.
+     */
+    static final String[] CITY_HINTS = {
+            "City refuge: this flat is home.", "Crouch and press F to bar a door.",
+            "[F] searches. Searching is noisy.", "[M] city map and journal.", "Survivors may have work for you."};
+    static final String[] CITY_CREATIVE_HINTS = {
+            "City refuge, in Creative mode.", "[E] catalog. Esc, [T]: world.", "Double-tap Space to fly.",
+            "[M] city map and journal."};
+
+    private void cityHints() {
+        for (String line : game.gameMode() == GameMode.CREATIVE ? CITY_CREATIVE_HINTS : CITY_HINTS) {
+            game.log(line);
         }
     }
 }

@@ -94,9 +94,12 @@ final class FrontendController {
         }
     }
 
-    /** Opens the worldless mode choice; the save check happens once, not every frame. */
+    /**
+     * Opens the worldless mode choice; the save check happens once, not every frame. The screen
+     * describes the city when the development selector makes this session's new worlds cities.
+     */
     void openNewFrontier(boolean saveExists) {
-        game.newFrontierScreen.open(saveExists);
+        game.newFrontierScreen.open(saveExists, World.isUrbanGenerator(newWorldGenerator));
         game.appState = Game.AppState.TITLE_NEW_WORLD;
     }
 
