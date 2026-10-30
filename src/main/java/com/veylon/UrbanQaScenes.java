@@ -71,6 +71,12 @@ final class UrbanQaScenes {
      * taken as a friend, the relay repaired and the city answering, then F5 and F9 ({@code urban_missions}).
      */
     private final UrbanMissionQaScene missions;
+    /**
+     * Package 21: what a new survivor reads, from the refuge to a mission's next step: the HUD, the city
+     * map, its journal and floor sketch, a search, a locked door, a wrapped answer, night, fog and a load
+     * ({@code urban_onboarding}).
+     */
+    private final UrbanOnboardingQaScene onboarding;
     private final PlayerMovementSystem.Command walk = new PlayerMovementSystem.Command();
     private boolean holding;
     private float holdX;
@@ -112,6 +118,7 @@ final class UrbanQaScenes {
         this.refuge = new UrbanRefugeQaScene(game);
         this.utilities = new UrbanUtilityQaScene(game);
         this.missions = new UrbanMissionQaScene(game);
+        this.onboarding = new UrbanOnboardingQaScene(game);
     }
 
     /** Stages one of the urban scenes; inert, with a notice, outside a street-network world. */
@@ -164,6 +171,10 @@ final class UrbanQaScenes {
         }
         if (scene.equals("urban_missions")) {
             missions.stage(); // a normal session: poses between legs, the clock (forward) and the kit are staged
+            return;
+        }
+        if (scene.equals("urban_onboarding")) {
+            onboarding.stage(); // a fresh session: poses between legs, the clock (forward), fog and a spear are staged
             return;
         }
         if (!world.isUrban() || !world.urban.hasCityPlan()) {
@@ -263,6 +274,7 @@ final class UrbanQaScenes {
     UrbanRefugeQaScene refuge() { return refuge; }
     UrbanUtilityQaScene utilities() { return utilities; }
     UrbanMissionQaScene missions() { return missions; }
+    UrbanOnboardingQaScene onboarding() { return onboarding; }
 
     /** Per-frame hook, before streaming and rendering; inert unless a scene is staged. */
     void update(double elapsed) {
@@ -291,6 +303,7 @@ final class UrbanQaScenes {
         refuge.update(elapsed);
         utilities.update(elapsed);
         missions.update(elapsed);
+        onboarding.update(elapsed);
         if (holding) {
             apply();
         }
