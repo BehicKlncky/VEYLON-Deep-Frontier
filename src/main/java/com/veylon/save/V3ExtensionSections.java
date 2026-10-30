@@ -113,6 +113,9 @@ final class V3ExtensionSections {
             if (UrbanDiscoverySection.present(g)) {
                 sections.add(new V3Section(UrbanDiscoverySection.ID, UrbanDiscoverySection.write(g)));
             }
+            if (UrbanVisitsSection.present(g)) {
+                sections.add(new V3Section(UrbanVisitsSection.ID, UrbanVisitsSection.write(g)));
+            }
         }
         out.writeInt(V3_SECTION_ENVELOPE_MAGIC);
         out.writeInt(sections.size());
@@ -367,6 +370,8 @@ final class V3ExtensionSections {
                 UrbanRefugesSection.read(payload, g);
             } else if (UrbanDiscoverySection.ID.equals(id)) {
                 UrbanDiscoverySection.read(payload, g);
+            } else if (UrbanVisitsSection.ID.equals(id)) {
+                UrbanVisitsSection.read(payload, g);
             } else if (UrbanSitesSection.ID.equals(id)) {
                 sites = payload;
             } else if (UrbanCompoundsSection.ID.equals(id)) {

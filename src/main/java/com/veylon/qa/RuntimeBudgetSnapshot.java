@@ -56,7 +56,7 @@ public record RuntimeBudgetSnapshot(
         int urbanEncounterRecords,
         int urbanEcologyPlans, int activeAliens, int activeWildlife, int urbanSitePlans, int urbanSiteRecords,
         int urbanVehiclePlans, int damagedBarricades, int doorBraces, int refugeClaims, int tappedBuildings,
-        int utilityDevices, int missionRecords,
+        int utilityDevices, int missionRecords, int visitedPlaces, int sketchedFloors,
         int navigationRoutes, int pathQueries, int pathExpansions, int pathDeferred,
         int pathFailures, int unsupportedEntries, int hearingSamples) {
 
@@ -118,6 +118,9 @@ public record RuntimeBudgetSnapshot(
                 game.world.urban == null ? 0 : game.world.urban.utilities.tappedCount(),
                 game.world.urban == null ? 0 : game.world.urban.utilities.deviceCount(),
                 game.world.urban == null ? 0 : game.world.urban.missions.missions().size(),
+                game.world.urban == null ? 0
+                        : game.world.urban.visits.districtCount() + game.world.urban.visits.buildingCount(),
+                game.world.urban == null ? 0 : game.world.urban.visits.sketchedFloors(),
                 game.world.navigation.size(), game.world.navigation.budget.queries(),
                 game.world.navigation.budget.expansions(), game.world.navigation.budget.deferred(),
                 game.world.navigation.budget.failures(), game.world.navigation.budget.unsupportedEntries(),
@@ -144,6 +147,9 @@ public record RuntimeBudgetSnapshot(
                 && tappedBuildings <= com.veylon.world.urban.UrbanUtilities.MAX_TAPPED
                 && utilityDevices <= com.veylon.world.urban.UrbanUtilities.MAX_DEVICES
                 && missionRecords <= com.veylon.world.urban.UrbanMissions.MAX_RECORDS
+                && visitedPlaces <= com.veylon.world.urban.UrbanVisits.MAX_DISTRICTS
+                + com.veylon.world.urban.UrbanVisits.MAX_BUILDINGS
+                && sketchedFloors <= com.veylon.world.urban.UrbanVisits.MAX_SKETCHED_FLOORS
                 && urbanSiteRecords <= com.veylon.settlement.UrbanSiteDirector.MAX_SITES
                 && activeAliens <= com.veylon.entity.UrbanEncounterDirector.MAX_ACTIVE_ALIENS
                 && activeWildlife <= com.veylon.entity.UrbanEncounterDirector.MAX_ACTIVE_WILDLIFE
@@ -218,6 +224,7 @@ public record RuntimeBudgetSnapshot(
                 + " vehiclePlans=" + urbanVehiclePlans
                 + " fortifications={damaged=" + damagedBarricades + ",braces=" + doorBraces + "}"
                 + " refuges=" + refugeClaims + " tapped=" + tappedBuildings + " devices=" + utilityDevices + " urbanMissions=" + missionRecords
+                + " visits={places=" + visitedPlaces + ",sketchedFloors=" + sketchedFloors + "}"
                 + " fixtures={states=" + fixtureStates + ",residentDoors=" + residentDoors + "}";
     }
 
@@ -236,6 +243,9 @@ public record RuntimeBudgetSnapshot(
                 + " tapped=" + com.veylon.world.urban.UrbanUtilities.MAX_TAPPED
                 + " devices=" + com.veylon.world.urban.UrbanUtilities.MAX_DEVICES
                 + " urbanMissions=" + com.veylon.world.urban.UrbanMissions.MAX_RECORDS
+                + " visitedPlaces=" + (com.veylon.world.urban.UrbanVisits.MAX_DISTRICTS
+                + com.veylon.world.urban.UrbanVisits.MAX_BUILDINGS)
+                + " sketchedFloors=" + com.veylon.world.urban.UrbanVisits.MAX_SKETCHED_FLOORS
                 + " sites=" + com.veylon.settlement.UrbanSiteDirector.MAX_SITES
                 + " resident=" + SettlementManager.MAX_ACTIVE_RESIDENTS
                 + " party=" + SettlementManager.MAX_ACTIVE_WAR_PARTY_NPCS

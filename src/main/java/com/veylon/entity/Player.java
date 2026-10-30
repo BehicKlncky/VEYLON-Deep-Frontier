@@ -564,6 +564,7 @@ public class Player extends Entity {
         placeX = x; placeY = y; placeZ = z;
         UrbanPlaces.Observation seen = UrbanPlaces.at(world, x, y, z);
         place = seen.place();
+        com.veylon.world.urban.UrbanVisits.observe(world, x, y, z); // what the map may label (urban 21)
         if (seen.site() != 0 && world.urban.discovery.discover(seen.site())) {
             g.log(UrbanPlaces.discoveryLine(seen.place()));
         }
