@@ -231,7 +231,7 @@ public final class Fortification {
         World w = g.world;
         if (w.fixtureLockAt(bottom.x(), bottom.y(), bottom.z()) != FixtureStates.LOCK_BARRED
                 && !FixtureActions.barFromPlayerSide(g, bottom.x(), bottom.y(), bottom.z(), 2)) {
-            g.log("This door cannot change state: too many fixtures remembered.");
+            g.log("This door is jammed and will not move.");
             return;
         }
         w.urban.fortifications.setBrace(w, bottom, UrbanFortifications.BRACE_STRENGTH);

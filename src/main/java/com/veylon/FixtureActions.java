@@ -125,8 +125,10 @@ public final class FixtureActions {
         }
         String noun = noun(kind);
         String bar = kind.door ? "bar" : "latch";
-        String forceTool = t.requiresTool
-                ? " with a " + t.preferredTool.name().toLowerCase(Locale.ROOT) : "";
+        // What forcing takes, in the words of the tool the pack shows (a pry tool in a city, urban 21).
+        String tool = t.requiresTool
+                ? com.veylon.item.ItemNames.toolNoun(t.preferredTool, g.world.isUrban()) : null;
+        String article = tool == null ? "" : "A " + tool;
         // Layout fourteen: a brace behind a barred door (urban milestone 18).
         Float brace = kind.door ? Fortification.braceAt(g, new Vec3i(x, y, z)) : null;
         if (brace != null) {
@@ -136,7 +138,8 @@ public final class FixtureActions {
                         + Math.round(com.veylon.world.urban.UrbanFortifications.BRACE_STRENGTH) + ")";
             }
             if (action == Action.BARRED_OTHER_SIDE) {
-                return "Braced and barred from the other side. Break through it" + forceTool + " (loud) or go around";
+                return tool != null ? "Braced from inside. " + article + " breaks it: hold [LMB]"
+                        : "Braced from inside. Hold [LMB] to break through (loud)";
             }
         }
         return switch (decide(g, x, y, z)) {
@@ -145,17 +148,17 @@ public final class FixtureActions {
                     : "[F] Open " + noun + "  (crouch: " + bar + " it from this side)";
             case CLOSE -> "[F] Close " + noun;
             case BLOCKED -> "Something is in the " + (kind.door ? "doorway" : "window");
-            case LOCKED -> kind.door
-                    ? "Locked. Force it open" + forceTool + " (loud) or find another way in"
-                    : "Locked. Break the glass to get in (loud)";
+            case LOCKED -> !kind.door ? "Locked. Break the glass to get in (loud)"
+                    : tool != null ? "Locked. " + article + " forces it: hold [LMB] (loud)"
+                    : "Locked. Hold [LMB] to force it (loud), or go around";
             case BAR -> "[F] " + capitalize(bar) + " the " + noun + " from this side";
             case UNBAR -> kind.door ? "[F] Lift the bar" : "[F] Unlatch the window";
-            case BARRED_OTHER_SIDE -> kind.door
-                    ? "Barred from the other side. Force it" + forceTool + " (loud) or go around"
-                    : "Latched from the other side. Break the glass (loud) or go around";
+            case BARRED_OTHER_SIDE -> !kind.door ? "Latched from inside. Break the glass (loud) or go around"
+                    : tool != null ? "Barred from inside. " + article + " forces it: hold [LMB]"
+                    : "Barred from inside. Hold [LMB] to force it (loud)";
             case LOCK -> "[F] Lock " + noun + " (Creative)";
             case UNLOCK -> "[F] Unlock " + noun + " (Creative)";
-            case FULL -> "This " + noun + " cannot change state: too many fixtures remembered";
+            case FULL -> "This " + noun + " is jammed and will not move";
             case NONE -> null;
         };
     }

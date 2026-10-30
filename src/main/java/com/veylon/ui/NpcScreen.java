@@ -125,7 +125,7 @@ public class NpcScreen {
         oy += 36;
 
         if (!lastResponse.isEmpty()) {
-            ui.textShadow(x0 + 30, oy, 1.4f, '"' + lastResponse + '"', 0.95f, 0.9f, 0.7f, 1f);
+            response(ui, lastResponse, x0 + 30, oy, pw - 60, y0 + ph - 30);
         }
         ui.textCentered(w / 2f, y0 + ph - 24, 1.2f, "[Esc or F] leave", 0.7f, 0.7f, 0.7f, 1f);
 
@@ -169,7 +169,7 @@ public class NpcScreen {
      * legacy quests or wilderness trades, only what those people deal in.
      */
     private void updateSite(Game g, Npc n, com.veylon.settlement.UrbanSite site, UiRenderer ui, int w, int h) {
-        float pw = 600, ph = 420;
+        float pw = 600, ph = 470;
         float x0 = w / 2f - pw / 2f, y0 = h / 2f - ph / 2f;
         ui.panel(x0, y0, pw, ph);
         ui.textCentered(w / 2f, y0 + 12, 2f, n.name, 1f, 1f, 0.9f, 1f);
@@ -183,7 +183,7 @@ public class NpcScreen {
         }
         oy += 10;
         if (!lastResponse.isEmpty()) {
-            ui.textShadow(x0 + 30, oy, 1.4f, '"' + lastResponse + '"', 0.95f, 0.9f, 0.7f, 1f);
+            response(ui, lastResponse, x0 + 30, oy, pw - 60, y0 + ph - 30);
         }
         ui.textCentered(w / 2f, y0 + ph - 24, 1.2f, "[Esc or F] leave", 0.7f, 0.7f, 0.7f, 1f);
         for (int key = 1; key <= 9; key++) {
@@ -211,7 +211,7 @@ public class NpcScreen {
         out.add("[1] Talk");
         out.add("[2] Give food and water");
         ItemStack sel = g.player.selected();
-        out.add("[3] Give held item" + (sel != null ? " (" + sel.type.displayName + ")" : " (nothing held)"));
+        out.add("[3] Give held item" + (sel != null ? " (" + com.veylon.item.ItemNames.of(sel.type, true) + ")" : " (nothing held)"));
         if (site != null) {
             var offers = com.veylon.settlement.UrbanSiteDialogue.offers(g, n);
             var role = site.resident(n.residentIndex).role;
@@ -295,6 +295,25 @@ public class NpcScreen {
 
     private void option(UiRenderer ui, float x, float y, String s) {
         ui.textShadow(x, y, 1.5f, s, 0.9f, 0.95f, 1f, 1f);
+    }
+
+    /**
+     * The last answer, wrapped inside the panel above its footer (urban milestone 21): a long answer,
+     * such as where the relay stands, no longer runs past the panel's edge.
+     */
+    public static java.util.List<String> responseLines(String said, float width, float height,
+                                                java.util.function.ToDoubleFunction<String> measure) {
+        int room = Math.max(1, Math.min(4, (int) (height / RESPONSE_PITCH)));
+        return HudLayout.wrap('"' + said + '"', width, room, measure);
+    }
+
+    private static final float RESPONSE_SCALE = 1.4f, RESPONSE_PITCH = 20;
+
+    private static void response(UiRenderer ui, String said, float x, float y, float width, float bottom) {
+        for (String line : responseLines(said, width, bottom - y, s -> ui.textWidth(s, RESPONSE_SCALE))) {
+            ui.textShadow(x, y, RESPONSE_SCALE, line, 0.95f, 0.9f, 0.7f, 1f);
+            y += RESPONSE_PITCH;
+        }
     }
 
     private void tradeOption(UiRenderer ui, float x, float y, String key,

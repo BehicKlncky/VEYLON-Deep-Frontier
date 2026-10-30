@@ -140,7 +140,7 @@ public class CraftingScreen {
         dy += 26;
         if (r.result != null) {
             ui.itemIcon(r.result, dx, dy - 3, 24, known ? 1f : 0.4f);
-            ui.textShadow(dx + 30, dy, 1.3f, "Makes: " + r.resultCount + " x " + r.result.displayName,
+            ui.textShadow(dx + 30, dy, 1.3f, "Makes: " + r.resultCount + " x " + com.veylon.item.ItemNames.of(r.result, g.world.isUrban()),
                     0.85f, 0.85f, 0.85f, 1f);
         } else {
             String next = CraftingSystem.nextBlueprint(g.player.blueprints);
@@ -169,7 +169,7 @@ public class CraftingScreen {
             boolean ok = have >= e.getValue();
             ui.itemIcon(e.getKey(), dx, dy - 1, 16);
             ui.textShadow(dx + 21, dy, 1.3f,
-                    e.getKey().displayName + "  " + have + "/" + e.getValue() + (ok ? "" : "  MISSING"),
+                    com.veylon.item.ItemNames.of(e.getKey(), g.world.isUrban()) + "  " + have + "/" + e.getValue() + (ok ? "" : "  MISSING"),
                     ok ? 0.6f : 1f, ok ? 1f : 0.4f, ok ? 0.6f : 0.4f, 1f);
             dy += 19;
         }
@@ -210,7 +210,7 @@ public class CraftingScreen {
                 g.log("Blueprint decoded: " + CraftingSystem.blueprintTitle(result)
                         + "! New recipe available.");
             } else {
-                g.log("Crafted " + r.resultCount + " x " + r.result.displayName);
+                g.log("Crafted " + r.resultCount + " x " + com.veylon.item.ItemNames.of(r.result, g.world.isUrban()));
             }
         }
         return result;

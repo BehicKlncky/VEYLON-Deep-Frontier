@@ -103,30 +103,7 @@ final class CrateTransactionSystem {
             }
             openEntry = entry;
             var plan = entry.id > 0 ? UrbanContainers.planned(game.world,pos) : null;
-            var use = plan == null ? null : BuildingFurnishing.containerUse(plan.building(),plan.fixture());
-            boolean walkUp = plan == null || plan.building().family().walkUp();
-            containerTitle = plan == null ? entry.block.displayName : switch (use) {
-                case KITCHEN_CABINET -> "Kitchen cupboard";
-                case FRIDGE -> "Fridge shelf";
-                case PANTRY_SHELF -> "Pantry shelf";
-                case BATHROOM_CABINET -> "Bathroom cabinet";
-                case WARDROBE -> "Wardrobe";
-                case DRESSER_DESK -> walkUp ? "Dresser" : "Desk drawers";
-                case UTILITY_LOCKER -> plan.building().family() == com.veylon.world.urban.BuildingPlan.Family.TRANSIT
-                        ? "Maintenance locker" : "Utility locker";
-                case SHOP_SHELF -> walkUp ? "Shop shelf" : "Grocery shelf";
-                case STOCKROOM_CRATE -> "Supply cupboard";
-                case MEDICINE_CABINET -> "Dispensary cabinet";
-                case ARMORY_LOCKER -> "Armoury locker";
-                case TREATMENT_CABINET -> "Treatment cabinet";
-                case WAREHOUSE_RACK -> "Warehouse rack";
-                case TOOL_CHEST -> "Tool chest";
-            };
-            if (plan != null && plan.table() == LootTables.Table.SECURED
-                    && use != BuildingFurnishing.ContainerUse.ARMORY_LOCKER) {
-                containerTitle = "Secured supply locker";
-            }
-            containerTitle = containerTitle.toUpperCase(java.util.Locale.ROOT);
+            containerTitle = (plan == null ? entry.block.displayName : useTitle(plan)).toUpperCase(java.util.Locale.ROOT);
             searchHarm = game.player.harmEvents;
             rummageCooldown = 0;
             if (!entry.state.revealed()) {
@@ -147,6 +124,85 @@ final class CrateTransactionSystem {
         openUrbanContainer = Fixtures.isUrbanContainer(game.world.getBlock(pos.x(), pos.y(), pos.z()))
                 ? pos : null;
         return true;
+    }
+
+    /** What a planned container is called by its use: "Kitchen cupboard", "Dispensary cabinet". */
+    static String useTitle(UrbanContainers.Planned plan) {
+        var use = BuildingFurnishing.containerUse(plan.building(), plan.fixture());
+        boolean walkUp = plan.building().family().walkUp();
+        if (plan.table() == LootTables.Table.SECURED && use != BuildingFurnishing.ContainerUse.ARMORY_LOCKER) {
+            return "Secured supply locker";
+        }
+        return switch (use) {
+            case KITCHEN_CABINET -> "Kitchen cupboard";
+            case FRIDGE -> "Fridge shelf";
+            case PANTRY_SHELF -> "Pantry shelf";
+            case BATHROOM_CABINET -> "Bathroom cabinet";
+            case WARDROBE -> "Wardrobe";
+            case DRESSER_DESK -> walkUp ? "Dresser" : "Desk drawers";
+            case UTILITY_LOCKER -> plan.building().family() == com.veylon.world.urban.BuildingPlan.Family.TRANSIT
+                    ? "Maintenance locker" : "Utility locker";
+            case SHOP_SHELF -> walkUp ? "Shop shelf" : "Grocery shelf";
+            case STOCKROOM_CRATE -> "Supply cupboard";
+            case MEDICINE_CABINET -> "Dispensary cabinet";
+            case ARMORY_LOCKER -> "Armoury locker";
+            case TREATMENT_CABINET -> "Treatment cabinet";
+            case WAREHOUSE_RACK -> "Warehouse rack";
+            case TOOL_CHEST -> "Tool chest";
+        };
+    }
+
+    /**
+     * The HUD line for a container the player faces in a layout-sixteen city (urban milestone 21):
+     * what it is, whose it is, and what searching it costs or how far it got, read from the ledger
+     * and the plan without touching either, rolling nothing and registering no site. Null outside
+     * such a city, where the older lines stand.
+     */
+    String containerPrompt(Vec3i pos) {
+        var world = game.world;
+        if (!com.veylon.ui.CityMap.applies(world)) { return null; }
+        BlockType block = world.getBlock(pos.x(), pos.y(), pos.z());
+        UrbanContainers.Entry entry = world.urban.containers.at(pos);
+        UrbanContainers.Planned plan = UrbanContainers.planned(world, pos);
+        boolean planned = plan != null && plan.fixture().block() == block && !world.changedBlocks.containsKey(pos)
+                && (entry == null || entry.id == plan.fixture().id());
+        String name = (planned ? useTitle(plan) : block.displayName).toLowerCase(java.util.Locale.ROOT);
+        UrbanContainers.Owner owner = entry != null ? entry.owner : !planned ? UrbanContainers.Owner.PLAYER
+                : UrbanContainers.survivorOwned(world, plan) ? UrbanContainers.Owner.SURVIVOR : UrbanContainers.Owner.ABANDONED;
+        long ownerId = entry != null ? entry.ownerId : owner == UrbanContainers.Owner.SURVIVOR ? plan.building().id()
+                : com.veylon.world.urban.UrbanIds.NONE;
+        UrbanContainers.State state = entry != null ? entry.state
+                : planned ? UrbanContainers.State.UNSEARCHED : UrbanContainers.State.EMPTY;
+        String verb = state == UrbanContainers.State.SEARCHING ? "Keep searching"
+                : state == UrbanContainers.State.UNSEARCHED ? "Search" : "Open";
+        String detail;
+        if (owner == UrbanContainers.Owner.SURVIVOR) {
+            detail = survivorWords(ownerId);
+        } else if (world.urban.refuges.at(world, pos.x(), pos.y(), pos.z()) != null) {
+            detail = state.revealed() ? "your refuge" : "your refuge, unsearched";
+        } else if (owner == UrbanContainers.Owner.PLAYER) {
+            detail = "your storage";
+        } else {
+            detail = switch (state) {
+                case UNSEARCHED -> "noisy, about " + Math.round(LootTables.searchSeconds(plan.table())) + " s";
+                case SEARCHING -> Math.round(Math.min(1f, entry.progress / Math.max(.01f,
+                        LootTables.searchSeconds(plan.table()))) * 100) + "% searched";
+                case EMPTY -> "empty";
+                default -> "searched";
+            };
+        }
+        return "[F] " + verb + " the " + name + " (" + detail + ")";
+    }
+
+    /** Whose stores a survivor-owned container is, in a few words; a read of the registered site only. */
+    private String survivorWords(long ownerId) {
+        var s = com.veylon.settlement.UrbanSiteDirector.registered(game.world, ownerId);
+        if (s == null) { return "survivors' stores: theft"; }
+        if (s.present() == 0) { return s.refuge() && s.stashReleased ? "left to you" : "left behind"; }
+        if (s.raiders()) { return "raiders' stores: they want them back"; }
+        if (s.refuge()) { return "their last supplies: theft"; }
+        String whose = s.stronghold() ? "Wardens'" : "camp";
+        return s.grantsAccess() ? whose + " stores, shared with you" : whose + " stores: theft";
     }
 
     /**

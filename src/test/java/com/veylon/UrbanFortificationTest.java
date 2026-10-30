@@ -296,7 +296,7 @@ class UrbanFortificationTest {
         g.player.hotbarSel = 1;
         aim(g, door);
         g.updatePrompt();
-        assertTrue(g.interactPrompt.startsWith("Braced and barred from the other side"), g.interactPrompt);
+        assertTrue(g.interactPrompt.startsWith("Braced from inside."), g.interactPrompt);
         assertTrue(g.blockActions.completePlayerBlockBreak(door));
         assertSame(BlockType.WOOD_DOOR, g.world.getBlock(door.x(), door.y(), door.z()), "the brace took the blow");
         assertEquals(UrbanFortifications.BRACE_STRENGTH - com.veylon.Fortification.PLAYER_BLOW,

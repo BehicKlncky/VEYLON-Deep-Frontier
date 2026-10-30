@@ -105,7 +105,7 @@ class UrbanFixtureGameplayTest {
         a.game.world.fixtures.set(door.x(), door.y() + 1, door.z(), FixtureStates.LOCK_KEYED);
 
         a.aim(door);
-        assertTrue(a.prompt().startsWith("Locked. Force it open with a pickaxe"), a.prompt());
+        assertTrue(a.prompt().startsWith("Locked. A pry tool forces it: hold [LMB]"), a.prompt());
         a.pressF();
         assertSame(BlockType.METAL_DOOR, a.block(door), "F on a locked door is a failed entry");
         assertEquals(1, a.game.noise.countCategory("door-rattle"), "trying the handle is heard");
@@ -139,7 +139,7 @@ class UrbanFixtureGameplayTest {
 
         a.standAt(a.house.eastRoom());
         a.aim(door);
-        assertTrue(a.prompt().startsWith("Barred from the other side"), a.prompt());
+        assertTrue(a.prompt().startsWith("Barred from inside. Hold [LMB] to force it"), a.prompt());
         a.pressF();
         assertSame(BlockType.WOOD_DOOR, a.block(door));
 

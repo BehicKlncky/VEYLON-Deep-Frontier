@@ -44,6 +44,8 @@ final class InteractPromptBuilder {
     private static final float COLLECTOR_CAPACITY_L = 3.0f;
 
     private final Game game;
+    /** This frame's block line is only the generic "needs a tool" hint, which a salvage line replaces. */
+    private boolean genericToolHint;
 
     InteractPromptBuilder(Game game) {
         this.game = game;
@@ -55,6 +57,7 @@ final class InteractPromptBuilder {
      * <p>Sets it to {@code null} when nothing nearby is interactable.
      */
     void update() {
+        genericToolHint = false;
         // Layout fourteen: what the use button does with a fortification item in hand (milestone 18).
         game.interactPrompt = Fortification.prompt(game, game.player.selected());
         if (game.interactPrompt != null) {
@@ -98,12 +101,16 @@ final class InteractPromptBuilder {
             return false;
         }
         if (game.blockActions.dismantling.applies(pos, t)) {
-            boolean generic = game.interactPrompt == null || game.interactPrompt.startsWith("Requires ");
+            boolean generic = game.interactPrompt == null || genericToolHint;
             game.interactPrompt = generic ? hint
                     : game.interactPrompt + "  ·  " + game.blockActions.dismantling.shortPrompt(pos, t);
         } else if (RefugeSystem.isBed(t)) {
             // A bed's own line already says what crouching does to it: claim or give up a refuge.
             return game.interactPrompt != null;
+        } else if (game.interactPrompt != null && com.veylon.world.Fixtures.isContainer(t)
+                && com.veylon.ui.CityMap.applies(game.world)) {
+            // Layout sixteen: a container's line says what searching costs; crouching shows what it yields (urban 21).
+            return true;
         } else {
             game.interactPrompt = (game.interactPrompt == null ? "[LMB] Hold to carry it away" : game.interactPrompt)
                     + "  ·  " + hint;
@@ -213,7 +220,9 @@ final class InteractPromptBuilder {
             case CRATE, SHELF, CABINET, LOCKER -> {
                 var stores = world.settlementAt(targetX, targetZ);
                 boolean crate = game.targetHit.type() == BlockType.CRATE;
-                game.interactPrompt = stores != null && !stores.cleared && !stores.occupied
+                // Layout sixteen: what the container is, whose, and what searching it costs (urban 21).
+                String city = game.crates.containerPrompt(new Vec3i(targetX, targetY, targetZ));
+                game.interactPrompt = city != null ? city : stores != null && !stores.cleared && !stores.occupied
                         ? "[F] Open " + (stores.hostile() ? "enemy" : "restricted")
                         + " stores (taking supplies has consequences)"
                         : crate ? "[F] Open crate"
@@ -319,8 +328,10 @@ final class InteractPromptBuilder {
         }
         if (game.targetHit.type().requiresTool
                 && !holdingTool(game.targetHit.type().preferredTool)) {
-            game.interactPrompt = "Requires "
-                    + game.targetHit.type().preferredTool.name().toLowerCase();
+            // The tool in the words the pack shows: a city's pry tool (urban 21); never an enum name.
+            String tool = com.veylon.item.ItemNames.toolNoun(game.targetHit.type().preferredTool, world.isUrban());
+            game.interactPrompt = world.isUrban() ? "Needs a " + tool + " in hand to break" : "Requires " + tool;
+            genericToolHint = true;
             return true;
         }
         return false;

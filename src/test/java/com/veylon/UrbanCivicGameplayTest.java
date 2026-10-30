@@ -48,7 +48,7 @@ class UrbanCivicGameplayTest {
         assertSame(BlockType.WOOD_DOOR, block(g, door.position()));
         stand(g, outside(door));
         aim(g, door.position());
-        assertTrue(prompt(g).startsWith("Locked. Force it open (loud)"), prompt(g));
+        assertTrue(prompt(g).startsWith("Locked. Hold [LMB] to force it (loud)"), prompt(g));
         g.interactions.interact();
         assertSame(BlockType.WOOD_DOOR, block(g, door.position()), "F on the dispensary lock fails");
         assertEquals(1, g.noise.countCategory("door-rattle"));
@@ -85,7 +85,7 @@ class UrbanCivicGameplayTest {
         Fixture door = securedDoor(post);
         stand(g, outside(door));
         aim(g, door.position());
-        assertTrue(prompt(g).startsWith("Locked. Force it open with a pickaxe"), prompt(g));
+        assertTrue(prompt(g).startsWith("Locked. A pry tool forces it: hold [LMB]"), prompt(g));
         assertFalse(g.completePlayerBlockBreak(door.position()), "bare hands cannot force a metal lock");
         g.player.inventory.set(g.player.hotbarSel, new ItemStack(ItemType.IRON_PICKAXE, 1));
         assertTrue(g.completePlayerBlockBreak(door.position()));
@@ -131,7 +131,7 @@ class UrbanCivicGameplayTest {
         assertTrue(rear.locked());
         stand(g, rear.target());
         aim(g, rear.position());
-        assertTrue(prompt(g).startsWith("Locked. Force it open (loud) or find another way in"), prompt(g));
+        assertTrue(prompt(g).startsWith("Locked. Hold [LMB] to force it (loud), or go around"), prompt(g));
         stand(g, front.target());
         aim(g, front.position());
         g.interactions.interact();

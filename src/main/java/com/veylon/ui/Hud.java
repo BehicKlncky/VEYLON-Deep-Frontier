@@ -289,7 +289,7 @@ public class Hud {
         }
         ItemStack held = g.player.selected();
         if (held != null) {
-            String label = held.type.displayName;
+            String label = com.veylon.item.ItemNames.of(held.type, g.world.isUrban());
             if (held.type.hasDurability()) label += " / " + (int) held.durability + "/"
                     + (int) held.type.maxDurability + " condition";
             else if (held.type.spoils()) label += " / " + (int) (held.freshnessFrac() * 100) + "% fresh";

@@ -140,7 +140,7 @@ public class InventoryScreen {
             detail = g.player.equipment[hoverEquip];
         }
         if (detail != null) {
-            ui.textCentered(w / 2f, y0 + gh + 48, 1.5f, detail.type.displayName, 1f, 1f, 0.85f, 1f);
+            ui.textCentered(w / 2f, y0 + gh + 48, 1.5f, com.veylon.item.ItemNames.of(detail.type, g.world.isUrban()), 1f, 1f, 0.85f, 1f);
             ui.textCentered(w / 2f, y0 + gh + 66, 1.2f, ItemDetails.line(detail), 0.75f, 0.8f, 0.85f, 1f);
         }
 

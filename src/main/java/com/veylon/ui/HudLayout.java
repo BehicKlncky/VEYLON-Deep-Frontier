@@ -17,7 +17,8 @@ public final class HudLayout {
     public static final float HELD_HEIGHT = 28, WEAPON_HEIGHT = 64, WEAPON_METER_X = 172;
     public static final float CONTEXT_HEIGHT = 120, MISSION_WIDTH = 420, MISSION_HEIGHT = 152;
     public static final float TARGET_WIDTH = 300, TARGET_HEIGHT = 40, TARGET_OFFSET = 26;
-    public static final float PROMPT_WIDTH = 440, PROMPT_HEIGHT = 36;
+    /** Wide enough for a prompt's cost or next step, narrow enough to clear the 720p side modules. */
+    public static final float PROMPT_WIDTH = 580, PROMPT_HEIGHT = 36;
 
     public record Rect(float x, float y, float width, float height) {
         public float right() { return x + width; }

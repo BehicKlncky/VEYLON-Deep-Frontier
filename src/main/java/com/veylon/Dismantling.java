@@ -222,7 +222,9 @@ final class Dismantling {
         SalvageTable.Entry e = SalvageTable.entry(game.world, pos, t);
         if (e == null || game.player.abilities.instantBuild()) { return null; }
         if (!applies(pos, t)) {
-            return CROUCH_HINT;
+            // A closed door only comes down open: crouching at it would be refused, so it is no hint (urban 21).
+            com.veylon.world.Fixtures.Kind kind = com.veylon.world.Fixtures.kindOf(t);
+            return kind != null && kind.door && !com.veylon.world.Fixtures.isOpen(t) ? null : CROUCH_HINT;
         }
         String refusal = SalvageTable.refusal(game.world, pos, t, toolOf(game.player.selected()));
         if (refusal != null) { return refusal; }
