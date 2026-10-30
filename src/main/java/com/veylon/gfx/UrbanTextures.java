@@ -1130,7 +1130,12 @@ final class UrbanTextures {
                 if ((x / 3 + line) % 5 != 0) { p.set(x, y, 0x6f6a60); }
             }
         }
-        p.fillFbmBlend(0x9a8a66, 0.7f, 6, 2403, 0.35f); // water stain
+        for (int y = 0; y < n; y++) { // a water stain, on the paper only: the rest stays see-through
+            for (int x = 0; x < n; x++) {
+                float f = p.fbm(x, y, 6, 2403);
+                if (f > 0.7f) { p.mulAt(x, y, 1f - 0.3f * Math.min(1f, (f - 0.7f) / 0.3f)); }
+            }
+        }
     }
 
     /** An official notice: pale paper with a black heading bar, columns of small type and a red stamp. */

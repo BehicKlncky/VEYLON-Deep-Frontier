@@ -138,6 +138,19 @@ class UrbanDressingTest {
             for (int px : a) { if ((px >>> 24) > 127) { opaque++; } }
             assertTrue(opaque > a.length / 50 && opaque < a.length * 0.8, decal + " is a cutout over its wall: " + opaque);
         }
+        // Paper and frames are pinned up inside their tile: a clear border all round stays
+        // see-through, so nothing but the sheet itself ever shows on the wall.
+        int n = MaterialRegistry.TILE_SIZE, border = 4;
+        for (String tile : new String[]{"decal_poster", "decal_notice", "decal_photo", "decal_drawing"}) {
+            int[] a = ProceduralTextures.generate(tile, 0, n);
+            for (int y = 0; y < n; y++) {
+                for (int x = 0; x < n; x++) {
+                    if (x < border || y < border || x >= n - border || y >= n - border) {
+                        assertEquals(0, a[y * n + x] >>> 24, tile + " pixel " + x + "," + y + " is see-through");
+                    }
+                }
+            }
+        }
         MaterialRegistry.Census census = MaterialRegistry.census();
         assertTrue(census.errors().isEmpty(), census.errors().toString());
         assertTrue(census.layers() <= MaterialRegistry.MAX_LAYERS, census.layers() + " layers");
