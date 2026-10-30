@@ -22,6 +22,7 @@ is original project DSP. No recordings, sound fonts or decoding libraries.
 | Threat | Reports, impacts and warning calls lead; the music response remains below those cues |
 | First night | A brief vulnerable phrase, once per world session when the first night is encountered |
 | Repaired beacon | A restrained consonant signal phrase responds to proximity; the audible beacon retains its own identity |
+| Abandoned city | Rooms, halls, cellars and tunnels each ring as what they are; far-off metal, shutters, glass and water by district; the tells of what lives there (see the last section) |
 
 This table records intent, not listening approval. Each implemented phase and
 its available evidence is recorded in [AUDIO_UPGRADE_PLAN.md](AUDIO_UPGRADE_PLAN.md).
@@ -82,6 +83,10 @@ HF decay ratio, density and diffusion; all except seconds are linear factors.
 | Deep cave | 3.80 | 0.40 | 0.50 | 0.55 | 1.00 | 1.00 |
 | Shelter | 0.65 | 0.22 | 0.35 | 0.50 | 0.60 | 0.70 |
 | Large stone structure | 2.60 | 0.35 | 0.70 | 0.80 | 1.00 | 1.00 |
+| City room (urban 22) | 0.45 | 0.20 | 0.55 | 0.60 | 0.55 | 0.70 |
+| City hall (urban 22) | 1.40 | 0.28 | 0.65 | 0.70 | 0.85 | 0.90 |
+| City basement (urban 22) | 1.05 | 0.30 | 0.45 | 0.55 | 0.90 | 0.85 |
+| City tunnel (urban 22) | 2.30 | 0.34 | 0.55 | 0.65 | 1.00 | 0.75 |
 
 `ReverbPresets` is executable authority. Depth above five blocks selects shallow
 underground, at least eighteen selects deep cave; depth takes precedence over
@@ -124,3 +129,119 @@ Six original motifs use additive sine partials around D3 (146.832 Hz), a quiet o
 Scene precedence is nearby threat/combat, repaired beacon within 36 blocks, depth at least 18 blocks, first night, later nights, then calm. Threat observation checks at most 64 creatures and 64 NPCs per medium tick, ignores dead/abstract travelers, uses a 24-block proximity radius and 48 blocks for current player combat targets, and never plans a settlement or generates a chunk. First-night ownership is session-local and resets on load; it is not a new save field. No playback or synthesis thread is added.
 
 Six music buffers add 6,350,400 PCM bytes. The final catalog has 122 buffers / 40,824,424 PCM bytes; complete warmed synthesis/conditioning/encoding measured 494.648 ms at W11. The pure director benchmark measured 0.000004 ms/update versus 0.02 ms. The 10,000-second deterministic schedule stays over 90% silent. These establish resource and timing behavior, not listener approval of the composition.
+
+## The abandoned city (urban milestone 22)
+
+A generated city should sound abandoned, not empty. Wind finds loose metal, a
+shutter slaps, glass lets go somewhere, water slops against a wall, a floor
+settles overhead; closer, the city says what lives in it and where. Every sound
+here is original project DSP. `CitySounds` synthesizes them last, from its own
+seed, so no earlier buffer changes a sample.
+
+### Rooms, cellars, halls and tunnels
+
+Every interior of a generated city used to take the 2.6-second stone-structure
+reverb. The four city zones at the end of the reverb table above (zones are never
+saved) apply as follows:
+
+| Zone | Where |
+| --- | --- |
+| City room | A furnished room or corridor indoors above the street |
+| City hall | A room of 48 cells or more (a shop floor, warehouse, office or stair hall), a station concourse |
+| City basement | Anything indoors below the street datum, hidden cellars included |
+| City tunnel | A transit tunnel or a service passage |
+
+`AudioSceneState.urbanZone` decides from what the medium tick already observes:
+the place underfoot, sky exposure, the shelter evaluation, depth below the street
+datum and the one building plan around the listener. The street and the roofs
+are open; a covered porch is a shelter. Worlds that are not generated cities keep
+their classification.
+
+### Weather and insects by where the listener stands
+
+How much of the weather outside reaches a city listener: all of it in the street,
+0.6 under a porch, 0.16 deep in a room rising to 0.55 beside its window (from the
+sky light at the ear: 0.12 deep inside, up to 0.72 at a pane), 0.06 in a cellar
+and 0.03 in a tunnel. Rain and wind scale by it, from one bounded sky-light read
+per medium tick. A cellar has its own low room tone on the cave channel (0.45)
+with its drips. Night insects keep to the overgrown housing and the flooded
+quarter (and to cities planned before districts) and are heard indoors only as
+much as the weather is; there are none in a cellar.
+
+### The city's own sounds
+
+`CitySoundscape`, owned by `AmbienceSystem`, runs on the emitter pass (every
+0.12 s) in a generated city:
+
+- **Far off**, every 6 to 15 seconds and sooner in wind, a sound of the district
+  underfoot, 26 to 46 blocks away in a random direction between the street and
+  the third storey: shutters in the housing, glass downtown, metal grinding in the
+  yards and along the cordon, flood water lapping in the flooded quarter, a little
+  falling masonry everywhere. Not in cellars or tunnels. Walls muffle it through
+  the occlusion filter like any positioned sound.
+- **Indoors**, every 10 to 22 seconds, a floor settling overhead or a pipe
+  knocking, 2 to 5 blocks away; below the street, pipes every 9 to 18 seconds.
+- **What lives here**: a Veilbound that has not noticed anyone breathes every 5 to
+  10 seconds where it stands (within 22 blocks), and falls silent into its own
+  notice and strike cues once it hunts; a Veilmaw folded in its growth throbs
+  every 4 to 7 seconds (within 24); a person turning on the survivor barks once
+  where they stand (within 40), and again only after 12 seconds of not hunting;
+  a fed work lamp hums within 6 blocks.
+
+Distant and indoor sounds use the ambience bus at background priority and never
+take a voice from a fight; the breath and throb are ordinary effects, the bark an
+important one. Per pass at most 64 people and 64 creatures are examined, 8 of
+each kind of tell followed for its timer, and 2 sounds started.
+
+### Presentation never becomes simulation
+
+The soundscape draws only its own presentation generator, seeded from the world
+seed with its own salt and reset with the world. It reads entity state and never
+a simulation generator, and it never emits `WorldNoise`: no sound of the city can
+draw a threat or change a roll. `CitySoundscapeTest` runs two sessions of the same
+city whose soundscapes draw different streams: they play different sounds at
+different times, and their simulations, including the noise the AI hears, match
+frame by frame.
+
+### Footsteps
+
+Every wilderness block keeps its step. The city's metal (sheet metal, metal
+doors, rails, wrecks, lockers and machines) clanks; rubble, and debris at the
+feet, crunch; the shaped stair flights, which stepped like grass, sound like
+concrete. Two new banks hold four takes each. A step is as loud as what the AI
+hears of it: crouched 0.45 of a walk, sprinting 1.45.
+
+### What the survivor hears and what the AI hears
+
+The two are not one physical model, but they follow the same rules: louder
+actions carry farther for both, and walls and closed doors cost both.
+
+| Action | The survivor hears | The AI hears (`WorldNoise` radius, weight) |
+| --- | --- | --- |
+| A crouched step | A faint step (gain 0.16) | Nothing |
+| A walking step | A step (0.35) | 10 blocks, 0.15 |
+| A sprinting step | A loud step (0.51) | 22 blocks, 0.38 |
+| Searching a container | Rummaging at the container | 12 blocks, 0.3 |
+| Opening a wooden door / a metal door / a window | Creak and latch / clank / slide, positioned | 8 / 12 / 5 blocks, 0.15 / 0.25 / 0.08 |
+| Trying a locked handle | A rattle | 10 blocks, 0.25 |
+| Forcing a door / breaking glass | A crack / shattering, heard far off | 36 / 28 blocks, 0.7 / 0.6 |
+| A generator starting / running | Pull cords and chug (3 to 40 blocks) | 34 / 28 blocks, 0.6 / 0.5 |
+| A Breacher's blow on a door | A heavy thud | 16 blocks, 0.6 |
+| A gunshot | A report heard far off (14 to 220 blocks) | The weapon's radius (musket 90, flintlock 70) |
+| The city's own sounds | Everything in the soundscape | Nothing |
+
+Through walls the AI loses 8 blocks of range for each solid cell on the direct
+path, 6 for a closed door, 4 for glass and nothing for an open door; non-player
+sounds weaker than 0.6 reach no AI listener. The survivor hears the same walls as
+a muffling of the direct path: three solid samples muffle a sound fully, to 45%
+gain and 8% treble, when the device has EFX.
+
+### Dry fallback and budgets
+
+Without EFX (or with `VEYLON_NO_EFX=1` for device QA) there is no reverb and no
+occlusion filter: zones are ignored and every city sound plays dry with OpenAL's
+distance attenuation. The catalogue now holds 167 buffers and 43,443,964 PCM
+bytes; the city added 19 buffers (8 footstep takes, 11 cues) and 1,118,376 bytes.
+Signal tests prove waveform properties and policy only. Whether the city sounds
+right on speakers and headphones, with and without EFX, is the listening pass of
+the consolidated human playtest that D-80 schedules after package 22.
