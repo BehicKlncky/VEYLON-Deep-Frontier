@@ -6,11 +6,11 @@ This is the running record for the 26-package urban-survival roadmap. The pack i
 
 | Item | Value |
 | --- | --- |
-| Last completed package | **21 — Map, HUD and onboarding** (2026-10-30): in a generator-19 city, M opens a city map of the streets around the survivor with the buildings they entered named, home, the sites they found, every objective (rumours as rough areas), a journal read from the saved ledger and a sketch of the storey underfoot; the HUD names the district and the building and floor; container and lock lines say what a press does and costs; NEW FRONTIER, the pause menu and the first session speak of the city. Secrets stay secret: the map knows only what the survivor walked, entered (`urban.visits` v1, new and optional) or found, and two mission markers became rumours until confirmed. The native tour passed at 720p and 1080p, scale 0.75 to 1.5, by day, night and in fog, in both modes. Human-only checks are deferred by D-80. |
-| Source revision | 21: `e764168` 20's records → `4ee6b89` visits → `2749358` rumours → `8f0d89b` city map → `d762cdf` interactions → `1df1e21` onboarding text → `dd121c1` onboarding tour; the records follow in their own commit. 20: `ff1edff` 19's gate → `71cf2ca` relay → `6d5a317` communications → `cc874ac` missions → `3888a28` acceptance route → `b8967b8` mission tour; records `e764168`. |
+| Last completed package | **22 — Ruined-city visuals and sound** (2026-10-30): every generated city now wears its district (grades, ivy or the veil's growth, notices, the quarantine's cordon mark, mould, photographs and drawings in flats, a tide line and murky water in the flooded quarter) and its people's marks by their doors; lamp and fire light stops at walls for the renderer and the AI alike; rooms take a little daylight, cellars want a light, rain marks only open sky, contaminated ground and the infected's veil glow faintly, toxic fog looks harmful only where it sickens. Rooms, halls, cellars and tunnels ring as what they are; the weather is heard by where the survivor stands; footsteps clank and crunch as loudly as the AI hears them; the city sounds around the survivor without any AI hearing it. Before and after natives in both modes and on the dry audio route. The manual listening pass is the human playtest D-80 schedules now. |
+| Source revision | 22: `728c47b` 21's records → `6903ac8` atmosphere tour → `99a8f24` walls stop light → `2877256` toxic fog's look → `9b48d0b` acoustic zones → `ea0e6a2` sound bank and footsteps → `eabf5cc` soundscape → `a97d86d` tells in the dark → `d7a3a0a` city shading → `8d0dcbf` district dressing → `6a13d71` door marks → `a90ca1c` guards' bark → `96d7c4a` fainter veil → `bfe6e5c` poster stain → `4f6299e` art direction → `21cbb0d` audio direction; the records follow in their own commit. 21: `e764168` 20's records → `4ee6b89` visits → `2749358` rumours → `8f0d89b` city map → `d762cdf` interactions → `1df1e21` onboarding text → `dd121c1` onboarding tour; records `728c47b`. |
 | Default new world | Legacy (`World.DEFAULT_NEW_WORLD_GENERATOR = GEN_CAVE_IDENTITIES`), unchanged until 26 passes. Isolated `VEYLON_GENERATOR=urban-dev` creates generator 19 (`GEN_URBAN_MISSIONS`, layout 16 / template 7 / content 3, encounter catalogue 5). Generators 1–18 stay loadable with their original geometry and encounters. |
-| Next package | **22 — Ruined-city visuals and sound, NOT STARTED.** Keep `UrbanSliceRouteTest` (generators 10–19), `UrbanCatalogueQaSceneTest`, `UrbanDistrictQaSceneTest`, `UrbanUndergroundQaSceneTest`, `UrbanEcologyQaSceneTest`, `UrbanSurvivorQaSceneTest`, `UrbanStrongholdQaSceneTest`, `UrbanRefugeQaSceneTest`, `UrbanUtilityQaSceneTest`, `UrbanMissionRouteTest`, `UrbanMissionQaSceneTest`, `UrbanOnboardingQaSceneTest`, `ui.CityMapTest` and `UrbanInteractionPromptsTest` as regression gates. Owner question P-15 (the inverted day/night temperature curve) is open. The consolidated human playtest (D-80) follows 22. |
-| Human testing schedule | Owner instruction (2026-10-11, D-80): consolidated human playtesting/listening after milestone 22. Through 22, run automated and scripted native validation and record human-only checks as deferred; do not request interim human walks. |
+| Next package | **The consolidated human playtest and listening pass (D-80), then 23 — Survival economy and extended play, NOT STARTED.** Keep `UrbanSliceRouteTest` (generators 10–19), `UrbanCatalogueQaSceneTest`, `UrbanDistrictQaSceneTest`, `UrbanUndergroundQaSceneTest`, `UrbanEcologyQaSceneTest`, `UrbanSurvivorQaSceneTest`, `UrbanStrongholdQaSceneTest`, `UrbanRefugeQaSceneTest`, `UrbanUtilityQaSceneTest`, `UrbanMissionRouteTest`, `UrbanMissionQaSceneTest`, `UrbanOnboardingQaSceneTest`, `ui.CityMapTest`, `UrbanInteractionPromptsTest`, `UrbanAtmosphereQaSceneTest`, `UrbanAcousticsTest`, `CitySoundscapeTest`, `world.urban.UrbanDressingTest` and `UrbanTracesTest` as regression gates. Owner question P-15 (the inverted day/night temperature curve) is open. |
+| Human testing schedule | Owner instruction (2026-10-11, D-80): consolidated human playtesting/listening after milestone 22. Package 22 is complete, so it is due now: a human walk of the slice and the city, and the listening pass package 22 asks for (positional and indoor cues, with an EFX device and with `VEYLON_NO_EFX=1`). Until it runs, every human-only gate from 09 to 22 stays pending. |
 | Commits | Separate `feat`, `test`, `docs` and `chore` commits on `feature/urban-survival`; see the reconstruction ledger below. `main` stays at `923345f`. Original combined commit retained at `backup/urban-m01-m04-before-split`. No merge, push, tag or publication. |
 
 ## Package ledger
@@ -40,7 +40,7 @@ The status vocabulary is NOT STARTED, IN PROGRESS, PARTIAL, BLOCKED or COMPLETE.
 | 19 | Water, power and refuge utilities | 18 | `world/urban/UrbanUtilities` (taps, devices, circuits), `UtilitySystem` (owned by `RefugeSystem`, one medium-tick line in `Game`), `urban.utilities` v1; `World.emitterOn` and `Chunk` light lists for lamps; `SalvageTable` (fuel tanks, devices); `UtilitySounds` | One water utility and one power source and consumer run from urban supplies, conserve resources, persist, follow the pause and dormancy policy and respect Creative. | **COMPLETE** (2026-10-29; human-only validation deferred by D-80) |
 | 20 | Urban missions and long-term purpose | 19, 16–17, 02 | `world/urban/{RelaySites,CommsComponents,UrbanMissions}`, `settlement/{UrbanComms,UrbanMissionBoard}`, `CommsObjective` (owned by `RefugeSystem`), `urban.missions` v1, a fourth `UrbanUtilities` device kind, hooks in the storage, aid, guide and purifier paths, `NpcScreen`, `Hud`, `QuestObjectiveView` and the victory flow | An integration route advances C1–C5 without trees or ore. A hidden-refuge mission and a guarded-access mission. Failure alternatives. Rewards exactly once. The legacy beacon is intact. | **COMPLETE** (2026-10-30; human-only validation deferred by D-80) |
 | 21 | Map, HUD and onboarding | 20 | `world/urban/UrbanVisits` and `urban.visits` v1; `ui/{CityMap,CityMapView,FloorSketch}` behind `ui/MapScreen`; `ui/{Hud,HudLayout,QuestObjectiveView,CrateScreen,NpcScreen,NewFrontierScreen,PauseMenu}`; `item/ItemNames`; `InteractPromptBuilder`, `CrateTransactionSystem`, `FixtureActions`, `WorldBootstrap`; `settlement/UrbanMissionBoard` targets | A new player finds supplies, floors, the refuge and the next step through ordinary UI. Secrets stay secret. `docs/graphics/HUD_VALIDATION.md` captures. | **COMPLETE** (2026-10-30; human-only validation deferred by D-80) |
-| 22 | Ruined-city visuals and sound | 21 | Materials, lighting (D-19), `AmbienceSystem`, `AudioSceneState`, `engine/ReverbPresets`, `engine/AudioManager` | Districts, sites and threats are recognisable in day, night and fog. Props, lights and audio stay bounded. Dry fallback works. A manual listening pass. | NOT STARTED |
+| 22 | Ruined-city visuals and sound | 21 | Materials, lighting (D-19), `AmbienceSystem`, `AudioSceneState`, `engine/ReverbPresets`, `engine/AudioManager` | Districts, sites and threats are recognisable in day, night and fog. Props, lights and audio stay bounded. Dry fallback works. A manual listening pass. | **COMPLETE** (2026-10-30; its human listening pass is due under D-80) |
 | 23 | Survival economy and extended play | 22 | Loot tables, recipes, trade stock, encounter pressure; balance record in DESIGN | One route reaches the objective plus several days without trees or ore. Other seeds have reachability. Conservation holds. Fresh extended play recorded. | NOT STARTED |
 | 24 | Dense-city performance and streaming | 23 | `world/World` retention and eviction or a finite city (D-24); plan caches; queues; `docs/PERFORMANCE_BENCHMARKS.md` | Bounded queues and caches. Measured scenes meet calibrated gates. A long-travel CPU, GPU and save-growth policy with no lost state. | NOT STARTED |
 | 25 | Integrated save and regression audit | 24 | `save/*`, all `urban.*` sections, fixtures | Historical worlds and earlier urban revisions are preserved. An integrated urban fixture survives every order and revisit. Corruption policy and atomic replacement hold. | NOT STARTED |
@@ -3102,6 +3102,196 @@ was performed.
 **Next:** package 22, ruined-city visuals and sound: districts, sites and threats
 recognisable in day, night and fog, bounded props, lights and audio, a working
 dry fallback; after it the consolidated human playtest (D-80).
+
+## Milestone 22 — ruined-city visuals and sound (2026-10-30)
+
+**Status: COMPLETE**, with its human listening pass due in the consolidated
+playtest D-80 schedules after this package. A generated city now looks and
+sounds like its districts and its people. Its surfaces wear their district
+(warm brick and ivy in the housing, grime and notices downtown, soot and rust in
+the yards, a tide line and murky water in the flooded quarter, the cleanest
+precinct, and in the quarantine a sickly wash, the veil's growth on walls and a
+cordon mark of its own); flats keep the odd photograph and child's drawing;
+survivors leave chalk, arrows and warnings by their doors. Lamp and fire light
+stops at walls for the renderer and every AI alike; rooms above the street take
+a little of the day while cellars want a light; rain marks only what the sky
+reaches; contaminated ground and the infected's veil glow faintly in the dark;
+toxic fog looks harmful only where it sickens. Rooms, halls, cellars and tunnels
+each ring as what they are; the weather is heard by where the survivor stands;
+footsteps clank and crunch on the city's materials as loudly as the AI hears
+them; and the city sounds around the survivor (distant metal, shutters, glass
+and water by district, settling floors and pipes, a resting Veilbound's breath,
+a folded Veilmaw's throb, a raider's bark) without any AI hearing it. Decisions
+D-219 to D-231; P-01 carries a package-22 note; P-15 is still open.
+
+### Start state
+
+- Branch `feature/urban-survival` at `728c47b` (the 21 records), clean tree.
+- Read the revised base, the prompt, `AGENTS.md`, `docs/COMMIT_WORKFLOW.md`,
+  these records, `docs/graphics/ART_DIRECTION.md`, `ASSET_PIPELINE.md`,
+  `ASSET_PROVENANCE.md` and `docs/audio/AUDIO_DESIGN.md`.
+
+### Before anything changed
+
+The first commit added the atmosphere tour, so the "before" captures come from
+that exact tree: 24 views in both modes, zero GL and KHR errors
+(`build/qa/m22-before-survival`, `-creative`). Its listener report and the
+captures set this package's targets: every city interior (a kitchen, a stair
+hall, a basement, the hidden cellar) took the same 2.6 s stone-structure reverb;
+night insects played at full level in the hidden cellar; not one positioned
+sound played in the whole tour; the quarantine's streets looked like any clean
+street; a kitchen floor beside its window looked half wet in rain; lamp light
+lit the room behind a wall and the storey under a slab.
+
+### What changed
+
+- **Where it applies (D-219).** Every generated city (generators 7 to 19); door
+  marks from generator 15. Nothing is saved, and no generator, layout, template,
+  content revision, catalogue, block, item, ordinal or section changed.
+- **Light (D-220).** Walls, slabs and closed doors stop lamp and fire light;
+  glass, open leaves and doorways pass it. The renderer and the AI share it.
+- **Toxic fog (D-221).** Drawn harmful only where it sickens.
+- **Acoustics (D-222, D-223).** City room, hall, basement and tunnel zones; the
+  weather's reach by where the listener stands; a cellar's room tone; night
+  insects only in the housing and the flooded quarter, and indoors only as much
+  as the weather.
+- **Sounds (D-224, D-225, D-226).** An original city bank (19 buffers); footsteps
+  on metal and rubble, loud as the AI hears them; the soundscape, presentation
+  only, from its own generator, never `WorldNoise`.
+- **Looks (D-227 to D-230).** The infected's and contaminated ground's glow; dry
+  rooms in rain, a room bounce, murky water; district grades and decals; door
+  marks whose words the interaction line reads.
+- **QA (D-231).** `VEYLON_SCENE=urban_atmosphere`.
+- **Found while building it.** A stronghold's guards and raiders never name the
+  survivor as their combat target, so the first rule for the bark kept them
+  silent; a follow-up commit lets anyone attacking with no infected in sight
+  bark. The native review found the infected's resting glow reading as white by
+  day (a follow-up commit lowers it from 0.18 to 0.07), and jagged black shapes
+  beside every poster, where its water stain was painted past the paper (a
+  follow-up commit keeps the stain on the sheet, and a test now requires a clear
+  border round every pinned-up decal).
+
+### Changed paths
+
+**Production** (`src/main/java/com/veylon/`):
+
+- New: `CitySoundscape.java`, `UrbanAtmosphereQaScene.java`,
+  `UrbanAtmosphereTourPlan.java`, `engine/{CitySounds,FootstepSurface}.java`,
+  `world/urban/{UrbanDressing,UrbanTraces}.java`.
+- Edited: `AmbienceSystem.java`, `AudioSceneState.java`, `Game.java` (the
+  footstep call), `InteractPromptBuilder.java`, `QaHarness.java` (one label on an
+  existing line), `UrbanApartmentQaScene.java`, `UrbanQaScenes.java`,
+  `engine/{AudioEnvironment,AudioManager,EfxProcessor,ProceduralAudio,ReverbPresets,Renderer}.java`,
+  `entity/Player.java`, `gfx/{Environment,MaterialRegistry,UrbanTextures}.java`,
+  `gfx/model/Animator.java`, `world/{ChunkMesher,World}.java`,
+  `world/urban/UrbanIndoorQueries.java`; `src/main/resources/assets/shaders/chunk.frag`.
+
+**Tests** (`src/test/java/com/veylon/`):
+
+- New: `UrbanAtmosphereQaSceneTest`, `world/urban/UrbanBlockLightTest`,
+  `UrbanAcousticsTest`, `engine/{CitySoundsTest,FootstepSurfaceTest}`,
+  `CitySoundscapeTest`, `gfx/model/InfectedTellTest`, `gfx/CityEnvironmentTest`,
+  `world/urban/UrbanDressingTest`, `UrbanTracesTest`.
+- Edited (expectations the change requires): `UrbanApartmentQaSceneTest` (the
+  porch torch no longer lights the hall through a closed door; floor() for the
+  camera cell), `UrbanDistrictPresenceTest` (the fog's look),
+  `engine/AudioEnvironmentTest`, `UrbanIndoorEnvironmentTest` and
+  `UrbanUndergroundEnvironmentTest` (the city zones).
+
+**Records and docs:** this file, [DESIGN.md](DESIGN.md) (§12),
+[DECISIONS.md](DECISIONS.md) (D-219 to D-231, §3, P-01),
+[VALIDATION.md](VALIDATION.md#milestone-22--ruined-city-visuals-and-sound-2026-10-30),
+`docs/ARCHITECTURE.md`, `docs/DEVELOPING.md`, `docs/graphics/ART_DIRECTION.md`,
+`docs/graphics/ASSET_PIPELINE.md`, `docs/graphics/ASSET_PROVENANCE.md` and
+`docs/audio/AUDIO_DESIGN.md`.
+
+### Compatibility
+
+- No generator, layout, template, content revision, encounter catalogue, block,
+  item, enum ordinal, icon or save section changed or was added; generators 1 to
+  19 keep their geometry and pins; the default new world stays generator 3.
+- Appended transient enums only: four `AudioEnvironment.Zone` constants, the
+  `CitySounds.Cue`, `FootstepSurface`, `UrbanDressing.Decal` and
+  `UrbanTraces.Kind` values, none of them saved.
+- Behaviour that changes for existing cities, on purpose: AI light readings no
+  longer pass through walls (D-220); the city's acoustics, footsteps and look.
+  Saves of any build load unchanged in both directions; nothing new is written.
+- 13 texture layers (143 of 160), 19 audio buffers (167, 43,443,964 PCM bytes).
+
+### Commands and results
+
+Exact commands and outputs are in
+[VALIDATION.md](VALIDATION.md#milestone-22--ruined-city-visuals-and-sound-2026-10-30).
+In short:
+
+- Every code commit was validated with the full portable build on its exact
+  tree in a detached worktree, with the existing Windows skip: `6903ac8` 2,243
+  tests in 274 classes, `99a8f24` 2,246 in 275, `2877256` 2,247 in 275,
+  `9b48d0b` 2,252 in 276, `ea0e6a2` 2,277 in 278, `eabf5cc` 2,282 in 279,
+  `a97d86d` 2,283 in 280, `d7a3a0a` 2,284 in 281, `8d0dcbf` 2,290 in 282,
+  `6a13d71` 2,294 in 283, and `a90ca1c`, `96d7c4a` and `bfe6e5c` 2,295 in 283.
+  Up to four trees were built in parallel, each assembled from the one before
+  it and compared with the main index. Two runs (at `6903ac8` and `eabf5cc`)
+  failed only to delete a JUnit temp directory on Windows; each class passed on
+  rerun and `build -x test` passed on the same tree.
+- The two docs commits and these records: relative links and anchors checked,
+  `git diff --check` clean.
+- Native runs at 1280 × 720 before (`6903ac8`, 24 captures in each mode) and on
+  the final code: the atmosphere tour in Survival and Creative with EFX and in
+  Survival on the dry route (`VEYLON_NO_EFX=1`), 25 captures each with zero GL
+  and KHR errors and no native audio error (`build/qa/m22-final-survival`,
+  `-creative`, `-dry`); the package-09 apartment scene with its Veilbound
+  (`build/qa/m22-final-infected`).
+- `graphify update . --no-cluster` on the final code: 11,670 nodes and 48,522
+  edges, with extractor warnings for `build.gradle` and `settings.gradle`.
+- No reviewer subagents ran.
+
+The commits:
+
+| Commit | Subject |
+| --- | --- |
+| `6903ac8` | `feat(qa): tour the city's look and sound for before-and-after captures` |
+| `99a8f24` | `feat(render): keep lamp and fire light inside the room it shines in` |
+| `2877256` | `fix(render): draw the toxic fog as harmful only where it sickens` |
+| `9b48d0b` | `feat(audio): ring a city's rooms, cellars, halls and tunnels as what they are` |
+| `ea0e6a2` | `feat(audio): give the city its own sounds and metal and rubble footsteps` |
+| `eabf5cc` | `feat(audio): let the city sound around the survivor without being heard by it` |
+| `a97d86d` | `feat(render): let infected and contaminated ground show in the dark` |
+| `d7a3a0a` | `feat(render): keep city rooms dry in rain, give them daylight and still the water` |
+| `8d0dcbf` | `feat(render): dress the city's walls by district, from ivy to the cordon mark` |
+| `6a13d71` | `feat(urban): leave chalk, arrows and warnings by the doors of the city's people` |
+| `a90ca1c` | `fix(audio): let stronghold guards and raiders bark as they go for the survivor` |
+| `96d7c4a` | `fix(render): make the infected's resting glow faint by day as well as by night` |
+| `bfe6e5c` | `fix(render): keep a poster's water stain on its paper` |
+| `4f6299e` | `docs(graphics): set the abandoned city's art direction` |
+| `21cbb0d` | `docs(audio): describe the city's sound and what the AI hears of it` |
+
+These records follow in their own commit. No push, merge, tag or publication
+was performed.
+
+### Limitations and next concrete step
+
+- **Human checks (D-80).** Whether the districts read as themselves, whether the
+  city sounds right on speakers and headphones, with EFX and on the dry route,
+  and whether positional cues are useful were checked by script, tests, logs and
+  captures, never by a person. The manual listening pass this package asks for is
+  part of the consolidated human playtest D-80 schedules now, after 22.
+- **What a capture cannot show.** The infected's glow was captured indoors by day
+  only; its night look is covered by a model test, not a native capture. The
+  soundscape's tells (breath, throb, bark) were exercised by tests; no native tour
+  stood near a resting infected or a folded Veilmaw.
+- **Light cost.** A light's ray costs about 0.3 µs per cell evaluated on the
+  densest generated chunk here (one light within reach); a heavily lit refuge can
+  trace one ray per light per cell. Package 24 measures it under load.
+- **Dressing is decoration.** Decals sit on walls only (never floors, ceilings or
+  furniture), 384 per chunk at most; the door marks are one per site.
+- **Older cities.** Generators 7 to 14 wear residential dressing where they have
+  no districts and carry no door marks.
+- **Day/night temperature (P-15).** Still inverted in every world; unchanged.
+- **Default.** The ordinary new world stays generator 3 until 26.
+
+**Next:** the consolidated human playtest and listening pass (D-80), then
+package 23, survival economy and extended play.
 
 ## Resume rules
 

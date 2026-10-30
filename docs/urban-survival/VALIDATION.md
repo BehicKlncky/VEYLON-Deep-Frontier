@@ -3485,3 +3485,158 @@ use `VEYLON_FRONTEND` and `VEYLON_SHOT=3` instead of the scene.
 - No reviewer subagents ran.
 
 Next: package 22.
+
+## Milestone 22 — ruined-city visuals and sound (2026-10-30)
+
+### Scope and baseline
+
+- Branch `feature/urban-survival` at `728c47b` (the 21 records), clean tree.
+  Read the revised base, the prompt, `AGENTS.md`, `docs/COMMIT_WORKFLOW.md`,
+  these records, `docs/graphics/ART_DIRECTION.md`, `ASSET_PIPELINE.md`,
+  `ASSET_PROVENANCE.md` and `docs/audio/AUDIO_DESIGN.md`.
+- No generator, layout, template, content revision, encounter catalogue, block,
+  item, icon, enum ordinal or save section was added or changed (D-219). Added:
+  13 texture layers (143 of 160), 19 audio buffers (167 in all, 43,443,964 PCM
+  bytes), four transient acoustic zones. The default new world is unchanged.
+- Host: Windows 11, NVIDIA GeForce RTX 3060 Ti, driver 610.88, OpenGL 3.3.0 with
+  KHR_debug, the repository-local Temurin 25.0.4.1; windowed 1280 × 720 natives
+  from the main checkout with isolated data directories.
+
+### Before: the atmosphere tour at its own commit
+
+`6903ac8` added `VEYLON_SCENE=urban_atmosphere` and nothing else visible, so its
+captures are the "before" set (`build/qa/m22-before-survival`, `-creative`):
+
+```powershell
+$env:VEYLON_GENERATOR='urban-dev'; $env:VEYLON_SEED='20260731'
+$env:VEYLON_GAME_MODE='survival'; $env:VEYLON_SCENE='urban_atmosphere'
+$env:VEYLON_RESOLUTION='1280x720'; $env:VEYLON_CAPTURE_TAG='m22-before-survival'
+Remove-Item Env:VEYLON_SHOT -ErrorAction SilentlyContinue
+.\gradlew.bat run -PveylonDataDir=build/qa/m22-before-survival --console=plain
+```
+
+Both modes printed `[urban-atmosphere] pass=true ... poses=24 captures=24`, every
+capture `glErrors=0 khrErrors=0`, `nativeErrors=0`, and
+`[audio] occlusion peakRays=0/4`: not one positioned sound played in the tour.
+The listener report: every interior (kitchen, upper floor, stair hall, basement,
+hidden cellar) `zone=STONE_STRUCTURE`; `crickets=0.80` in the hidden cellar and
+the kitchen at night; rain 0.27 upstairs against 0.60 in the street. The
+captures: the quarantine's streets like any clean street; the kitchen floor
+beside its window dark and glossy in rain; the stronghold gate, cellar and
+growth as package 21 left them.
+
+### Behaviour evidence and portable builds
+
+Every code commit was validated with the full portable build on its exact tree
+in a detached worktree (`build/m21-check`, `m12-check`, `m13-check`,
+`m14-check`), assembled from the commit before the series plus the series' own
+changes in order; every tree was compared with the main index (`git write-tree`)
+and committed unchanged with `git read-tree`. Up to four builds ran in parallel.
+
+| Commit | Checks on the exact tree | What they prove |
+| --- | --- | --- |
+| `6903ac8` | Full portable build: 2,243 tests in 274 classes, one existing skip; `FixtureStatesSectionTest` failed only to delete its temp directory and passed on rerun; `build -x test` passed (`m22-c1-build.log`, `-rerun.log`, `-rest.log`) | `UrbanAtmosphereQaSceneTest` (3): the tour reaches and reports all its views on the design seed in both modes, staging changes no block, the places are the ones meant; it refuses generator 18 |
+| `99a8f24` | Full portable build: 2,246 tests in 275 classes, one existing skip (`m22-c2-build.log`) | `world.urban.UrbanBlockLightTest` (3): a torch lights its side of a wall and not the other, doorways, open leaves and glass pass light, closed doors stop it, no ray squeezes between blocks meeting at an edge, the wilderness is unchanged; `UrbanApartmentQaSceneTest` with the porch torch no longer lighting the hall |
+| `2877256` | Full portable build: 2,247 tests in 275 classes, one existing skip (`m22-c3-build.log`) | `UrbanDistrictPresenceTest` (5): the toxic fog drawn as a haze downtown, as murk with the vignette in the cordon, as before in the wilderness |
+| `9b48d0b` | Full portable build: 2,252 tests in 276 classes, one existing skip (`m22-c4-build.log`) | `UrbanAcousticsTest` (4): at the tour's real places the street is open, rooms rooms, the stair hall and a station halls, the cellar and basement basements, the track a tunnel; insects outdoors in the housing, faint through a kitchen window, none in the cellar or downtown; rain loudest in the street, softer upstairs, a trace below; the reach ordering. `engine.AudioEnvironmentTest` (5) adds the city zones' ordering; the indoor and underground environment tests expect the new zones |
+| `ea0e6a2` | Full portable build: 2,277 tests in 278 classes, one existing skip (`m22-c5-build.log`) | `engine.CitySoundsTest` (3): the bank comes last from its own seed, every buffer clean and distinct, the hum at its mains pitch, metal ringing above rubble, the throb low; `engine.FootstepSurfaceTest` (3): every wilderness block keeps its step, the city's surfaces, loudness ordered like the AI's hearing |
+| `eabf5cc` | Full portable build: 2,282 tests in 279 classes, one existing skip; `UrbanContainersSectionTest` failed only to delete its temp directory and passed on rerun; `build -x test` passed (`m22-c6-build.log`, `-rerun.log`, `-rest.log`) | `CitySoundscapeTest` (5): district sounds, a resting Veilbound's breath and its silence once hunting, one bark per turn, the per-pass and follower bounds, forgetting a world; two sessions with different presentation streams play differently and simulate identically frame by frame |
+| `a97d86d` | Full portable build: 2,283 tests in 280 classes, one existing skip (`m22-c7-build.log`) | `gfx.model.InfectedTellTest` (1): the veil glows at rest and brightens through the windup for both infected kinds; a person has no veil |
+| `d7a3a0a` | Full portable build: 2,284 tests in 281 classes, one existing skip (`m22-c8-build.log`) | `gfx.CityEnvironmentTest` (1): the city flag and murky water in a city, neither in the wilderness or a city without generated buildings |
+| `8d0dcbf` | Full portable build: 2,290 tests in 282 classes, one existing skip (`m22-c9-build.log`) | `world.urban.UrbanDressingTest` (6): sparse decals in their districts, unbroken rooted ivy, the loose panel's exact parity with plaster, subtle grades, nothing on glass, doors, floors or ceilings, every tile within the layer budget |
+| `6a13d71` | Full portable build: 2,294 tests in 283 classes, one existing skip (`m22-c10-build.log`) | `UrbanTracesTest` (4): every site's mark near the spawn sits on a real wall cell facing the street, each line fits the one-line prompt, a mark is read through normal play, older layouts have none; `UrbanAtmosphereQaSceneTest` reads the door mark's words in both modes |
+| `a90ca1c` | Full portable build: 2,295 tests in 283 classes, one existing skip (`m22-c11-build.log`) | `CitySoundscapeTest` (6) adds a stronghold guard fighting an infected (no bark), going for the survivor (one bark) and standing down |
+| `96d7c4a` | Full portable build: 2,295 tests in 283 classes, one existing skip (`m22-c12-build.log`) | `gfx.model.InfectedTellTest` (1) pins the resting glow at 0.1 or below |
+| `bfe6e5c` | Full portable build: 2,295 tests in 283 classes, one existing skip (`m22-c13-build.log`) | `world.urban.UrbanDressingTest` (6) requires a clear four-pixel border round every pinned-up decal; the old painter fails it at the poster's left edge |
+
+Against the §5 matrix: the always set and row 22's `engine.*` audio and `gfx.*`
+tests ran in every build above; its new evidence is the material census and
+dressing tests, the model test, the zone, mix and soundscape tests and the
+soundscape's reset (`CitySoundscapeTest`); its native evidence is the before and
+after captures below. Its manual listening is the pending human check.
+
+Two JUnit runs (`FixtureStatesSectionTest` at `6903ac8` and
+`UrbanContainersSectionTest` at `eabf5cc`) failed only to delete their
+`@TempDir` on Windows ("Failed to delete temp directory", no assertion failed)
+while four builds and the native runs shared the machine; each class passed on
+rerun in its worktree, and `build -x test` (Javadoc, assemble, check) passed
+there.
+
+The two docs commits (`4f6299e`, `21cbb0d`) and these records changed
+documentation only: relative links and anchors were checked and
+`git diff --check` was clean; no build was needed for them.
+
+### After: the atmosphere tour on the final code
+
+The same command with `m22-final-*` tags, from the final code tree:
+
+| Run | Data directory | Result | Audio |
+| --- | --- | --- | --- |
+| Survival, EFX | `build/qa/m22-final-survival` | `pass=true poses=25 captures=25`, 25 captures `glErrors=0 khrErrors=0`, 143 of 160 layers | 167 buffers, 43,443,964 PCM bytes, 10 zones, no voice steals, occlusion peak 1/4 rays, `nativeErrors=0`; mean update 0.030 ms (one 11.9 ms spike while four builds shared the host) |
+| Creative, EFX | `build/qa/m22-final-creative` | The same | The same, mean update 0.026 ms, peak 2.4 ms |
+| Survival, dry route (`VEYLON_NO_EFX=1`) | `build/qa/m22-final-dry` | The same | `EFX unavailable; dry playback enabled.`, no occlusion filters, cues played (`shutter_bang:2,masonry_fall:1,pipe_knock:1`), `nativeErrors=0` |
+| `urban_infected_apartment`, Survival | `build/qa/m22-final-infected` | `[urban-infected] pass=true`, 6 shots clean | 4/4 occlusion rays at peak, `nativeErrors=0` |
+
+The earlier after-runs from the tree before the glow and poster fixes
+(`build/qa/m22-after-survival`, `-creative`, `-dry`, `m22-infected-apartment`)
+passed the same way and are kept for comparison.
+
+What the 25 views show against the 24 before:
+
+- **Streets (01–06, 15, 20–22, 24).** Residential brick with a mossy foot and
+  ivy columns; commercial grime with posters and notices; industrial soot and
+  rust; the flooded quarter's murky water and tide line; the
+  civic precinct clean. The quarantine checkpoint (06, 21) stands on a boundary
+  avenue whose fence panels face the camera on their unmarked side (a probe found
+  15 cordon marks on the 35 fence panels there); the quarantine reads in its own
+  courtyard (14, 19).
+- **Apartments (07–11, 16, 23).** Rooms take `zone=ROOM` (the stair hall `HALL`,
+  the basement `BASEMENT` with its 0.45 room tone), a little more daylight in the
+  ground-floor rooms at noon, a dry floor beside the window in rain, rain at 0.12
+  upstairs against 0.60 in the street, insects at 0.17 through the kitchen window
+  at night.
+- **Basement civilians (12, 17).** The hidden cellar takes `zone=BASEMENT`, no
+  insects at night, the same people.
+- **Stronghold (13, 18).** The gate as before; the notice beside it shows its
+  paper only.
+- **Quarantine growth (14, 19).** The veil's growth on the courtyard walls,
+  cordon marks, and at night the contaminated ground's blooms and the node glow.
+- **Door mark (25).** The chalk ringed dot beside the refuge building's door, and
+  the line `Chalk by the door: a ringed dot. "Knock twice."`.
+- **City sounds.** Over the tour the soundscape played distant masonry, metal and
+  shutters and a pipe in the cellar (`cityCues=` per view); no tour view stands
+  near a resting infected or a folded Veilmaw.
+
+The dry route (`VEYLON_NO_EFX=1`) logged `EFX unavailable; dry playback enabled.`,
+no occlusion line (no filters exist without EFX), the same 25 captures and the
+city's cues, with `nativeErrors=0`.
+
+The package-09 apartment scene (`VEYLON_SCENE=urban_infected_apartment`, shots
+`0.7,3,4.1,8,14,17`) printed `[urban-infected] pass=true` and showed the
+Veilbound's veil a little paler than its body by day (0.07 at rest after the
+follow-up; 0.18 read almost white in the first after-run).
+
+### Measurements
+
+- **Block light.** Evaluating `World.blockLight` for every cell of the densest
+  generated chunk near the spawn and the stronghold (one light within reach of
+  its 3 × 3 chunks), y 30–69: 10,240 cells in 2.6–3.5 ms after warm-up, about
+  0.3 µs per cell (a throwaway timing test, not kept).
+- **Audio.** The native logs report 167 buffers and 43,443,964 PCM bytes (148 and
+  42,325,588 before); synthesis and upload took 0.72 s before and 0.8 to 1.1 s
+  after on this loaded host; audio update mean about 0.02 ms per frame, no voice
+  steals, no native errors.
+
+### Limits and next gate
+
+- **Human checks (D-80).** No person looked or listened. The prompt's manual
+  positional and indoor listening pass, with normal and dry-fallback devices, is
+  the consolidated human playtest D-80 schedules now; it is pending, not passed.
+  Signal tests prove waveform properties and scheduling policy only.
+- **Not captured natively.** The infected's glow at night, the soundscape's tells
+  (breath, throb, bark) and a lit lamp behind a wall; tests cover them.
+- `graphify update . --no-cluster` on the final code: 11,670 nodes and 48,522
+  edges, with the extractor warnings for `build.gradle` and `settings.gradle`.
+  No reviewer subagents ran.
+
+Next: the consolidated human playtest and listening pass (D-80), then package 23.

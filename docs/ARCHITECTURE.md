@@ -786,6 +786,33 @@ HUD's field panel reads `CityMap.hereLine`; `CrateTransactionSystem.containerPro
 gives the container line the prompt builder shows. The map, storage, conversation and
 inventory screens keep the world running; only the pause menu and its screens pause it.
 
+### The ruined city's look and sound
+
+Urban package 22 adds no system to `Game`; it changes what existing owners derive in
+a generated city (`UrbanWorldState.hasGeneratedBuildings`), and nothing it adds is
+saved. `World.blockLight` traces a bounded ray (`UrbanIndoorQueries.lightReaches`, at
+most 48 cells) for a light that would brighten a cell, so walls, floors and closed
+doors stop lamp and fire light; the mesher and every AI light read share it.
+`ChunkMesher` grades city surfaces by district and lays at most 384 wall decals per
+chunk, as thin quads with the face's own light, from the pure rules of
+`world.urban.UrbanDressing` and the site-plan marks of `world.urban.UrbanTraces`;
+`InteractPromptBuilder` reads a mark's words. `Environment.city` tells the terrain
+shader to wet and frost only open sky and to bounce a little daylight into rooms, and
+makes city water murky. `Player.toxicFogHarmfulHere` decides both the toxic-fog roll
+and whether the screen draws the fog as harmful.
+
+`AudioSceneState.urbanZone` classifies a city listener into the appended room, hall,
+basement and tunnel zones, and `weatherReach` scales rain and wind by where they
+stand. `AmbienceSystem` owns `CitySoundscape`, which runs on the emitter pass with
+its own presentation generator (reseeded with the world) and plays
+`engine.CitySounds` through `AudioManager.playCity`: distant and indoor scenery by
+district, and the tells of resting infected, folded Veilmaws, people turning hostile
+and fed lamps. It examines at most 64 people and 64 creatures, follows 8 of each kind
+of tell and starts 2 sounds per pass, and never emits `WorldNoise`. Footsteps go
+through `engine.FootstepSurface`, whose loudness follows what the AI hears of a step.
+`VEYLON_SCENE=urban_atmosphere` holds the camera at fixed places for before-and-after
+captures and prints what a listener there is given.
+
 ### Doors, windows and urban fixtures
 
 Urban package 04 appended 21 block ids (`ASPHALT` … `DEBRIS`): restrained urban
