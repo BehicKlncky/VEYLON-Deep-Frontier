@@ -189,7 +189,8 @@ final class UrbanSiteRelations {
         }
         frighten(s, -10f);
         trust(g, s, gain, null);
-        g.log(s.refuge() ? "They take the supplies with shaking hands." : "The camp takes in your supplies.");
+        g.log(s.refuge() ? "They take the supplies with shaking hands."
+                : s.stronghold() ? "The Wardens take in your supplies." : "The camp takes in your supplies.");
         return gain;
     }
 

@@ -18,6 +18,7 @@ import com.veylon.world.urban.DistrictPlan;
 import com.veylon.world.urban.ParcelPlan;
 import com.veylon.world.urban.RelaySites;
 import com.veylon.world.urban.StreetNetwork;
+import com.veylon.world.urban.SuperblockPlan;
 import com.veylon.world.urban.SurvivorSites;
 import com.veylon.world.urban.UrbanContainers;
 import com.veylon.world.urban.UrbanIds;
@@ -574,47 +575,80 @@ public final class UrbanMissionBoard {
 
     /**
      * Where the first mission in hand points: its givers once it is ready, otherwise what it names
-     * (the clinic, the building the hidden people are under, the camp, the relay's district or roof,
-     * the stronghold). Null with no mission in hand.
+     * (the clinic, the people below, the camp, the relay, the stronghold). Null with no mission in hand.
      */
     public static UrbanComms.Target target(Game g) {
         if (!applies(g.world)) { return null; }
         for (Mission m : ledger(g).missions()) {
-            if (!m.active()) { continue; }
-            Vec3i at;
-            if (m.status == Status.READY) {
-                UrbanSite giver = UrbanSiteDirector.registered(g.world, m.giver);
-                at = giver == null ? null : giver.homeAnchor(g.world.urban);
-            } else {
-                at = switch (m.kind) {
-                    case CLINIC_SUPPLIES -> {
-                        BuildingPlan b = g.world.urban.buildingById(m.target);
-                        yield b == null ? null : centre(b);
-                    }
-                    case HIDDEN_AID -> {
-                        SurvivorSites.Site r = SurvivorSites.resolve(g.world.urban, m.target);
-                        yield r == null ? null : r.anchor();
-                    }
-                    case CAMP_UTILITY, STRONGHOLD_COMPONENT -> {
-                        UrbanSite giver = UrbanSiteDirector.registered(g.world, m.giver);
-                        yield giver == null ? null : giver.plan.anchor();
-                    }
-                    case LANDMARK -> {
-                        RelaySites.Site relay = g.world.urban.relay();
-                        yield relay == null ? null : new Vec3i(relay.rx() * StreetNetwork.REGION_SIZE + StreetNetwork.REGION_SIZE / 2,
-                                relay.relay().y(), relay.rz() * StreetNetwork.REGION_SIZE + StreetNetwork.REGION_SIZE / 2);
-                    }
-                };
-            }
-            if (at != null) { return new UrbanComms.Target(m.id(), at, true, m.kind.title); }
+            UrbanComms.Target t = target(g, m);
+            if (t != null) { return t; }
         }
         return null;
+    }
+
+    /**
+     * Where one mission in hand points, or null for a mission no longer in hand or whose place is
+     * gone. What the survivor was told is a rumour until they confirm it (urban milestone 21): the
+     * hidden people are marked by the middle of their city block until their cellar is found, and
+     * the old relay by its district until the survivor has stood beside it. Everything else, and a
+     * ready mission's givers, is a place the survivor knows exactly.
+     */
+    public static UrbanComms.Target target(Game g, Mission m) {
+        if (!applies(g.world) || !m.active()) { return null; }
+        Vec3i at;
+        boolean exact = true;
+        if (m.status == Status.READY) {
+            UrbanSite giver = UrbanSiteDirector.registered(g.world, m.giver);
+            at = giver == null ? null : giver.homeAnchor(g.world.urban);
+        } else {
+            switch (m.kind) {
+                case CLINIC_SUPPLIES -> {
+                    BuildingPlan b = g.world.urban.buildingById(m.target);
+                    at = b == null ? null : centre(b);
+                }
+                case HIDDEN_AID -> {
+                    SurvivorSites.Site r = SurvivorSites.resolve(g.world.urban, m.target);
+                    exact = r != null && g.world.urban.discovery.discovered(r.room());
+                    BuildingPlan b = r == null ? null : g.world.urban.buildingById(r.id());
+                    at = r == null ? null : exact || b == null ? r.anchor() : blockCentre(g, b);
+                }
+                case CAMP_UTILITY, STRONGHOLD_COMPONENT -> {
+                    UrbanSite giver = UrbanSiteDirector.registered(g.world, m.giver);
+                    at = giver == null ? null : giver.plan.anchor();
+                }
+                case LANDMARK -> {
+                    RelaySites.Site relay = g.world.urban.relay();
+                    exact = relay != null && ledger(g).comms.relayFound;
+                    at = relay == null ? null : exact ? relay.relay()
+                            : new Vec3i(relay.rx() * StreetNetwork.REGION_SIZE + StreetNetwork.REGION_SIZE / 2,
+                            relay.relay().y(), relay.rz() * StreetNetwork.REGION_SIZE + StreetNetwork.REGION_SIZE / 2);
+                }
+                default -> at = null;
+            }
+        }
+        return at == null ? null : new UrbanComms.Target(m.id(), at, exact, m.kind.title);
     }
 
     /** The middle of a building's parcel at street level. */
     private static Vec3i centre(BuildingPlan b) {
         ParcelPlan p = b.parcel();
         return new Vec3i((p.x0() + p.x1()) / 2, 41, (p.z0() + p.z1()) / 2);
+    }
+
+    /**
+     * The middle of the city block a building stands in, at street level: near the building, shared
+     * by every building of that block, and never the building itself.
+     */
+    static Vec3i blockCentre(Game g, BuildingPlan b) {
+        ParcelPlan p = b.parcel();
+        long id = b.id();
+        for (SuperblockPlan block : g.world.urban.regionPlan(UrbanIds.regionX(id), UrbanIds.regionZ(id)).superblocks()) {
+            if (block.index() == p.superblock()) {
+                ParcelPlan.Rect r = block.bounds();
+                return new Vec3i((r.x0() + r.x1()) / 2, 41, (r.z0() + r.z1()) / 2);
+            }
+        }
+        return centre(b);
     }
 
     /** "to the north-east", from one cell to another. */

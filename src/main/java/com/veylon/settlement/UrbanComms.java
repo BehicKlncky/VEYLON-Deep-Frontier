@@ -278,6 +278,6 @@ public final class UrbanComms {
         if (c.relayFound) { return new Target(id, r.relay(), true, "Relay mast"); }
         int cx = r.rx() * StreetNetwork.REGION_SIZE + StreetNetwork.REGION_SIZE / 2;
         int cz = r.rz() * StreetNetwork.REGION_SIZE + StreetNetwork.REGION_SIZE / 2;
-        return new Target(id, new Vec3i(cx, r.relay().y(), cz), false, "Rumoured relay");
+        return new Target(id, new Vec3i(cx, r.relay().y(), cz), false, "Old relay mast");
     }
 }
