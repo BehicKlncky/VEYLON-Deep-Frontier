@@ -181,11 +181,19 @@ final class UrbanAtmosphereQaScene extends UrbanRouteScene {
         int fx = (int) Math.floor(game.player.pos.x), fz = (int) Math.floor(game.player.pos.z);
         float depth = game.world.environmentDepth(fx, game.player.pos.y, fz);
         float[] mix = game.ambience.lastMix;
+        StringBuilder cues = new StringBuilder();
+        int[] played = game.ambience.soundscape.played;
+        for (var cue : com.veylon.engine.CitySounds.Cue.values()) {
+            if (played[cue.ordinal()] > 0) {
+                cues.append(cues.isEmpty() ? "" : ",").append(cue.name().toLowerCase(Locale.ROOT)).append(':')
+                        .append(played[cue.ordinal()]);
+            }
+        }
         return String.format(Locale.ROOT, "zone=%s indoor=%b exposed=%b depth=%.1f sky=%.2f block=%.2f"
-                        + " rain=%.2f wind=%.2f fire=%.2f cave=%.2f crickets=%.2f reach=%.2f",
+                        + " rain=%.2f wind=%.2f fire=%.2f cave=%.2f crickets=%.2f reach=%.2f cityCues=%s",
                 AudioSceneState.environment(game, depth), game.player.shelter.indoor(), game.player.exposedToSky,
                 depth, game.world.skyLight(x, y, z), game.world.blockLight(x, y, z),
-                mix[0], mix[1], mix[2], mix[3], mix[4], game.ambience.lastReach);
+                mix[0], mix[1], mix[2], mix[3], mix[4], game.ambience.lastReach, cues.isEmpty() ? "none" : cues);
     }
 
     private final class Report extends Task {

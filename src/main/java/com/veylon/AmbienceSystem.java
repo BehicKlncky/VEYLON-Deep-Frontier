@@ -88,6 +88,8 @@ final class AmbienceSystem {
     final BodyFireEffects bodyFire;
     /** The last ambient mix computed, for QA reports: rain, wind, fire, cave, crickets, beacon. */
     final float[] lastMix = new float[6];
+    /** The generated city's own sounds around the survivor (urban milestone 22). */
+    final CitySoundscape soundscape = new CitySoundscape();
     /** The acoustic zone of the last mix, and how much of the weather outside reached the listener. */
     AudioEnvironment.Zone lastZone = AudioEnvironment.Zone.OPEN;
     float lastReach = 1f;
@@ -107,6 +109,7 @@ final class AmbienceSystem {
         emitterRng.setSeed(seed);
         rainField.reset();
         bodyFire.reset();
+        soundscape.reseed(seed);
         lastZone = AudioEnvironment.Zone.OPEN;
         lastReach = 1f;
         emitterTimer = breathTimer = coughTimer = 0;
@@ -130,6 +133,7 @@ final class AmbienceSystem {
         emitFires(px, py, pz);
         emitLiquidFire(px, py, pz);
         bodyFire.update(EMITTER_INTERVAL, emitterRng);
+        soundscape.update(game, EMITTER_INTERVAL, lastZone, lastMix[1]);
         emitBeacon(px, py, pz);
         emitPlayerEffects();
     }
