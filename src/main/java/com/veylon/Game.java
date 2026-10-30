@@ -667,9 +667,8 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
             footstepTimer -= dt;
             if (footstepTimer <= 0) {
                 footstepTimer = p.crouching ? 0.62f : (p.sprinting ? 0.31f : 0.45f);
-                BlockType under = world.getBlock((int) Math.floor(p.pos.x),
-                        (int) Math.floor(p.pos.y - 0.1f), (int) Math.floor(p.pos.z));
-                audio.playFootstep(under, p.inWater);
+                audio.playFootstep(com.veylon.engine.FootstepSurface.underfoot(world, p.pos.x, p.pos.y, p.pos.z),
+                        p.inWater, com.veylon.engine.FootstepSurface.loudness(p.sprinting, p.crouching));
                 emitPlayerFootstepNoise(p.sprinting, p.crouching);
             }
         }

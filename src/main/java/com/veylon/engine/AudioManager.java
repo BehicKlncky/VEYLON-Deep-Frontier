@@ -75,6 +75,48 @@ public class AudioManager {
         if (enabled) { playAt(utilityBuffers[cue.ordinal()], x, y, z, 0.7f, pitchVar(0.03f), 3f, 40f); }
     }
 
+    // Milestone 22: the city's own sounds and its metal and rubble footsteps (CitySounds).
+    private final int[] cityBuffers = new int[CitySounds.Cue.values().length];
+    private static final CitySounds.Cue[] CITY_CUES = CitySounds.Cue.values();
+    private int bFootMetal, bFootRubble;
+
+    /**
+     * Milestone 22: one of the city's sounds where it happens, {@code gain} before the bus. Distant
+     * sounds and indoor settling belong to the ambience bus and never take a voice from a fight; a
+     * resting Veilbound's breath and a Veilmaw's throb are ordinary effects, a turning raider's bark
+     * an important one. Presentation only: none of them is heard by any AI.
+     */
+    public void playCity(CitySounds.Cue cue, float x, float y, float z, float gain) {
+        if (!enabled) return;
+        float reference = switch (cue) {
+            case METAL_GROAN, SHUTTER_BANG, GLASS_TINKLE, MASONRY_FALL, WATER_LAP -> 10f;
+            case SHOUT -> 6f;
+            case VEIL_PULSE -> 3f;
+            case WOOD_CREAK, PIPE_KNOCK, INFECTED_RASP -> 2f;
+            case LAMP_HUM -> 1f;
+        };
+        float maximum = switch (cue) {
+            case METAL_GROAN, SHUTTER_BANG, GLASS_TINKLE, MASONRY_FALL, WATER_LAP -> 90f;
+            case SHOUT -> 60f;
+            case VEIL_PULSE -> 30f;
+            case INFECTED_RASP -> 26f;
+            case WOOD_CREAK, PIPE_KNOCK -> 18f;
+            case LAMP_HUM -> 8f;
+        };
+        float pitch = cue == CitySounds.Cue.LAMP_HUM ? 1f : pitchVar(cue == CitySounds.Cue.SHOUT ? 0.06f : 0.1f);
+        playAt(cityBuffers[cue.ordinal()], x, y, z, gain, pitch, reference, maximum);
+    }
+
+    /** Whether a city buffer plays on the ambience bus at background priority. */
+    private boolean cityAmbience(int buffer) {
+        for (CitySounds.Cue cue : CITY_CUES) {
+            if (cityBuffers[cue.ordinal()] == buffer) {
+                return cue != CitySounds.Cue.INFECTED_RASP && cue != CitySounds.Cue.VEIL_PULSE && cue != CitySounds.Cue.SHOUT;
+            }
+        }
+        return false;
+    }
+
     // Ambience loops.
     private final int[] detailBuffers = new int[4];
     private final AmbientEvents ambientEvents = new AmbientEvents(rng);
@@ -310,23 +352,32 @@ public class AudioManager {
         music.scene(mood);
     }
 
+    /** A walking step on the block underfoot; see {@link #playFootstep(FootstepSurface, boolean, float)}. */
     public void playFootstep(BlockType under, boolean inWater) {
         if (!enabled) return;
+        playFootstep(FootstepSurface.of(under, null), inWater, 1f);
+    }
+
+    /**
+     * A step on a surface, {@code loudness} relative to a walking step ({@link FootstepSurface#loudness}):
+     * crouched steps are faint, sprinting ones loud, as the AI hears them.
+     */
+    public void playFootstep(FootstepSurface surface, boolean inWater, float loudness) {
+        if (!enabled) return;
         if (inWater) {
-            play2d(bFootWater, 0.4f, pitchVar(0.2f));
+            play2d(bFootWater, 0.4f * loudness, pitchVar(0.2f));
             return;
         }
-        int buf = switch (under) {
-            case STONE, GRAVEL, COAL_ORE, COPPER_ORE, IRON_ORE, RUIN_STONE, FURNACE, ASH,
-                 SCRAP_BLOCK, POD_HULL, ICE, STONE_BRICK, BASALT, ASPHALT, PAVING, CONCRETE,
-                 BRICK, PLASTER, SHEET_METAL, RUBBLE, STAIRS, LOCKER, METAL_DOOR, RAILING,
-                 HIDDEN_PANEL, CAR_WRECK, BARRICADE_METAL, GENERATOR, WATER_PURIFIER -> bFootStone;
-            case PLANK, LOG, WORKBENCH, CRATE, WALL, MAP_TABLE, HERB_STATION, WOOD_DOOR, SHELF,
-                 CABINET, TABLE, SIGN, BARRICADE -> bFootWood;
+        int buf = switch (surface) {
+            case STONE -> bFootStone;
+            case WOOD -> bFootWood;
             case SNOW -> bFootSnow;
-            default -> bFootGrass;
+            case WATER -> bFootWater;
+            case METAL -> bFootMetal;
+            case RUBBLE -> bFootRubble;
+            case GRASS -> bFootGrass;
         };
-        play2d(buf, 0.35f, pitchVar(0.08f));
+        play2d(buf, FootstepSurface.WALK_GAIN * loudness, pitchVar(0.08f));
     }
 
     public void playBlockHit(BlockType t, float x, float y, float z) {
@@ -669,8 +720,9 @@ public class AudioManager {
 
     private void submit(int buffer, float x, float y, float z, float gain, float pitch,
                         float reference, float maximum, boolean relative) {
-        // A burning body's crackle is the fire's ambience, like the pops of a campfire.
-        boolean ambience = buffer == bBodyCrackle;
+        // A burning body's crackle is the fire's ambience, like the pops of a campfire, and so is
+        // the city's distant and indoor scenery (milestone 22).
+        boolean ambience = buffer == bBodyCrackle || cityAmbience(buffer);
         for (int detail : detailBuffers) if (detail == buffer) ambience = true;
         boolean wet = buffer != bClick && buffer != bQuest && buffer != bDiscover;
         voices.play(new VoicePool.Request(buffer, x, y, z, gain, pitch, reference, maximum,
@@ -688,10 +740,11 @@ public class AudioManager {
         }
         if (buffer == bMusket || buffer == bPistol || buffer == bHowl || buffer == bGrowl
                 || buffer == bClick || buffer == bDiscover || buffer == bQuest || buffer == bToolBreak
-                || buffer == bGlassBreak || buffer == bDoorForced)
+                || buffer == bGlassBreak || buffer == bDoorForced || buffer == cityBuffers[CitySounds.Cue.SHOUT.ordinal()])
             return VoicePool.Priority.IMPORTANT;
         if (ambience || buffer == bFootGrass || buffer == bFootStone || buffer == bFootWood
-                || buffer == bFootSnow || buffer == bFootWater || buffer == bChirp || buffer == bFlap)
+                || buffer == bFootSnow || buffer == bFootWater || buffer == bChirp || buffer == bFlap
+                || buffer == bFootMetal || buffer == bFootRubble)
             return VoicePool.Priority.BACKGROUND;
         return VoicePool.Priority.ORDINARY;
     }
@@ -782,12 +835,22 @@ public class AudioManager {
         for (UtilitySounds.Cue cue : UtilitySounds.Cue.values()) {
             utilityBuffers[cue.ordinal()] = bank.get(UtilitySounds.key(cue));
         }
+        for (CitySounds.Cue cue : CITY_CUES) {
+            cityBuffers[cue.ordinal()] = bank.get(CitySounds.key(cue));
+        }
+        bFootMetal = bank.get(CitySounds.FOOT_METAL);
+        bFootRubble = bank.get(CitySounds.FOOT_RUBBLE);
         bBodyCrackle = bank.get(BodyFireSounds.CRACKLE);
         bBodyFlare = bank.get(BodyFireSounds.FLARE);
         bBodySizzle = bank.get(BodyFireSounds.SIZZLE);
         for (int i = 0; i < detailBuffers.length; i++) detailBuffers[i] = bank.get(AmbienceBeds.EVENT_NAMES[i]);
         variants.clear();
         for (String name : VariantBank.NAMES) {
+            int[] ids = new int[VariantBank.COUNT];
+            for (int i = 0; i < ids.length; i++) ids[i] = bank.get(VariantBank.key(name, i));
+            variants.put(ids[0], new VariantBank(ids));
+        }
+        for (String name : CitySounds.FOOTSTEPS) {
             int[] ids = new int[VariantBank.COUNT];
             for (int i = 0; i < ids.length; i++) ids[i] = bank.get(VariantBank.key(name, i));
             variants.put(ids[0], new VariantBank(ids));
