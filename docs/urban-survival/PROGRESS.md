@@ -6,10 +6,10 @@ This is the running record for the 26-package urban-survival roadmap. The pack i
 
 | Item | Value |
 | --- | --- |
-| Last completed package | **20 — Urban missions and long-term purpose** (2026-10-30): generator 19 plans one old relay mast on a precinct roof; survivors speak of it, its three parts lie in two independent kinds of source each, friends share its codes, and the parts fitted and a radio workstation on the refuge's generator carry a call until the city answers once, on the existing ending card, from which the player carries on. Camps and strongholds give five kinds of mission on real objects, rewarded once and failing for good, four in hand, all kept by `urban.missions` v1. The acceptance route reaches the answer from the city alone, and the native tour passed in both modes. Human-only checks are deferred by D-80. |
-| Source revision | 20: `ff1edff` 19's gate → `71cf2ca` relay → `6d5a317` communications → `cc874ac` missions → `3888a28` acceptance route → `b8967b8` mission tour; the records follow in their own commit. 19: `7258c34` taps → `d4c5d7b` power → `4c93639` purifier → `640bf67` sustainability check → `def0278` utility tour; records `ef29fe8` and the gate's closing record. |
+| Last completed package | **21 — Map, HUD and onboarding** (2026-10-30): in a generator-19 city, M opens a city map of the streets around the survivor with the buildings they entered named, home, the sites they found, every objective (rumours as rough areas), a journal read from the saved ledger and a sketch of the storey underfoot; the HUD names the district and the building and floor; container and lock lines say what a press does and costs; NEW FRONTIER, the pause menu and the first session speak of the city. Secrets stay secret: the map knows only what the survivor walked, entered (`urban.visits` v1, new and optional) or found, and two mission markers became rumours until confirmed. The native tour passed at 720p and 1080p, scale 0.75 to 1.5, by day, night and in fog, in both modes. Human-only checks are deferred by D-80. |
+| Source revision | 21: `e764168` 20's records → `4ee6b89` visits → `2749358` rumours → `8f0d89b` city map → `d762cdf` interactions → `1df1e21` onboarding text → `dd121c1` onboarding tour; the records follow in their own commit. 20: `ff1edff` 19's gate → `71cf2ca` relay → `6d5a317` communications → `cc874ac` missions → `3888a28` acceptance route → `b8967b8` mission tour; records `e764168`. |
 | Default new world | Legacy (`World.DEFAULT_NEW_WORLD_GENERATOR = GEN_CAVE_IDENTITIES`), unchanged until 26 passes. Isolated `VEYLON_GENERATOR=urban-dev` creates generator 19 (`GEN_URBAN_MISSIONS`, layout 16 / template 7 / content 3, encounter catalogue 5). Generators 1–18 stay loadable with their original geometry and encounters. |
-| Next package | **21 — Map, HUD and onboarding, NOT STARTED.** Keep `UrbanSliceRouteTest` (generators 10–19), `UrbanCatalogueQaSceneTest`, `UrbanDistrictQaSceneTest`, `UrbanUndergroundQaSceneTest`, `UrbanEcologyQaSceneTest`, `UrbanSurvivorQaSceneTest`, `UrbanStrongholdQaSceneTest`, `UrbanRefugeQaSceneTest`, `UrbanUtilityQaSceneTest`, `UrbanMissionRouteTest` and `UrbanMissionQaSceneTest` as regression gates. Owner question P-15 (the inverted day/night temperature curve) is open. |
+| Next package | **22 — Ruined-city visuals and sound, NOT STARTED.** Keep `UrbanSliceRouteTest` (generators 10–19), `UrbanCatalogueQaSceneTest`, `UrbanDistrictQaSceneTest`, `UrbanUndergroundQaSceneTest`, `UrbanEcologyQaSceneTest`, `UrbanSurvivorQaSceneTest`, `UrbanStrongholdQaSceneTest`, `UrbanRefugeQaSceneTest`, `UrbanUtilityQaSceneTest`, `UrbanMissionRouteTest`, `UrbanMissionQaSceneTest`, `UrbanOnboardingQaSceneTest`, `ui.CityMapTest` and `UrbanInteractionPromptsTest` as regression gates. Owner question P-15 (the inverted day/night temperature curve) is open. The consolidated human playtest (D-80) follows 22. |
 | Human testing schedule | Owner instruction (2026-10-11, D-80): consolidated human playtesting/listening after milestone 22. Through 22, run automated and scripted native validation and record human-only checks as deferred; do not request interim human walks. |
 | Commits | Separate `feat`, `test`, `docs` and `chore` commits on `feature/urban-survival`; see the reconstruction ledger below. `main` stays at `923345f`. Original combined commit retained at `backup/urban-m01-m04-before-split`. No merge, push, tag or publication. |
 
@@ -39,7 +39,7 @@ The status vocabulary is NOT STARTED, IN PROGRESS, PARTIAL, BLOCKED or COMPLETE.
 | 18 | Safehouses, salvage and fortification | 17, 07, 04 | New `RefugeSystem`, `urban.refuges`; salvage in `PlayerBlockActions`; barricades; `SleepSystem` safety | Claim, store, dismantle, barricade from salvage and sleep. Threats attack or route around defences. Claims, salvage and defences persist. Survivor property has consequences. | **COMPLETE** (2026-10-27; human-only validation deferred by D-80) |
 | 19 | Water, power and refuge utilities | 18 | `world/urban/UrbanUtilities` (taps, devices, circuits), `UtilitySystem` (owned by `RefugeSystem`, one medium-tick line in `Game`), `urban.utilities` v1; `World.emitterOn` and `Chunk` light lists for lamps; `SalvageTable` (fuel tanks, devices); `UtilitySounds` | One water utility and one power source and consumer run from urban supplies, conserve resources, persist, follow the pause and dormancy policy and respect Creative. | **COMPLETE** (2026-10-29; human-only validation deferred by D-80) |
 | 20 | Urban missions and long-term purpose | 19, 16–17, 02 | `world/urban/{RelaySites,CommsComponents,UrbanMissions}`, `settlement/{UrbanComms,UrbanMissionBoard}`, `CommsObjective` (owned by `RefugeSystem`), `urban.missions` v1, a fourth `UrbanUtilities` device kind, hooks in the storage, aid, guide and purifier paths, `NpcScreen`, `Hud`, `QuestObjectiveView` and the victory flow | An integration route advances C1–C5 without trees or ore. A hidden-refuge mission and a guarded-access mission. Failure alternatives. Rewards exactly once. The legacy beacon is intact. | **COMPLETE** (2026-10-30; human-only validation deferred by D-80) |
-| 21 | Map, HUD and onboarding | 20 | `ui/MapScreen` plan layer, `ui/Hud`, `InteractPromptBuilder`, `ui/NewFrontierScreen`, `ui/PauseMenu` | A new player finds supplies, floors, the refuge and the next step through ordinary UI. Secrets stay secret. `docs/graphics/HUD_VALIDATION.md` captures. | NOT STARTED |
+| 21 | Map, HUD and onboarding | 20 | `world/urban/UrbanVisits` and `urban.visits` v1; `ui/{CityMap,CityMapView,FloorSketch}` behind `ui/MapScreen`; `ui/{Hud,HudLayout,QuestObjectiveView,CrateScreen,NpcScreen,NewFrontierScreen,PauseMenu}`; `item/ItemNames`; `InteractPromptBuilder`, `CrateTransactionSystem`, `FixtureActions`, `WorldBootstrap`; `settlement/UrbanMissionBoard` targets | A new player finds supplies, floors, the refuge and the next step through ordinary UI. Secrets stay secret. `docs/graphics/HUD_VALIDATION.md` captures. | **COMPLETE** (2026-10-30; human-only validation deferred by D-80) |
 | 22 | Ruined-city visuals and sound | 21 | Materials, lighting (D-19), `AmbienceSystem`, `AudioSceneState`, `engine/ReverbPresets`, `engine/AudioManager` | Districts, sites and threats are recognisable in day, night and fog. Props, lights and audio stay bounded. Dry fallback works. A manual listening pass. | NOT STARTED |
 | 23 | Survival economy and extended play | 22 | Loot tables, recipes, trade stock, encounter pressure; balance record in DESIGN | One route reaches the objective plus several days without trees or ore. Other seeds have reachability. Conservation holds. Fresh extended play recorded. | NOT STARTED |
 | 24 | Dense-city performance and streaming | 23 | `world/World` retention and eviction or a finite city (D-24); plan caches; queues; `docs/PERFORMANCE_BENCHMARKS.md` | Bounded queues and caches. Measured scenes meet calibrated gates. A long-travel CPU, GPU and save-growth policy with no lost state. | NOT STARTED |
@@ -2905,6 +2905,203 @@ was performed.
 **Next:** package 21, map, HUD and onboarding: a new player finds supplies,
 floors, the refuge and the next step (now including the relay, the parts and
 the missions) through ordinary UI, with secrets kept secret.
+
+## Milestone 21 — map, HUD and onboarding (2026-10-30)
+
+**Status: COMPLETE.** A new survivor in a generator-19 city can now read their
+way through it with ordinary UI. M opens a city map: the streets around them as
+far as the city has been generated near them, the buildings they have entered
+named by what they are, their refuges and home, the camps, strongholds and
+raider yards they have found, and hidden people only once their cellar is found;
+the objective and every mission in hand, a known place as a ring and a rumour as
+a rough dashed area. Beside it a journal reads the saved ledger (the radio's
+next step, each mission's concrete objective, who it is for and where, the last
+finished or failed with the reason, and first steps for a new survivor), and a
+sketch of the storey underfoot shows its stairs, ways out, live door states and
+the rooms they have entered, never a container or an unfound cellar. The HUD
+names the district and the building and floor. Interaction lines say what a
+container is, whose it is and what searching costs; locks name the control and
+the tool, and the city's pry tool is named so in the pack. The storage and
+conversation screens show owner, progress, condition and whole answers; NEW
+FRONTIER, the pause menu and the first session speak of the city. Secrets stay
+secret: what the map knows comes from the survivor's own walking
+(`urban.visits`, new and optional) and the existing discovery ledgers, and two
+mission markers that pointed at secret or unfound places are now rumours until
+confirmed. The native tour passed at 720p and 1080p, at 0.75, 1 and 1.5 scale,
+by day, at night and in fog, in both modes. Human-only validation remains
+deferred by D-80. Decisions D-209–D-218; P-05 carries a package-21 note; P-15 is
+still open.
+
+### Start state
+
+- Branch `feature/urban-survival` at `e764168` (the 20 records), clean tree.
+- Read the revised base, the prompt, `AGENTS.md`, `docs/COMMIT_WORKFLOW.md`,
+  these records, `docs/graphics/HUD_VALIDATION.md` and the save-compatibility
+  skill. The work and its commits ran on 2026-10-30.
+
+### Map, HUD and onboarding
+
+- **Where it applies (D-209).** Generator 19, the city of package 20; earlier
+  cities and the wilderness keep their map, HUD and hints. Corrections reach
+  every world where their screen appears: the wider interaction box, lock lines
+  that name the control and the tool, the city's "Pry Tool", no take-apart hint
+  on a closed door, wrapped answers, the storage screen's owner, progress and
+  condition, and a city's pause menu.
+- **What the survivor walked and entered (D-210).** `UrbanVisits` records, as
+  the feet cell changes in a loaded column, the district underfoot and a
+  building only from inside one of its rooms; nothing planned, generated, seen
+  from the street or told counts. It is saved as the new optional section
+  `urban.visits` v1, bounded at 1,024 districts and 4,096 buildings.
+- **The city map (D-211).** M opens a 128 m ground plan of the streets around
+  the survivor where the city was generated near them, the buildings they
+  entered named by family (others are unnamed blocks), the edges and names of
+  the other districts walked, home and the other refuges, camps, strongholds
+  and raider yards once found, hidden people only once their cellar is found,
+  and the objective and every mission in hand: a known place as a ring, a rumour
+  as a dashed area with "Rumour:", away ones at the edge with their distance.
+  Never a container. The HUD behind it is dimmed and the world keeps running.
+- **Rumours (D-212, refines D-206).** A hidden-people mission marks the middle
+  of their city block until their cellar is found; the relay's mission marks
+  its district until the survivor stands beside it; the navigation line writes
+  "~120m NE (rumour)". Giving supplies to the Wardens no longer logs "the camp".
+- **The journal (D-211, D-217).** The radio's next step and where it points;
+  each mission in hand with its concrete objective, who it is for and where; the
+  last two finished or failed with the reason; for a new survivor, "First
+  steps", "Your refuge" and "Survivors". It reads the saved ledger, so a load
+  shows exactly what is true.
+- **The floor sketch (D-213).** Inside a building, the storey underfoot: its
+  outline, stairs up and down under one label, doors with their live state and
+  outer ones and fire escapes as ways out, the survivor and their facing, a strip
+  of the storeys with the one underfoot lit, and only the rooms entered this
+  session; an unfound hidden cellar and its panel are never drawn.
+- **The HUD (D-214).** The field panel shows the district and "Clinic · floor 2"
+  (or "your refuge", "survivor camp", "hidden cellar", "Street", "Transit
+  tunnel"); the empty navigation line reads "[M] Map & journal".
+- **Interactions (D-215).** A container's line names its use, its owner and
+  what searching costs or how far it got, touching nothing; locks name the
+  control and the tool; the interaction box is 580 px wide.
+- **Screens (D-216).** The storage screen's owner line warns of theft in amber,
+  a search shows a progress bar and its noise, slots show wear and freshness,
+  the item under the cursor is described; conversation answers wrap.
+- **Onboarding text (D-217).** Five short first-session lines (Creative four),
+  each whole on the HUD's log; NEW FRONTIER describes the city when the isolated
+  development selector makes the session's new worlds cities, with the replace
+  notice unchanged and no user-visible selector; a city's pause menu.
+- **QA (D-218).** `VEYLON_SCENE=urban_onboarding`.
+- **Found while touring it.** The first native captures showed the stair labels
+  colliding ("up" over "down"), truncated room names in the sketch, the
+  current district's label colliding with an edge marker, clipped edge labels,
+  "[M]" inside the journal and the slot skin's teal corner under the journal's
+  heading; all were fixed before the map's commit and the tours rerun. A cupboard
+  in a city named the iron pickaxe "pry tool" while the pack said "Iron Pickaxe",
+  and a closed door offered a take-apart hint that crouching there refuses; both
+  are fixed for every city.
+
+### Changed paths
+
+**Production** (`src/main/java/com/veylon/`):
+
+- New: `world/urban/UrbanVisits.java`, `save/UrbanVisitsSection.java`,
+  `ui/{CityMap,CityMapView,FloorSketch}.java`, `item/ItemNames.java`,
+  `UrbanOnboardingQaScene.java`.
+- Edited: `entity/Player.java`, `world/urban/UrbanWorldState.java`,
+  `save/V3ExtensionSections.java`, `qa/RuntimeBudgetSnapshot.java`,
+  `settlement/{UrbanMissionBoard,UrbanComms,UrbanSiteRelations}.java`,
+  `ui/{QuestObjectiveView,MapScreen,Hud,HudLayout,CrateScreen,NpcScreen,InventoryScreen,CraftingScreen,NewFrontierScreen,PauseMenu}.java`,
+  `{FixtureActions,Fortification,InteractPromptBuilder,CrateTransactionSystem,Dismantling,FrontendController,WorldBootstrap,UrbanQaScenes}.java`,
+  `QaHarness.java` (one label on an existing line).
+
+**Tests** (`src/test/java/com/veylon/`):
+
+- New: `UrbanVisitsTest`, `save/UrbanVisitsSectionTest`, `UrbanMissionRumourTest`,
+  `ui/{CityMapTest,FloorSketchTest,CityMapLayoutTest,CrateScreenToneTest,CityOnboardingScreensTest}`,
+  `UrbanInteractionPromptsTest`, `UrbanFirstSessionHintsTest`,
+  `UrbanOnboardingQaSceneTest`.
+- Edited (the older lock wording): `UrbanCivicGameplayTest`,
+  `UrbanFixtureGameplayTest`, `UrbanFortificationTest`.
+
+**Records:** this file, [DESIGN.md](DESIGN.md) (§3.1, §12, §13),
+[DECISIONS.md](DECISIONS.md) (D-209–D-218, §3, P-05, D-206's pointer),
+[VALIDATION.md](VALIDATION.md#milestone-21--map-hud-and-onboarding-2026-10-30),
+`docs/ARCHITECTURE.md`, `docs/DEVELOPING.md` and
+`docs/graphics/HUD_VALIDATION.md`.
+
+### Compatibility
+
+- No generator, layout, template, content revision or encounter catalogue
+  changed; no block, item, enum constant, ordinal, texture layer, icon or audio
+  buffer was added. Generators 1–19 keep their geometry and pins; the default
+  new world stays generator 3.
+- New: the optional section `urban.visits` v1, written only for generator 19 and
+  rejected by an earlier city. A generator-19 save of package 20 has none and
+  loads with nothing visited; a package-20 build skips the unknown section and
+  loads the world (re-saving there drops it). No older binary was run.
+- Earlier cities and the wilderness keep their map, HUD panel and first-session
+  lines; the corrections of D-209 reach them where their screens appear, and the
+  wilderness's wording ("Requires pickaxe", the beacon's reference) is unchanged.
+
+### Commands and results
+
+Exact commands and outputs are in
+[VALIDATION.md](VALIDATION.md#milestone-21--map-hud-and-onboarding-2026-10-30).
+In short:
+
+- Every code commit was validated with the full portable build on its exact
+  tree in a detached worktree, with no failures and the existing Windows skip:
+  `4ee6b89` 2,212 tests in 264 classes, `2749358` 2,215 in 265, `8f0d89b`
+  2,227 in 268, `d762cdf` 2,232 in 270, `1df1e21` 2,237 in 272 and `dd121c1`
+  2,240 in 273. The last four were built in parallel worktrees, each tree
+  assembled from the one before it and compared with the main index.
+- The native onboarding tour passed at 1280 × 720 (scale 1 and 0.75) and
+  1920 × 1080 (scale 1, 1.5 and 0.75), in Survival and Creative, 14 captures
+  each with zero GL and KHR errors; the new-world and pause screens were captured
+  with and without the selector.
+- `graphify update . --no-cluster` on the final code: 11,423 nodes and 47,599
+  edges, with extractor warnings for `build.gradle` and `settings.gradle`.
+- No reviewer subagents ran.
+
+The commits:
+
+| Commit | Subject |
+| --- | --- |
+| `4ee6b89` | `feat(urban): remember the districts walked and buildings entered` |
+| `2749358` | `fix(missions): mark a mission's unconfirmed places as rumours` |
+| `8f0d89b` | `feat(map): draw a city map with a journal and a sketch of the storey` |
+| `d762cdf` | `feat(ui): explain urban interactions, owners and search progress` |
+| `1df1e21` | `feat(frontend): describe the city on the new-world and pause screens` |
+| `dd121c1` | `feat(qa): tour what a new survivor reads, from the refuge to a mission` |
+
+These records follow in their own commit. No push, merge, tag or publication
+was performed.
+
+### Limitations and next concrete step
+
+- **Evidence types.** The tour stages two poses, a forward-only clock, fog and a
+  spear; the headless tests stage positions. Whether a new player actually finds
+  their way is the human playtest D-80 defers until after 22; it was checked by
+  script, tests and captures, not judged by a person.
+- **The map's reach.** It shows 128 m around the survivor, only where the city
+  was generated near them; it cannot pan or zoom, and a rumour of the relay's
+  district is usually an edge marker with a distance.
+- **The sketch.** Only the storey underfoot; other storeys are not browsed. Rooms
+  are remembered for this session only (64 floors), so after a load they are
+  sketched again as they are entered; the outline, stairs and ways out always
+  show.
+- **What the map does not know.** A searched or picked-clean building is not
+  marked; buildings are named by family, not by their signs.
+- **One line per prompt.** With a usable item in hand at a device, a part at the
+  relay or a fortification item at a door, the line is the use button's; F's
+  action still works but is not shown beside it.
+- **Hover details.** The storage screen describes the item under the cursor; the
+  scripted tour cannot move the mouse, so no capture shows it.
+- **Earlier cities** (generators 4–18) keep the wilderness-style map, their
+  field panel and their first lines.
+- **Day/night temperature (P-15).** Still inverted in every world; unchanged.
+- **Default.** The ordinary new world stays generator 3 until 26.
+
+**Next:** package 22, ruined-city visuals and sound: districts, sites and threats
+recognisable in day, night and fog, bounded props, lights and audio, a working
+dry fallback; after it the consolidated human playtest (D-80).
 
 ## Resume rules
 

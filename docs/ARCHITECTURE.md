@@ -303,7 +303,10 @@ remember, generators 17–19 `urban.refuges` v2, their claimed refuges, and
 `urban.fortifications` v1, their damaged barricades and braces, generators 18 and 19
 `urban.utilities` v1, their taps' ledger and devices, and generator 19
 `urban.missions` v1, what its survivor learned and did toward the city's
-communications. Compatibility directions:
+communications. Generator 19 also writes `urban.visits` v1 (package 21): the districts its
+survivor walked and the buildings they entered, as ascending stable ids capped at
+1,024 and 4,096; it is optional, absence (a package-20 save) means nothing visited, and
+an older build skips it as unknown. Compatibility directions:
 
 - this build, a legacy save: unchanged, and no urban state is created;
 - this build, an urban save: the same geometry through its generator, the content
@@ -619,7 +622,7 @@ Scripted urban QA routes extend `UrbanRouteScene`: a task queue played through t
 production input seam, mouse-look turns, bounded walking that opens doors with F,
 threat handling, forcing and captures. `urban_slice`, `urban_catalogue`,
 `urban_districts`, `urban_underground`, `urban_ecology`, `urban_survivors`,
-`urban_strongholds`, `urban_refuge`, `urban_utilities` and `urban_missions` use it; the last five extend
+`urban_strongholds`, `urban_refuge`, `urban_utilities`, `urban_missions` and `urban_onboarding` use it; the last six extend
 `UrbanPeopleScene`, which adds the staged clock and poses, walking up to someone and
 talking, conversation choices through the screen's command, a trade and F5 and F9.
 
@@ -768,6 +771,20 @@ The game side reaches the ledger through the seams the screens and tests share:
 and the records, validated against the plans and each other
 (`UrbanMissionsSection.finishLoad` rejects a generator-19 save without it). The noise
 timer and the once-per-tick broadcast guard are transient.
+
+### The city map, place lines and onboarding
+
+Urban package 21 adds no system to `Game`. `Player.trackPlace`, when the feet cell
+changes, also calls `UrbanVisits.observe`, which records in a generator-19 city the
+district underfoot and a building only from inside one of its rooms, plus a transient
+memory of the rooms entered on the last 64 floors (`urban.visits` v1 keeps the first
+two, never the rooms). `MapScreen.update` hands a generator-19 world to `CityMapView`,
+which draws what `CityMap` and `FloorSketch` answer: pure reads of plans, loaded
+chunks, the visits and discovery ledgers, registered sites, refuge claims and the
+mission ledger, never creating a chunk, rolling a container or registering a site. The
+HUD's field panel reads `CityMap.hereLine`; `CrateTransactionSystem.containerPrompt`
+gives the container line the prompt builder shows. The map, storage, conversation and
+inventory screens keep the world running; only the pause menu and its screens pause it.
 
 ### Doors, windows and urban fixtures
 

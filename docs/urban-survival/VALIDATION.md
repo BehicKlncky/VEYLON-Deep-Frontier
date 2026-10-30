@@ -3303,3 +3303,185 @@ graphify update . --no-cluster > build/m20-graphify.log 2>&1
 - No reviewer subagents ran.
 
 Next: package 21.
+
+## Milestone 21 — map, HUD and onboarding (2026-10-30)
+
+### Scope and baseline
+
+- Branch `feature/urban-survival` at `e764168` (the 20 records), clean tree.
+  Read the revised base, the prompt, `AGENTS.md`, `docs/COMMIT_WORKFLOW.md`,
+  these records, `docs/graphics/HUD_VALIDATION.md` and the save-compatibility
+  skill.
+- No generator, layout, template, content revision or encounter catalogue
+  changed, and no block, item, texture layer, icon or audio buffer was added. The
+  one new state is the optional section `urban.visits` v1, written for generator
+  19 only. The default new world is unchanged (generator 3).
+- Generators 1–18 keep their map, HUD and first-session lines; the corrections of
+  D-209 (the 580 px interaction box, lock lines, a city's "Pry Tool", the closed
+  door's take-apart hint, wrapped answers, the storage screen, a city's pause
+  menu) reach them where their screens appear. Wilderness wording such as
+  "Requires pickaxe" is unchanged.
+
+### Behaviour, persistence and onboarding evidence
+
+Every code commit was validated with the full portable build on its exact tree
+in a detached worktree. The first two used `build/m14-check`, checked out at the
+commit before them and given exactly the staged diff. The last four were built
+in parallel in `build/m21-check` (a new worktree), `build/m13-check`,
+`build/m12-check` and `build/m14-check`, each assembled from the commit before
+the series plus the earlier changes of the series and its own; every tree was
+compared with the main index (`git write-tree`) and committed unchanged.
+
+| Commit | Checks on the exact tree | What they prove |
+| --- | --- | --- |
+| `4ee6b89` | Full portable build: 2,212 tests in 264 classes, one existing skip (`m21-a-build.log`) | `UrbanVisitsTest` (5): a fresh city knows only the refuge it wakes in and its district, in both modes; the street walks a district but enters nothing, a room enters its building and is remembered for the sketch; an unloaded column and a generator-18 city record nothing; the ledger and the sketch memory stop at their caps, within the runtime snapshot's hard limits, and a restore refuses wrong kinds, duplicates and excess. `UrbanVisitsSectionTest` (3): round trip, empty and absent sections, nine damaged payloads refused with the live world kept, a generator-18 save writing none and refusing one. `RuntimeBoundsTest` unchanged. |
+| `2749358` | Full portable build: 2,215 tests in 265 classes, one existing skip (`m21-b-build.log`) | `UrbanMissionRumourTest` (3): the hidden people's mission marks their city block, not their building, until the panel is slid aside, then their refuge; the relay's mission marks its district until the survivor stands beside it, a ready mission its givers; the navigation line marks rumours; the Wardens are not called a camp. `UrbanMissionsTest`, `UrbanCommsTest` and `MapScreenTest` unchanged. |
+| `8f0d89b` | Full portable build: 2,227 tests in 268 classes, one existing skip (`m21-c2-build.log`; two earlier drafts of the drawing passed it too, `m21-c-build-first.log` and `-second.log`) | `ui.CityMapTest` (6): a new survivor sees home and their refuge only, no site, no objective, the journal's radio step and first steps; entering a building names it, the cheap family agreeing with the plan; hidden people stay off the map until their panel is slid aside; a found camp, its rumour and two missions fill the map and the journal, a destroyed dispensary fails its mission with its reason, and a save and load show the same journal and markers; earlier worlds keep their map and no map screen pauses the world. `ui.FloorSketchTest` (4): real stairs and ways out, never a container, only rooms entered; a door opened in the world is open on the sketch; a hidden cellar and its panel only once found; no sketch outside. `ui.CityMapLayoutTest` (2): every panel on screen and apart at five logical sizes; journal text wraps in the bundled face. `HudLayoutTest` (51) and `HudTextTest` unchanged. |
+| `d762cdf` | Full portable build: 2,232 tests in 270 classes, one existing skip (`m21-d-build.log`) | `UrbanInteractionPromptsTest` (4): a city calls the pry tool what its prompts ask for, the wilderness keeps "Requires pickaxe"; locked doors name the control and any tool and offer no take-apart hint; a container's line names its use, owner and cost, its progress and its searched state, touching nothing, the camp's stash warning of theft; the lines fit the 580 px box and a long answer wraps whole. `ui.CrateScreenToneTest` (1). The lock-wording expectations of `UrbanCivicGameplayTest`, `UrbanFixtureGameplayTest` and `UrbanFortificationTest` updated with the behaviour; `HudLayoutTest` keeps every module apart with the wider box. |
+| `1df1e21` | Full portable build: 2,237 tests in 272 classes, one existing skip (`m21-e-build.log`) | `ui.CityOnboardingScreensTest` (2): NEW FRONTIER describes the city only for a city session, keeps the replace notice and Survival as the default; the pause menu keeps the wilderness reference and gives a city its own, naming the relay only where there is one; every line fits. `UrbanFirstSessionHintsTest` (3): a new city's lines in each mode, earlier cities' unchanged, each whole on the HUD's log beside its timestamp; the controller opens the city variant when the session makes cities. `UrbanDevelopmentSelectorTest` and `ModeSelectionRoutingTest` unchanged. |
+| `dd121c1` | Full portable build: 2,240 tests in 273 classes, one existing skip (`m21-f-build.log`) | `UrbanOnboardingQaSceneTest` (3): the tour passes headlessly in both modes, 14 captures and 49 simulated seconds each, and refuses generator 18. |
+
+### Native onboarding tour and screens
+
+GPU and driver from the runs' `[gl]` lines: NVIDIA GeForce RTX 3060 Ti, driver
+610.88, OpenGL 3.3.0 with KHR_debug; windowed, from the main checkout on its
+final code.
+
+```bash
+export VEYLON_GENERATOR=urban-dev VEYLON_SEED=20260731 VEYLON_SCENE=urban_onboarding
+export VEYLON_GAME_MODE=survival VEYLON_RESOLUTION=1280x720 VEYLON_UI_SCALE=1
+export VEYLON_CAPTURE_TAG=m21-onboarding-survival-720-2
+./gradlew.bat run -PveylonDataDir=build/qa/m21-onboarding-survival-720-2 --console=plain
+```
+
+Each QA directory was new. Seed `20260731` gives (from the `plan` line): the
+starter refuge `urban:building:0,0:44:0`; the flats beside it
+`urban:building:0,0:40:0`, their ground-floor wardrobe at (65, 41, 66) and a
+first-floor cupboard at (65, 45, 66); the starter district's nearest locked
+wooden door at (40, 41, 68), in a clinic; the camp `urban:building:0,0:53:0`.
+
+Two scratch runs (`m21-onboarding-try1`, `-try2`, Survival 1280 × 720) passed
+before the map's commit; their captures showed the faults fixed then (the stair
+labels colliding, truncated room names, the district label under an edge marker,
+clipped edge labels, "[M]" in the journal). A first matrix on the code before
+the last map fix passed in all six configurations; its map captures showed the
+slot skin's teal corner under the journal's and the sketch's headings (cyan on
+teal at 0.75 and 1.5 scale), so the cards took the HUD's panel skin and the six
+tours were rerun. The new-world and pause captures of that matrix stand, as
+nothing they draw changed.
+
+Final tours (2026-10-30), each `[urban-onboarding] pass=true` with 2 staged
+poses, 14 captures, full health and 49 route seconds; every capture
+`glErrors=0 khrErrors=0`, and the shutdown summary `glGetError=0`, 17 KHR
+messages, 0 KHR errors (the usual MEDIUM pixel-transfer notes); Gradle exit 0:
+
+| Tag (`build/qa/<tag>/screenshots/`) | Mode | Framebuffer | Requested → effective scale | Wall time |
+| --- | --- | --- | --- | --- |
+| `m21-onboarding-survival-720-2` | Survival | 1280×720 | 1 → 1 | 72 s |
+| `m21-onboarding-creative-720-2` | Creative | 1280×720 | 1 → 1 | 61 s |
+| `m21-onboarding-survival-720-scale075-2` | Survival | 1280×720 | 0.75 → 0.75 | 61 s |
+| `m21-onboarding-survival-1080-2` | Survival | 1920×1080 | 1 → 1 | 64 s |
+| `m21-onboarding-survival-1080-scale150-2` | Survival | 1920×1080 | 1.5 → 1.5 | 63 s |
+| `m21-onboarding-creative-1080-scale075-2` | Creative | 1920×1080 | 0.75 → 0.75 | 63 s |
+
+Screens, one capture each at 3 s, 1280 × 720, scale 1, `glGetError=0` and 0 KHR
+errors: `m21-newworld-city` (`VEYLON_FRONTEND=newworld-save` with the selector),
+`m21-newworld-wilderness` (without it), `m21-pause-city`, `m21-pause-city-creative`
+and `m21-pause-wilderness`.
+
+The Survival `deeds` line: the rumour ("There's an old relay mast on a rooftop in
+the Civic Precinct south of here…"); "Our dressings are gone. The Northlight
+Clinic & Pharmacy to the east had a dispensary…"; "Some nights we hear people
+under the street to the west…". The `views` line: the wardrobe's line "[F] Search
+the wardrobe (noisy, about 4 s)", "Abandoned property | Searching 26%" and
+"| Searched", the HUD's "Flats · floor 1", the locked door's "Locked. Hold [LMB]
+to force it (loud), or go around", and the journal's headings at each map. The
+`before-save` and final `state` lines match in both modes: district (0, 0)
+walked; four buildings entered (the refuge, the flats, the clinic before the
+locked door and the camp's); the journal COMMS, then the clinic's and the people
+below's missions open.
+
+Inspected captures, by run. The scratch runs drew the HUD, storage, prompt and
+conversation screens with the final code and the map with an earlier draft:
+`try1` `01`, `02`, `04`, `07`, `08`, `09`, `10` and `13`; `try2` `07`, `10`, `12` and
+`14`. The first matrix (final code but for the map's cards): Creative 0.75 at
+1080p `10`, Survival 1.5 at 1080p `05` and `07`, Survival 0.75 at 720p `13`, and the
+new-world and pause captures but `m21-pause-city-creative`. The final reruns:
+Survival 1280 × 720 `02` and `10`, Survival 1.5 at 1080p `07` and Creative 1280 ×
+720 `01`. What they show: `01` the refuge at 08:02, the field panel's "Reclaimed
+Residential" and "Flats · ground floor · your refuge", the five first-session
+lines whole on the log (Creative its four), "[M] Map & journal"; `02` the city map
+with the courtyard blocks and streets near the refuge, the refuge tinted and named
+"Flats", home ringed white, the journal's radio step and first steps, and the
+sketch of the woken-in storey with "stairs up / down" and the storey strip; `04`
+"WARDROBE", "Abandoned property", an amber bar at 26 % with its noise and reach
+notes and the pack's wear and freshness rails; `05` its contents (fibre, a vest
+with its wear rail, bandages) and "Searched"; `07` the storey upstairs with the
+bedroom entered, the corridor's doors and the strip lit at 1; `08` "Locked. Hold
+[LMB] to force it (loud), or go around" under "Wooden Door", whole in the wider
+box; `09` Teodor of the camp, the rumour wrapped over two lines inside the panel;
+`10` the map at the camp: the camp marker, both flats named, "Medicine from the
+clinic 122 m E" at the edge, "Rumour: The people below ~160 m NW" and "Rumour: Old
+relay mast ~585 m S", the journal's three entries with "For the camp · ~160m NW
+(rumour)"; `12` the map at night, as legible as by day; `13` the HUD in fog at
+23:06 ("Mild Season, 6 days left / Fog"), small but whole at 0.75; `14` the map
+after "Game loaded.", unchanged. At 0.75 the map's text is small but whole; at
+1.5 the map, journal and sketch keep their layout. The new-world capture with the
+selector shows "THE ABANDONED CITY / development build", the city's descriptions,
+the default note and the replace notice; without it the wilderness screen is
+unchanged. The city pause menu names the world and gives the city's keys and
+goals; the wilderness pause menu is unchanged.
+
+### Commands and portable builds
+
+```bash
+export JAVA_HOME="$PWD/build/tools/jdk25/jdk-25.0.4.1+1" PATH="$JAVA_HOME/bin:$PATH"
+# 4ee6b89, 2749358: the staged diff applied with `git apply --index` in build/m14-check, trees compared, then
+(cd build/m14-check && ./gradlew.bat build --console=plain) > build/m21-a-build.log 2>&1   # m21-b-build.log likewise
+# 8f0d89b, d762cdf, 1df1e21, dd121c1: their trees assembled in build/m21-check, build/m13-check,
+# build/m12-check and build/m14-check and built in parallel the same way
+#   (m21-c2-build.log, m21-d-build.log, m21-e-build.log, m21-f-build.log)
+./gradlew.bat test --tests "com.veylon.UrbanOnboardingQaSceneTest" -i --console=plain > build/m21-tour-test.log 2>&1
+bash m21-natives.sh      # the first matrix: six tours and five screens (qa-m21-natives.log)
+bash m21-natives-2.sh    # the six tours again, tags ending -2 (qa-m21-natives-2.log)
+graphify update . --no-cluster > build/m21-graphify.log 2>&1
+```
+
+The two scripts (kept in the session scratchpad, not the repository) run, per
+configuration, `VEYLON_GENERATOR=urban-dev VEYLON_SEED=20260731
+VEYLON_SCENE=urban_onboarding` with the mode, `VEYLON_RESOLUTION`,
+`VEYLON_UI_SCALE` and `VEYLON_CAPTURE_TAG=<tag>`, and `./gradlew.bat run
+-PveylonDataDir=build/qa/<tag> --console=plain > build/qa-<tag>.log`; the screens
+use `VEYLON_FRONTEND` and `VEYLON_SHOT=3` instead of the scene.
+
+- Focused classes while iterating: the new classes above, `RuntimeBoundsTest`,
+  `UrbanMissionsTest`, `UrbanCommsTest`, `MapScreenTest`, `HudLayoutTest`,
+  `HudTextTest`, `HudQaSceneTest`, `UrbanCivicGameplayTest`,
+  `UrbanFixtureGameplayTest`, `UrbanFortificationTest`, `UrbanSalvageTest`,
+  `UrbanSurvivorSitesTest`, `UrbanRefugeClaimsTest`, `UrbanStationTest`,
+  `ContainerCloseKeyRoutingTest`, `UrbanDevelopmentSelectorTest`,
+  `ModeSelectionRoutingTest`, and the scene tests of the catalogue, refuge,
+  utility, slice, survivor and mission tours with `UrbanMissionRouteTest`.
+- The portable builds above, each `BUILD SUCCESSFUL` with no failures.
+- `graphify update . --no-cluster` on the final code: 11,423 nodes and 47,599
+  edges, with extractor warnings for `build.gradle` (no symbols) and
+  `settings.gradle`. No clustering or semantic extraction ran.
+
+### Limits and next gate
+
+- The gate is met: every code commit's portable build, the headless tour in both
+  modes and the native captures across the HUD matrix passed. Package 21 is
+  COMPLETE.
+- Scripted evidence, not the human playtest deferred by D-80: whether a new
+  player finds their way was checked by tests, logs and captures, not judged by a
+  person.
+- The storage screen's item description needs the mouse, so no capture shows it;
+  requested 1.5 at 1280 × 720 is clamped to 1 by the renderer and was not a
+  separate run.
+- The map reaches 128 m and only where the city was generated near the survivor;
+  the sketch draws only the storey underfoot and remembers rooms for the session.
+- With a usable item in hand the interaction line shows the use button's action
+  only.
+- No reviewer subagents ran.
+
+Next: package 22.
