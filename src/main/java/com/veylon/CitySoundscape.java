@@ -139,7 +139,7 @@ final class CitySoundscape {
         var npcs = game.entities.npcs;
         for (int i = 0, n = Math.min(SCAN_LIMIT, npcs.size()); i < n; i++) {
             Npc npc = npcs.get(i);
-            if (npc.infected() || npc.dead || npc.abstractTravel || npc.combatTarget != game.player
+            if (npc.infected() || npc.dead || npc.abstractTravel || !goingFor(game, npc)
                     || npc.distSqTo(x, y, z) > SHOUT_RADIUS * SHOUT_RADIUS) { continue; }
             int slot = slot(hostile, npc);
             if (slot >= 0) {
@@ -153,6 +153,14 @@ final class CitySoundscape {
                 hostileHold[slot] = 12f;
             }
         }
+    }
+
+    /**
+     * Whether a person is going for the survivor: their target is the survivor, or, as a
+     * stronghold's guard or a raider hunts, they are attacking with no infected in their sights.
+     */
+    private static boolean goingFor(Game game, Npc n) {
+        return n.combatTarget == game.player || n.state == Npc.NpcState.ATTACK && n.combatTarget == null;
     }
 
     /** The nearest fed work lamp within {@value #HUM_RADIUS} blocks hums, one second at a time. */

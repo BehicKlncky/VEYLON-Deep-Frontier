@@ -77,6 +77,29 @@ class CitySoundscapeTest {
         assertEquals(1, run(game, sounds, 2f, Cue.SHOUT), "turning again after a while barks again");
     }
 
+    /**
+     * A stronghold's guard or a raider hunts by attacking with no infected in its sights rather than
+     * by naming the survivor its target (CompoundResidentAI); it barks as it goes for them too, and
+     * a defender fighting an infected does not.
+     */
+    @Test
+    void aGuardOrRaiderGoingForTheSurvivorBarksAndOneFightingAnInfectedDoesNot() {
+        Game game = scene();
+        CitySoundscape sounds = new CitySoundscape();
+        sounds.reseed(SEED);
+        Npc guard = game.entities.spawnNpc(game.world, "Warden", game.player.pos.x + 9, game.player.pos.y,
+                game.player.pos.z);
+        guard.archetype = NpcArchetype.GUARD;
+        Npc infected = infected(game, 30f);
+        guard.state = Npc.NpcState.ATTACK;
+        guard.combatTarget = infected;
+        assertEquals(0, run(game, sounds, 2f, Cue.SHOUT), "fighting an infected is no bark at the survivor");
+        guard.combatTarget = null;
+        assertEquals(1, run(game, sounds, 6f, Cue.SHOUT), "one bark as the hunt begins");
+        guard.state = Npc.NpcState.IDLE;
+        assertEquals(0, run(game, sounds, 2f, Cue.SHOUT));
+    }
+
     @Test
     void theSoundscapeStaysWithinItsBoundsAndForgetsTheOutgoingWorld() {
         Game game = scene();
