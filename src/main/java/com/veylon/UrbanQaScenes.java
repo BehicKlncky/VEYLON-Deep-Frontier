@@ -77,6 +77,12 @@ final class UrbanQaScenes {
      * ({@code urban_onboarding}).
      */
     private final UrbanOnboardingQaScene onboarding;
+    /**
+     * Package 22: the city held still at the places a survivor spends time, by day, night, fog and
+     * rain, for captures before and after a presentation change and what a listener there is given
+     * ({@code urban_atmosphere}).
+     */
+    private final UrbanAtmosphereQaScene atmosphere;
     private final PlayerMovementSystem.Command walk = new PlayerMovementSystem.Command();
     private boolean holding;
     private float holdX;
@@ -119,6 +125,7 @@ final class UrbanQaScenes {
         this.utilities = new UrbanUtilityQaScene(game);
         this.missions = new UrbanMissionQaScene(game);
         this.onboarding = new UrbanOnboardingQaScene(game);
+        this.atmosphere = new UrbanAtmosphereQaScene(game);
     }
 
     /** Stages one of the urban scenes; inert, with a notice, outside a street-network world. */
@@ -175,6 +182,10 @@ final class UrbanQaScenes {
         }
         if (scene.equals("urban_onboarding")) {
             onboarding.stage(); // a fresh session: poses between legs, the clock (forward), fog and a spear are staged
+            return;
+        }
+        if (scene.equals("urban_atmosphere")) {
+            atmosphere.stage(); // a normal session: only poses, the clock and the weather are staged
             return;
         }
         if (!world.isUrban() || !world.urban.hasCityPlan()) {
@@ -275,6 +286,7 @@ final class UrbanQaScenes {
     UrbanUtilityQaScene utilities() { return utilities; }
     UrbanMissionQaScene missions() { return missions; }
     UrbanOnboardingQaScene onboarding() { return onboarding; }
+    UrbanAtmosphereQaScene atmosphere() { return atmosphere; }
 
     /** Per-frame hook, before streaming and rendering; inert unless a scene is staged. */
     void update(double elapsed) {
@@ -304,6 +316,7 @@ final class UrbanQaScenes {
         utilities.update(elapsed);
         missions.update(elapsed);
         onboarding.update(elapsed);
+        atmosphere.update(elapsed);
         if (holding) {
             apply();
         }

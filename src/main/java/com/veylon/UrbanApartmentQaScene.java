@@ -37,7 +37,8 @@ final class UrbanApartmentQaScene {
     private boolean supplementalLighting;
     private int viewIndex = -1;
 
-    private record View(String name, Vec3i feet, Vec3i lookAt, float pitch) { }
+    /** One scripted camera hold: where the feet stand, what is looked at and the pitch. */
+    record View(String name, Vec3i feet, Vec3i lookAt, float pitch) { }
 
     UrbanApartmentQaScene(Game game) { this.game = game; }
 
@@ -126,7 +127,8 @@ final class UrbanApartmentQaScene {
                 || Math.floorDiv(parcel.z0(), Chunk.SZ) != Math.floorDiv(parcel.z1(), Chunk.SZ);
     }
 
-    private static List<View> createViews(BuildingPlan plan) {
+    /** The seven views of a selected apartment: street, entrance, kitchen, upper floor, basement, exit, stairs. */
+    static List<View> createViews(BuildingPlan plan) {
         ParcelPlan.Entrance entry = plan.parcel().primaryEntrance();
         Vec3i door = new Vec3i(entry.x(), 41, entry.z());
         Vec3i street = new Vec3i(entry.outsideX() + 4 * entry.facing().dx, 41,

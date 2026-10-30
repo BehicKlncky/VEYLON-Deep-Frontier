@@ -82,6 +82,8 @@ final class AmbienceSystem {
     private final Game game;
     /** What burning bodies give off and how they sound. */
     final BodyFireEffects bodyFire;
+    /** The last ambient mix computed, for QA reports: rain, wind, fire, cave, crickets, beacon. */
+    final float[] lastMix = new float[6];
     private final Vector3f firePosition = new Vector3f();
     private final Random emitterRng = new Random();
     private float emitterTimer;
@@ -311,5 +313,11 @@ final class AmbienceSystem {
         game.audio.setSheltered(!game.player.exposedToSky);
         game.audio.setWeatherIntensity(game.weather.intensity());
         game.audio.setAmbience(rainGain, windGain, fireGain, caveGain, cricketGain, beaconGain);
+        lastMix[0] = rainGain;
+        lastMix[1] = windGain;
+        lastMix[2] = fireGain;
+        lastMix[3] = caveGain;
+        lastMix[4] = cricketGain;
+        lastMix[5] = beaconGain;
     }
 }
