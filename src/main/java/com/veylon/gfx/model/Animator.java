@@ -128,6 +128,8 @@ public final class Animator {
         }
     }
 
+    /** A Veilbound's or Breacher's veil glow at rest, and what a strike's full windup adds (urban 22). */
+    public static final float VEIL_GLOW = 0.18f, VEIL_STRIKE_GLOW = 0.62f;
     private static final String[] VEILMAW_LEGS = {"leg_fl", "leg_fr", "leg_bl", "leg_br"};
 
     /**
@@ -330,6 +332,16 @@ public final class Animator {
 
         if (n.infected()) {
             boolean breacher = n.archetype == com.veylon.settlement.NpcArchetype.BREACHER;
+            // Urban milestone 22: the veil growing through the body glows faintly, so one standing in
+            // a dark room is a dim sickly shape rather than nothing, and it brightens through a strike's
+            // windup in step with the strike's sound: the tell reads in the dark as well as the light.
+            float strikeTell = n.strikeWindup >= 0 ? 1 - Math.max(0f, n.strikeWindup)
+                    / (breacher ? com.veylon.ai.BreacherAI.WINDUP : com.veylon.ai.InfectedAI.WINDUP) : 0f;
+            float veil = VEIL_GLOW + VEIL_STRIKE_GLOW * Math.min(1f, strikeTell);
+            m.part("veilRibs").emissive = veil;
+            m.part("veilShoulder").emissive = veil;
+            m.part("breacherSeal").emissive = breacher ? veil : 0f;
+            m.part("breacherHump").emissive = breacher ? veil * 0.8f : 0f;
             torso.rotX = n.painTimer > 0 ? -0.18f : breacher ? 0.34f : 0.22f;
             m.part("head").rotZ = breacher ? 0f : -0.13f;
             m.part("head").rotX = breacher ? 0.26f : 0f; // the sealed face hangs, listening

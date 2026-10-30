@@ -214,8 +214,10 @@ public final class MaterialRegistry {
             // Milestone 12 frontage sign: two weathered lettering layouts by position.
             register("sign", BlockType.SIGN, "sign_edge", "sign_board", "sign_edge", 2, TintMode.NONE, false, 0f, 0.8f);
             // Milestone 13 district hazard: an oily crust with sickly blooms, glossy where it seeps.
+            // Milestone 22: the blooms give off a faint glow, so the ground that sickens still reads
+            // as a hazard at night and in fog.
             register("contaminated", BlockType.CONTAMINATED_GROUND, "contaminated", "contaminated", "contaminated",
-                    2, TintMode.NONE, false, 0f, 0.55f);
+                    2, TintMode.NONE, false, 0.08f, 0.55f);
             // Milestone 14 routes: a cutout guard rail, and a loose panel that wears the plaster coat
             // with a seam, scuffs and, on one layout, a chalk tally.
             register("railing", BlockType.RAILING, "railing_top", "railing", "railing_top", 1, TintMode.NONE, true, 0f, 0.4f);
