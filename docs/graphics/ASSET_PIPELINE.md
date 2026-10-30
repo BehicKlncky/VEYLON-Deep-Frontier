@@ -27,6 +27,15 @@ assets/
    Variants use `<tileId>_2.png`, `<tileId>_3.png`… (variant 1 = base name).
 4. Natural variants are chosen per block from a world-position hash — stable,
    deterministic, no save impact.
+5. City dressing (urban milestone 22) works the same way one level up. A
+   generated city's surfaces take a district grade in the vertex tint, and
+   `decal_*` tiles (ivy, notices, the cordon mark, mould, photographs, the
+   door marks survivors leave) are standalone cutout layers the mesher lays as
+   thin quads over wall faces. `world.urban.UrbanDressing` and
+   `world.urban.UrbanTraces` decide where, purely from the district plan, the
+   block, its position and the site plans; `UrbanTextures` paints the tiles and
+   `MaterialRegistry` registers them. A new decal is one tile case, one enum
+   constant and one placement rule: no block id, entity, light or save field.
 
 ## Shaders
 
