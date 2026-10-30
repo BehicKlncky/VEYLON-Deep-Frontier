@@ -77,6 +77,41 @@ public final class HudLayout {
         return new String(points, 0, lo).stripTrailing() + ellipsis;
     }
 
+    /**
+     * Word-wraps text into at most {@code maxLines} lines no wider than {@code width}, measured the
+     * way it will be drawn. A word too long for a line is fitted on its own; text left over after the
+     * last line ends that line with a visible ellipsis, never silent clipping.
+     */
+    public static java.util.List<String> wrap(String text, float width, int maxLines, ToDoubleFunction<String> measure) {
+        java.util.List<String> lines = new java.util.ArrayList<>();
+        if (text == null || width <= 0 || maxLines <= 0) return lines;
+        String[] words = text.replace('\n', ' ').replace('\r', ' ').replace('\t', ' ').trim().split(" +");
+        StringBuilder line = new StringBuilder();
+        int i = 0;
+        while (i < words.length && lines.size() < maxLines) {
+            String candidate = line.isEmpty() ? words[i] : line + " " + words[i];
+            if (measure.applyAsDouble(candidate) <= width) {
+                line.setLength(0);
+                line.append(candidate);
+                i++;
+                continue;
+            }
+            if (line.isEmpty()) {
+                lines.add(fit(words[i], width, measure));
+                i++;
+            } else {
+                lines.add(line.toString());
+                line.setLength(0);
+            }
+        }
+        if (!line.isEmpty() && lines.size() < maxLines) lines.add(line.toString());
+        if (i < words.length && !lines.isEmpty()) {
+            int last = lines.size() - 1;
+            lines.set(last, fit(lines.get(last) + " " + words[i] + "…", width, measure));
+        }
+        return lines;
+    }
+
     /** State words are also rendered, so a warning never depends on hue alone. */
     public static String vitalState(float fraction) {
         return fraction <= 0.1f ? "CRITICAL" : fraction <= 0.25f ? "LOW" : "";

@@ -10,14 +10,20 @@ import com.veylon.world.World;
 
 /**
  * Top-down map of explored terrain around the player. Shows the NPC camp,
- * discovered points of interest and the distress beacon.
+ * discovered points of interest and the distress beacon. A layout-sixteen
+ * city draws its own map instead ({@link CityMap}, urban milestone 21).
  */
 public class MapScreen {
 
     private static final int CELLS = 64;
     private static final int STEP = 2;
+    private final CityMapView city = new CityMapView();
 
     public void update(Game g) {
+        if (CityMap.applies(g.world)) {
+            city.draw(g);
+            return;
+        }
         UiRenderer ui = g.ui;
         int w = ui.screenW(), h = ui.screenH();
         float size = Math.min(w, h) * 0.72f;

@@ -224,6 +224,16 @@ public class Hud {
         panel(ui, box, "FIELD CONDITIONS", CYAN);
         float x = box.x() + PAD, width = box.width() - PAD * 2;
         fitted(ui, x, box.y() + 32, width, TITLE, g.time.timeString(), TEXT);
+        if (CityMap.applies(g.world)) {
+            // A city trades the separate season line for where the survivor stands (urban 21).
+            fitted(ui, x, box.y() + 56, width, SMALL, g.seasons.current(g.time).displayName + ", "
+                    + g.seasons.daysLeft(g.time) + " days left / " + g.weather.effective().displayName, AMBER);
+            String district = CityMap.districtName(g.world, (int) Math.floor(g.player.pos.x),
+                    (int) Math.floor(g.player.pos.z));
+            fitted(ui, x, box.y() + 77, width, SMALL, district == null ? "Beyond the city plan" : district, TEXT);
+            fitted(ui, x, box.y() + 97, width, SMALL, CityMap.hereLine(g), MUTED);
+            return;
+        }
         fitted(ui, x, box.y() + 56, width, SMALL,
                 g.seasons.current(g.time).displayName + " / " + g.seasons.daysLeft(g.time) + " days left", AMBER);
         fitted(ui, x, box.y() + 77, width, SMALL, "Weather / " + g.weather.effective().displayName, TEXT);
@@ -245,8 +255,8 @@ public class Hud {
         fitted(ui, x, box.y() + 89, width, BODY, comms != null ? comms
                 : g.faction.quest == null ? "No active request" : g.faction.quest.describe(), TEXT);
         String navigation = QuestObjectiveView.navigationLabel(g);
-        fitted(ui, x, box.y() + 120, width, SMALL,
-                navigation.isEmpty() ? "[M] Map & navigation" : navigation, CYAN);
+        fitted(ui, x, box.y() + 120, width, SMALL, !navigation.isEmpty() ? navigation
+                : CityMap.applies(g.world) ? "[M] Map & journal" : "[M] Map & navigation", CYAN);
     }
 
     private void renderHotbar(Game g, UiRenderer ui, HudLayout layout) {
