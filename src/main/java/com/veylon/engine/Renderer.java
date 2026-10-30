@@ -350,6 +350,7 @@ public class Renderer {
         chunkShader.set("uFoliageTint", env.foliageTint);
         chunkShader.set("uWetness", env.wetness);
         chunkShader.set("uFrost", env.frost);
+        chunkShader.set("uCity", env.city);
         chunkShader.set("uFogColor", env.fogColor);
         chunkShader.set("uFogStart", fogStart);
         chunkShader.set("uFogEnd", fogEnd);

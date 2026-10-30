@@ -40,6 +40,11 @@ public class Environment {
     public final Vector3f foliageTint = new Vector3f(1, 1, 1);
     public float wetness;
     public float frost;
+    /**
+     * 1 in a generated city, else 0 (urban milestone 22): the terrain shader then wets and frosts
+     * only what the sky reaches and bounces a little daylight into rooms above the street.
+     */
+    public float city;
 
     // Water palette.
     public final Vector3f waterDeep = new Vector3f(0.05f, 0.16f, 0.28f);
@@ -207,6 +212,17 @@ public class Environment {
             foliageTint.mul(1.05f, 0.95f, 0.8f);
         } else if (biome == Biome.MARSH) {
             foliageTint.mul(0.9f, 1.0f, 0.85f);
+        }
+
+        city = g.world.urban != null && g.world.urban.hasGeneratedBuildings() ? 1f : 0f;
+        // A generated city's water stands in flooded streets, canals and basins: murky and
+        // still, not a mountain lake's clear blue (urban milestone 22).
+        if (city > 0) {
+            waterDeep.set(0.06f, 0.10f, 0.08f);
+            waterShallow.set(0.20f, 0.27f, 0.21f);
+        } else {
+            waterDeep.set(0.05f, 0.16f, 0.28f);
+            waterShallow.set(0.16f, 0.42f, 0.45f);
         }
 
         // ---- Wetness / frost (smoothed so transitions read naturally) ----
