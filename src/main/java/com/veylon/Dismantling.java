@@ -89,11 +89,15 @@ final class Dismantling {
 
     /**
      * A standing break of this block already does something: it forces a closed door, or carries
-     * away the block's own form (furniture, an open door, a legacy station).
+     * away the block's own form (furniture, an open door, a legacy station). In layout seventeen
+     * (milestone 23) a worn or wrecked piece is too far gone to carry away whole, so any hold takes it
+     * apart: carrying a piece off and setting it down can never make it sound again.
      */
     private boolean breaksAlone(Vec3i pos, BlockType t) {
         if (Fixtures.isClosed(t)) { return true; }
-        return FixtureActions.isUrbanBlock(t) ? FixtureActions.salvageOf(game.world, pos, t) != null : t.drop != null;
+        boolean carried = FixtureActions.isUrbanBlock(t) ? FixtureActions.salvageOf(game.world, pos, t) != null : t.drop != null;
+        return carried && !(game.world.urban.hasEconomy()
+                && SalvageTable.condition(game.world, pos, t) != SalvageTable.Condition.SOUND);
     }
 
     /** One frame of holding the attack button on a piece being taken apart. */

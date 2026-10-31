@@ -1,7 +1,9 @@
 package com.veylon.world.urban;
 
+import com.veylon.item.CraftingSystem;
 import com.veylon.item.ItemStack;
 import com.veylon.item.ItemType;
+import com.veylon.item.Recipe;
 import com.veylon.item.ToolKind;
 import com.veylon.util.Vec3i;
 import com.veylon.world.BlockType;
@@ -203,10 +205,33 @@ public final class SalvageTable {
             if (i == 0) { count = Math.max(1, count); }
             if (count > 0) { out.add(new ItemStack(base.type, count)); }
         }
+        // Layout seventeen (milestone 23): a piece the player set down never gives back anything the
+        // recipe that makes it does not spend, nor more of it, so building and taking apart can never
+        // mint a part. A rebuilt workbench comes apart for planks and scrap, never the workshop's spare part.
+        Recipe recipe = w.urban.hasEconomy() && w.changedBlocks.containsKey(p) ? recipeFor(w, t) : null;
+        if (recipe != null) { out = withinRecipe(out, recipe); }
         // A generator taken apart gives back the whole cans left in its tank; the one it was burning is lost.
         UrbanUtilities.Device device = t == BlockType.GENERATOR ? w.urban.utilities.device(p) : null;
         int cans = device == null ? 0 : (int) Math.floor(device.fuel / UrbanUtilities.CAN_SECONDS + 1e-4f);
         if (cans > 0) { out.add(new ItemStack(ItemType.FUEL_CAN, cans)); }
+        return out;
+    }
+
+    /** The first recipe of a world's list whose result puts this block down, or null when none does. */
+    public static Recipe recipeFor(World w, BlockType t) {
+        for (Recipe r : CraftingSystem.recipesFor(w)) {
+            if (r.result != null && r.result.places() == t) { return r; }
+        }
+        return null;
+    }
+
+    /** A yield cut down to what one result of a recipe spends: nothing it does not use, no more than it uses. */
+    private static List<ItemStack> withinRecipe(List<ItemStack> yields, Recipe recipe) {
+        List<ItemStack> out = new ArrayList<>();
+        for (ItemStack s : yields) {
+            int count = Math.min(s.count, recipe.ingredients.getOrDefault(s.type, 0) / Math.max(1, recipe.resultCount));
+            if (count > 0) { out.add(new ItemStack(s.type, count)); }
+        }
         return out;
     }
 
