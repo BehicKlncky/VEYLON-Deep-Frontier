@@ -98,6 +98,7 @@ public final class InfectedAI {
      */
     static boolean ready(Game g, Npc n, float dt) {
         n.attackCooldown -= dt;
+        n.painGuard = Math.max(0f, n.painGuard - dt);
         n.repathCooldown -= dt;
         n.decideTimer -= dt;
         n.searchTimer = Math.max(0, n.searchTimer - dt);

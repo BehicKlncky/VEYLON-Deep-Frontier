@@ -244,14 +244,25 @@ public class Npc extends Entity {
     /** Species profile uses the shared humanoid appearance codec, not settlement ownership. */
     public boolean infected() { return archetype != null && archetype.infected(); }
 
+    /**
+     * Layout seventeen (urban milestone 23): the seconds after a flinch in which an infected body shrugs
+     * off further pain, so a strike wound up under a rain of blows still lands (decision D-97's finding).
+     */
+    public static final float PAIN_GUARD_SECONDS = 1.2f;
+    /** Seconds left in which a fresh blow does not flinch this infected body again; transient. */
+    public float painGuard;
+
     @Override
     public void hurt(float damage, boolean byPlayer) {
         boolean living = !dead;
         super.hurt(damage, byPlayer);
         if (living && !dead && damage > 0 && infected()) {
-            painTimer = Math.max(painTimer, 0.35f);
             painSound = true;
-            strikeWindup = -1f;
+            if (painGuard <= 0f) {
+                painTimer = Math.max(painTimer, 0.35f);
+                strikeWindup = -1f;
+                if (world != null && world.urban != null && world.urban.hasEconomy()) { painGuard = PAIN_GUARD_SECONDS; }
+            }
         }
     }
 
