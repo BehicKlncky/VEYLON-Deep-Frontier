@@ -83,6 +83,12 @@ final class UrbanQaScenes {
      * ({@code urban_atmosphere}).
      */
     private final UrbanAtmosphereQaScene atmosphere;
+    /**
+     * Package 23: two and a half days of survival in the economy city in real time, from the refuge's
+     * stores and the first trip to a flat in the next block, water boiled and caught, two nights slept in
+     * the refuge, F5 and F9 ({@code urban_economy}).
+     */
+    private final UrbanEconomyQaScene economy;
     private final PlayerMovementSystem.Command walk = new PlayerMovementSystem.Command();
     private boolean holding;
     private float holdX;
@@ -126,6 +132,7 @@ final class UrbanQaScenes {
         this.missions = new UrbanMissionQaScene(game);
         this.onboarding = new UrbanOnboardingQaScene(game);
         this.atmosphere = new UrbanAtmosphereQaScene(game);
+        this.economy = new UrbanEconomyQaScene(game);
     }
 
     /** Stages one of the urban scenes; inert, with a notice, outside a street-network world. */
@@ -186,6 +193,10 @@ final class UrbanQaScenes {
         }
         if (scene.equals("urban_atmosphere")) {
             atmosphere.stage(); // a normal session: only poses, the clock and the weather are staged
+            return;
+        }
+        if (scene.equals("urban_economy")) {
+            economy.stage(); // a normal session in real time: one pose between legs is staged, nothing else
             return;
         }
         if (!world.isUrban() || !world.urban.hasCityPlan()) {
@@ -287,6 +298,7 @@ final class UrbanQaScenes {
     UrbanMissionQaScene missions() { return missions; }
     UrbanOnboardingQaScene onboarding() { return onboarding; }
     UrbanAtmosphereQaScene atmosphere() { return atmosphere; }
+    UrbanEconomyQaScene economy() { return economy; }
 
     /** Per-frame hook, before streaming and rendering; inert unless a scene is staged. */
     void update(double elapsed) {
@@ -317,6 +329,7 @@ final class UrbanQaScenes {
         missions.update(elapsed);
         onboarding.update(elapsed);
         atmosphere.update(elapsed);
+        economy.update(elapsed);
         if (holding) {
             apply();
         }
