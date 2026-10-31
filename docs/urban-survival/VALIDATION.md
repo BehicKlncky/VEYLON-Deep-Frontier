@@ -3640,3 +3640,203 @@ follow-up; 0.18 read almost white in the first after-run).
   No reviewer subagents ran.
 
 Next: the consolidated human playtest and listening pass (D-80), then package 23.
+
+## Milestone 23 — survival economy and extended play (2026-10-30 to 2026-10-31)
+
+### Scope and baseline
+
+- Branch `feature/urban-survival` at `cf1a96f` (the 22 records), clean tree. Read the
+  revised base, the prompt, `AGENTS.md`, `docs/COMMIT_WORKFLOW.md` and these records.
+- Added: generator 20 (layout 17), content revision 4, encounter catalogue 6, one salt
+  (`UrbanSalts.STARTER_PICKED_OVER`), one QA scene. No block, item, icon, ordinal or
+  save section (D-232). The default new world is unchanged.
+- Host: Windows 11, NVIDIA GeForce RTX 3060 Ti, OpenGL 3.3.0 with KHR_debug, the
+  repository-local Temurin 25.0.4.1; windowed 1280 × 720 natives from the main
+  checkout with isolated data directories.
+
+### Before: a census of generator 19
+
+A throwaway census test (never committed) read every container of region (0, 0)'s
+starter block and of the nine regions round the spawn through the production rolls on
+the six design seeds (content 3):
+
+| Measure | Seed 20260731 | −4242 | 7 | 0 | 987654321 | −9e18 |
+| --- | --- | --- | --- | --- | --- | --- |
+| Starter block food, waking days | 18.5 | 20.5 | 20.5 | 18.1 | 15.0 | 26.1 |
+| Starter block pry tools | 28 | 26 | 27 | 27 | 27 | 22 |
+| Refuge alone: scrap, planks, fibre | 25, 6, 4 | 22, 6, 16 | 21, 6, 4 | 23, 6, 4 | 27, 6, 4 | 21, 6, 22 |
+| Pry tools in nine regions | 1,627 | 1,543 | 1,721 | 1,545 | 1,673 | 1,509 |
+
+The refuge's own stores funded the reinforced spear (three scrap, two planks, two
+fibre) on every seed, and the residential district's flats averaged about 2.8 servings
+and 1.7 litres.
+
+### Behaviour evidence
+
+Each figure is printed by the test named and re-run by every build.
+
+- `UrbanEconomyCensusTest` (content 4): starter block food 6.3, 7.0, 7.7, 4.9, 5.2,
+  9.7 waking days and pry tools 7, 7, 6, 4, 4, 4 on the six seeds; the refuge's stores
+  `{PLANK 6, DRIED_BERRY 3, WATERSKIN_CLEAN 1, BANDAGE 2, ANTISEPTIC 1, TORCH 1}` (fibre
+  on two seeds), no scrap; stocked flats in nine regions 1.42–1.66 servings and
+  0.57–0.65 litres, treatment in 52–58 % of bathrooms, 23–28 % of buildings picked
+  clean, no spare part in a flat; two kinds of source for each necessity in every
+  district.
+- `UrbanEconomySalvageTest`: put down and taken apart, "Repair Workbench → 3 planks,
+  2 scrap metal; Textile Bedroll → 4 fiber; Rain Collector → 2 scrap metal; Plank
+  Barricade → 2 planks; Sheet-Metal Barricade → 1 sheet metal, 1 scrap metal; Rebuild
+  Generator → 2 spare parts, 2 scrap metal, 1 sheet metal; Wire Work Lamp → 1 spare
+  parts; Build Water Purifier → 1 sheet metal, 1 spare parts, 1 scrap metal; Build Radio
+  Workstation → 1 transmitter module, 1 scrap metal"; generator 19's rebuilt bench
+  still gives a spare part; a worn table comes apart under a standing hold.
+- `UrbanEconomyTradeTest`: "generator 19 3 Scrap Metal for 1 Waterskin (clean water)
+  to 4 people: sold 4 of 4, 0 left"; "generator 20 … sold 0 of 4, 4 left, last word
+  'We can't spare water. What's left is what we drink.'"; "after 4 h of foraging: sold
+  2 more, 4 left"; everyone fed and watered a day later.
+- `UrbanEconomyCombatTest`: "pry tool, generator 19: damageTaken=0.0, seconds=2.3,
+  blows=6"; "pry tool, generator 20: damageTaken=6.0, blows=6"; "reinforced spear,
+  generator 20: damageTaken=0.0, seconds=0.95, blows=3".
+- `UrbanEconomyEncounterTest`: "starter slots 2 (catalogue 5: 8), nearest 33.0, 32.0,
+  29.2, 33.0, 33.0, 26.4 blocks from the refuge door"; catalogue 6 equals catalogue 5
+  everywhere else.
+- `UrbanEconomyAuditTest`: unheld part sources within three regions (modules 27, 16,
+  43, 28, 22, 14 buildings; cells 306–411; cable 149–256), cars that did not burn within
+  one region ring 32, 25, 27, 25, 30, 22; spawn region food against hunting 5,356/180,
+  5,936/330, 5,470/210, 5,394/180, 7,236/60, 6,270/180 and fuel against park trees
+  597,780/38,160 s … 575,940/39,000 s; two unplannable parcels reported and skipped.
+- `UrbanEconomyRouteTest` (seed 20260731, Survival, accelerated headless days): the
+  refuge's stores (no scrap) then the neighbour's ground floor funded the spear; the
+  camp's rumour and three missions; "stole 11 … trust now −23", "stole 6 … trust now
+  −37", a demand ("You'll have to come through us."); "every mission the camp gave
+  failed: [CLINIC_SUPPLIES, HIDDEN_AID, LANDMARK]"; the armoury door forced; four
+  engines, two tanks, two bodies and a locker taken apart; generator and radio built;
+  cable and cells fitted; "the city answered on day 1" without codes; then four days:
+
+| Day | Time | Health | Hunger | Thirst | Food in hand | Clean water | Searched that day |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 1 (game day 2) | 20:05 | 100 | 71 | 61 | 20 | 12 | 15 |
+| 2 (game day 3) | 20:25 | 100 | 80 | 97 | 19 | 14 | 8 |
+| 3 (game day 4) | 20:28 | 100 | 76 | 92 | 20 | 16 | 8 |
+| 4 (game day 5) | 20:29 | 100 | 71 | 89 | 21 | 17 | 10 |
+
+  A save and load after day 2 kept the objective, the failed missions and a searched
+  container as they were; no block that was a tree or an ore vein changed.
+- `UrbanSliceRouteTest`: the slice completes on generator 20 on every slice seed, one
+  infected engaged and defeated each, the spear crafted.
+- The earlier tours on generator 20 (a throwaway probe, never committed): `urban_missions`,
+  `urban_onboarding`, `urban_utilities` and `urban_refuge` each printed `pass=true` when
+  `urban-dev` hands them a generator-20 world, headless in Survival.
+
+### Commands and portable builds
+
+Every code commit was validated by the full portable build on its exact tree
+in a detached worktree (`build/m12-check`, `m13-check`, `m14-check`,
+`m21-check`, reset to `cf1a96f`, the staged tree applied and its `git
+write-tree` hash compared with the main index before building), four at a
+time, then committed with `git read-tree <tree>` and `git commit -F`:
+
+| Commit | Tree | Tests | Classes | Build |
+| --- | --- | --- | --- | --- |
+| `e214f52` | `ea09a5d` | 2,302 | 284 | BUILD SUCCESSFUL in 27m 50s |
+| `c382717` | `99cdf3b` | 2,304 | 285 | BUILD SUCCESSFUL in 27m 54s |
+| `de7eff9` | `f13ec5d` | 2,306 | 286 | BUILD SUCCESSFUL in 27m 46s |
+| `0873c1e` | `fd1fe0b` | 2,307 | 287 | BUILD SUCCESSFUL in 28m 1s |
+| `6f60e54` | `32404c9` | 2,309 | 288 | BUILD SUCCESSFUL in 37m 59s |
+| `b3de774` | `eac6050` | 2,313 | 289 | BUILD SUCCESSFUL in 39m 18s |
+| `7d10039` | `3ad310f` | 2,314 | 290 | BUILD SUCCESSFUL in 39m 48s |
+| `24540b0` | `a8b616b` | 2,317 | 291 | BUILD SUCCESSFUL in 39m 46s |
+
+No test failed or errored in any of them (the existing Windows skip applies).
+The second batch shared the machine with native runs. Before the tour existed,
+the main checkout's full build (the `7d10039` tree plus documents) passed:
+2,314 tests, `BUILD SUCCESSFUL in 17m 41s`.
+
+Focused runs while iterating (`.\gradlew.bat test --tests ... --console=plain`):
+the census, revision, meta-section, dispatch, selector, fingerprint, slice-route,
+starter-progression, game-loop, containers-section and runtime-bounds classes;
+then each new economy class with its neighbours (`UrbanSalvageTest`,
+`UrbanSiteDialogueTest`, `UrbanMissionsTest`, `InfectedBehaviorTest`,
+`BreacherBehaviorTest`, `UrbanEcologyPopulationTest`). They found, and these
+commits fix: an additive district bias that erased flooded pry tools (now a
+percentage), bathrooms holding treatment two times in three (now about half),
+a reserve of two skins a mouth larger than a camp's first stock (now one), a
+route that waited outdoors in the rain and counted a rested 00:34 waking as
+morning, and a tour that pressed F three times a press and captured during a
+load.
+
+`graphify update . --no-cluster` on the final code: 11,846 nodes and 49,588
+edges, with the usual extractor warnings for `build.gradle` and
+`settings.gradle`. No reviewer subagents ran.
+
+### Native extended play
+
+Scripted runs of `VEYLON_SCENE=urban_economy` on the committed code
+(`24540b0`), seed 20260731, generator 20 through `urban-dev`, 1280 × 720,
+isolated data directories:
+
+```powershell
+$env:VEYLON_GENERATOR='urban-dev'; $env:VEYLON_SEED='20260731'
+$env:VEYLON_GAME_MODE='survival'; $env:VEYLON_SCENE='urban_economy'
+$env:VEYLON_RESOLUTION='1280x720'; $env:VEYLON_CAPTURE_TAG='m23-economy-survival-2'
+Remove-Item Env:VEYLON_SHOT -ErrorAction SilentlyContinue
+.\gradlew.bat run -PveylonDataDir=build/qa/m23-economy-survival-2 --console=plain
+```
+
+**Survival** (`build/qa/m23-economy-survival-2`), 1,062 s of real time, the
+day's ledger lines:
+
+| Ledger | Day | Time | Health | Hunger | Thirst | Food | Clean water | Searched | Meals | Drinks | Nights |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| day 1 morning | 1 | 08:02 | 100 | 100 | 100 | 1 | 1 | 0 | 0 | 0 | 0 |
+| day 1 evening | 1 | 20:30 | 100 | 79 | 65 | 5 | 5 | 7 | 0 | 0 | 0 |
+| day 2 morning | 2 | 05:10 | 100 | 78 | 64 | 5 | 5 | 7 | 0 | 0 | 1 |
+| day 2 evening | 2 | 20:30 | 100 | 73 | 87 | 7 | 4 | 11 | 1 | 2 | 1 |
+| day 3 morning | 3 | 05:31 | 100 | 73 | 86 | 7 | 4 | 11 | 1 | 2 | 2 |
+
+- **Revision and seed:** `24540b0` (tree `a8b616b`), seed 20260731, generator 20,
+  content revision 4.
+- **Gear:** the starting kit (a serving, a skin of water, an empty skin, a
+  bandage, a torch); a pry tool, scrap, planks and fibre from the neighbour's
+  ground floor; the reinforced spear, crafted at 09:49 on day 1.
+- **Choices:** the refuge's stores; the quiet apartment's inner door forced
+  (`forced=BROKEN_DOOR`) and its locker, kitchen and bathroom searched; the
+  corner shop's shelf; a skin filled at the rain collector each morning ("Filled
+  a waterskin with clean rainwater"; no empty skin was left over for the tap and
+  the fire); the days spent indoors; the nights slept in the refuge's bed, woken
+  rested twice a night ("You wake after 2.0 hours") and back to sleep; on day 2
+  the next block's flat `urban:building:0,0:72:0`, its street door the one staged
+  pose, searched on its two lowest storeys; F5 and F9 with
+  `before-save containers=11 food=6 clean-water=4 day=3` equal to `after-load`.
+- **Failures:** none. No infected came within reach (engaged and defeated
+  empty), and the refuge, never barred, read "4 ways in open" each night without
+  drawing anything. A toxic-fog event ran outside the quarantine without harm.
+- **Frames:** 11 captures, every one `glErrors=0 khrErrors=0`;
+  `[audio] ... nativeErrors=0`. Reviewed: the refuge morning with the kit, the
+  searched bathroom cabinet ("empty · hold LMB for 2 planks"), the spear at the
+  bench, the rain collector (2.0/3.0 L), waking at dawn in the refuge, the next
+  block's pantry upstairs, and the reloaded refuge on day 3 ("Game loaded",
+  berries 75 % fresh).
+
+**Creative** (`build/qa/m23-economy-creative-2`), 1,022 s of real time: the same
+route with nothing consumed (health, hunger and thirst at 100 throughout, no
+meal or drink taken), the inner door broken outright (`forced=AIR`, as a
+Creative break is), food 8 and water 5 in hand on day 3,
+`before-save containers=11 food=8 clean-water=5 day=3` equal to `after-load`;
+11 captures with zero GL and KHR errors and `nativeErrors=0`.
+
+A first pair of runs on an earlier tree of the tour (`build/qa/m23-economy-survival`,
+`-creative`) passed the same way but captured `11-after-load` during the load's
+transition, a black frame; the tour now waits 1.5 s and compares the saved
+state before that capture, and the runs above are its evidence.
+
+This is scripted native evidence of two and a half in-game days, separate from
+the accelerated headless days of `UrbanEconomyRouteTest` and never a human
+playtest (D-80).
+
+### Limits and next gate
+
+- Human extended play, listening and judgement of how the economy feels are pending
+  under D-80; the scripted native run is not one.
+- The two unplannable parcels (DESIGN §16.6) are packages 24 and 25's.
+
+Next: the consolidated human playtest and listening pass (D-80), with package 23's extended play, then package 24.

@@ -813,6 +813,27 @@ through `engine.FootstepSurface`, whose loudness follows what the AI hears of a 
 `VEYLON_SCENE=urban_atmosphere` holds the camera at fixed places for before-and-after
 captures and prints what a listener there is given.
 
+### The survival economy
+
+Urban package 23 adds no system to `Game`. Generator 20 plans layout 17, layout 16's
+city exactly, and the rules below gate on `UrbanWorldState.hasEconomy()` (every
+earlier predicate also holds for it). A fresh world resolves its generator's content
+revision (`UrbanRevision.contentFor`: 4 for generator 20, 3 for every earlier urban
+generator), and `UrbanWorldState.resolveContentRevision` refuses content 4 outside
+layout 17 and any other revision inside it, so a load never rolls a world against
+tables it was not created with. `UrbanContainers.firstRoll` is the first-touch roll
+that `touch` commits (the content revision's starter reservation, then a site's
+stash, then the table, then the relay's part) and that censuses read without
+touching the ledger; `LootTables` keeps content 4's tables beside the frozen ones,
+with a district's bias as a percentage of each chance, and `UrbanStarterSite.economySupplies`
+holds content 4's starter reservations. In layout 17 `SalvageTable.yields` caps a piece
+the player set down by the recipe that makes it (`recipeFor`), and `Dismantling`
+takes a worn or wrecked piece apart under any hold. `UrbanSiteDialogue.keepsBack` is a
+trader's reserve for the people its stash feeds; `Npc.painGuard`, run down by
+`InfectedAI.ready`, is an infected body's transient guard after a flinch; and
+`EncounterAnchors` freezes catalogue 6, catalogue 5 with one starter apartment's
+slots. `VEYLON_SCENE=urban_economy` plays two and a half real-time days.
+
 ### Doors, windows and urban fixtures
 
 Urban package 04 appended 21 block ids (`ASPHALT` … `DEBRIS`): restrained urban

@@ -6,11 +6,11 @@ This is the running record for the 26-package urban-survival roadmap. The pack i
 
 | Item | Value |
 | --- | --- |
-| Last completed package | **22 — Ruined-city visuals and sound** (2026-10-30): every generated city now wears its district (grades, ivy or the veil's growth, notices, the quarantine's cordon mark, mould, photographs and drawings in flats, a tide line and murky water in the flooded quarter) and its people's marks by their doors; lamp and fire light stops at walls for the renderer and the AI alike; rooms take a little daylight, cellars want a light, rain marks only open sky, contaminated ground and the infected's veil glow faintly, toxic fog looks harmful only where it sickens. Rooms, halls, cellars and tunnels ring as what they are; the weather is heard by where the survivor stands; footsteps clank and crunch as loudly as the AI hears them; the city sounds around the survivor without any AI hearing it. Before and after natives in both modes and on the dry audio route. The manual listening pass is the human playtest D-80 schedules now. |
-| Source revision | 22: `728c47b` 21's records → `6903ac8` atmosphere tour → `99a8f24` walls stop light → `2877256` toxic fog's look → `9b48d0b` acoustic zones → `ea0e6a2` sound bank and footsteps → `eabf5cc` soundscape → `a97d86d` tells in the dark → `d7a3a0a` city shading → `8d0dcbf` district dressing → `6a13d71` door marks → `a90ca1c` guards' bark → `96d7c4a` fainter veil → `bfe6e5c` poster stain → `4f6299e` art direction → `21cbb0d` audio direction; the records follow in their own commit. 21: `e764168` 20's records → `4ee6b89` visits → `2749358` rumours → `8f0d89b` city map → `d762cdf` interactions → `1df1e21` onboarding text → `dd121c1` onboarding tour; records `728c47b`. |
-| Default new world | Legacy (`World.DEFAULT_NEW_WORLD_GENERATOR = GEN_CAVE_IDENTITIES`), unchanged until 26 passes. Isolated `VEYLON_GENERATOR=urban-dev` creates generator 19 (`GEN_URBAN_MISSIONS`, layout 16 / template 7 / content 3, encounter catalogue 5). Generators 1–18 stay loadable with their original geometry and encounters. |
-| Next package | **The consolidated human playtest and listening pass (D-80), then 23 — Survival economy and extended play, NOT STARTED.** Keep `UrbanSliceRouteTest` (generators 10–19), `UrbanCatalogueQaSceneTest`, `UrbanDistrictQaSceneTest`, `UrbanUndergroundQaSceneTest`, `UrbanEcologyQaSceneTest`, `UrbanSurvivorQaSceneTest`, `UrbanStrongholdQaSceneTest`, `UrbanRefugeQaSceneTest`, `UrbanUtilityQaSceneTest`, `UrbanMissionRouteTest`, `UrbanMissionQaSceneTest`, `UrbanOnboardingQaSceneTest`, `ui.CityMapTest`, `UrbanInteractionPromptsTest`, `UrbanAtmosphereQaSceneTest`, `UrbanAcousticsTest`, `CitySoundscapeTest`, `world.urban.UrbanDressingTest` and `UrbanTracesTest` as regression gates. Owner question P-15 (the inverted day/night temperature curve) is open. |
-| Human testing schedule | Owner instruction (2026-10-11, D-80): consolidated human playtesting/listening after milestone 22. Package 22 is complete, so it is due now: a human walk of the slice and the city, and the listening pass package 22 asks for (positional and indoor cues, with an EFX device and with `VEYLON_NO_EFX=1`). Until it runs, every human-only gate from 09 to 22 stays pending. |
+| Last completed package | **23 — Survival economy and extended play** (2026-10-31): the economy city (generator 20, content revision 4, encounter catalogue 6) supplies a survivor through scavenging, salvage, survivors and utilities alone. A flat holds a serving or two and half a litre, the starter block keeps its guarantees but its refuge cannot fund the first upgrade, salvage and trade cannot be turned into more than they are worth, a trader keeps back what its people live on, a rain of blows no longer pain-locks the infected and the starter block holds one apartment's two encounter slots. An acceptance route reaches the city's answer without anyone's help and lives four more days with no tree or ore; the native tour lives two and a half real-time days. Human extended play is pending under D-80. Package 22 before it: ruined-city visuals and sound (2026-10-30). |
+| Source revision | 23: `cf1a96f` 22's records → `e214f52` generator 20 and content 4 → `c382717` salvage loops → `de7eff9` the trader's reserve → `0873c1e` the pain guard → `6f60e54` catalogue 6 → `b3de774` audit → `7d10039` the multi-day route → `24540b0` the economy tour; the records follow in their own commit. 22: `728c47b` 21's records → `6903ac8` atmosphere tour → `99a8f24` walls stop light → `2877256` toxic fog's look → `9b48d0b` acoustic zones → `ea0e6a2` sound bank and footsteps → `eabf5cc` soundscape → `a97d86d` tells in the dark → `d7a3a0a` city shading → `8d0dcbf` district dressing → `6a13d71` door marks → `a90ca1c` guards' bark → `96d7c4a` fainter veil → `bfe6e5c` poster stain → `4f6299e` art direction → `21cbb0d` audio direction; the records follow in their own commit. 21: `e764168` 20's records → `4ee6b89` visits → `2749358` rumours → `8f0d89b` city map → `d762cdf` interactions → `1df1e21` onboarding text → `dd121c1` onboarding tour; records `728c47b`. |
+| Default new world | Legacy (`World.DEFAULT_NEW_WORLD_GENERATOR = GEN_CAVE_IDENTITIES`), unchanged until 26 passes. Isolated `VEYLON_GENERATOR=urban-dev` creates generator 20 (`GEN_URBAN_ECONOMY`, layout 17 / template 7 / content 4, encounter catalogue 6). Generators 1–19 stay loadable with their original geometry, content and encounters. |
+| Next package | **The consolidated human playtest and listening pass (D-80), with package 23's extended play, then 24 — Dense-city performance and streaming, NOT STARTED** (with the two unplannable parcels of DESIGN §16.6). Keep `UrbanEconomyCensusTest`, `UrbanEconomyAuditTest`, `UrbanEconomyRouteTest`, `UrbanEconomyQaSceneTest`, `UrbanEconomySalvageTest`, `UrbanEconomyTradeTest`, `UrbanEconomyCombatTest`, `UrbanEconomyEncounterTest`, `UrbanSliceRouteTest` (generators 10–20), `UrbanCatalogueQaSceneTest`, `UrbanDistrictQaSceneTest`, `UrbanUndergroundQaSceneTest`, `UrbanEcologyQaSceneTest`, `UrbanSurvivorQaSceneTest`, `UrbanStrongholdQaSceneTest`, `UrbanRefugeQaSceneTest`, `UrbanUtilityQaSceneTest`, `UrbanMissionRouteTest`, `UrbanMissionQaSceneTest`, `UrbanOnboardingQaSceneTest`, `ui.CityMapTest`, `UrbanInteractionPromptsTest`, `UrbanAtmosphereQaSceneTest`, `UrbanAcousticsTest`, `CitySoundscapeTest`, `world.urban.UrbanDressingTest` and `UrbanTracesTest` as regression gates. Owner question P-15 (the inverted day/night temperature curve) is open. |
+| Human testing schedule | Owner instruction (2026-10-11, D-80): consolidated human playtesting/listening after milestone 22. Package 22 is complete, so it is due now: a human walk of the slice and the city, and the listening pass package 22 asks for (positional and indoor cues, with an EFX device and with `VEYLON_NO_EFX=1`). Until it runs, every human-only gate from 09 to 23 stays pending; package 23 adds human extended play (several in-game days on the economy city, noting the day count, revision, seed, gear, choices and failures). |
 | Commits | Separate `feat`, `test`, `docs` and `chore` commits on `feature/urban-survival`; see the reconstruction ledger below. `main` stays at `923345f`. Original combined commit retained at `backup/urban-m01-m04-before-split`. No merge, push, tag or publication. |
 
 ## Package ledger
@@ -41,7 +41,7 @@ The status vocabulary is NOT STARTED, IN PROGRESS, PARTIAL, BLOCKED or COMPLETE.
 | 20 | Urban missions and long-term purpose | 19, 16–17, 02 | `world/urban/{RelaySites,CommsComponents,UrbanMissions}`, `settlement/{UrbanComms,UrbanMissionBoard}`, `CommsObjective` (owned by `RefugeSystem`), `urban.missions` v1, a fourth `UrbanUtilities` device kind, hooks in the storage, aid, guide and purifier paths, `NpcScreen`, `Hud`, `QuestObjectiveView` and the victory flow | An integration route advances C1–C5 without trees or ore. A hidden-refuge mission and a guarded-access mission. Failure alternatives. Rewards exactly once. The legacy beacon is intact. | **COMPLETE** (2026-10-30; human-only validation deferred by D-80) |
 | 21 | Map, HUD and onboarding | 20 | `world/urban/UrbanVisits` and `urban.visits` v1; `ui/{CityMap,CityMapView,FloorSketch}` behind `ui/MapScreen`; `ui/{Hud,HudLayout,QuestObjectiveView,CrateScreen,NpcScreen,NewFrontierScreen,PauseMenu}`; `item/ItemNames`; `InteractPromptBuilder`, `CrateTransactionSystem`, `FixtureActions`, `WorldBootstrap`; `settlement/UrbanMissionBoard` targets | A new player finds supplies, floors, the refuge and the next step through ordinary UI. Secrets stay secret. `docs/graphics/HUD_VALIDATION.md` captures. | **COMPLETE** (2026-10-30; human-only validation deferred by D-80) |
 | 22 | Ruined-city visuals and sound | 21 | Materials, lighting (D-19), `AmbienceSystem`, `AudioSceneState`, `engine/ReverbPresets`, `engine/AudioManager` | Districts, sites and threats are recognisable in day, night and fog. Props, lights and audio stay bounded. Dry fallback works. A manual listening pass. | **COMPLETE** (2026-10-30; its human listening pass is due under D-80) |
-| 23 | Survival economy and extended play | 22 | Loot tables, recipes, trade stock, encounter pressure; balance record in DESIGN | One route reaches the objective plus several days without trees or ore. Other seeds have reachability. Conservation holds. Fresh extended play recorded. | NOT STARTED |
+| 23 | Survival economy and extended play | 22 | Generator 20 and content revision 4 (`world/World`, `world/urban/{UrbanRevision,UrbanWorldState,LootTables,UrbanStarterSite,UrbanContainers}`), salvage (`world/urban/SalvageTable`, `Dismantling`), trade (`settlement/UrbanSiteDialogue`), the pain guard (`entity/Npc`, `ai/InfectedAI`), catalogue 6 (`world/urban/EncounterAnchors`), the tour `UrbanEconomyQaScene`; the balance record DESIGN §16 | One route reaches the objective plus several days without trees or ore. Other seeds have reachability. Conservation holds. Fresh extended play recorded. | **COMPLETE** (2026-10-31; human extended play pending under D-80) |
 | 24 | Dense-city performance and streaming | 23 | `world/World` retention and eviction or a finite city (D-24); plan caches; queues; `docs/PERFORMANCE_BENCHMARKS.md` | Bounded queues and caches. Measured scenes meet calibrated gates. A long-travel CPU, GPU and save-growth policy with no lost state. | NOT STARTED |
 | 25 | Integrated save and regression audit | 24 | `save/*`, all `urban.*` sections, fixtures | Historical worlds and earlier urban revisions are preserved. An integrated urban fixture survives every order and revisit. Corruption policy and atomic replacement hold. | NOT STARTED |
 | 26 | Default urban rollout and final acceptance | 25, 11, 23, 24 | `DEFAULT_NEW_WORLD_GENERATOR` switch; frontend labels; README and docs | A normal new Survival session starts in the city. The pack README final scenario passes on the default path. Legacy and Creative pass. Fresh evidence and a local milestone commit. No tag or publication. | NOT STARTED |
@@ -3292,6 +3292,163 @@ was performed.
 
 **Next:** the consolidated human playtest and listening pass (D-80), then
 package 23, survival economy and extended play.
+
+## Milestone 23 — survival economy and extended play (2026-10-30 to 2026-10-31)
+
+**Status: COMPLETE for its scripted and headless gates; the human extended play and
+the judgement of how the economy feels are pending under D-80.** The economy city
+(generator 20, layout 17, content revision 4, encounter catalogue 6) supplies a
+survivor through scavenging, salvage, survivors and utilities alone and holds up for
+days: an acceptance route reaches the city's answer and lives four more in-game days
+without a tree or an ore block, every design seed meets its starter, district and
+specialist reachability, finite sources deplete, renewables conserve, and no salvage,
+trade or reward loop can pay more than it is worth. Decisions D-232 to D-240; the
+balance record is [DESIGN.md §16](DESIGN.md#16-the-survival-economy-inputs-targets-and-the-seed-matrix-package-23).
+
+### Start state
+
+- Branch `feature/urban-survival` at `cf1a96f` (the 22 records), clean tree. The
+  consolidated human playtest (D-80), due since 22, has not run; this package went
+  ahead on the owner's instruction to execute 23 and leaves every human-only gate
+  pending.
+- Read the revised base, the prompt, `AGENTS.md`, `docs/COMMIT_WORKFLOW.md` and
+  these records.
+
+### What the census found first
+
+A throwaway census of generator 19 (content 3) on the six design seeds, read through
+the production rolls: the starter block held 15–26 waking days of food, 22–28 pry
+tools and about 60 torches, and its refuge alone funded the reinforced spear (D-97);
+an ordinary flat held about 2.8 servings and 1.7 litres against S5's 1–2 and 0.5–1;
+nine regions held about 1,600 pry tools and hundreds of useless iron ingots and
+black powder; a player-built workbench came apart for a spare part, minting the
+scarcest repair part from planks; a worn piece carried away and set down became
+sound; a trader would sell a camp's last food; continuous melee pain-locked a
+Veilbound; the starter block held eight encounter slots.
+
+### What changed
+
+- **Generator 20 (D-232).** The economy city: generator 19's city exactly, under
+  rules gated on `hasEconomy()`, with content revision 4 paired to it in both
+  directions; `urban-dev` creates it.
+- **Content revision 4 (D-233, D-234).** Scarcer, purpose-led tables, a district
+  bias as a percentage, household basement storage, no ingot or powder; a lean
+  starter block whose refuge holds no scrap and whose upper floors are picked over
+  to half.
+- **Loops closed (D-235).** A player-set piece never yields more than its recipe
+  spends; a worn piece comes apart under any hold.
+- **Trade (D-236).** A trader keeps back a ration and a skin a mouth.
+- **Encounter pressure (D-237, D-238).** A 1.2 s pain guard after a flinch;
+  catalogue 6's two starter slots.
+- **Left alone with reasons (D-239).** Spoilage, carrying, search times and noise,
+  tool durability, firearm noise and the temperature curve (P-15).
+- **Evidence (D-240).** The census, audit, salvage, trade, combat, encounter and
+  route tests, and the tour `VEYLON_SCENE=urban_economy`.
+
+### Changed paths
+
+**Production** (`src/main/java/com/veylon/`):
+
+- New: `UrbanEconomyQaScene.java`.
+- Edited: `Dismantling.java`, `QaHarness.java` (one label on an existing line),
+  `UrbanQaScenes.java`, `UrbanSlicePlan.java`, `WorldBootstrap.java`,
+  `ai/InfectedAI.java`, `entity/{Npc,UrbanEncounterDirector}.java`,
+  `save/UrbanPopulationSection.java`, `settlement/UrbanSiteDialogue.java`,
+  `world/World.java`, `world/urban/{EncounterAnchors,LootTables,SalvageTable,UrbanContainers,UrbanRevision,UrbanSalts,UrbanStarterSite,UrbanWorldState}.java`.
+
+**Tests** (`src/test/java/com/veylon/`):
+
+- New: `UrbanEconomyCensusTest`, `UrbanEconomySalvageTest`, `UrbanEconomyTradeTest`,
+  `UrbanEconomyCombatTest`, `UrbanEconomyEncounterTest`, `UrbanEconomyAuditTest`,
+  `UrbanEconomyRouteTest`, `UrbanEconomyQaSceneTest`.
+- Edited (expectations the change requires): `UrbanSliceRouteTest` (the slice on
+  generator 20), `world/WorldGeneratorFingerprintTest` (generator 20 holds every
+  generator-19 pin), `world/UrbanGeneratorDispatchTest`, `world/urban/UrbanRevisionTest`,
+  `save/UrbanMetaSectionTest`, `UrbanDevelopmentSelectorTest`, and five tests that
+  resolved `CURRENT_CONTENT` on earlier generators and now name their generator's
+  revision (`CitySoundscapeTest`, `UrbanIndoorEnvironmentTest`,
+  `entity/GeneratedApartmentTraversalTest`, `GameLoopIntegrationTest`,
+  `save/UrbanContainersSectionTest`).
+
+**Records and docs:** this file, [DESIGN.md](DESIGN.md) (§8, §10, §13, §16),
+[DECISIONS.md](DECISIONS.md) (D-232 to D-240, §3, P-10, P-11, P-15),
+[VALIDATION.md](VALIDATION.md#milestone-23--survival-economy-and-extended-play-2026-10-30-to-2026-10-31),
+`docs/ARCHITECTURE.md` and `docs/DEVELOPING.md`.
+
+### Compatibility
+
+- Generators 1–19 keep their geometry, pins, content revisions, catalogues and
+  rules; every new rule is gated on layout 17. Generator 20 holds every generator-19
+  pin; it adds no block, item, icon, ordinal or save section.
+- A generator-20 save writes `urban.meta` content 4 and `urban.population` codec 2
+  under catalogue 6; it refuses any other content revision, and an earlier city
+  refuses content 4. A build supporting at most generator 19 rejects a generator-20
+  save before replacing its live world; no older binary was run.
+- Earlier cities' QA scenes and regression routes keep rolling content 3:
+  `UrbanRevision.contentFor` gives every fresh world its generator's revision.
+
+### Commands and results
+
+Exact commands and outputs are in
+[VALIDATION.md](VALIDATION.md#milestone-23--survival-economy-and-extended-play-2026-10-30-to-2026-10-31).
+In short:
+
+- Every code commit was validated with the full portable build on its exact
+  tree in a detached worktree, four at a time, with the existing Windows skip:
+  `e214f52` 2,302 tests in 284 classes, `c382717` 2,304 in 285, `de7eff9` 2,306
+  in 286, `0873c1e` 2,307 in 287, `6f60e54` 2,309 in 288, `b3de774` 2,313 in
+  289, `7d10039` 2,314 in 290 and `24540b0` 2,317 in 291, none failing.
+- Accelerated headless days: `UrbanEconomyRouteTest` reaches the city's answer
+  on seed 20260731 and lives four more in-game days; `UrbanEconomyQaSceneTest`
+  plays the tour in both modes.
+- Native extended play (scripted, not a human playtest): `VEYLON_SCENE=urban_economy`
+  on `24540b0`, seed 20260731, in Survival (`build/qa/m23-economy-survival-2`,
+  1,062 s: into day 3 at 05:34 with health 100, 11 containers searched, two meals
+  and two drinks, two nights slept in the refuge, the load restoring exactly what
+  was saved) and in Creative (`-creative-2`, 1,022 s, nothing consumed), 11
+  captures each with zero GL and KHR errors and no native audio error.
+- These records: relative links and anchors checked, `git diff --check` clean.
+- `graphify update . --no-cluster` on the final code: 11,846 nodes and 49,588
+  edges, with extractor warnings for `build.gradle` and `settings.gradle`.
+- No reviewer subagents ran.
+
+The commits:
+
+| Commit | Subject |
+| --- | --- |
+| `e214f52` | `feat(urban): give a generator-20 city scarcer, purpose-led supplies` |
+| `c382717` | `feat(salvage): stop benches minting parts and worn pieces leaving whole` |
+| `de7eff9` | `feat(survivors): let a trader keep back what its people live on` |
+| `0873c1e` | `feat(infected): let a strike land through a rain of blows` |
+| `6f60e54` | `feat(encounters): ease the starter block to one apartment's slots` |
+| `b3de774` | `test(economy): audit the city's inputs, sources and nature` |
+| `7d10039` | `test(economy): live four days after the city answers unaided` |
+| `24540b0` | `feat(qa): tour two and a half real days of survival in the economy city` |
+
+These records follow in their own commit. No push, merge, tag or publication
+was performed.
+
+### Limitations and next concrete step
+
+- **Human checks (D-80).** Whether the scarcity feels tense rather than tedious,
+  whether one building a day is the right rhythm, whether the starter threat is fair,
+  whether the band scan is a fair price for refusing cooperation and how many real
+  days the objective takes were never judged by a person. The scripted native run
+  and the headless route are separate evidence from human extended play.
+- **Total plenty.** A region holds hundreds of waking days of food; the economy's
+  pressure is distance, time, noise, risk and spoilage, not exhaustion.
+- **Staged poses.** The route completes the objective on day one because its legs
+  are staged; the tour stages one pose.
+- **Two unplannable parcels** under template 7 (generators 13–20): seed 987654321
+  region (−2, −3) parcel 44 and seed −9000000000000000000 region (−3, 0) parcel 116
+  throw when their chunks generate. Found by the audit's three-region sweep; owned by
+  packages 24 and 25.
+- **Older tours on generator 20.** `urban-dev` now creates generator 20. A throwaway probe played `urban_missions`, `urban_onboarding`, `urban_utilities` and `urban_refuge` headless in Survival on it, and each printed `pass=true`; the other tours were not re-run on it natively, and every tour's headless test keeps the generator it was written for.
+- **Day/night temperature (P-15).** Still inverted in every world; unchanged.
+- **Default.** The ordinary new world stays generator 3 until 26.
+
+**Next:** the consolidated human playtest and listening pass (D-80), then package 24,
+dense-city performance and streaming (with the two unplannable parcels).
 
 ## Resume rules
 

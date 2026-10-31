@@ -439,6 +439,16 @@ property; their upper storeys are not. Grocers, canteens, break rooms, washrooms
 treatment rooms, utility rooms and workshops keep food, water, treatment, light and
 pry tools available without forcing anything.
 
+**Implemented in 23 (D-232–D-240), generator 20.** Content revision 4 meets S5's
+targets: a stocked flat holds 1.42–1.66 servings and 0.57–0.65 litres on the design
+seeds, treatment lies in about half of bathrooms, and a district's bias is a percentage
+of each chance, so S3's two kinds of source hold in every district. The starter block
+keeps §4.4 from reservations while its refuge holds no scrap, so the first upgrade takes
+a trip. Salvage, trade and rewards cannot be turned into more than they are worth, a
+trader keeps back what its people live on, and S6's renewables are the rain, boiling,
+camps' foraging surplus and nothing else. §16 records the targets, the seed matrix and
+the assumptions.
+
 ## 9. Legacy mechanics disposition (D-26)
 
 "Urban-gated" means the urban generator selects a new behaviour while legacy worlds stay byte-identical.
@@ -474,6 +484,7 @@ These are bounded starting scope, not a wish list. Packages may change a number 
 | 18 | ≤ 3 claimed refuges; ≤ 3 barricade kinds; a salvage table for every urban furniture kind. **Implemented** (D-170, D-171, D-173, D-174, D-176, D-177): ≤ 3 claims; plank and sheet-metal barricades and the door brace; a salvage entry for every furniture kind, the doors, rails, barricades and each part of a wreck; ≤ 6 burnt-out cars a region; ≤ 2,048 damaged barricade cells and ≤ 256 braces kept |
 | 19 | 1 water utility and 1 power source (generator or battery bank); ≤ 4 consumer kinds (light, purifier or pump, radio, optional fridge); circuit scope of one building. **Implemented** (D-184, D-186, D-187, D-190, D-195): the purifier-pump and the generator; two consumer kinds, the work lamp and the purifier, the radio workstation left to 20 and no refrigerator; one building a circuit, one generator to it feeding its four nearest consumers within 16 blocks; ≤ 64 devices; taps finite per building, ≤ 1,024 tapped buildings |
 | 20 | Comms chain C1–C5; 5 missions (clinic supplies, hidden-civilian aid, camp utility, district landmark, stronghold-held component); active journal ≤ 4. **Implemented** (D-198, D-199, D-203, D-206): one relay a world; two independent kinds of source for each of three parts; the five missions, each kind given once by a site and each object asked for once in a world; ≤ 4 missions in hand and ≤ 256 records |
+| 23 | Tuned supplies, spoilage, carrying, rummaging, durability, salvage, trade and encounter pressure; a balance record with a seed matrix. **Implemented** (D-232–D-240): content revision 4's twelve tables; a trader's reserve of a ration and a skin a mouth; a 1.2 s pain guard; two starter encounter slots (catalogue 6); spoilage, carrying, search times, durability and firearm noise unchanged with reasons (D-239); §16 |
 
 ## 11. Seed matrix and acceptance criteria (D-15)
 
@@ -537,7 +548,7 @@ The table is in dependency order: an item may depend only on items above it. Sec
 | # | State | Kind | Owner | Package | Depends on | Persistence; absence default | Reset (new / load / dormancy) | Bound |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | 1 | Generator version `GEN_URBAN` | Persistent | `World` | 02 | — | v3 base int; values above `MAX_SUPPORTED_GENERATOR` rejected | Fixed per `World` | — |
-| 2 | Urban content revision | Persistent | `UrbanRevision` | 02, 07–08 | 1 | `urban.meta`; absent means 1 for older layouts; generators 9–11 require content 3 | New and load | — |
+| 2 | Urban content revision | Persistent | `UrbanRevision` | 02, 07–08 | 1 | `urban.meta`; absent means 1 for older layouts; generators 9–11 require content 3. **23:** a fresh world records its generator's revision (`UrbanRevision.contentFor`); generator 20 requires content 4 and no other layout accepts it (D-232) | New and load | — |
 | 3 | Region, district, street and parcel plans | Derived | `CityPlanner` | 03 | 1, 2 | Not saved | Cache per `World` | ≤ 16 regions |
 | 4 | Building, floor, room and fixture plans | Derived | `BuildingPlanner` / `BuildingPlan` | 05–06, 08 | 3 | Generator 6 selects template 1 / layout 3; 7 furnished template 2 / layout 4; 8 shaped template 3 / layout 5; 9 starter template 4 / layout 6; 10 same geometry plus encounter catalogue 1 / layout 7; 11 the commercial and civic catalogue, template 5 / layout 8, walk-ups unchanged. Unchanged `urban.meta` v1 validates the layout; plans not serialized | Cache per `World`, discarded on new/load | ≤ 256 buildings; ≤ 73,984 cells/plan |
 | 5 | Generated blocks plus edits | Derived plus deltas | Generator and `World` | 03, 06 | 3, 4 | `changedBlocks` (v3 base, last-write log, B-29) | — | 4,000,000 edits |
@@ -545,7 +556,7 @@ The table is in dependency order: an item may depend only on items above it. Sec
 | 7 | Container identity, state and owner; authoritative contents | Persistent, touched only | `UrbanContainers` metadata; `World.crateContents` inventory | 07–08 | 2, 4 | `urban.containers` v1; required for content ≥ 2; content-1 absence adopts core contents/empties and edited reservations | Load replaces; never re-rolled | ≤ 32,768 rows/core inventories; 12 slots; 20-byte header + 36 bytes/row metadata |
 | 8 | Search progress; open target and rummage timer | Progress persistent; target/timer transient | Ledger; `CrateTransactionSystem` | 07 | 7 | Progress in `urban.containers`; load closes UI but retains elapsed work (D-72 revises the initial transient proposal) | Load replaces progress; resets target/timer | One active search |
 | 9 | Starter refuge identity and ground-floor respawn anchor; claims later | Persistent | `UrbanWorldState` / `UrbanBootstrap`; `RefugeSystem` later | 08, 18 | 4 | `urban.refuges` v1, required for generators 9–16; absent on older worlds means no claim. **18:** version 2, required for generator 17, adds up to three claims and home (D-179) | New sets starter once; load replaces without replenishing | One starter anchor; ≤ 3 claims in 18 |
-| 10 | Encounter identities, durable injuries/positions and permanent deaths | Persistent | `EntityManager.encounters` / `UrbanEncounterDirector` | 09, 15 | 4 | `urban.population` v1 with catalogue 1 (generator 10) or 2 (generator 11, D-102); required for generators 10–11, absent on earlier worlds means no encounters. **15:** codec 2 under catalogue 5 (generator 14) keeps every species: a species id per row and a binding into the NPC or creature list (D-136) | New clears; load replaces; dormancy pauses; no migration or replacement generation | 32,768 rows, 47 bytes/row + 12-byte header |
+| 10 | Encounter identities, durable injuries/positions and permanent deaths | Persistent | `EntityManager.encounters` / `UrbanEncounterDirector` | 09, 15 | 4 | `urban.population` v1 with catalogue 1 (generator 10) or 2 (generator 11, D-102); required for generators 10–11, absent on earlier worlds means no encounters. **15:** codec 2 under catalogue 5 (generator 14) keeps every species: a species id per row and a binding into the NPC or creature list (D-136). **23:** generator 20 freezes catalogue 6 under the same codec 2 (D-238) | New clears; load replaces; dormancy pauses; no migration or replacement generation | 32,768 rows, 47 bytes/row + 12-byte header |
 | 11 | Live hostile brain, pain, fire, panic and route intent | Transient | `Npc` / `InfectedAI` | 09 | 10 | Body health/position/yaw remain in frozen core when active, linked by population index; durable torso wounds in population | Re-derived on activation/load; pending strikes forgotten by Creative perception controls | 12 active, two per building; two spawns/slow tick |
 | 12 | Portals, route caches, path budget | Derived and transient | `PortalGraph`, `PathBudget` | 10 | 4, 6 | Not saved | Invalidated by edits and doors | ≤ 64 routes |
 | 13 | District overlays (flood, contamination, growth) | Derived; consequential changes persistent | `DistrictRules` | 13, 15 | 3 | Within `urban.population` or `urban.sites` as decided. **15:** growth is generated blocks plus recorded edits (a burnt node is an ash edit); a Veilmaw whose node is gone is a tombstone in `urban.population` (D-136) | — | Capped |
@@ -591,3 +602,72 @@ The tuning findings in D-97 (threat pressure, a self-sufficient refuge, generous
 ## 15. Out of scope
 
 Whole-city simulation, driving (vehicles only as static salvage props), multiplayer, structural collapse, simulated elevators, procedural dialogue AI, a citywide electricity solver, a full food web, a full-building acoustic simulation, and an expanded anatomical-gore goal. Each needs an explicit owner scope change (DECISIONS §5).
+
+## 16. The survival economy: inputs, targets and the seed matrix (package 23)
+
+Package 23 (generator 20, content revision 4, encounter catalogue 6; DECISIONS D-232–D-240) tunes the city against a survivor's real needs and proves the loop sustains days of play without a tree or an ore block. Figures marked *measured* come from the tests named beside them on the six design seeds (`20260731`, `-4242`, `7`, `0`, `987654321`, `-9000000000000000000`); they are deterministic and re-run in every build. Nothing here is a playtest observation: those wait for the human pass D-80 schedules.
+
+### 16.1 What a survivor needs, and where the city gives it
+
+A waking game day (900 real seconds) costs 40.5 hunger and 67.5 thirst; a day with a night slept in the refuge costs about 25 and 40 (sleep drains 0.10 and 0.14 a second for the few seconds a night takes). A serving of dried berries gives 14 hunger at full freshness (7 to 12 as found), dried meat 22, a clean waterskin 60 thirst.
+
+| Need | Urban sources (content 4) | Alternatives and renewables | Never needs |
+| --- | --- | --- | --- |
+| Food | Kitchens, pantries, fridges, grocers and shop shelves; survivors' trade | Camps' foraging surplus above their reserve (D-236); optional hunting (finite) | Berries, herbs or meat from the wild |
+| Water | Kitchens, pantries, fridges, grocers, shops; a building's taps (stale, untreated) | Rain collectors; boiling at a fire on planks; the purifier on generator power | Lakes or streams |
+| Treatment | Bathrooms (about half), clinics and dispensaries, desks, shops, armouries | Bandages from fibre; splints from sticks and fibre; a friendly camp's medic | Herbs or a herbalist bench |
+| Clothing | Wardrobes (rain cloaks, boots) | Indoor shelter and fires | Hides or a tannery |
+| Light | Torches (pantries, desks, lockers, warehouses, shops) | Torches from sticks and fibre; a lantern on planks (450 s each); work lamps on power | Charcoal |
+| Fuel | Planks from furniture and doors (60 s of fire each) | Fuel cans from the tanks of cars that did not burn (power only) | Logs or coal |
+| Repair parts | Scrap (lockers, warehouses, furniture, cars), sheet metal (lockers, metal doors), spare parts (engines, warehouses, workshop benches) | — | Ingots or smelting |
+| Weapons | The reinforced spear (scrap, planks, fibre); the pry tool; a flintlock with balls in secured storage | Repairs for two scrap | Ore, a furnace or an anvil |
+| Utility components | Spare parts, sheet metal, scrap, fibre filters | — | — |
+| Aid and trade goods | Food, water and medicine from any search; salvage as payment | — | — |
+| Objective items | Transmitter module (security armouries, stronghold stores), power cells (warehouse tool chests, clinic lockers), antenna cable (office and roof lockers) | Codes from a friend, or the band scan without them | Any one site's goodwill |
+
+The audit (`UrbanEconomyAuditTest`) holds the "never needs" column: no recipe of the city list asks for a log, ore, ingot, coal, charcoal, sulfur, saltpeter, black powder, hide, leather, bone, berry or herb, or a station other than the hand and the workbench; every recipe's inputs are reachable from containers, salvage, survivors' stores, the starter kit and the city's creatures; and the module, cells, cable, fuel, spare parts, sheet metal and pry tool all lie within two regions.
+
+### 16.2 Balance targets and what was measured
+
+| Target | Value | Measured (content 4, six seeds) | Test |
+| --- | --- | --- | --- |
+| Food in a stocked flat (S5) | 1–2 servings | 1.42–1.66 (content 3: about 2.8) | census |
+| Water in a stocked flat (S5) | 0.5–1 litre | 0.57–0.65 (content 3: about 1.7) | census |
+| Bathrooms holding treatment (S5) | about half | 52–58 % | census |
+| Buildings picked clean (S5) | about a third | 23–28 % | census |
+| The starter block's food | days, not weeks: 3–12 waking days, at most 0.6 of content 3's | 4.9–9.7 (content 3: 15–26) | census |
+| The starter guarantees (§4.4) | food ≥ 6 servings in ≥ 3 containers in ≥ 2 buildings, water ≥ 3, two bandages and an antiseptic, a pry tool outside the refuge | held on every seed, from reservations alone | census |
+| The first upgrade | one trip: never from the refuge alone | the refuge holds no scrap; one neighbour's ground floor funds the spear | census, route |
+| Pry tools in the starter block | found, not tripped over: at most half of content 3's | 4–7 (content 3: 22–28) | census |
+| Necessities in every district (S3) | two kinds of source each | held in all six districts on every seed | census |
+| Specialist goods (S3) | where they belong | spare parts never in flats; pistols only in secured storage; medicine four times richer a cabinet in clinics than bathrooms | census |
+| Comms parts without anyone's leave | two unheld sources a part within three regions | modules 14–43, cells 271–411, cable 149–256 buildings | audit |
+| Cars that did not burn within one region ring | enough for a generator, a radio, a purifier and the band scan (six) | 22–32 | audit |
+| Optional nature | never more than a side dish | hunting the spawn region's wildlife gives at most a sixteenth of its containers' food, felling every park tree at most a ninth of its furniture's fuel | audit |
+| Starter encounter pressure (§4.4) | one or two bodies, away from the refuge door | two slots on one apartment, 26–33 blocks from the door (catalogue 5: eight) | encounters |
+| Melee | useful, never risk-free | a pry tool takes a strike in a fight with one Veilbound; the spear wins before the first strike | combat |
+| Trade | finite, never starving the seller | stops at a ration and a skin a mouth; resumes from foraging | trade |
+| Salvage loops | nothing mints value | nine recipe-made pieces never return more than they cost | salvage |
+
+### 16.3 Time and the long game
+
+- **First session (§3.1).** The slice route still completes on generator 20 on every slice seed: the first trip to the quiet apartment (its inner door forced), the shop, the spear at the refuge's bench, the starter threat met from across the block.
+- **Days, headless.** The acceptance route (`UrbanEconomyRouteTest`, seed 20260731) completes the objective on day one because its legs are staged poses, then lives four more days: one walk-up searched a day (8 to 15 containers) keeps food above six servings and water above three with the rain collector, health stays at 100 and nothing is felled or mined. Real pacing, how long the objective takes a player and how the days feel, is a playtest question (§16.5).
+- **Days, native.** `VEYLON_SCENE=urban_economy` lives two and a half real-time days with nights slept in the refuge (VALIDATION, milestone 23).
+
+### 16.4 Sustainability assumptions
+
+- **Searched containers never refill.** Nothing is reset, respawned or restocked by time; tombstones and depletion persist (S1, S6).
+- **Water is renewable.** One rain collector emptied daily gives 2.4–3.0 litres against a waking day's 1.13 (D-195); taps are finite per building but every building has them, and boiling needs only planks.
+- **Food is finite but vast, with one bounded renewable.** A region holds hundreds of waking days of food in its containers; camps forage a ration for every three people and a skin for every two every six hours, up to 16 and 12, and a trader sells only above its people's reserve. Gardening is not supported (no planting exists) and hunting never respawns.
+- **Spoilage is the pressure on hoarding.** Found food goes stale (a third of its freshness) within one to four waking days, and stale food can poison; carrying is limited to 28 kg plus a pack.
+- **Power is a convenience.** Fuel is finite (one can a tank, 300 s idle); nothing a survivor needs to live waits on it.
+
+### 16.5 What tests guarantee and what only a person can judge
+
+Deterministic, re-run in every build: the bands of §16.2, the starter guarantees, reachability and the no-tree, no-ore audit, conservation (no salvage, trade or reward loop pays twice), and the multi-day route. Subjective, pending the human playtest (D-80): whether scarcity feels tense rather than tedious, whether one building a day is the right rhythm, whether the starter block's threat is fair, whether the long band scan is a fair cost for refusing cooperation, and how many real days the objective takes.
+
+### 16.6 Findings left to later packages
+
+- **Two parcels cannot be planned** under building template 7 (generators 13–20): seed 987654321 region (−2, −3) parcel 44 at (−440, −681) and seed −9000000000000000000 region (−3, 0) parcel 116 at (−637, 219). Generating either chunk throws `IllegalStateException` ("no valid building in finite fallback"). Found by this package's three-region audit sweep; owned by packages 24 and 25 (streaming and the regression audit).
+- **The city is generous in total.** The pressure the economy applies is distance, time, noise, risk and spoilage, not a running-out of food; whether that is enough is for the playtest.
