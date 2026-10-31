@@ -201,6 +201,10 @@ public final class UrbanSiteDialogue {
             if (store != null) { have += store.count(o.get()); }
         }
         if (have < o.getCount()) { return "We're out of " + o.get().displayName + "."; }
+        if (have - keepsBack(g, s, o.get()) < o.getCount()) {
+            return o.get() == ItemType.WATERSKIN_CLEAN ? "We can't spare water. What's left is what we drink."
+                    : "We can't spare food. What's left is what we eat.";
+        }
         // All or nothing: both sides must have room before anything moves.
         if (fits(inv, o.get(), o.getCount()) < o.getCount()) { return "You can't carry it."; }
         if (stashRoom(g, s, o.give(), o.giveCount()) < o.giveCount()) { return "We've no room to keep that."; }
@@ -219,6 +223,32 @@ public final class UrbanSiteDialogue {
         g.log("Traded " + o.describe() + ".");
         UrbanSiteRelations.trust(g, s, 1f, null);
         return "A fair trade.";
+    }
+
+    /** Rations and clean waterskins a trader keeps back for each mouth its stash feeds (layout seventeen). */
+    public static final int RESERVE_PER_MOUTH = 1;
+
+    /**
+     * What a trader will not sell of an item (urban milestone 23): in layout seventeen, a ration and a
+     * waterskin for everyone its stash feeds, its own people at home and the guests who moved in: what
+     * they eat and drink (a ration in eighteen hours, a skin in twelve) until their foraging, every six
+     * hours, brings more. A trade never takes the last of a camp's food or water, so buying cannot starve
+     * the people who sell; their foraging, not the player's purse, is what restocks them. Nothing is kept
+     * back of anything else, nor in an earlier city.
+     */
+    static int keepsBack(Game g, UrbanSite s, ItemType item) {
+        if (g.world.urban == null || !g.world.urban.hasEconomy()
+                || !(UrbanSiteNeeds.ration(item) || item == ItemType.WATERSKIN_CLEAN)) {
+            return 0;
+        }
+        int mouths = s.present();
+        for (Settlement other : g.world.settlements.values()) {
+            if (other instanceof UrbanSite guest && guest.relocation == UrbanSite.Relocation.ARRIVED
+                    && guest.relocatedTo == s.id) {
+                mouths += guest.present();
+            }
+        }
+        return RESERVE_PER_MOUTH * mouths;
     }
 
     /** How many of a fresh stack would fit in an inventory, tried on a copy. */
