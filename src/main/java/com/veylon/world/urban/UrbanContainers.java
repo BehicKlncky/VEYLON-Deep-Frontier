@@ -93,10 +93,13 @@ public final class UrbanContainers {
             building = station == null ? null : station.plan();
         }
         if (building == null) { return null; }
+        // The economy's content belongs to its layout alone (UrbanWorldState.resolveContentRevision), so
+        // the layout names the content here even while a load has yet to restore it.
+        int content = world.urban.hasEconomy() ? UrbanRevision.ECONOMY_CONTENT : UrbanRevision.STARTER_CONTENT;
         for (var fixture : building.fixtures()) {
             if (fixture.kind() == BuildingPlan.FixtureKind.CONTAINER && fixture.position().equals(position)) {
                 return new Planned(building,fixture,LootTables.table(building,fixture,
-                        world.urban.districtAt(position.x(),position.z())));
+                        world.urban.districtAt(position.x(),position.z()),content));
             }
         }
         return null;
@@ -117,20 +120,35 @@ public final class UrbanContainers {
         Entry entry = generated(world,plan,legacy ? State.SEARCHED : State.UNSEARCHED);
         put(entry);
         if (!legacy) {
-            Inventory rolled = world.urban.hasStarter() && world.urban.contentRevision() == 3
-                    ? UrbanStarterSite.supplies(plan.building, plan.fixture) : null;
-            // Layout twelve: a survivor site's stash holds what its people live on.
-            if (rolled == null) { rolled = SurvivorStash.supplies(world, plan.building, plan.fixture); }
-            if (rolled == null) {
-                rolled = LootTables.roll(world.seed,world.urban.contentRevision(),entry.id,plan.table,
-                        world.urban.districtAt(position.x(),position.z()),plan.building.variant());
-            }
-            // Layout sixteen: the relay's parts are in the first roll of their source containers.
-            rolled = CommsComponents.withPart(world.urban, plan.building, plan.fixture, rolled);
+            Inventory rolled = firstRoll(world, plan);
             if (rolled != null) { world.crateContents.put(position,rolled); }
         }
         compact(world,entry);
         return entry;
+    }
+
+    /**
+     * What a generated container holds on its first touch: its content revision's starter reservation,
+     * a survivor site's stash, or its table's roll, with the relay's part added to the first roll of a
+     * part's source. Null is a rolled empty container. Pure: it reads the plans and allocates only its
+     * result, so a census can read the city's contents without touching the ledger.
+     */
+    public static Inventory firstRoll(World world, Planned plan) {
+        int content = world.urban.contentRevision();
+        Inventory rolled = !world.urban.hasStarter() ? null
+                : content == UrbanRevision.STARTER_CONTENT ? UrbanStarterSite.supplies(plan.building, plan.fixture)
+                // Layout seventeen: the economy's lean starter reservations (milestone 23).
+                : content == UrbanRevision.ECONOMY_CONTENT ? UrbanStarterSite.economySupplies(world.seed, plan.building, plan.fixture)
+                : null;
+        // Layout twelve: a survivor site's stash holds what its people live on.
+        if (rolled == null) { rolled = SurvivorStash.supplies(world, plan.building, plan.fixture); }
+        if (rolled == null) {
+            Vec3i position = plan.fixture.position();
+            rolled = LootTables.roll(world.seed,content,plan.fixture.id(),plan.table,
+                    world.urban.districtAt(position.x(),position.z()),plan.building.variant());
+        }
+        // Layout sixteen: the relay's parts are in the first roll of their source containers.
+        return CommsComponents.withPart(world.urban, plan.building, plan.fixture, rolled);
     }
 
     /** Reserve all required identities before a block mutation. At the cap, fail closed without moving anything. */

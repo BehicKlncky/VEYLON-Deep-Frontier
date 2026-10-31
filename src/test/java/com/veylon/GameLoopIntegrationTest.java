@@ -514,7 +514,7 @@ class GameLoopIntegrationTest {
 
     private static void assertUrbanFoundationOnly(Game game) {
         assertTrue(game.world.isUrban());
-        assertEquals(UrbanRevision.CURRENT_CONTENT, game.world.urban.contentRevision());
+        assertEquals(UrbanRevision.contentFor(game.world.generatorVersion), game.world.urban.contentRevision());
         assertNull(game.world.campPos);
         assertNull(game.faction.campPos, "the previous world's camp must not follow the player");
         assertTrue(game.entities.npcs.isEmpty(), "no camp residents carried over");

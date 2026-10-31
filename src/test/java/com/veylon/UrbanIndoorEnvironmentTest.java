@@ -199,7 +199,7 @@ class UrbanIndoorEnvironmentTest {
     private static Game scene() {
         Game game = new Game();
         game.world = new World(SEED, World.GEN_URBAN_APARTMENTS);
-        game.world.urban.resolveContentRevision(UrbanRevision.CURRENT_CONTENT);
+        game.world.urban.resolveContentRevision(UrbanRevision.contentFor(game.world.generatorVersion));
         game.player = new Player(game.world);
         return game;
     }

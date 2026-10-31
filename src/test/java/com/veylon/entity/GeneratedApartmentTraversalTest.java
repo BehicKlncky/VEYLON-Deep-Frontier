@@ -28,7 +28,7 @@ class GeneratedApartmentTraversalTest {
 
     private static void walkGenerated(int generator) {
         World world = new World(20260731, generator);
-        world.urban.resolveContentRevision(UrbanRevision.CURRENT_CONTENT);
+        world.urban.resolveContentRevision(UrbanRevision.contentFor(generator));
         for (ParcelPlan.Side side : ParcelPlan.Side.values()) {
             BuildingPlan plan = world.urban.regionPlan(0, 0).parcels().stream()
                     .filter(p -> p.frontage() == side && p.use() != ParcelPlan.Use.COMMERCIAL)

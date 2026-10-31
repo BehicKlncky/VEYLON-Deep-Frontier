@@ -180,9 +180,14 @@ public final class UrbanWorldState {
     /**
      * Layout sixteen (milestone 20): layout fifteen's city and rules, plus the relay mast on one roof of
      * the civic precinct nearest the spawn, under the rules of urban missions and the communications
-     * objective.
+     * objective; and layout seventeen, which keeps them exactly.
      */
-    public boolean hasMissions() { return layoutRevision == UrbanRevision.LAYOUT_MISSIONS; }
+    public boolean hasMissions() { return layoutRevision == UrbanRevision.LAYOUT_MISSIONS || hasEconomy(); }
+    /**
+     * Layout seventeen (milestone 23): layout sixteen's city and rules under the survival economy:
+     * content revision four's supplies and the economy's salvage, trade and encounter rules.
+     */
+    public boolean hasEconomy() { return layoutRevision == UrbanRevision.LAYOUT_ECONOMY; }
 
     public boolean contentRevisionResolved() {
         return contentRevision != UNRESOLVED;
@@ -208,6 +213,12 @@ public final class UrbanWorldState {
         UrbanRevision.requireSupportedContent(revision);
         if (hasStarter() && revision < 3) {
             throw new IllegalArgumentException("starter layout requires urban content revision 3 or later");
+        }
+        // The economy's supplies belong to its layout alone, in both directions (milestone 23).
+        if (hasEconomy() != (revision == UrbanRevision.ECONOMY_CONTENT)) {
+            throw new IllegalArgumentException(hasEconomy()
+                    ? "economy layout requires urban content revision " + UrbanRevision.ECONOMY_CONTENT
+                    : "urban content revision " + revision + " belongs to the economy layout only");
         }
         if (contentRevision != UNRESOLVED) {
             throw new IllegalStateException("urban content revision is already resolved ("

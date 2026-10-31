@@ -123,7 +123,7 @@ class UrbanContainersSectionTest {
         byte[] reordered=CreativeSaveSections.append(CreativeSaveSections.replace(good,UrbanMetaSection.ID,null),
                 UrbanMetaSection.ID,metadata);
         Files.write(save,reordered); assertTrue(SaveSystem.load(g,save));
-        assertEquals(com.veylon.world.urban.UrbanRevision.CURRENT_CONTENT,g.world.urban.contentRevision());
+        assertEquals(com.veylon.world.urban.UrbanRevision.contentFor(g.world.generatorVersion),g.world.urban.contentRevision());
         assertEquals(1,g.world.urban.containers.size());
     }
 

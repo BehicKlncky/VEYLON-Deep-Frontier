@@ -472,6 +472,36 @@ class WorldGeneratorFingerprintTest {
                 + "re-recording:\n  " + String.join("\n  ", moved));
     }
 
+    /**
+     * Generator 20 (milestone 23), checked at introduction: the survival economy is rules and content
+     * over generator 19's city. Every pin generator 19 holds (terrain, wrecks, sites, compounds, the
+     * chunks under the nearest wreck, the relay and its chunk) must hold for it unchanged; it has no pin
+     * of its own because it stamps nothing new.
+     */
+    @Test
+    void theEconomyCityIsTheMissionCityExactly() {
+        List<String> moved = new ArrayList<>();
+        for (int i = 0; i < SEEDS.length; i++) {
+            long terrain = terrainFingerprint(SEEDS[i], World.GEN_URBAN_ECONOMY);
+            long vehicles = vehicleFingerprint(SEEDS[i], World.GEN_URBAN_ECONOMY);
+            long chunks = vehicleChunkFingerprint(SEEDS[i], World.GEN_URBAN_ECONOMY);
+            World world = new World(SEEDS[i], World.GEN_URBAN_ECONOMY);
+            var relay = world.urban.relay();
+            assertTrue(relay != null, "seed " + SEEDS[i] + " has a relay");
+            long site = mix(0xcbf29ce484222325L, relay.toString().hashCode());
+            long relayChunk = hashChunk(world.getOrCreateChunk(Math.floorDiv(relay.relay().x(), Chunk.SX),
+                    Math.floorDiv(relay.relay().z(), Chunk.SZ)));
+            if (terrain != URBAN_ECOLOGY_TERRAIN_FINGERPRINTS[i] || vehicles != URBAN_VEHICLE_FINGERPRINTS[i]
+                    || chunks != URBAN_VEHICLE_CHUNK_FINGERPRINTS[i] || site != URBAN_RELAY_FINGERPRINTS[i]
+                    || relayChunk != URBAN_RELAY_CHUNK_FINGERPRINTS[i]) {
+                moved.add(String.format("seed %d: terrain 0x%016xL, vehicles 0x%016xL, chunks 0x%016xL, relay 0x%016xL,"
+                        + " relay chunk 0x%016xL", SEEDS[i], terrain, vehicles, chunks, site, relayChunk));
+            }
+        }
+        assertTrue(moved.isEmpty(), () -> "generator 20 left generator 19's city; its economy must be rules and "
+                + "content only:\n  " + String.join("\n  ", moved));
+    }
+
     /** Every wreck within three regions of the spawn, and the compounds and sites planned beside them. */
     private static long vehicleFingerprint(long seed, int generator) {
         World world = new World(seed, generator);

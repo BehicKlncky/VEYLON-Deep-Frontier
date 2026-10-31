@@ -168,6 +168,10 @@ public final class UrbanSalts {
     /** Which of the precinct's candidate roofs carries the relay mast. */
     public static final long RELAY_SITE = 0x5652_454c_4159_5354L;
 
+    // Content revision 4 (milestone 23): the survival economy.
+    /** Which containers on the starter block's upper floors were emptied before the survivor came. */
+    public static final long STARTER_PICKED_OVER = 0x5645_434f_5049_434bL;
+
     private UrbanSalts() {
     }
 }

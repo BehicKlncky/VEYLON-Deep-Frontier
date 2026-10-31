@@ -48,8 +48,8 @@ class UrbanMetaSectionTest {
             throws IOException {
         Game original = urbanWorld(SEED);
         assertEquals(World.GEN_URBAN, original.world.generatorVersion);
-        assertEquals(UrbanRevision.CURRENT_CONTENT, original.world.urban.contentRevision(),
-                "a fresh world records the current content revision before generating");
+        assertEquals(UrbanRevision.STARTER_CONTENT, original.world.urban.contentRevision(),
+                "a fresh world records its generator's content revision before generating");
         Vec3i edit = new Vec3i(10, UrbanDatum.STREET_Y + 1, 10);
         original.world.setBlock(edit.x(), edit.y(), edit.z(), BlockType.PLANK, true);
         Path save = save(original, "urban.sav");
@@ -57,14 +57,14 @@ class UrbanMetaSectionTest {
         Map<String, byte[]> sections = sections(Files.readAllBytes(save));
         assertTrue(sections.containsKey(UrbanMetaSection.ID));
         assertEquals(List.of(1, UrbanRevision.LAYOUT_DATUM_PLACEHOLDER,
-                        UrbanRevision.CURRENT_CONTENT),
+                        UrbanRevision.STARTER_CONTENT),
                 ints(sections.get(UrbanMetaSection.ID)), "urban.meta v1: version, layout, content");
 
         Game loaded = new Game();
         assertTrue(SaveSystem.load(loaded, save));
         assertEquals(World.GEN_URBAN, loaded.world.generatorVersion);
         assertEquals(UrbanRevision.LAYOUT_DATUM_PLACEHOLDER, loaded.world.urban.layoutRevision());
-        assertEquals(UrbanRevision.CURRENT_CONTENT, loaded.world.urban.contentRevision());
+        assertEquals(UrbanRevision.STARTER_CONTENT, loaded.world.urban.contentRevision());
         assertEquals(BlockType.PLANK, loaded.world.getBlock(edit.x(), edit.y(), edit.z()));
         assertEquals(BlockType.STONE_BRICK,
                 loaded.world.getBlock(-20, UrbanDatum.STREET_Y, -20), "geometry re-derived");
@@ -84,7 +84,7 @@ class UrbanMetaSectionTest {
         Vec3i edit = new Vec3i(spawn[0], UrbanDatum.STREET_Y + 1, spawn[1] + 1);
         original.world.setBlock(edit.x(), edit.y(), edit.z(), BlockType.PLANK, true);
         Path save = save(original, "streets.sav");
-        assertEquals(List.of(1, UrbanRevision.LAYOUT_STREET_NETWORK, UrbanRevision.CURRENT_CONTENT),
+        assertEquals(List.of(1, UrbanRevision.LAYOUT_STREET_NETWORK, UrbanRevision.STARTER_CONTENT),
                 ints(sections(Files.readAllBytes(save)).get(UrbanMetaSection.ID)));
 
         Game loaded = new Game();
@@ -109,7 +109,7 @@ class UrbanMetaSectionTest {
         live.newWorld(SEED + 9, true, World.GEN_CAVE_IDENTITIES);
         World liveWorld = live.world;
         assertFalse(SaveSystem.load(live, write("mismatch.sav", withPayload(bytes,
-                meta(1, UrbanRevision.LAYOUT_DATUM_PLACEHOLDER, UrbanRevision.CURRENT_CONTENT)))));
+                meta(1, UrbanRevision.LAYOUT_DATUM_PLACEHOLDER, UrbanRevision.STARTER_CONTENT)))));
         assertSame(liveWorld, live.world);
     }
 
@@ -122,7 +122,7 @@ class UrbanMetaSectionTest {
         assertEquals(1, original.world.urban.buildingTemplateRevision());
         Path file = save(original, "building-plans.sav");
         byte[] bytes = Files.readAllBytes(file);
-        assertEquals(List.of(1, UrbanRevision.LAYOUT_BUILDING_PLANS, UrbanRevision.CURRENT_CONTENT),
+        assertEquals(List.of(1, UrbanRevision.LAYOUT_BUILDING_PLANS, UrbanRevision.STARTER_CONTENT),
                 ints(sections(bytes).get(UrbanMetaSection.ID)), "existing meta layout, no new codec bytes");
         Game loaded = new Game();
         assertTrue(SaveSystem.load(loaded, file));
@@ -133,7 +133,7 @@ class UrbanMetaSectionTest {
 
         World preserved = loaded.world;
         assertFalse(SaveSystem.load(loaded, write("wrong-plan-layout.sav", withPayload(bytes,
-                meta(1, UrbanRevision.LAYOUT_STREET_NETWORK, UrbanRevision.CURRENT_CONTENT)))));
+                meta(1, UrbanRevision.LAYOUT_STREET_NETWORK, UrbanRevision.STARTER_CONTENT)))));
         assertSame(preserved, loaded.world);
         assertTrue(SaveSystem.load(loaded, write("plans-absent-meta.sav", withoutSection(bytes, UrbanMetaSection.ID))));
         assertEquals(1, loaded.world.urban.buildingTemplateRevision(), "generator pins template even without optional meta");
@@ -155,7 +155,7 @@ class UrbanMetaSectionTest {
 
         assertTrue(SaveSystem.load(live, save));
         assertTrue(live.world.isUrban());
-        assertEquals(UrbanRevision.CURRENT_CONTENT, live.world.urban.contentRevision());
+        assertEquals(UrbanRevision.STARTER_CONTENT, live.world.urban.contentRevision());
         assertNull(live.faction.campPos, "the legacy camp does not follow the player");
         assertTrue(live.entities.npcs.isEmpty());
     }
@@ -195,13 +195,15 @@ class UrbanMetaSectionTest {
         legacyGame.newWorld(SEED + 2, true, World.GEN_CAVE_IDENTITIES);
         byte[] legacy = Files.readAllBytes(save(legacyGame, "legacy.sav"));
         int layout = UrbanRevision.LAYOUT_DATUM_PLACEHOLDER;
-        int content = UrbanRevision.CURRENT_CONTENT;
+        int content = UrbanRevision.STARTER_CONTENT;
 
         Map<String, byte[]> damaged = new LinkedHashMap<>();
         damaged.put("newer section version", withPayload(urban, meta(2, layout, content)));
         damaged.put("layout of another generator", withPayload(urban, meta(1, layout + 1, content)));
         damaged.put("layout zero", withPayload(urban, meta(1, 0, content)));
-        damaged.put("newer content revision", withPayload(urban, meta(1, layout, content + 1)));
+        damaged.put("newer content revision", withPayload(urban, meta(1, layout, UrbanRevision.CURRENT_CONTENT + 1)));
+        damaged.put("the economy's content revision in an earlier layout",
+                withPayload(urban, meta(1, layout, UrbanRevision.ECONOMY_CONTENT)));
         damaged.put("content revision zero", withPayload(urban, meta(1, layout, 0)));
         damaged.put("negative content revision", withPayload(urban, meta(1, layout, -1)));
         damaged.put("trailing bytes", withPayload(urban, meta(1, layout, content, 0)));
@@ -225,7 +227,37 @@ class UrbanMetaSectionTest {
         // The same damage refused on the title screen, where there is no rehearsal.
         Game title = new Game();
         assertFalse(SaveSystem.load(title, write("newer.sav",
-                withPayload(urban, meta(1, layout, content + 1)))));
+                withPayload(urban, meta(1, layout, UrbanRevision.CURRENT_CONTENT + 1)))));
+    }
+
+    /**
+     * The economy city (generator 20, milestone 23) records content revision 4, the only one its layout
+     * accepts: a save that names any other is refused before the live world is touched, never rolled
+     * against tables it was not created with.
+     */
+    @Test
+    void anEconomyCityKeepsContentRevisionFourAndRefusesAnyOther() throws IOException {
+        Game original = new Game();
+        original.newWorld(SEED, true, World.GEN_URBAN_ECONOMY, GameMode.SURVIVAL);
+        assertEquals(UrbanRevision.ECONOMY_CONTENT, original.world.urban.contentRevision());
+        byte[] bytes = Files.readAllBytes(save(original, "economy.sav"));
+        assertEquals(List.of(1, UrbanRevision.LAYOUT_ECONOMY, UrbanRevision.ECONOMY_CONTENT),
+                ints(sections(bytes).get(UrbanMetaSection.ID)));
+
+        Game loaded = new Game();
+        assertTrue(SaveSystem.load(loaded, write("economy-copy.sav", bytes)));
+        assertEquals(World.GEN_URBAN_ECONOMY, loaded.world.generatorVersion);
+        assertEquals(UrbanRevision.ECONOMY_CONTENT, loaded.world.urban.contentRevision());
+
+        World live = loaded.world;
+        for (int other : new int[]{UrbanRevision.ABSENT_CONTENT, UrbanRevision.STARTER_CONTENT}) {
+            assertFalse(SaveSystem.load(loaded, write("economy-" + other + ".sav", withPayload(bytes,
+                    meta(1, UrbanRevision.LAYOUT_ECONOMY, other)))), "content " + other + " in the economy city");
+            assertSame(live, loaded.world, "a refused revision leaves the live world alone");
+        }
+        assertFalse(SaveSystem.load(loaded, write("economy-no-meta.sav", withoutSection(bytes, UrbanMetaSection.ID))),
+                "without urban.meta the documented default (content 1) is no economy revision either");
+        assertSame(live, loaded.world);
     }
 
     @Test
@@ -239,7 +271,7 @@ class UrbanMetaSectionTest {
                 "an unresolved revision is never written as if it were known");
 
         Game fresh = urbanWorld(SEED);
-        assertEquals(UrbanRevision.CURRENT_CONTENT, fresh.world.urban.contentRevision());
+        assertEquals(UrbanRevision.STARTER_CONTENT, fresh.world.urban.contentRevision());
     }
 
     // ------------------------------------------------------------------

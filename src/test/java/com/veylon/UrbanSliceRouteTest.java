@@ -172,6 +172,22 @@ class UrbanSliceRouteTest {
         }
     }
 
+    /**
+     * Generator 20 (milestone 23) keeps generator 19's city under the survival economy: content revision
+     * four's leaner supplies. The development selector now creates it; the loop must still hold on what
+     * that content leaves in the starter block.
+     */
+    @Test
+    void theSliceLoopStillCompletesOnTheEconomyGenerator() {
+        for (long seed : SLICE_SEEDS) {
+            UrbanSliceRun run = new UrbanSliceRun(seed, GameMode.SURVIVAL, World.GEN_URBAN_ECONOMY).play();
+            assertTrue(run.slice().passed(), "seed=" + seed);
+            assertEquals(World.GEN_URBAN_ECONOMY, run.game.world.generatorVersion);
+            assertEquals(com.veylon.world.urban.UrbanRevision.ECONOMY_CONTENT, run.game.world.urban.contentRevision());
+            assertTrue(run.game.player.inventory.count(ItemType.IRON_SPEAR) >= 1, "the first upgrade seed=" + seed);
+        }
+    }
+
     @Test
     void frozenSeedsPlayTheScavengeRiskReturnLoopInSurvivalAndCreative() {
         for (GameMode mode : GameMode.values()) {

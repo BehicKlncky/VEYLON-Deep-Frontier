@@ -52,7 +52,10 @@ class UrbanRevisionTest {
         assertEquals(UrbanRevision.LAYOUT_MISSIONS, UrbanRevision.layoutRevisionOf(World.GEN_URBAN_MISSIONS));
         assertEquals(UrbanRevision.BUILDING_TEMPLATE_ROUTES,
                 UrbanRevision.buildingTemplateRevisionOf(World.GEN_URBAN_MISSIONS), "layout sixteen keeps template seven");
-        assertEquals(World.GEN_URBAN_MISSIONS, UrbanRevision.DEVELOPMENT_GENERATOR,
+        assertEquals(UrbanRevision.LAYOUT_ECONOMY, UrbanRevision.layoutRevisionOf(World.GEN_URBAN_ECONOMY));
+        assertEquals(UrbanRevision.BUILDING_TEMPLATE_ROUTES,
+                UrbanRevision.buildingTemplateRevisionOf(World.GEN_URBAN_ECONOMY), "layout seventeen keeps template seven");
+        assertEquals(World.GEN_URBAN_ECONOMY, UrbanRevision.DEVELOPMENT_GENERATOR,
                 "the development selector builds the newest layout (decision D-35)");
         for (int notUrban : new int[]{0, World.GEN_LEGACY, World.GEN_DEEP,
                 World.GEN_CAVE_IDENTITIES, World.MAX_SUPPORTED_GENERATOR + 1}) {
@@ -92,13 +95,40 @@ class UrbanRevisionTest {
                 () -> state.resolveContentRevision(UrbanRevision.CURRENT_CONTENT + 1));
         assertFalse(state.contentRevisionResolved(), "a refused revision leaves it unresolved");
 
-        state.resolveContentRevision(UrbanRevision.CURRENT_CONTENT);
-        assertEquals(UrbanRevision.CURRENT_CONTENT, state.contentRevision());
+        state.resolveContentRevision(UrbanRevision.STARTER_CONTENT);
+        assertEquals(UrbanRevision.STARTER_CONTENT, state.contentRevision());
         assertThrows(IllegalStateException.class,
-                () -> state.resolveContentRevision(UrbanRevision.CURRENT_CONTENT),
+                () -> state.resolveContentRevision(UrbanRevision.STARTER_CONTENT),
                 "a world resolves its content revision once");
         assertThrows(IllegalArgumentException.class,
                 () -> new UrbanWorldState(1L, World.GEN_CAVE_IDENTITIES));
+    }
+
+    @Test
+    void theEconomysContentRevisionBelongsToItsLayoutAloneInBothDirections() {
+        assertEquals(UrbanRevision.ECONOMY_CONTENT, UrbanRevision.contentFor(World.GEN_URBAN_ECONOMY));
+        assertEquals(UrbanRevision.CURRENT_CONTENT, UrbanRevision.ECONOMY_CONTENT, "the newest revision this build knows");
+        for (int earlier : new int[]{World.GEN_URBAN, World.GEN_URBAN_STARTER, World.GEN_URBAN_REFUGES,
+                World.GEN_URBAN_MISSIONS}) {
+            assertEquals(UrbanRevision.STARTER_CONTENT, UrbanRevision.contentFor(earlier),
+                    "a fresh world of generator " + earlier + " keeps rolling what it always rolled");
+            UrbanWorldState state = new UrbanWorldState(1L, earlier);
+            IllegalArgumentException refused = assertThrows(IllegalArgumentException.class,
+                    () -> state.resolveContentRevision(UrbanRevision.ECONOMY_CONTENT));
+            assertTrue(refused.getMessage().contains("economy layout only"), refused.getMessage());
+            assertFalse(state.contentRevisionResolved());
+        }
+        UrbanWorldState economy = new UrbanWorldState(1L, World.GEN_URBAN_ECONOMY);
+        assertTrue(economy.hasEconomy() && economy.hasMissions() && economy.hasUtilities(),
+                "layout seventeen keeps every rule of the layouts before it");
+        for (int other : new int[]{UrbanRevision.ABSENT_CONTENT, 2, UrbanRevision.STARTER_CONTENT}) {
+            IllegalArgumentException refused = assertThrows(IllegalArgumentException.class,
+                    () -> economy.resolveContentRevision(other));
+            assertTrue(refused.getMessage().contains("requires urban content revision"), refused.getMessage());
+        }
+        economy.resolveContentRevision(UrbanRevision.ECONOMY_CONTENT);
+        assertEquals(UrbanRevision.ECONOMY_CONTENT, economy.contentRevision());
+        assertFalse(new UrbanWorldState(1L, World.GEN_URBAN_MISSIONS).hasEconomy());
     }
 
     @Test

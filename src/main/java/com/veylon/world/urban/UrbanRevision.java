@@ -21,9 +21,9 @@ import com.veylon.world.World;
  *
  * <p>The <b>content revision</b> covers what is rolled rather than stamped:
  * loot, encounter and trade tables. It never shapes geometry. A new world
- * records the current one, saves keep it in the {@code urban.meta} section, and
- * tables are append-only within a revision; changing an existing entry means a
- * new content revision.
+ * records its generator's revision ({@link #contentFor}), saves keep it in the
+ * {@code urban.meta} section, and tables are append-only within a revision;
+ * changing an existing entry means a new content revision.
  *
  * <h2>Retirement</h2>
  *
@@ -128,9 +128,27 @@ public final class UrbanRevision {
      * objective repairs. Missions, rumours and the broadcast are rules over that city.
      */
     public static final int LAYOUT_MISSIONS = 16;
+    /**
+     * Layout of {@link World#GEN_URBAN_ECONOMY}, the survival economy (milestone 23): layout sixteen
+     * exactly, every block, plan and id, under the economy's rules and with content revision
+     * {@value #ECONOMY_CONTENT}'s supplies. It stamps nothing new.
+     */
+    public static final int LAYOUT_ECONOMY = 17;
 
-    /** Content revision every new urban world records. */
-    public static final int CURRENT_CONTENT = 3;
+    /**
+     * The content revision of the starter catalogue and of every urban world up to generator 19
+     * (milestone 08): the frozen tables of {@link LootTables} with the starter superblock's
+     * reservations.
+     */
+    public static final int STARTER_CONTENT = 3;
+    /**
+     * The economy's content revision (milestone 23): scarcer, purpose-led tables and lean starter
+     * reservations. It belongs to layout {@value #LAYOUT_ECONOMY} alone: that layout requires it and no
+     * other layout accepts it, so an earlier city never rolls the economy's tables.
+     */
+    public static final int ECONOMY_CONTENT = 4;
+    /** The newest content revision this build knows. */
+    public static final int CURRENT_CONTENT = ECONOMY_CONTENT;
     /** Oldest content revision this build still loads. */
     public static final int MIN_SUPPORTED_CONTENT = 1;
     /**
@@ -141,9 +159,20 @@ public final class UrbanRevision {
     public static final int ABSENT_CONTENT = 1;
 
     /** The urban generator the development selector creates: the newest layout. */
-    public static final int DEVELOPMENT_GENERATOR = World.GEN_URBAN_MISSIONS;
+    public static final int DEVELOPMENT_GENERATOR = World.GEN_URBAN_ECONOMY;
 
     private UrbanRevision() {
+    }
+
+    /**
+     * The content revision a fresh world of an urban generator records: the economy's for generator
+     * 20, the starter catalogue's for every earlier urban generator, whose new worlds (QA scenes and
+     * regression routes among them) keep rolling exactly what they always rolled.
+     *
+     * @throws IllegalArgumentException for a generator that is not urban
+     */
+    public static int contentFor(int generatorVersion) {
+        return layoutRevisionOf(generatorVersion) == LAYOUT_ECONOMY ? ECONOMY_CONTENT : STARTER_CONTENT;
     }
 
     /**
@@ -169,6 +198,7 @@ public final class UrbanRevision {
             case World.GEN_URBAN_REFUGES -> LAYOUT_REFUGES;
             case World.GEN_URBAN_UTILITIES -> LAYOUT_UTILITIES;
             case World.GEN_URBAN_MISSIONS -> LAYOUT_MISSIONS;
+            case World.GEN_URBAN_ECONOMY -> LAYOUT_ECONOMY;
             default -> throw new IllegalArgumentException(
                     "generator " + generatorVersion + " is not an urban generator");
         };
@@ -186,7 +216,7 @@ public final class UrbanRevision {
             case World.GEN_URBAN_DISTRICTS -> BUILDING_TEMPLATE_DISTRICTS;
             case World.GEN_URBAN_UNDERGROUND, World.GEN_URBAN_ECOLOGY, World.GEN_URBAN_SURVIVORS,
                  World.GEN_URBAN_STRONGHOLDS, World.GEN_URBAN_REFUGES, World.GEN_URBAN_UTILITIES,
-                 World.GEN_URBAN_MISSIONS
+                 World.GEN_URBAN_MISSIONS, World.GEN_URBAN_ECONOMY
                     -> BUILDING_TEMPLATE_ROUTES;
             default -> throw new IllegalArgumentException("not an urban generator " + generatorVersion);
         };

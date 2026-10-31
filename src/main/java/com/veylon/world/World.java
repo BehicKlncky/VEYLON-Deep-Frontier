@@ -114,10 +114,16 @@ public class World implements VoxelAccess {
      * urban missions and the long-term objective of restoring the city's communications.
      */
     public static final int GEN_URBAN_MISSIONS = 19;
+    /**
+     * Layout 17 (urban milestone 23): generator 19's city exactly, every block, plan and id, under the
+     * rules of the survival economy: content revision four's scarcer supplies, salvage and trade that
+     * cannot be turned into more than they are worth, and the first session's encounter pressure.
+     */
+    public static final int GEN_URBAN_ECONOMY = 20;
     /** The generator of every ordinary new world; generator 3 until the urban rollout. */
     public static final int DEFAULT_NEW_WORLD_GENERATOR = GEN_CAVE_IDENTITIES;
     /** The highest generator version a save may name; a load rejects anything above it. */
-    public static final int MAX_SUPPORTED_GENERATOR = GEN_URBAN_MISSIONS;
+    public static final int MAX_SUPPORTED_GENERATOR = GEN_URBAN_ECONOMY;
 
     public final long seed;
     /** Persisted in save v3; legacy (v2) saves always load as {@link #GEN_LEGACY}. */
@@ -221,7 +227,8 @@ public class World implements VoxelAccess {
                 || version == GEN_URBAN_DISTRICTS || version == GEN_URBAN_UNDERGROUND
                 || version == GEN_URBAN_ECOLOGY || version == GEN_URBAN_SURVIVORS
                 || version == GEN_URBAN_STRONGHOLDS || version == GEN_URBAN_REFUGES
-                || version == GEN_URBAN_UTILITIES || version == GEN_URBAN_MISSIONS;
+                || version == GEN_URBAN_UTILITIES || version == GEN_URBAN_MISSIONS
+                || version == GEN_URBAN_ECONOMY;
     }
 
     /** Generators 2 and 3: deep caves, underground POIs, cave mouths and settlements. */

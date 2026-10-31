@@ -70,7 +70,7 @@ final class WorldBootstrap {
         game.world = new World(seed, generatorVersion);
         if (fresh && game.world.isUrban()) {
             // Fixed before any chunk generates; a load restores the saved one instead.
-            game.world.urban.resolveContentRevision(UrbanRevision.CURRENT_CONTENT);
+            game.world.urban.resolveContentRevision(UrbanRevision.contentFor(generatorVersion));
         }
         game.audio.bindWorld(game.world);
         game.world.listener = game;
