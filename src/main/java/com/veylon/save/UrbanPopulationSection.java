@@ -40,9 +40,9 @@ final class UrbanPopulationSection {
             + Math.max(ProjectileLethality.BULLET_TORSO_WOUNDS, ProjectileLethality.ARROW_TORSO_WOUNDS);
     private UrbanPopulationSection() { }
 
-    /** The codec version a world's frozen catalogue writes: 2 for catalogue five, 1 before it. */
+    /** The codec version a world's frozen catalogue writes: 2 for catalogues five and six, 1 before them. */
     static int codecFor(World world) {
-        return EncounterAnchors.catalogue(world) == 5 ? 2 : 1;
+        return EncounterAnchors.hasCreatures(world) ? 2 : 1;
     }
 
     static byte[] write(Game g) throws IOException {

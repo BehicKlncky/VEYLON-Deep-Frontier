@@ -52,8 +52,12 @@ record UrbanSlicePlan(BuildingPlan refuge, BuildingPlan apartment, BuildingPlan 
         }
         if (shop == null || apartments.isEmpty()) { throw new IllegalStateException("starter block lacks a shop or apartment"); }
         Vec3i court = refuge.approaches().getLast();
+        // Catalogue six (milestone 23) keeps only the farthest starter apartment's slots, which cannot be
+        // admitted while the survivor stands inside it: the route searches the nearest other apartment and
+        // meets the threat that comes from across the block, as DESIGN §3.1's first session does.
+        boolean eased = EncounterAnchors.catalogue(world) == 6;
         BuildingPlan apartment = apartments.stream().min(Comparator
-                .comparingInt((BuildingPlan b) -> threatRank(world, b, refuge))
+                .comparingInt((BuildingPlan b) -> eased ? -threatRank(world, b, refuge) : threatRank(world, b, refuge))
                 .thenComparingInt(b -> distSq(b.approaches().getLast(), court))
                 .thenComparingLong(BuildingPlan::id)).orElseThrow();
         Fixture locker = container(apartment, 0, ContainerUse.UTILITY_LOCKER);

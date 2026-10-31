@@ -45,14 +45,24 @@ public final class EncounterAnchors {
         if (world.urban == null) {
             return 1;
         }
-        return world.urban.hasEcology() ? 5 : world.urban.hasUnderground() ? 4 : world.urban.hasDistricts() ? 3
-                : world.urban.hasCivicCatalogue() ? 2 : 1;
+        return world.urban.hasEconomy() ? 6 : world.urban.hasEcology() ? 5 : world.urban.hasUnderground() ? 4
+                : world.urban.hasDistricts() ? 3 : world.urban.hasCivicCatalogue() ? 2 : 1;
     }
 
-    /** Catalogues four and five keep a region's station slots; earlier ones have no stations. */
+    /** Catalogues four to six keep a region's station slots; earlier ones have no stations. */
     public static boolean hasStations(World world) {
         int catalogue = catalogue(world);
-        return catalogue == 4 || catalogue == 5;
+        return catalogue == 4 || catalogue == 5 || catalogue == 6;
+    }
+
+    /**
+     * Catalogues five and six plan creatures beside the infected: the quarantine's Veilmaws, the
+     * Breachers and city wildlife (milestone 15). Catalogue six is catalogue five with the starter
+     * block's pressure eased (milestone 23).
+     */
+    public static boolean hasCreatures(World world) {
+        int catalogue = catalogue(world);
+        return catalogue == 5 || catalogue == 6;
     }
 
     public static boolean selected(World world, ParcelPlan parcel) {
@@ -71,7 +81,35 @@ public final class EncounterAnchors {
             if (!plan.family().walkUp()) { return civic(world, plan); }
         }
         if (!selected(world, parcel)) { return List.of(); }
+        if (catalogue == 6 && UrbanStarterSite.isNeighbour(parcel) && parcel.index() != starterThreat(world)) {
+            return List.of();
+        }
         return walkUp(world.urban.buildingAt(parcel.x0(), parcel.z0()));
+    }
+
+    /**
+     * Catalogue six (layout seventeen, milestone 23): the one starter apartment that keeps catalogue
+     * one's two slots, the one whose street door lies farthest from the refuge's courtyard door (ties by
+     * parcel index), so the first session meets the one or two bodies DESIGN §4.4 asks for instead of up to
+     * eight. Pure in the plans.
+     */
+    static int starterThreat(World world) {
+        UrbanStarterSite site = UrbanStarterSite.of(world.urban);
+        Vec3i door = site.refuge().approaches().getLast();
+        int best = -1;
+        long bestDistance = -1;
+        for (ParcelPlan parcel : world.urban.regionPlan(0, 0).parcels()) {
+            if (!UrbanStarterSite.isNeighbour(parcel) || parcel.use() != ParcelPlan.Use.RESIDENTIAL) { continue; }
+            BuildingPlan plan = world.urban.buildingAt(parcel.x0(), parcel.z0());
+            if (plan == null || plan.variant() == BuildingPlan.Variant.OCCUPIED) { continue; }
+            Vec3i street = plan.approaches().getFirst();
+            long dx = street.x() - door.x(), dz = street.z() - door.z(), distance = dx * dx + dz * dz;
+            if (distance > bestDistance) {
+                best = parcel.index();
+                bestDistance = distance;
+            }
+        }
+        return best;
     }
 
     /** Catalogue one's slots: the street approach and the first ground-floor living room or kitchen. */
@@ -134,7 +172,7 @@ public final class EncounterAnchors {
             // The station spends one building's share of the district budget first.
             chosen = chosen.subList(0, chosen.size() - 1);
         }
-        boolean ecology = catalogue(world) == 5;
+        boolean ecology = hasCreatures(world);
         if (ecology && district.district == UrbanDistrict.QUARANTINE && !chosen.isEmpty()) {
             // Catalogue five: the quarantine's Veilmaws are part of its threat budget, one building's
             // share (two anchors) for every two growth sites, rounded up, keeping one building.
@@ -229,7 +267,7 @@ public final class EncounterAnchors {
      * catalogue.
      */
     public static List<Anchor> forEcology(World world, int rx, int rz, int superblock) {
-        if (catalogue(world) != 5 || !CityPlanner.isPlannable(rx, rz)) { return List.of(); }
+        if (!hasCreatures(world) || !CityPlanner.isPlannable(rx, rz)) { return List.of(); }
         DistrictPlan district = world.urban.regionPlan(rx, rz);
         long site = UrbanIds.building(UrbanIds.parcel(district.districtId,
                 superblock * ParcelPlan.SLOTS_PER_SUPERBLOCK + EcologySites.ID_SLOT), 0);

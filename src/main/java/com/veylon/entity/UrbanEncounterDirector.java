@@ -173,7 +173,7 @@ public final class UrbanEncounterDirector {
         int rx = StreetNetwork.regionOf(cell(g.player.pos.x)), rz = StreetNetwork.regionOf(cell(g.player.pos.z));
         if (rx != scanX || rz != scanZ) { scanX = rx; scanZ = rz; regionCursor = parcelCursor = 0; }
         boolean stations = EncounterAnchors.hasStations(g.world);
-        boolean ecology = EncounterAnchors.catalogue(g.world) == 5;
+        boolean ecology = EncounterAnchors.hasCreatures(g.world);
         while (lastParcels < MAX_PARCELS_PER_TICK && lastSpawns < MAX_SPAWNS_PER_TICK && !capped(g)) {
             int ax = rx + REGIONS[regionCursor][0], az = rz + REGIONS[regionCursor][1];
             if (!CityPlanner.isPlannable(ax, az)) { advanceRegion(); lastParcels++; continue; }
@@ -225,7 +225,7 @@ public final class UrbanEncounterDirector {
      * infected cap, as they always did; catalogue five stops only when every kind is at its cap.
      */
     private boolean capped(Game g) {
-        if (EncounterAnchors.catalogue(g.world) != 5) { return activeCount(g) >= MAX_ACTIVE; }
+        if (!EncounterAnchors.hasCreatures(g.world)) { return activeCount(g) >= MAX_ACTIVE; }
         return activeCount(g) >= MAX_ACTIVE && activeAliens(g) >= MAX_ACTIVE_ALIENS
                 && activeWildlife(g) >= MAX_ACTIVE_WILDLIFE;
     }
