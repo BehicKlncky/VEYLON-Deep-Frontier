@@ -321,11 +321,7 @@ final class QaHarness {
         peakChunks = Math.max(peakChunks, game.renderer.chunksRendered);
         particleDrawCallSum += game.renderer.particleDrawCalls;
         peakParticleDrawCalls = Math.max(peakParticleDrawCalls, game.renderer.particleDrawCalls);
-        int resident = 0;
-        for (Chunk c : game.world.loadedChunks()) {
-            if (c.meshOpaque != null || c.meshWater != null) resident++;
-        }
-        peakResidentChunkMeshes = Math.max(peakResidentChunkMeshes, resident);
+        peakResidentChunkMeshes = Math.max(peakResidentChunkMeshes, Chunk.meshedChunks());
     }
 
     // ------------------------------------------------------------------

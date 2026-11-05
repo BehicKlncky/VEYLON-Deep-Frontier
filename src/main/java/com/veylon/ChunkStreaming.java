@@ -12,6 +12,14 @@ final class ChunkStreaming {
     /** Chunk meshes rebuilt in one frame at most. */
     static final int MESH_PER_FRAME = 3;
 
+    /**
+     * How far streaming generates: one ring beyond the render radius, so every chunk the renderer
+     * draws has its eight neighbours and its mesh is built once, final (urban milestone 24).
+     */
+    static int generationRadius(int renderRadius) {
+        return renderRadius + 1;
+    }
+
     private final Game game;
     /** When the last frame's streaming step began, by {@link System#nanoTime}. */
     long startedAt;
@@ -29,7 +37,7 @@ final class ChunkStreaming {
         var player = game.player;
         startedAt = System.nanoTime();
         generatedLastFrame = game.world.ensureChunks((int) player.pos.x, (int) player.pos.z,
-                game.renderer.renderRadius(), GENERATE_PER_FRAME);
+                generationRadius(game.renderer.renderRadius()), GENERATE_PER_FRAME);
         long meshStart = System.nanoTime();
         game.renderer.buildDirtyMeshes(game.world, Math.floorDiv((int) player.pos.x, 16),
                 Math.floorDiv((int) player.pos.z, 16), MESH_PER_FRAME);

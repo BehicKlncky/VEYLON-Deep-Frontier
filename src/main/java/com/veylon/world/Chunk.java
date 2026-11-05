@@ -30,6 +30,20 @@ public class Chunk {
 
     public Mesh meshOpaque;
     public Mesh meshWater;
+    /**
+     * Chunks holding GPU meshes, process-wide: one GL context draws every world. QA reports read
+     * this instead of walking every chunk a long journey keeps (urban milestone 24).
+     */
+    private static int meshed;
+
+    public static int meshedChunks() {
+        return meshed;
+    }
+
+    /** The mesher's first upload for this chunk created its meshes. */
+    void meshesCreated() {
+        meshed++;
+    }
 
     public Chunk(int cx, int cz) {
         this.cx = cx;
@@ -144,6 +158,7 @@ public class Chunk {
         if (meshOpaque != null) {
             meshOpaque.delete();
             meshOpaque = null;
+            meshed--;
         }
         if (meshWater != null) {
             meshWater.delete();

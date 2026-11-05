@@ -215,12 +215,13 @@ class UrbanCityPerformanceTest {
             long t0 = System.nanoTime();
             g.playStep(DT, DT);
             long t1 = System.nanoTime();
-            generated += g.world.ensureChunks((int) g.player.pos.x, (int) g.player.pos.z, radius, 2);
+            generated += g.world.ensureChunks((int) g.player.pos.x, (int) g.player.pos.z,
+                    ChunkStreaming.generationRadius(radius), ChunkStreaming.GENERATE_PER_FRAME);
             long t2 = System.nanoTime();
             int pcx = Math.floorDiv((int) g.player.pos.x, 16), pcz = Math.floorDiv((int) g.player.pos.z, 16);
-            List<Chunk> dirty = g.renderer.selectDirty(g.world, pcx, pcz);
+            List<Chunk> dirty = g.renderer.selectDirty(g.world, pcx, pcz, ChunkStreaming.MESH_PER_FRAME);
             long t3 = System.nanoTime();
-            for (int i = 0; i < Math.min(3, dirty.size()); i++) {
+            for (int i = 0; i < dirty.size(); i++) {
                 mesher.tessellate(g.world, dirty.get(i));
                 dirty.get(i).dirty = false;
                 meshed++;
@@ -244,6 +245,9 @@ class UrbanCityPerformanceTest {
         report("stream", "%s tessellate %s", label, mesh);
         report("stream", "%s visible-select %s", label, visible);
         report("stream", "%s cpu-frame %s", label, frame);
+        // Target (milestone 24): streaming and the simulation together keep under half a 60 fps frame at
+        // the 99th percentile, leaving the other half to rendering, the interface and the swap.
+        assertTrue(frame.pct(0.99) < FRAME_MS / 2, label + " streaming CPU frame p99 above half a frame: " + frame);
         assertTrue(RuntimeBudgetSnapshot.capture(g).withinHardLimits(), RuntimeBudgetSnapshot.capture(g).occupancySummary());
     }
 
@@ -397,10 +401,11 @@ class UrbanCityPerformanceTest {
                 g.player.vel.zero();
                 long t0 = System.nanoTime();
                 g.playStep(DT, DT);
-                g.world.ensureChunks((int) g.player.pos.x, (int) g.player.pos.z, radius, 2);
+                g.world.ensureChunks((int) g.player.pos.x, (int) g.player.pos.z,
+                        ChunkStreaming.generationRadius(radius), ChunkStreaming.GENERATE_PER_FRAME);
                 long t1 = System.nanoTime();
                 int pcx = Math.floorDiv((int) g.player.pos.x, 16), pcz = Math.floorDiv((int) g.player.pos.z, 16);
-                g.renderer.selectDirty(g.world, pcx, pcz);
+                g.renderer.selectDirty(g.world, pcx, pcz, ChunkStreaming.MESH_PER_FRAME);
                 g.renderer.selectVisible(g.world, pcx, pcz);
                 long t2 = System.nanoTime();
                 frame.add((t1 - t0) / 1e6);

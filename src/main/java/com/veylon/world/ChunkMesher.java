@@ -95,6 +95,7 @@ public class ChunkMesher {
         tessellate(world, c);
         if (c.meshOpaque == null) {
             c.meshOpaque = new Mesh(ATTRIBS);
+            c.meshesCreated();
         }
         if (c.meshWater == null) {
             c.meshWater = new Mesh(WATER_ATTRIBS);
