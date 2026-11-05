@@ -58,7 +58,7 @@ public record RuntimeBudgetSnapshot(
         int urbanVehiclePlans, int damagedBarricades, int doorBraces, int refugeClaims, int tappedBuildings,
         int utilityDevices, int missionRecords, int visitedPlaces, int sketchedFloors, int urbanThreatBudgets,
         int navigationRoutes, int pathQueries, int pathExpansions, int pathDeferred,
-        int pathFailures, int unsupportedEntries, int hearingSamples) {
+        int pathFailures, int unsupportedEntries, int hearingSamples, int retainedChunks, long unloadedChunks) {
 
     public static RuntimeBudgetSnapshot capture(Game game) {
         int pathNodes = 0;
@@ -125,7 +125,7 @@ public record RuntimeBudgetSnapshot(
                 game.world.navigation.size(), game.world.navigation.budget.queries(),
                 game.world.navigation.budget.expansions(), game.world.navigation.budget.deferred(),
                 game.world.navigation.budget.failures(), game.world.navigation.budget.unsupportedEntries(),
-                game.noise.hearingSamples());
+                game.noise.hearingSamples(), game.world.loadedCount(), game.world.chunkUnloads());
     }
 
     /** True when every collection with a hard runtime ceiling is within it. */
@@ -227,7 +227,8 @@ public record RuntimeBudgetSnapshot(
                 + " fortifications={damaged=" + damagedBarricades + ",braces=" + doorBraces + "}"
                 + " refuges=" + refugeClaims + " tapped=" + tappedBuildings + " devices=" + utilityDevices + " urbanMissions=" + missionRecords
                 + " visits={places=" + visitedPlaces + ",sketchedFloors=" + sketchedFloors + "}"
-                + " fixtures={states=" + fixtureStates + ",residentDoors=" + residentDoors + "}";
+                + " fixtures={states=" + fixtureStates + ",residentDoors=" + residentDoors + "}"
+                + " chunks={retained=" + retainedChunks + ",unloaded=" + unloadedChunks + "}";
     }
 
     public static String hardLimitSummary() {

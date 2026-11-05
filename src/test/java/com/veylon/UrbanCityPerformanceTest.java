@@ -215,8 +215,10 @@ class UrbanCityPerformanceTest {
             long t0 = System.nanoTime();
             g.playStep(DT, DT);
             long t1 = System.nanoTime();
-            generated += g.world.ensureChunks((int) g.player.pos.x, (int) g.player.pos.z,
+            int made = g.world.ensureChunks((int) g.player.pos.x, (int) g.player.pos.z,
                     ChunkStreaming.generationRadius(radius), ChunkStreaming.GENERATE_PER_FRAME);
+            if (made > 0) { g.streaming.retention.afterStreaming(); }
+            generated += made;
             long t2 = System.nanoTime();
             int pcx = Math.floorDiv((int) g.player.pos.x, 16), pcz = Math.floorDiv((int) g.player.pos.z, 16);
             List<Chunk> dirty = g.renderer.selectDirty(g.world, pcx, pcz, ChunkStreaming.MESH_PER_FRAME);
@@ -401,8 +403,10 @@ class UrbanCityPerformanceTest {
                 g.player.vel.zero();
                 long t0 = System.nanoTime();
                 g.playStep(DT, DT);
-                g.world.ensureChunks((int) g.player.pos.x, (int) g.player.pos.z,
-                        ChunkStreaming.generationRadius(radius), ChunkStreaming.GENERATE_PER_FRAME);
+                if (g.world.ensureChunks((int) g.player.pos.x, (int) g.player.pos.z,
+                        ChunkStreaming.generationRadius(radius), ChunkStreaming.GENERATE_PER_FRAME) > 0) {
+                    g.streaming.retention.afterStreaming();
+                }
                 long t1 = System.nanoTime();
                 int pcx = Math.floorDiv((int) g.player.pos.x, 16), pcz = Math.floorDiv((int) g.player.pos.z, 16);
                 g.renderer.selectDirty(g.world, pcx, pcz, ChunkStreaming.MESH_PER_FRAME);
@@ -423,13 +427,17 @@ class UrbanCityPerformanceTest {
             int loadedChunks = loaded.world.loadedCount();
             loaded = null;
             RuntimeBudgetSnapshot snap = RuntimeBudgetSnapshot.capture(g);
-            report("travel", "km=%d retained=%d heapMiB=%.1f regionPlans=%d buildingPlans=%d encounterRecords=%d"
+            report("travel", "km=%d retained=%d evicted=%d pinned=%d heapMiB=%.1f regionPlans=%d buildingPlans=%d encounterRecords=%d"
                             + " sites=%d visits=%d containers=%d edits=%d fixtures=%d searched=%d",
-                    km, g.world.loadedCount(), mib(heapAfterGc()), snap.urbanRegionPlans(), snap.urbanBuildingPlans(),
+                    km, g.world.loadedCount(), g.streaming.retention.evicted, g.streaming.retention.pinnedLastPass,
+                    mib(heapAfterGc()), snap.urbanRegionPlans(), snap.urbanBuildingPlans(),
                     snap.urbanEncounterRecords(), snap.urbanSiteRecords(), snap.visitedPlaces(),
                     g.world.urban.containers.size(), g.world.changedBlocks.size(), g.world.fixtures.size(), searched);
             report("travel", "km=%d save=%d bytes in %.1fms load=%.1fms (%d chunks regenerated) step+stream %s"
                     + " chunk-scans %s", km, bytes, saveMs, loadMs, loadedChunks, frame, scans);
+            // Target (milestone 24): the journey holds a bounded city, whatever its length. A checkpoint's
+            // building search may generate a few chunks between two passes.
+            assertTrue(g.world.loadedCount() <= ChunkRetention.RETAIN_LIMIT + 32, "retained chunks unbounded: " + g.world.loadedCount());
             assertTrue(snap.withinHardLimits(), snap.occupancySummary());
         }
     }

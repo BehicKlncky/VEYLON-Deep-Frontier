@@ -21,11 +21,12 @@ import com.veylon.world.StairGeometry;
  * spot instead of falling forever into ungenerated space.
  *
  * <p>Column lookups go through the same direct-mapped cache
- * {@code RainCollision} uses, and for the same two reasons: {@code World}
- * retains voxel columns for its lifetime so a cached reference stays valid and
- * shows edits immediately, and going through {@code World.getChunk} for every
- * one of the thousands of voxel probes a field of bodies makes would box a key
- * on each miss. Chunk <em>references</em> are cached; voxel contents and absent
+ * {@code RainCollision} uses, and for the same two reasons: a cached reference
+ * shows edits immediately and stays valid until {@code World} drops the chunk
+ * (a city's far chunks, urban milestone 24, whose unload count flushes the
+ * cache), and going through {@code World.getChunk} for every one of the
+ * thousands of voxel probes a field of bodies makes would cost a lookup on each
+ * miss. Chunk <em>references</em> are cached; voxel contents and absent
  * columns never are.
  */
 final class RagdollCollision {
@@ -45,6 +46,7 @@ final class RagdollCollision {
     float z;
 
     private World cachedWorld;
+    private long cachedUnloads;
     private final Chunk[] columns = new Chunk[COLUMNS];
 
     void reset() {
@@ -166,13 +168,14 @@ final class RagdollCollision {
     }
 
     /**
-     * World retains voxel columns for its lifetime (only GPU meshes unload), so
-     * caching a reference keeps edits visible. Absent columns are never cached.
+     * A cached reference keeps edits visible until the world drops that chunk;
+     * any drop flushes the cache. Absent columns are never cached.
      */
     private Chunk column(World world, int cx, int cz) {
-        if (world != cachedWorld) {
+        if (world != cachedWorld || world.chunkUnloads() != cachedUnloads) {
             java.util.Arrays.fill(columns, null);
             cachedWorld = world;
+            cachedUnloads = world.chunkUnloads();
         }
         int slot = (cx * 31 + cz * 7) & (COLUMNS - 1);
         Chunk chunk = columns[slot];

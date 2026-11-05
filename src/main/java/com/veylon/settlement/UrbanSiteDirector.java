@@ -84,6 +84,24 @@ public final class UrbanSiteDirector {
     }
 
     /** Every registered site, in id order. */
+    /**
+     * The cells whose columns a registered site needs generated to go on as it would with the player
+     * near (urban milestone 24's chunk retention keeps them): the stash its hourly needs eat from,
+     * since a site steps only while every container of it is loaded, and a compound's gate while its
+     * timer runs, since the gate shuts only while loaded. Pure reads; bounded by {@link #MAX_SITES}.
+     */
+    public static void heldCells(Game g, java.util.function.Consumer<Vec3i> out) {
+        if (!manages(g.world)) { return; }
+        for (Settlement settlement : g.world.settlements.values()) {
+            if (!(settlement instanceof UrbanSite s)) { continue; }
+            for (Vec3i p : UrbanSiteNeeds.stashOf(g, s)) { out.accept(p); }
+            if (s.compound() && s.gateTimer > 0f) {
+                com.veylon.world.urban.CompoundSites.Compound c = s.compoundPlan(g.world.urban);
+                if (c != null) { c.gate().leaves().forEach(out); }
+            }
+        }
+    }
+
     public static List<UrbanSite> sites(World w) {
         List<UrbanSite> out = new ArrayList<>();
         for (Settlement s : w.settlements.values()) {

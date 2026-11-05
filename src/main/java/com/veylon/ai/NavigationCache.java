@@ -48,4 +48,9 @@ public final class NavigationCache {
                 && z >= r.z0 && z <= r.z1);
     }
     public int size() { return routes.size(); }
+
+    /** Columns x0..x1, z0..z1 left the world (urban milestone 24): forget every route touching them. */
+    public void unloaded(int x0, int z0, int x1, int z1) {
+        routes.values().removeIf(r -> r.x0 <= x1 && r.x1 >= x0 && r.z0 <= z1 && r.z1 >= z0);
+    }
 }

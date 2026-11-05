@@ -314,9 +314,9 @@ public class World implements VoxelAccess {
      * the map: per-body queries that hop between the chunks a crowd stands in
      * (body fire contact, 20 times a second for every body) never box.
      *
-     * <p>Neither can go stale. Chunks are only ever added to the map —
-     * unloading frees GPU meshes and leaves the block data in place — and a new
-     * world is a new {@link World}, so there is no invalidation to get wrong.
+     * <p>Neither can go stale: {@link #unloadChunk}, the one way a chunk leaves
+     * the map (urban milestone 24), clears both before it returns, and a new
+     * world is a new {@link World}.
      */
     private int cachedCx = Integer.MIN_VALUE;
     private int cachedCz = Integer.MIN_VALUE;
@@ -326,6 +326,7 @@ public class World implements VoxelAccess {
     private final int[] recentCx = new int[1 << 2 * RECENT_BITS];
     private final int[] recentCz = new int[1 << 2 * RECENT_BITS];
     private final Chunk[] recentChunk = new Chunk[1 << 2 * RECENT_BITS];
+    private long chunkUnloads;
 
     public Chunk getChunk(int cx, int cz) {
         if (cx == cachedCx && cz == cachedCz) {
@@ -770,6 +771,54 @@ public class World implements VoxelAccess {
 
     public Collection<Chunk> loadedChunks() {
         return chunks.values();
+    }
+
+    /**
+     * Whether a chunk of this world may be dropped and later generated again without losing or
+     * changing anything (urban milestone 24, D-241). A generated city's chunk is pure in the seed,
+     * the layout and the stable plans, takes no decoration from a neighbour and gets every recorded
+     * edit and saved door or window state back as it generates ({@link #getOrCreateChunk}). Legacy
+     * terrain writes trees and structures across chunk borders, and the unbuilt urban layouts do
+     * not replay edits, so those worlds keep every chunk they generate.
+     */
+    public boolean evictsChunks() {
+        return urban != null && urban.hasGeneratedBuildings();
+    }
+
+    /**
+     * Drops one generated chunk (urban milestone 24): its GPU meshes, its block data, both lookup
+     * caches' references to it and every cached route through its columns. The next request for it
+     * generates it again. Only {@link #evictsChunks} worlds drop chunks, and only the caller knows
+     * that nothing near it still needs it: see {@code ChunkRetention}.
+     *
+     * @return false when the chunk is not loaded
+     * @throws IllegalStateException in a world whose chunks do not regenerate exactly
+     */
+    public boolean unloadChunk(int cx, int cz) {
+        if (!evictsChunks()) {
+            throw new IllegalStateException("generator " + generatorVersion + " keeps every chunk it generates");
+        }
+        Chunk c = chunks.remove(key(cx, cz));
+        if (c == null) {
+            return false;
+        }
+        c.deleteMeshes();
+        if (cachedChunk == c) {
+            cachedChunk = null;
+            cachedCx = cachedCz = Integer.MIN_VALUE;
+        }
+        int slot = (cx & RECENT_MASK) | (cz & RECENT_MASK) << RECENT_BITS;
+        if (recentChunk[slot] == c) {
+            recentChunk[slot] = null;
+        }
+        navigation.unloaded(cx * Chunk.SX, cz * Chunk.SZ, cx * Chunk.SX + Chunk.SX - 1, cz * Chunk.SZ + Chunk.SZ - 1);
+        chunkUnloads++;
+        return true;
+    }
+
+    /** Chunks this world has dropped; a cache that holds chunk references flushes when it moves. */
+    public long chunkUnloads() {
+        return chunkUnloads;
     }
 
     public int loadedCount() {

@@ -24,6 +24,11 @@ public class WaterSystem implements MediumTickSystem {
     private final Random rng = new Random();
     public long cellsProcessed = 0;
 
+    /** Cells waiting to flow; their columns must stay loaded until they settle (urban milestone 24). */
+    public java.util.Collection<Vec3i> pendingCells() {
+        return java.util.Collections.unmodifiableSet(scheduled);
+    }
+
     /** Seeded per world so a given world seed replays identically. */
     public void setRandomSeed(long seed) {
         rng.setSeed(seed);

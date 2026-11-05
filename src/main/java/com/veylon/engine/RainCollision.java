@@ -15,6 +15,7 @@ public final class RainCollision {
     public BlockType material;
     public int probes;
     private World cachedWorld;
+    private long cachedUnloads;
     private final Chunk[] columns = new Chunk[32];
 
     void reset() {
@@ -24,9 +25,10 @@ public final class RainCollision {
     }
 
     private Chunk loadedColumn(World world, int cx, int cz) {
-        if (world != cachedWorld) {
+        if (world != cachedWorld || world.chunkUnloads() != cachedUnloads) {
             java.util.Arrays.fill(columns, null);
             cachedWorld = world;
+            cachedUnloads = world.chunkUnloads();
         }
         int slot = (cx * 31 + cz * 7) & (columns.length - 1);
         Chunk chunk = columns[slot];
@@ -34,7 +36,7 @@ public final class RainCollision {
             chunk = world.getChunk(cx, cz);
             columns[slot] = chunk;
         }
-        // World retains voxel columns for its lifetime (only GPU meshes unload).
+        // A city drops far chunks (World.unloadChunk); the unload count flushes these references.
         // Cache references, never voxel contents or absent columns, so edits stay visible.
         return chunk;
     }

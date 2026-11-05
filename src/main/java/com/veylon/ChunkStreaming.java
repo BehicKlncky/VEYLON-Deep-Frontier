@@ -2,8 +2,9 @@ package com.veylon;
 
 /**
  * The frame's streaming step: generates the missing chunks nearest the player within the frame's
- * generation budget, then rebuilds the nearest dirty meshes within the meshing budget, and
- * times both so city QA can attribute a frame (urban milestone 24). It runs once a frame on the main
+ * generation budget, lets a generated city drop its farthest chunks once it holds too many
+ * ({@link ChunkRetention}), then rebuilds the nearest dirty meshes within the meshing budget, and
+ * times it so city QA can attribute a frame (urban milestone 24). It runs once a frame on the main
  * thread, after the control and simulation step and before rendering.
  */
 final class ChunkStreaming {
@@ -21,6 +22,8 @@ final class ChunkStreaming {
     }
 
     private final Game game;
+    /** Drops a generated city's far chunks once it holds too many (urban milestone 24). */
+    final ChunkRetention retention;
     /** When the last frame's streaming step began, by {@link System#nanoTime}. */
     long startedAt;
     /** What the last frame's generation and meshing cost, in nanoseconds. */
@@ -31,6 +34,7 @@ final class ChunkStreaming {
 
     ChunkStreaming(Game game) {
         this.game = game;
+        this.retention = new ChunkRetention(game);
     }
 
     void frame() {
@@ -38,6 +42,9 @@ final class ChunkStreaming {
         startedAt = System.nanoTime();
         generatedLastFrame = game.world.ensureChunks((int) player.pos.x, (int) player.pos.z,
                 generationRadius(game.renderer.renderRadius()), GENERATE_PER_FRAME);
+        if (generatedLastFrame > 0) {
+            retention.afterStreaming();
+        }
         long meshStart = System.nanoTime();
         game.renderer.buildDirtyMeshes(game.world, Math.floorDiv((int) player.pos.x, 16),
                 Math.floorDiv((int) player.pos.z, 16), MESH_PER_FRAME);
