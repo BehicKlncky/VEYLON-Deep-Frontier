@@ -193,8 +193,11 @@ while (!window.shouldClose())
    explosion fuses, noise decay, ambient emitters). Nothing else advances the world, so a
    paused frame burns, panics and settles nothing.
 7. **Camera and audio** follow the player eye; set the listener before `audio.update(dt)`.
-8. **Streaming** — `world.ensureChunks(...)` around the player, then
-   `renderer.buildDirtyMeshes(...)` on a per-frame budget.
+8. **Streaming** — `ChunkStreaming.frame()`: `world.ensureChunks(...)` out to one
+   ring beyond the render radius (two chunks a frame), a generated city's
+   `ChunkRetention` pass once it holds too many chunks, then
+   `renderer.buildDirtyMeshes(...)` (three a frame, only chunks whose eight
+   neighbours exist); each part is timed for the city QA tour.
 9. **Render** — `renderer.render(...)`, then the UI pass: HUD, the active
    screen, debug overlays, death/victory overlay, `ui.end()`.
 
@@ -439,8 +442,10 @@ mistaking surrounding structures for geometry owned by the inspected plan.
 `ChunkBlockEdits` keeps the public delta-map contract with a per-chunk index.
 Generation restores that chunk's recorded edits after structure and before
 saved fixture overrides, then finalises heights/lights once and dirties adjacent
-meshes. The index adds transient memory proportional to the edit log; CPU chunks
-are still retained (eviction remains package 24). No codec or enum changes.
+meshes. The index adds transient memory proportional to the edit log. Because a
+generated chunk gets its edits and fixture states back whenever it generates, package
+24 can drop a city's far chunks and regenerate them identically (see "Dense-city
+streaming and chunk retention"). No codec or enum changes.
 
 `UrbanIndoorQueries` observes loaded voxels, never generating columns. A derived
 precipitation-height map (1 KiB/chunk) treats opaque roofs and closed glass as
@@ -833,6 +838,47 @@ trader's reserve for the people its stash feeds; `Npc.painGuard`, run down by
 `InfectedAI.ready`, is an infected body's transient guard after a flinch; and
 `EncounterAnchors` freezes catalogue 6, catalogue 5 with one starter apartment's
 slots. `VEYLON_SCENE=urban_economy` plays two and a half real-time days.
+
+### Dense-city streaming and chunk retention
+
+Urban package 24 moves the frame's streaming step out of `Game` into `ChunkStreaming`
+(generation, retention and mesh rebuilds, each timed) and bounds what a long journey
+keeps. Nothing in it is saved, and no generator, plan or codec changes.
+
+- **Chunk storage.** `World.chunks` is a `ChunkMap`: open addressing on the packed key
+  with a multiplicative hash. The old `HashMap<Long, Chunk>` hashed every key to
+  `cx ^ cz`, so diagonals shared buckets and lookups of absent chunks walked trees.
+- **Generation and meshing.** Streaming generates one ring beyond the render radius
+  (`ChunkStreaming.generationRadius`). `Renderer.selectDirty` walks only the render
+  window, nearest first by chunk steps, into a reused list and takes only dirty chunks
+  whose eight neighbours exist. A chunk's border faces, corner shading and light depend
+  on its neighbours, so waiting builds each final mesh once instead of about 2.6 times;
+  the meshes are the same (`ChunkMesherFingerprintTest`). `selectVisible` walks the
+  window too, and `Chunk.meshedChunks` counts meshed chunks for QA. `ChunkMesher`
+  skips block-light sampling when no emitter stands in the 5 x 5 chunks around the
+  chunk it builds: a light reaches 11.25 blocks, so every such sample is exactly 0.
+- **Retention.** In a world whose chunks regenerate exactly (`World.evictsChunks`:
+  generated cities, generators 7–20), `ChunkRetention` runs after streaming once more
+  than 2,048 chunks are held and drops the farthest down to 1,792 through
+  `World.unloadChunk`, which deletes GPU meshes, clears both chunk lookup caches,
+  forgets cached routes through the chunk's columns and advances `World.chunkUnloads`,
+  which `RagdollCollision` and `RainCollision` compare before trusting a cached chunk
+  reference. Nothing inside the kept window (render radius + 4, at least 13 chunks) is
+  dropped, nor any chunk beside a cell that holds state only a loaded column runs or a
+  save reads back by its block: burning cells and liquid fire, campfire fuel, lanterns,
+  drying racks, rain collectors, lit fuses, gate and resident-door timers, flowing water,
+  utility devices, containers holding food that still spoils, a survivor site's stash and
+  a compound's running gate (`UrbanSiteDirector.heldCells`), and every body, piece and
+  projectile. A dropped chunk therefore behaves as one a load has not brought back yet.
+  Legacy worlds (whose trees cross chunk borders) and the unbuilt urban layouts keep
+  every chunk.
+- **Caches.** `EncounterAnchors` keeps each region's threat budget in
+  `UrbanWorldState.threatBudget` (16 regions, rebuilt identically); the encounter
+  director asked for it once per parcel. The snapshot reports `threatBudgets`, and
+  `chunks={retained,unloaded}` in its occupancy line.
+- **QA.** `VEYLON_SCENE=urban_performance` (`UrbanPerformanceQaScene`) reports measured
+  legs; `cityPerformanceTest` runs `UrbanCityPerformanceTest` in its own worker under a
+  2 GiB heap.
 
 ### Doors, windows and urban fixtures
 
