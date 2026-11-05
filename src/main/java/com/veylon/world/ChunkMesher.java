@@ -71,6 +71,14 @@ public class ChunkMesher {
     private final byte[] lightSet = new byte[CW * CH * CW];
     private int baseX, baseZ;
     private World world;
+    /**
+     * Whether any light block stands in the 5 x 5 chunks around the one being built. A light reaches
+     * at most 11.25 blocks ({@code World.blockLight}), less than a chunk, so with none there every
+     * cached cell's block light is exactly 0 and is not asked of the world. Most city chunks have no
+     * emitter near them, and the world's answer walks nine chunks' light lists for every cell
+     * (urban milestone 24).
+     */
+    private boolean lightsNear;
 
     // Urban milestone 22 dressing: district grade and wall decals in generated cities.
     private boolean dressing;
@@ -127,6 +135,7 @@ public class ChunkMesher {
         baseZ = c.cz * Chunk.SZ;
         java.util.Arrays.fill(solidCache, (byte) 0);
         java.util.Arrays.fill(lightSet, (byte) 0);
+        lightsNear = lightsAround(world, c.cx, c.cz);
         dressing = world.urban != null && world.urban.hasGeneratedBuildings();
         decals = 0;
         java.util.Arrays.fill(districtKnown, false);
@@ -289,9 +298,21 @@ public class ChunkMesher {
     private void ensureLight(int x, int y, int z, int i) {
         if (lightSet[i] == 0) {
             skyCache[i] = world.skyLight(x, y, z);
-            blockCache[i] = world.blockLight(x, y, z);
+            // A cached cell lies within one block of the chunk, so every light World.blockLight
+            // would weigh for it stands in the 5 x 5 chunks lightsNear looked at.
+            blockCache[i] = lightsNear ? world.blockLight(x, y, z) : 0f;
             lightSet[i] = 1;
         }
+    }
+
+    private static boolean lightsAround(World world, int cx, int cz) {
+        for (int dx = -2; dx <= 2; dx++) {
+            for (int dz = -2; dz <= 2; dz++) {
+                Chunk n = world.getChunk(cx + dx, cz + dz);
+                if (n != null && !n.lights.isEmpty()) { return true; }
+            }
+        }
+        return false;
     }
 
     private float skyAt(int x, int y, int z) {
