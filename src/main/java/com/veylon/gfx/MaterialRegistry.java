@@ -89,6 +89,24 @@ public final class MaterialRegistry {
                 + " PROBLEMS (see above)"));
     }
 
+    /**
+     * Registers every material and layer on the CPU without GL, so headless measurement can
+     * tessellate chunks with their real materials; {@link #textureArray} stays absent until
+     * {@link #init}. Idempotent.
+     */
+    public static void initCatalog() {
+        if (current.fallback == null) {
+            current = Catalog.build();
+        }
+    }
+
+    /** Drops a catalog {@link #initCatalog} installed, so a headless test leaves the registry as it found it. */
+    public static void clearCatalog() {
+        if (array == null) {
+            current = new Catalog();
+        }
+    }
+
     /** Runs the full registration on the CPU and reports it; the live registry is untouched. */
     public static Census census() {
         Catalog catalog = Catalog.build();

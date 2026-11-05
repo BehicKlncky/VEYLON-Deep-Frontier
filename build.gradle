@@ -136,7 +136,7 @@ tasks.named('check') {
 }
 
 tasks.register('performanceTest', Test) {
-    dependsOn 'rainPerformanceTest'
+    dependsOn 'rainPerformanceTest', 'cityPerformanceTest'
     group = 'verification'
     description = 'Runs the hardware-calibrated simulation and save/load benchmarks.'
     testClassesDirs = sourceSets.test.output.classesDirs
@@ -144,7 +144,7 @@ tasks.register('performanceTest', Test) {
     outputs.upToDateWhen { false }
     useJUnitPlatform {
         includeTags 'performance'
-        excludeTags 'rain-performance'
+        excludeTags 'rain-performance', 'city-performance'
     }
     // The measured figures are the point of this task, so print them rather
     // than making every run pass --info to see whether a budget was close.
@@ -164,6 +164,25 @@ tasks.register('rainPerformanceTest', Test) {
     outputs.upToDateWhen { false }
     useJUnitPlatform {
         includeTags 'rain-performance'
+    }
+    testLogging {
+        showStandardStreams = true
+    }
+    shouldRunAfter tasks.named('test')
+}
+
+// The dense-city profile generates thousands of city chunks. Like rain it runs in a fresh worker
+// so its JIT profiles cannot move the calibrated figures above, and under the launcher's 2 GiB
+// heap so its memory figures read as a player's session would (urban milestone 24).
+tasks.register('cityPerformanceTest', Test) {
+    group = 'verification'
+    description = 'Profiles dense-city streaming, simulation, memory and save growth in isolation.'
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath
+    outputs.upToDateWhen { false }
+    maxHeapSize = '2g'
+    useJUnitPlatform {
+        includeTags 'city-performance'
     }
     testLogging {
         showStandardStreams = true

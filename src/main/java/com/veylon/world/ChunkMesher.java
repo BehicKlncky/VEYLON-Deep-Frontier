@@ -84,6 +84,42 @@ public class ChunkMesher {
     private static final float DECAL_OFFSET = 0.012f;
 
     public void buildChunk(World world, Chunk c) {
+        tessellate(world, c);
+        if (c.meshOpaque == null) {
+            c.meshOpaque = new Mesh(ATTRIBS);
+        }
+        if (c.meshWater == null) {
+            c.meshWater = new Mesh(WATER_ATTRIBS);
+        }
+        c.meshOpaque.upload(opaque.array(), opaque.size());
+        c.meshWater.upload(water.array(), water.size());
+        c.dirty = false;
+    }
+
+    /** Floats the last {@link #tessellate} wrote for the opaque and water meshes. */
+    public int opaqueFloats() { return opaque.size(); }
+    public int waterFloats() { return water.size(); }
+
+    /** A 64-bit hash of every float the last {@link #tessellate} wrote, for meshing regression tests. */
+    public long fingerprint() {
+        return hash(hash(0xcbf29ce484222325L, opaque), water);
+    }
+
+    private static long hash(long h, FloatList list) {
+        float[] data = list.array();
+        h = (h ^ list.size()) * 0x100000001b3L;
+        for (int i = 0; i < list.size(); i++) {
+            h = (h ^ Float.floatToRawIntBits(data[i])) * 0x100000001b3L;
+        }
+        return h;
+    }
+
+    /**
+     * The CPU half of a rebuild: fills this mesher's vertex lists for one chunk and touches no
+     * GL state, so a headless measurement can time city meshing ({@link #buildChunk} uploads).
+     * It needs {@link MaterialRegistry} registered, by {@code init} or {@code initCatalog}.
+     */
+    public void tessellate(World world, Chunk c) {
         this.world = world;
         opaque.clear();
         water.clear();
@@ -213,15 +249,6 @@ public class ChunkMesher {
             }
         }
 
-        if (c.meshOpaque == null) {
-            c.meshOpaque = new Mesh(ATTRIBS);
-        }
-        if (c.meshWater == null) {
-            c.meshWater = new Mesh(WATER_ATTRIBS);
-        }
-        c.meshOpaque.upload(opaque.array(), opaque.size());
-        c.meshWater.upload(water.array(), water.size());
-        c.dirty = false;
         this.world = null;
     }
 

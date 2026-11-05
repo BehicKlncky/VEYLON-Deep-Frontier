@@ -230,6 +230,19 @@ public class Renderer {
     /** Rebuilds up to budget dirty chunk meshes near the player. */
     public void buildDirtyMeshes(World world, int pcx, int pcz, int budget) {
         chunkMeshRebuildsLastFrame = 0;
+        List<Chunk> dirty = selectDirty(world, pcx, pcz);
+        for (int i = 0; i < Math.min(budget, dirty.size()); i++) {
+            mesher.buildChunk(world, dirty.get(i));
+            chunkMeshRebuildsLastFrame++;
+            chunkMeshRebuildsTotal++;
+        }
+    }
+
+    /**
+     * The dirty generated chunks inside the render radius, nearest first by chunk steps: the
+     * queue {@link #buildDirtyMeshes} takes its budget from. Touches no GL state.
+     */
+    public List<Chunk> selectDirty(World world, int pcx, int pcz) {
         List<Chunk> dirty = new ArrayList<>();
         for (Chunk c : world.loadedChunks()) {
             if (c.dirty && c.generated
@@ -240,11 +253,29 @@ public class Renderer {
         dirty.sort((a, b2) -> Integer.compare(
                 Math.abs(a.cx - pcx) + Math.abs(a.cz - pcz),
                 Math.abs(b2.cx - pcx) + Math.abs(b2.cz - pcz)));
-        for (int i = 0; i < Math.min(budget, dirty.size()); i++) {
-            mesher.buildChunk(world, dirty.get(i));
-            chunkMeshRebuildsLastFrame++;
-            chunkMeshRebuildsTotal++;
+        return dirty;
+    }
+
+    /**
+     * Fills the frame's visible list with the meshed chunks inside the render radius that the
+     * frustum last set by {@link #render} can see, and returns how many. Touches no GL state.
+     */
+    public int selectVisible(World world, int pcx, int pcz) {
+        visible.clear();
+        for (Chunk c : world.loadedChunks()) {
+            if (!c.generated || c.meshOpaque == null) {
+                continue;
+            }
+            if (Math.max(Math.abs(c.cx - pcx), Math.abs(c.cz - pcz)) > renderRadius()) {
+                continue;
+            }
+            float minX = c.cx * 16, minZ = c.cz * 16;
+            if (!frustum.testAab(minX, 0, minZ, minX + 16, Chunk.SY, minZ + 16)) {
+                continue;
+            }
+            visible.add(c);
         }
+        return visible.size();
     }
 
     public void render(Game game, float dt) {
@@ -283,21 +314,8 @@ public class Renderer {
         int pcx = Math.floorDiv((int) Math.floor(cam.position.x), 16);
         int pcz = Math.floorDiv((int) Math.floor(cam.position.z), 16);
 
-        visible.clear();
         chunksRendered = 0;
-        for (Chunk c : game.world.loadedChunks()) {
-            if (!c.generated || c.meshOpaque == null) {
-                continue;
-            }
-            if (Math.max(Math.abs(c.cx - pcx), Math.abs(c.cz - pcz)) > renderRadius()) {
-                continue;
-            }
-            float minX = c.cx * 16, minZ = c.cz * 16;
-            if (!frustum.testAab(minX, 0, minZ, minX + 16, Chunk.SY, minZ + 16)) {
-                continue;
-            }
-            visible.add(c);
-        }
+        selectVisible(game.world, pcx, pcz);
 
         // ---- Shadow pass ----
         boolean shadowsOn = settings.shadowQuality > 0;
