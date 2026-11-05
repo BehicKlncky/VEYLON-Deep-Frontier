@@ -149,7 +149,7 @@ The milestone-01 audit described in §7 produced these facts. The design records
 | --- | --- | --- | --- | --- |
 | R-01 | Column height is a roof: heightmap and `surfaceHeight` consumers misplace or misclassify things in a city | §4.1 | Plan-based street, floor and room queries; urban-gated classification; legacy byte-identical | 02, 03, 06, 08, 09, 13, 21, 22 |
 | R-02 | Block-id and visual capacity | B-11, B-23, B-24 | Budgets in DECISIONS §3; measure layers at boot in 04; no per-variant ids; widening only through C-8 | 04 and every content package |
-| R-03 | CPU chunk retention and growth collections | B-17, B-29, B-30 | §4.3 | 11 (measure), 24 (decide) |
+| R-03 | CPU chunk retention and growth collections | B-17, B-29, B-30 | §4.3 | 11 (measure), 24 (decide); **24:** decided, D-241 |
 | R-04 | Single real save slot | B-25, B-32, B-33 | §4.4 | 02 |
 | R-05 | Monotonic generator gates leak legacy features | B-13 | D-02 plus tests that `GEN_URBAN` plans no settlements, caves, ores, POIs or stalkers | 02 |
 | R-06 | `CURRENT_GENERATOR` is both the new-world default and the load ceiling | B-02, B-26 | D-03 | 02 |
@@ -235,7 +235,7 @@ Required handling:
 - urban caches are LRU-bounded;
 - urban state is sparse (touched only);
 - package 11 records retained chunks and heap after the slice route (measured in [Milestone 11](#milestone-11--playable-vertical-slice-gate-2026-10-13); its fixed arrays are 26,624 B per chunk, because the precipitation height map adds 1,024 B to the ≈26 KB above);
-- package 24 decides eviction or a finite metropolis (D-24, P-03) and proves that no state is lost.
+- package 24 decides eviction or a finite metropolis (D-24, P-03) and proves that no state is lost. **24:** decided and proven (D-241, D-242): a generated city drops its farthest chunks past 2,048 and regenerates them identically; `ChunkRetentionTest` finds the save of a world that dropped 1,000+ chunks on a 3 km journey identical to its twin's that kept every chunk. Measured in [milestone 24](#milestone-24--dense-city-performance-and-streaming-2026-11-05): 27 KB a retained chunk; a fast 8 km journey holds 1,803 chunks and 72.6 MiB after collection instead of 6,664 and 199.4 MiB.
 
 ### 4.4 The single real save slot
 
@@ -277,7 +277,7 @@ The **always** set runs for every code package, together with the portable build
 | 21 | `ui.HudLayoutTest`, `ui.MapScreenTest`, `ui.HudTextTest`, `HudQaSceneTest` | Input, routing, layout, discovery and persistence | `docs/graphics/HUD_VALIDATION.md` capture matrix in both modes |
 | 22 | `engine.*` audio tests, `gfx.*` | Material, model and state checks; audio selection and reset | Before and after captures; manual listening with normal and dry-fallback devices |
 | 23 | 08 and 20 tests | Resource, prerequisite and transaction tests; a multi-day production integration | Fresh extended play with day count, revision, seed, gear and choices |
-| 24 | `qa.RuntimeBoundsTest` and allocation tests | Bounds, allocation and state; eviction and revisit order if eviction is chosen | `.\gradlew.bat performanceTest --console=plain` (opt-in, calibrated host) plus native city measurements |
+| 24 | `qa.RuntimeBoundsTest` and allocation tests | Bounds, allocation and state; eviction and revisit order if eviction is chosen. **24:** `ChunkRetentionTest`, `ChunkStreamingScheduleTest`, `ChunkMesherFingerprintTest`, `world.ChunkMapTest`, `entity.ChunkUnloadCachesTest`, `ai.NavigationCacheUnloadTest`, `UrbanPerformanceQaSceneTest` and `RuntimeBoundsTest`'s threat budgets | `.\gradlew.bat performanceTest --console=plain` (opt-in, calibrated host) plus native city measurements |
 | 25 | `save.*`, fingerprints, quest, settlement and parity tests | Integrated urban fixture across orders and revisits; corruption and atomic replacement | A genuine legacy world and the integrated urban state, from isolated saves |
 | 26 | Everything relevant | Rollout path tests | Default-path smoke and the manual acceptance scenario from the pack README |
 
@@ -3840,3 +3840,134 @@ playtest (D-80).
 - The two unplannable parcels (DESIGN §16.6) are packages 24 and 25's.
 
 Next: the consolidated human playtest and listening pass (D-80), with package 23's extended play, then package 24.
+
+## Milestone 24 — dense-city performance and streaming (2026-11-05)
+
+### Scope and baseline
+
+- Branch `feature/urban-survival` at `71ce6af` (the 23 records), clean tree. Read the
+  revised base, the prompt, `AGENTS.md`, `docs/COMMIT_WORKFLOW.md`, the performance and
+  save-compatibility skills, `docs/PERFORMANCE_BENCHMARKS.md` and these records. The
+  consolidated human playtest (D-80) has not run; this package went ahead on the owner's
+  instruction to execute 24.
+- Added: two instruments (the city profile, the native tour), three exact optimizations,
+  a streaming schedule and bounded chunk retention (D-241 to D-247). No block, item,
+  icon, ordinal, save section, generator or plan change; the default new world is
+  unchanged.
+- Host, the second machine: AMD Ryzen 5 5600X, 31.9 GB, Windows 11 Pro 10.0.26200,
+  NVIDIA GeForce RTX 3060 Ti, OpenGL 3.3.0 NVIDIA 621.01 (driver 32.0.16.2101) with
+  KHR_debug, the repository-local Temurin 25.0.4.1+1, launcher `-Xmx2G`; windowed
+  1280 × 720 natives from the main checkout with isolated data directories, VSync off,
+  render distance 6, shadows 1, bloom and FXAA on, seed 20260731, no concurrent build.
+
+### Before: measuring first
+
+`cityPerformanceTest` on the instruments alone (`.\gradlew.bat cityPerformanceTest
+--console=plain`: the profile of `ab42cb8` with the tour of `3438751`) and the native
+tour on the same engine located the costs:
+
+```powershell
+$env:VEYLON_GENERATOR='urban-dev'; $env:VEYLON_SEED='20260731'
+$env:VEYLON_SCENE='urban_performance'; $env:VEYLON_RESOLUTION='1280x720'
+$env:VEYLON_VSYNC='0'; $env:VEYLON_GAME_MODE='survival'
+.\gradlew.bat run -PveylonDataDir=build/qa/m24-before-survival --console=plain
+```
+
+(log `build/qa/m24-before-survival.log`; the after run used `m24-after-survival`).
+Java Flight Recorder (`JAVA_TOOL_OPTIONS` with `-XX:StartFlightRecording=settings=profile`,
+recordings under `build/m24-jfr/`) attributed them:
+
+- streaming: light sampling during meshing about a quarter (`ChunkMesher.ensureLight`,
+  `World.getChunk`, `World.blockLight`) and building planning about a quarter
+  (`DistrictCatalogue.best`, `AccessibilityValidator`), with `HashMap$TreeNode.find`
+  under `World.getChunk`: the chunk map's buckets had treeified;
+- a long journey: building planning about half, and the renderer's chunk selections and
+  their map iteration about a fifth by 8 km;
+- the slow tick: a throwaway probe (never committed) timed each part at a street and a
+  stronghold; `EntityManager.slowTick` (the encounter director) cost 10–34 ms on most
+  ticks, every other part under 3 ms;
+- the save: the sites, containers and population writers reading their bytes back with
+  the load's checks, re-planning what the plan caches had dropped.
+
+Every figure is in `docs/PERFORMANCE_BENCHMARKS.md` ("Dense city").
+
+### Behaviour evidence and portable builds
+
+Every code commit was validated by the full portable build on its exact tree in a
+detached worktree (`build/m12-check`, `m13-check`, `m14-check`, `m21-check`, reset to
+`71ce6af` and laid over by one script, its `git write-tree` hash recorded), four and
+then three at a time, then committed with `git read-tree <tree>` and `git commit -F`:
+
+| Commit | Tree | Tests | Classes | Build |
+| --- | --- | --- | --- | --- |
+| `ab42cb8` | `1d9d518` | 2,318 | 292 | BUILD SUCCESSFUL in 22m 1s |
+| `3438751` | `e5312f1` | 2,320 | 293 | BUILD SUCCESSFUL in 22m 7s |
+| `6babe85` | `54ff7cf` | 2,322 | 294 | BUILD SUCCESSFUL in 22m 4s |
+| `da53372` | `ea12e60` | 2,323 | 294 | BUILD SUCCESSFUL in 20m 13s |
+| `34b4c34` | `e13148f` | 2,323 | 294 | BUILD SUCCESSFUL in 18m 0s |
+| `ee280ee` | `1d0a2c5` | 2,324 | 295 | see below |
+| `0dd758c` | `51b119c` | 2,329 | 298 | BUILD SUCCESSFUL in 18m 33s |
+
+No test failed in them but one at `ee280ee`: `save.UrbanEcologySaveTest` could not have
+its JUnit temporary directory deleted (`DirectoryNotEmptyException`, the Windows cleanup
+flake recorded since package 22) while three builds ran; run alone in that worktree it
+passed its 5 tests, javadoc and check had passed, and `build -x test` succeeded. The
+existing Windows skip applies throughout. The test sources of `ab42cb8` were compiled
+again after its profile's guards were settled.
+
+Focused runs while iterating (`.\gradlew.bat test --tests ... --console=plain`, the
+classes read back from `build/test-results`): `ChunkRetentionTest` (3), `ChunkMapTest`
+(2), `ChunkMesherFingerprintTest` (1), `ChunkStreamingScheduleTest` (1),
+`entity.ChunkUnloadCachesTest`, `ai.NavigationCacheUnloadTest`,
+`UrbanPerformanceQaSceneTest` (2), `qa.RuntimeBoundsTest` (19), `gfx.UrbanMaterialsTest`,
+`qa.OrchestratorSizeTest`, `GameLoopIntegrationTest` and `WorldSeedDeterminismTest`. They
+found, and the commits avoid: a tour that died of a fall when the journey's last pose
+set a player carried at 90 blocks down on the street (the tour now resets fall state
+while it carries the player), and twin worlds compared over chunks the evicting one had
+not regenerated yet (both now generate the compared area first).
+
+The fingerprint was recorded with the mesher forced to ask the world for every cell's
+block light (the unoptimized path), then held with the shortcut: 5943656294887753686.
+The twin journey: 3 km out at 21.6 blocks a second and back, one world dropping chunks
+and one keeping them all; the evicting twin dropped over 1,000 chunks, never held more
+than 2,050, kept the burning campfire's chunk and regenerated most of home, and its save
+is byte for byte the keeping twin's; a fresh game loads it.
+
+### After: measurements on the final code
+
+- `cityPerformanceTest`, run by `.\gradlew.bat performanceTest --console=plain` (log
+  `build/m24-final-performanceTest.log`): every target holds (streaming p99 6.47, 6.57
+  and 7.64 ms against 8.3; retained chunks within the limit at every kilometre).
+- The native tour (log `build/qa/m24-after-survival.log`): `pass=true`, 16 legs,
+  `glGetError=0`, 0 KHR errors, audio `nativeErrors=0`.
+- `performanceTest`: the calibrated gates pass but the durable save (5.879 ms against
+  2.20, the host gap; 5.217 ms on `3438751`), which stops its test before `load`. With
+  `-x cityPerformanceTest -x rainPerformanceTest` on both trees, then
+  `PerformanceBenchmarkTest` alone twice on each, the chunk and entity ticks are the same
+  on both trees; the whole-task difference came from test-class order
+  (`docs/PERFORMANCE_BENCHMARKS.md`).
+- Visual check of the schedule: `VEYLON_SCENE=urban_atmosphere` on the final code
+  (`build/qa/m24-atmosphere-survival`, 25 captures, `pass=true`, 0 GL and KHR errors)
+  framed the views of package 22's `build/qa/m22-final-survival`; the residential and
+  flooded streets and the growth site, compared side by side, match but for grass sway
+  and a minute of clock.
+- The release smoke on a legacy world (`VEYLON_SEED=20260910`, `VEYLON_SMOKE=30`,
+  1280 × 720, VSync off, `build/qa/m24-smoke-legacy.log`): passed, 1,495 FPS, p99
+  0.88 ms, the fortress approach at 1,580 FPS, save and load, every hard limit, 0 GL and
+  KHR errors, no chunk dropped.
+
+`graphify update . --no-cluster` ran on the final code (PROGRESS). No reviewer subagents
+ran.
+
+### Limits and next gate
+
+- Measured on the second machine only; the reference machine has not run the city
+  profile, the tour or the calibrated gates for this package (D-245).
+- First-touch planning is bounded by count, not time (D-247): 23–30 ms slow ticks in
+  fast travel and 15–18 ms ones arriving somewhere new remain.
+- Save and load time grow with the places a save names (D-246), package 25's to cut.
+- The two unplannable parcels (DESIGN §16.6) are package 25's.
+- Human checks under D-80 are unchanged by this package and still pending.
+
+Next: package 25, the integrated save and regression audit, with the consolidated human
+playtest and listening pass still due under D-80.

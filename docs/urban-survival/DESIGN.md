@@ -567,7 +567,7 @@ The table is in dependency order: an item may depend only on items above it. Sec
 | 18 | Missions, comms stage, rewards | Persistent | `UrbanMissions` | 20 | 4, 7, 10, 15 | `urban.missions`. **20:** v1, required for generator 19: the objective's facts and every mission record, checked against each other and the plans; absent fails the load (D-207) | Idempotent events; rewards once | Journal ≤ 4 |
 | 19 | Map raster caches | Transient | `MapScreen` | 21 | 3, 4, 14 | Not saved. **21:** no raster cache: the city map reads pure plans and loaded chunks while open; the sketch's entered rooms are a transient memory in `UrbanVisits` (D-213) | New and load start empty | ≤ 64 sketched floors |
 | 20 | Presentation: ambience, particles, light terms | Transient | `engine`, `gfx` | 22 | 4 | Not saved | — | Existing caps |
-| 21 | Eviction bookkeeping, if eviction is chosen | Decided in 24 | `World` | 24 | All | Decided in 24 | — | — |
+| 21 | Eviction bookkeeping, if eviction is chosen | Transient. **24:** none is kept but counters: a dropped chunk is regenerated from the seed, the plans and the persisted deltas (D-241) | `World` (`unloadChunk`, `chunkUnloads`), `ChunkRetention` | 24 | All | Not saved; a load starts with the chunks it regenerates (§17) | New and load start empty | ≤ 2,048 chunks after a pass, beside the kept window and pinned chunks |
 
 Identity scheme (implemented by package 02 in `world/urban/UrbanIds`; the packed form is a save format and frozen):
 - **Canonical binary form**: a packed 64-bit id. Bits 63–60 hold a kind code: 1 district, 2 parcel, 3 building, 4 floor, 5 room, 6 fixture, 7 resident, 8 encounter. Code 0 is never valid, and codes 9–15 are reserved and append-only. Bits 59–58 are reserved and must be zero. Then come region x and z (18 bits each, signed, ±131,071 regions, about ±33.5 million blocks, well past float precision), parcel (7 bits, 0–127), building slot (2 bits, 0–3), floor + 2 (4 bits, floors −2 to 12, where floor *n* of an *n*-storey building is its roof), room (5 bits, 0–31) and slot (4 bits, 0–15).
@@ -669,5 +669,51 @@ Deterministic, re-run in every build: the bands of §16.2, the starter guarantee
 
 ### 16.6 Findings left to later packages
 
-- **Two parcels cannot be planned** under building template 7 (generators 13–20): seed 987654321 region (−2, −3) parcel 44 at (−440, −681) and seed −9000000000000000000 region (−3, 0) parcel 116 at (−637, 219). Generating either chunk throws `IllegalStateException` ("no valid building in finite fallback"). Found by this package's three-region audit sweep; owned by packages 24 and 25 (streaming and the regression audit).
+- **Two parcels cannot be planned** under building template 7 (generators 13–20): seed 987654321 region (−2, −3) parcel 44 at (−440, −681) and seed −9000000000000000000 region (−3, 0) parcel 116 at (−637, 219). Generating either chunk throws `IllegalStateException` ("no valid building in finite fallback"). Found by this package's three-region audit sweep; owned by packages 24 and 25 (streaming and the regression audit). **24:** left to 25: any fallback changes frozen template-7 output, a compatibility decision for the regression audit (D-247).
 - **The city is generous in total.** The pressure the economy applies is distance, time, noise, risk and spoilage, not a running-out of food; whether that is enough is for the playtest.
+
+## 17. Dense-city performance and the memory model (package 24)
+
+Measured on the second machine (VALIDATION, milestone 24): the economy city, seed 20260731, render distance 6, 1280 × 720, VSync off. Decisions D-241 to D-247.
+
+### 17.1 What a frame and a journey cost
+
+- **Rendering** is about a millisecond a frame on the second machine's RTX 3060 Ti wherever a survivor stands: 960–1,130 FPS in a street, a walk-up's rooms, a transit platform, a stronghold yard, a growth site and a storm with a fire, 60–80 chunks and 140–195 draw calls a frame, 0.4–0.6 million triangles. The world's CPU submission is 0.16–0.24 ms.
+- **Meshing** was the streaming frame's largest cost: a city chunk holds 12,600–26,900 vertices and takes 1.7 ms (p99 3.8–4.3 ms) on the CPU, and each was built about 2.6 times while streaming, because a neighbour that arrived later dirtied it again (D-243).
+- **Planning** happens on first touch: a region plan in 1.4–4.7 ms and a building in 1.1–2.5 ms, most of it the building's accessibility proof, which is also most of a chunk's first generation (0.1 ms once its buildings are planned).
+- **Simulation** in the dense scenes is under 0.1 ms a frame on average. A stronghold's or a street's slow tick cost 8–34 ms every ten seconds while the encounter director recomputed a region's threat budget for each parcel it asked about (D-244); it now costs 0.4 ms at the stronghold and 0.3–5.6 ms in the street, the larger planning a new region's sites; a slow tick that plans new regions' sites and anchors is the spike that remains (§17.5).
+- **Audio** updates in 0.004 ms a frame; lights and props are part of meshing (0.0 emitters and 24–79 props a city chunk).
+- **Memory** is the chunk: 27 KB of retained heap each in steady state (26,624 bytes of fixed arrays). Before D-241 a journey at render distance 6 kept about 810 chunks and 21 MiB more for every kilometre, and the renderer's two chunk selections and the QA harness walked all of them every frame.
+- **The save** grows with durable facts and its time with the places it names (D-246).
+
+### 17.2 Bounded work
+
+| Work | Bound | Owner |
+| --- | --- | --- |
+| Chunk generation | 2 a frame, out to the render radius + 1 | `ChunkStreaming` |
+| Mesh rebuilds | 3 a frame, finished neighbourhoods only, nearest first, inside the render window | `Renderer.selectDirty` |
+| Chunk selection and visibility | the render window, (2 r + 1)² lookups, a reused list | `Renderer` |
+| Light lists | one scan a generated chunk, one point update an edit | `Chunk` |
+| Retained chunks | 2,048 after a pass beside the kept window and pinned chunks; a pass every 256 new chunks | `ChunkRetention` |
+| Plan caches | 16 regions each of plans, route catalogues, ecology, sites, vehicles and threat budgets; 256 buildings; 64 transit segments | `UrbanWorldState` |
+| Path search | 4 queries and 2,800 expansions a fast tick; 64 cached routes | `PathBudget`, `NavigationCache` |
+| Encounter activation | 16 parcels, 16 snapshots and 2 admissions a slow tick; 12 infected, 4 aliens and 12 wildlife active | `UrbanEncounterDirector` |
+| Dormant updates | a site's hourly step only while its stash is loaded; utilities still beyond 128 blocks | `UrbanSiteDirector`, `UtilitySystem` |
+| Effects | 220 burning cells, liquid fire, particles, noise and hearing at their caps; 2 city sounds a pass; 384 decals a chunk mesh | their systems |
+
+Every count was already bounded before this package except the chunks a journey kept, the per-frame walks over them and the threat budget's recomputation. Planning is bounded by count, not time (§17.5).
+
+### 17.3 The memory model
+
+A generated city is unbounded and streamed: nothing is precomputed citywide and no boundary stops a survivor. Its far chunks are dropped once more than 2,048 are held and regenerated, block for block, on return (D-241), because a city chunk is a pure function of the seed and its plans plus the edits and door states the world replays onto every chunk it generates. Nothing else lives in a chunk: soil moisture and light counters are transient and reset as a load resets them. Whatever only a loaded column runs, or a save reads back by its block, keeps its chunk and the eight around it (D-242), so a dropped chunk is exactly one a load has not brought back yet. GPU meshes go with the chunk and are already freed beyond the render radius + 3. Legacy terrain keeps every chunk: its trees and structures cross chunk borders.
+
+### 17.4 Targets
+
+Taken from the 60 fps frame and asserted in `UrbanCityPerformanceTest`, not calibrated: a city chunk generates and meshes within a frame (16.7 ms) at p95; streaming and the simulation together stay under half a frame (8.3 ms) at p99 at walking, sprint and flight pace; a journey's retained chunks stay within the limit. The calibrated budgets of `docs/PERFORMANCE_BENCHMARKS.md` are unchanged.
+
+### 17.5 What remains open
+
+- **Planning hitches.** A first-touch building plan costs 1.1–2.5 ms and is bounded only by count. Fast travel still meets a 23–30 ms slow tick about every ten seconds where it enters new regions (their sites and anchors) and 6–10 ms generation frames; walking meets a 15 ms slow tick there. A main-thread planner working ahead of the streaming edge within a time budget is the next step (D-247).
+- **Save and load time** grow with the places a save names (D-246); the codec-side fix is package 25's.
+- **The reference machine** has not run the city profile or the calibrated gates for this package.
+- **The two unplannable parcels** (§16.6) remain package 25's.
