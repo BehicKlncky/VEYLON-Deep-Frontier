@@ -131,7 +131,7 @@ public class World implements VoxelAccess {
     public final WorldGenerator generator;
     /** Urban foundation state; present exactly when the generator is urban. */
     public final UrbanWorldState urban;
-    private final Map<Long, Chunk> chunks = new HashMap<>();
+    private final ChunkMap chunks = new ChunkMap();
     private final ChunkBlockEdits blockEdits = new ChunkBlockEdits();
     /** Blocks set during gameplay, persisted in saves (value = BlockType ordinal). */
     public final Map<Vec3i, Byte> changedBlocks = blockEdits;
@@ -302,8 +302,9 @@ public class World implements VoxelAccess {
      * pays for the map once.
      *
      * <p>Every block query in the engine funnels through here, and
-     * {@code chunks} is a {@code Map<Long, Chunk>} — so each one boxed a fresh
-     * {@link Long} before it could even hash. The access pattern is strongly
+     * {@code chunks} was once a {@code Map<Long, Chunk>}, so each one boxed a
+     * fresh {@link Long} before it could even hash ({@link ChunkMap} now looks a
+     * packed key up without boxing). The access pattern is strongly
      * local: plant growth walks a chunk it already holds, the mesher walks one
      * chunk's neighbourhood, fire and water work a cell at a time, and
      * raycasts step through a few metres.
