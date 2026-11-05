@@ -165,21 +165,11 @@ public final class EncounterAnchors {
      */
     private static List<Anchor> budgeted(World world, ParcelPlan parcel) {
         DistrictPlan district = world.urban.regionPlan(UrbanIds.regionX(parcel.id()), UrbanIds.regionZ(parcel.id()));
-        // Layout thirteen: a compound's claimed parcels are planned held (or a back way unheld).
-        List<Integer> chosen = budget(world.seed, district, world.urban.hasStrongholds()
-                ? world.urban.routes(district.rx, district.rz).claims() : CompoundClaims.NONE);
-        if (hasStations(world) && !forStation(world, district.rx, district.rz).isEmpty() && !chosen.isEmpty()) {
-            // The station spends one building's share of the district budget first.
-            chosen = chosen.subList(0, chosen.size() - 1);
-        }
-        boolean ecology = hasCreatures(world);
-        if (ecology && district.district == UrbanDistrict.QUARANTINE && !chosen.isEmpty()) {
-            // Catalogue five: the quarantine's Veilmaws are part of its threat budget, one building's
-            // share (two anchors) for every two growth sites, rounded up, keeping one building.
-            int sites = world.urban.ecology(district.rx, district.rz).growthSites().size();
-            chosen = chosen.subList(0, chosen.size() - Math.min(chosen.size() - 1, (sites + 1) / 2));
-        }
+        // Every parcel of a region asks for the same budget, and the director asks a parcel at a time:
+        // the region's choice is planned once and cached beside its plan (milestone 24).
+        List<Integer> chosen = world.urban.threatBudget(district.rx, district.rz, () -> chosen(world, district));
         if (!chosen.contains(parcel.index())) { return List.of(); }
+        boolean ecology = hasCreatures(world);
         BuildingPlan plan = world.urban.buildingAt(parcel.x0(), parcel.z0());
         if (plan.variant() == BuildingPlan.Variant.OCCUPIED) { return List.of(); }
         List<Anchor> anchors = plan.family().walkUp() ? walkUp(plan) : specialist(plan);
@@ -191,6 +181,24 @@ public final class EncounterAnchors {
             return out;
         }
         return anchors;
+    }
+
+    /** The parcel indices a region's budget keeps for its buildings, after its station and growth sites. Pure. */
+    private static List<Integer> chosen(World world, DistrictPlan district) {
+        // Layout thirteen: a compound's claimed parcels are planned held (or a back way unheld).
+        List<Integer> chosen = budget(world.seed, district, world.urban.hasStrongholds()
+                ? world.urban.routes(district.rx, district.rz).claims() : CompoundClaims.NONE);
+        if (hasStations(world) && !forStation(world, district.rx, district.rz).isEmpty() && !chosen.isEmpty()) {
+            // The station spends one building's share of the district budget first.
+            chosen = chosen.subList(0, chosen.size() - 1);
+        }
+        if (hasCreatures(world) && district.district == UrbanDistrict.QUARANTINE && !chosen.isEmpty()) {
+            // Catalogue five: the quarantine's Veilmaws are part of its threat budget, one building's
+            // share (two anchors) for every two growth sites, rounded up, keeping one building.
+            int sites = world.urban.ecology(district.rx, district.rz).growthSites().size();
+            chosen = chosen.subList(0, chosen.size() - Math.min(chosen.size() - 1, (sites + 1) / 2));
+        }
+        return chosen;
     }
 
     /**

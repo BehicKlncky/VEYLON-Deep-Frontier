@@ -56,7 +56,7 @@ public record RuntimeBudgetSnapshot(
         int urbanEncounterRecords,
         int urbanEcologyPlans, int activeAliens, int activeWildlife, int urbanSitePlans, int urbanSiteRecords,
         int urbanVehiclePlans, int damagedBarricades, int doorBraces, int refugeClaims, int tappedBuildings,
-        int utilityDevices, int missionRecords, int visitedPlaces, int sketchedFloors,
+        int utilityDevices, int missionRecords, int visitedPlaces, int sketchedFloors, int urbanThreatBudgets,
         int navigationRoutes, int pathQueries, int pathExpansions, int pathDeferred,
         int pathFailures, int unsupportedEntries, int hearingSamples) {
 
@@ -121,6 +121,7 @@ public record RuntimeBudgetSnapshot(
                 game.world.urban == null ? 0
                         : game.world.urban.visits.districtCount() + game.world.urban.visits.buildingCount(),
                 game.world.urban == null ? 0 : game.world.urban.visits.sketchedFloors(),
+                game.world.urban == null ? 0 : game.world.urban.cachedThreatBudgets(),
                 game.world.navigation.size(), game.world.navigation.budget.queries(),
                 game.world.navigation.budget.expansions(), game.world.navigation.budget.deferred(),
                 game.world.navigation.budget.failures(), game.world.navigation.budget.unsupportedEntries(),
@@ -141,6 +142,7 @@ public record RuntimeBudgetSnapshot(
                 && urbanEcologyPlans <= UrbanWorldState.MAX_REGION_PLANS
                 && urbanSitePlans <= UrbanWorldState.MAX_REGION_PLANS
                 && urbanVehiclePlans <= UrbanWorldState.MAX_REGION_PLANS
+                && urbanThreatBudgets <= UrbanWorldState.MAX_REGION_PLANS
                 && damagedBarricades <= com.veylon.world.urban.UrbanFortifications.MAX_DAMAGED
                 && doorBraces <= com.veylon.world.urban.UrbanFortifications.MAX_BRACES
                 && refugeClaims <= com.veylon.world.urban.UrbanRefuges.MAX_CLAIMS
@@ -221,7 +223,7 @@ public record RuntimeBudgetSnapshot(
                 + " encounterRecords=" + urbanEncounterRecords
                 + " ecologyPlans=" + urbanEcologyPlans + " creatures={aliens=" + activeAliens
                 + ",wildlife=" + activeWildlife + "} sitePlans=" + urbanSitePlans + " sites=" + urbanSiteRecords
-                + " vehiclePlans=" + urbanVehiclePlans
+                + " vehiclePlans=" + urbanVehiclePlans + " threatBudgets=" + urbanThreatBudgets
                 + " fortifications={damaged=" + damagedBarricades + ",braces=" + doorBraces + "}"
                 + " refuges=" + refugeClaims + " tapped=" + tappedBuildings + " devices=" + utilityDevices + " urbanMissions=" + missionRecords
                 + " visits={places=" + visitedPlaces + ",sketchedFloors=" + sketchedFloors + "}"
@@ -237,6 +239,7 @@ public record RuntimeBudgetSnapshot(
                 + " ecologyPlans=" + UrbanWorldState.MAX_REGION_PLANS
                 + " sitePlans=" + UrbanWorldState.MAX_REGION_PLANS
                 + " vehiclePlans=" + UrbanWorldState.MAX_REGION_PLANS
+                + " threatBudgets=" + UrbanWorldState.MAX_REGION_PLANS
                 + " damagedBarricades=" + com.veylon.world.urban.UrbanFortifications.MAX_DAMAGED
                 + " braces=" + com.veylon.world.urban.UrbanFortifications.MAX_BRACES
                 + " refuges=" + com.veylon.world.urban.UrbanRefuges.MAX_CLAIMS

@@ -437,6 +437,37 @@ class RuntimeBoundsTest {
     }
 
     @Test
+    void threatBudgetsStopAtTheirCapAndRebuildIdentically() {
+        Game game = new Game();
+        game.newWorld(20260731, true, World.GEN_URBAN_ECONOMY, com.veylon.entity.GameMode.SURVIVAL);
+        var urban = game.world.urban;
+        int chunks = game.world.loadedCount();
+        int cap = com.veylon.world.urban.UrbanWorldState.MAX_REGION_PLANS;
+        java.util.List<java.util.List<com.veylon.world.urban.EncounterAnchors.Anchor>> first = new ArrayList<>();
+        // Every parcel's anchors across more regions than the budget cache holds: pure, generating nothing.
+        for (int i = 0; i < cap + 8; i++) {
+            for (var parcel : urban.regionPlan(i, 1 - i).parcels()) {
+                var anchors = com.veylon.world.urban.EncounterAnchors.forParcel(game.world, parcel);
+                if (i == 0) { first.add(anchors); }
+            }
+            RuntimeBudgetSnapshot snapshot = RuntimeBudgetSnapshot.capture(game);
+            assertTrue(snapshot.withinHardLimits(), snapshot.occupancySummary());
+        }
+        assertEquals(cap, RuntimeBudgetSnapshot.capture(game).urbanThreatBudgets());
+        World fresh = new World(20260731, World.GEN_URBAN_ECONOMY);
+        var parcels = urban.regionPlan(0, 1).parcels();
+        for (int p = 0; p < parcels.size(); p++) {
+            assertEquals(first.get(p), com.veylon.world.urban.EncounterAnchors.forParcel(game.world, parcels.get(p)),
+                    "an evicted budget comes back identical, parcel " + p);
+            assertEquals(first.get(p), com.veylon.world.urban.EncounterAnchors.forParcel(fresh, parcels.get(p)),
+                    "a cached budget answers as a fresh world does, parcel " + p);
+        }
+        assertEquals(chunks, game.world.loadedCount(), "planning budgets generates no chunk");
+        assertTrue(RuntimeBudgetSnapshot.hardLimitSummary().contains("threatBudgets=" + cap));
+        assertTrue(RuntimeBudgetSnapshot.capture(game).occupancySummary().contains("threatBudgets=" + cap));
+    }
+
+    @Test
     void fortificationLedgersStopAtTheirCaps() {
         Game game = new Game();
         game.newWorld(20260731, true, World.GEN_URBAN_REFUGES, com.veylon.entity.GameMode.SURVIVAL);

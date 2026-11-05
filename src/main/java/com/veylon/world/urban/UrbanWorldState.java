@@ -72,6 +72,8 @@ public final class UrbanWorldState {
     private final BoundedPlanCache<Long, SurvivorSites> survivorSites;
     /** Layout fourteen: each region's burnt-out cars, beside its plan. */
     private final BoundedPlanCache<Long, VehicleSites> vehicleSites;
+    /** Encounter catalogues three to six: the parcels each region's threat budget occupies (milestone 24). */
+    private final BoundedPlanCache<Long, java.util.List<Integer>> threatBudgets;
     private int contentRevision = UNRESOLVED;
     /** Persistent sparse state, separate from evictable pure plan caches. */
     public final UrbanContainers containers = new UrbanContainers();
@@ -112,6 +114,7 @@ public final class UrbanWorldState {
         this.ecologySites = hasEcology() ? new BoundedPlanCache<>(MAX_REGION_PLANS) : null;
         this.survivorSites = hasSurvivors() ? new BoundedPlanCache<>(MAX_REGION_PLANS) : null;
         this.vehicleSites = hasRefuges() ? new BoundedPlanCache<>(MAX_REGION_PLANS) : null;
+        this.threatBudgets = hasCityPlan() ? new BoundedPlanCache<>(MAX_REGION_PLANS) : null;
     }
 
     public int layoutRevision() {
@@ -449,6 +452,21 @@ public final class UrbanWorldState {
      */
     public int cachedRoutePlans() {
         return (routeCatalogues == null ? 0 : routeCatalogues.size()) + (transitSegments == null ? 0 : transitSegments.size());
+    }
+
+    /**
+     * The parcel indices a region's threat budget occupies under encounter catalogues three to six,
+     * planned once and cached (urban milestone 24). The planner is pure in the region's plans, so an
+     * evicted budget comes back identical.
+     */
+    public java.util.List<Integer> threatBudget(int rx, int rz, java.util.function.Supplier<java.util.List<Integer>> planner) {
+        if (threatBudgets == null) { throw new IllegalStateException("layout revision " + layoutRevision + " has no city plan"); }
+        return threatBudgets.get(UrbanIds.district(rx, rz), ignored -> java.util.List.copyOf(planner.get()));
+    }
+
+    /** Threat budgets currently cached, for the runtime bounds snapshot; never above {@value #MAX_REGION_PLANS}. */
+    public int cachedThreatBudgets() {
+        return threatBudgets == null ? 0 : threatBudgets.size();
     }
 
     /** Region plans currently cached; never above {@value #MAX_REGION_PLANS}. */
