@@ -89,6 +89,12 @@ final class UrbanQaScenes {
      * the refuge, F5 and F9 ({@code urban_economy}).
      */
     private final UrbanEconomyQaScene economy;
+    /**
+     * Package 24: measured legs through a street, an apartment, a transit platform, a stronghold, a
+     * quarantine growth, a storm with a fire and five minutes of fast travel, then F5 and F9
+     * ({@code urban_performance}).
+     */
+    private final UrbanPerformanceQaScene performance;
     private final PlayerMovementSystem.Command walk = new PlayerMovementSystem.Command();
     private boolean holding;
     private float holdX;
@@ -133,6 +139,7 @@ final class UrbanQaScenes {
         this.onboarding = new UrbanOnboardingQaScene(game);
         this.atmosphere = new UrbanAtmosphereQaScene(game);
         this.economy = new UrbanEconomyQaScene(game);
+        this.performance = new UrbanPerformanceQaScene(game);
     }
 
     /** Stages one of the urban scenes; inert, with a notice, outside a street-network world. */
@@ -197,6 +204,10 @@ final class UrbanQaScenes {
         }
         if (scene.equals("urban_economy")) {
             economy.stage(); // a normal session in real time: one pose between legs is staged, nothing else
+            return;
+        }
+        if (scene.equals("urban_performance")) {
+            performance.stage(); // a normal session: poses, the pace along a leg, safety and one fire are staged
             return;
         }
         if (!world.isUrban() || !world.urban.hasCityPlan()) {
@@ -299,6 +310,7 @@ final class UrbanQaScenes {
     UrbanOnboardingQaScene onboarding() { return onboarding; }
     UrbanAtmosphereQaScene atmosphere() { return atmosphere; }
     UrbanEconomyQaScene economy() { return economy; }
+    UrbanPerformanceQaScene performance() { return performance; }
 
     /** Per-frame hook, before streaming and rendering; inert unless a scene is staged. */
     void update(double elapsed) {
@@ -330,6 +342,7 @@ final class UrbanQaScenes {
         onboarding.update(elapsed);
         atmosphere.update(elapsed);
         economy.update(elapsed);
+        performance.update(elapsed);
         if (holding) {
             apply();
         }

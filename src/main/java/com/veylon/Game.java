@@ -223,6 +223,8 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
 
     /** Shelter, smoke, vents, discovery and the stations within reach. */
     private final PlayerEnvironmentSystem environment = new PlayerEnvironmentSystem(this);
+    /** Chunk generation and mesh rebuilds near the player, budgeted and timed per frame. */
+    final ChunkStreaming streaming = new ChunkStreaming(this);
 
     /** Melee, bow, firearm and thrown-weapon rules; see the delegates below. */
     final PlayerCombatSystem combat = new PlayerCombatSystem(this);
@@ -491,12 +493,7 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
         }
         window.captureCursor(appState == AppState.PLAYING && uiMode == UiMode.NONE, input);
         playStep(dt, dtD);
-
-        // Stream chunks and rebuild meshes near the player.
-        world.ensureChunks((int) player.pos.x, (int) player.pos.z, renderer.renderRadius(), 2);
-        int pcx = Math.floorDiv((int) player.pos.x, 16);
-        int pcz = Math.floorDiv((int) player.pos.z, 16);
-        renderer.buildDirtyMeshes(world, pcx, pcz, 3);
+        streaming.frame(); // stream chunks and rebuild meshes near the player
 
         // Render world + UI.
         renderer.render(this, dt);

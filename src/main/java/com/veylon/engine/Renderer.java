@@ -109,6 +109,8 @@ public class Renderer {
     public int burningBodiesDrawn;
     public int chunkMeshRebuildsLastFrame;
     public long chunkMeshRebuildsTotal;
+    /** CPU time the last {@link #render} call took to submit the world, in nanoseconds (urban QA). */
+    public long renderNanos;
 
     public int renderRadius() {
         return settings.renderDistance;
@@ -279,6 +281,7 @@ public class Renderer {
     }
 
     public void render(Game game, float dt) {
+        long renderStart = System.nanoTime();
         Camera cam = game.camera;
         cam.fovDeg = settings.fov;
         int w = game.window.width(), h = game.window.height();
@@ -431,6 +434,7 @@ public class Renderer {
         // ---- Composite to backbuffer ----
         post.composite(env, settings.bloom, settings.fxaa);
         drawCalls += settings.bloom ? 4 : 1;
+        renderNanos = System.nanoTime() - renderStart;
     }
 
     // ------------------------------------------------------------------
