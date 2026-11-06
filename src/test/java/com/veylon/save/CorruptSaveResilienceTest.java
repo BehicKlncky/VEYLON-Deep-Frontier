@@ -243,6 +243,47 @@ class CorruptSaveResilienceTest {
         assertEquals(100_000, target.world.discoveredPois.size());
     }
 
+    /** Urban package 25: a file larger than any load reads is refused before anything is parsed or replaced. */
+    @Test
+    void aFileLargerThanAnyLoadReadsIsRefusedBeforeAnythingChanges(@TempDir Path dir) throws IOException {
+        Path save = fixture(dir, 40_115L);
+        byte[] complete = Files.readAllBytes(save);
+        Path huge = dir.resolve("huge.dat");
+        try (var channel = java.nio.channels.FileChannel.open(huge, java.nio.file.StandardOpenOption.CREATE_NEW,
+                java.nio.file.StandardOpenOption.WRITE)) {
+            channel.write(java.nio.ByteBuffer.wrap(complete));
+            channel.write(java.nio.ByteBuffer.wrap(new byte[1]), 128L * 1024 * 1024);
+        }
+        Game target = new Game();
+        target.newWorld(91_339L, true);
+        World liveWorld = target.world;
+        assertFalse(SaveSystem.load(target, huge));
+        assertSame(liveWorld, target.world, "refused before any world is replaced");
+        assertTrue(SaveSystem.load(target, save), "the same save at its own size loads");
+    }
+
+    /**
+     * Urban package 25: when the final replacement itself fails (here the slot's path is a folder holding
+     * a file), the save reports failure, the folder and its file are untouched and the completed
+     * temporary payload is removed rather than left beside it.
+     */
+    @Test
+    void aReplacementThatCannotHappenLeavesTheSlotAndNoTemporaryFile(@TempDir Path dir) throws IOException {
+        Game game = new Game();
+        game.newWorld(40_116L, true);
+        Path slot = dir.resolve("veylon.sav");
+        Files.createDirectory(slot);
+        Path inside = Files.write(slot.resolve("keep.txt"), new byte[]{1, 2, 3});
+        assertFalse(SaveSystem.save(game, slot));
+        assertTrue(Files.isDirectory(slot));
+        assertArrayEquals(new byte[]{1, 2, 3}, Files.readAllBytes(inside));
+        try (var files = Files.list(dir)) {
+            assertEquals(java.util.List.of(slot), files.toList(), "no temporary file is left beside the slot");
+        }
+        Path elsewhere = dir.resolve("elsewhere.sav");
+        assertTrue(SaveSystem.save(game, elsewhere), "the game can still save to a usable slot");
+    }
+
     @Test
     void unsupportedGeneratorVersionIsRejectedBeforeWorldReplacement(@TempDir Path dir)
             throws IOException {
