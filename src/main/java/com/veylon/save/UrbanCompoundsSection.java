@@ -16,7 +16,8 @@ import java.util.List;
 
 /**
  * urban.compounds v1 (urban milestone 17): what a compound remembers about the player beside the
- * people {@code urban.sites} keeps. Required for generator 16, rejected in any other world.
+ * people {@code urban.sites} keeps. Required from generator 16 on (every
+ * later urban generator has strongholds), rejected in any earlier world.
  *
  * <p>Header: int version (1), int count (at most {@value UrbanSiteDirector#MAX_SITES}). Then, in
  * ascending id order, one {@value #ROW}-byte row for every registered stronghold and raider yard:
@@ -133,7 +134,7 @@ final class UrbanCompoundsSection {
         return out;
     }
 
-    /** A generator-16 save without the section would forget every pass, debt and hunt: reject it. */
+    /** A save of generator 16 or later without the section would forget every pass, debt and hunt: reject it. */
     static void finishLoad(Game g) throws IOException {
         if (manages(g) && !g.settlementManager.urbanSites.compoundsRestored) {
             throw new IOException("missing required " + ID);

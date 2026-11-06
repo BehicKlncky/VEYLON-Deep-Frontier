@@ -17,8 +17,8 @@ import java.util.List;
  * 08), and from generator 17 the claimed refuges as well (version 2, milestone 18).
  *
  * <p>Version 1, for generators 9 to 16: int version, a presence byte and, when present, the
- * starter refuge's building id and its integer ground-floor anchor. Version 2, required for
- * generator 17 and accepted nowhere else: the same, then an int count of claims (at most
+ * starter refuge's building id and its integer ground-floor anchor. Version 2, required from
+ * generator 17 on and accepted in no earlier world: the same, then an int count of claims (at most
  * {@value UrbanRefuges#MAX_CLAIMS}), each a long floor id, a presence byte with, when present, its
  * sleeping cell, and the double game minute it was claimed; then the long floor id of home,
  * {@link UrbanIds#NONE} only when there is no claim. A world's generator decides the one version

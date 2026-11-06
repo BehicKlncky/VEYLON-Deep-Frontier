@@ -22,8 +22,8 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * urban.utilities v1 (urban milestone 19): what a layout-fifteen city's refuge utilities keep.
- * Required for generator 18, rejected in any other world.
+ * urban.utilities v1 (urban milestone 19): what a city's refuge utilities keep. Required from
+ * generator 18 (layout fifteen) on, rejected in any earlier world.
  *
  * <p>Payload: int version (1); int count of tapped buildings (at most
  * {@value UrbanUtilities#MAX_TAPPED}), then per building its long building id and the int litres
@@ -39,7 +39,7 @@ import java.util.Set;
  * than a full tank and only a generator that can run switched on; one generator to a building; a
  * lamp's condition full; a purifier's tanks each from empty to full. Anything else, a count over its cap or not matching the
  * length, a non-finite value or trailing bytes fails the whole load and leaves the live world
- * alone; without the section a generator-18 save is rejected rather than having its emptied pipes
+ * alone; without the section a save of generator 18 or later is rejected rather than having its emptied pipes
  * come back full and its generators forgotten.
  */
 final class UrbanUtilitiesSection {
@@ -165,7 +165,7 @@ final class UrbanUtilitiesSection {
         return true;
     }
 
-    /** A generator-18 save without the section would bring emptied pipes back full: reject it. */
+    /** A save of generator 18 or later without the section would bring emptied pipes back full: reject it. */
     static void finishLoad(Game g) throws IOException {
         if (manages(g) && !g.world.urban.utilities.sectionRestored()) {
             throw new IOException("missing required " + ID);

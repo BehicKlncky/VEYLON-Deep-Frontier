@@ -13,11 +13,11 @@ import java.util.List;
 import java.util.function.LongPredicate;
 
 /**
- * {@code urban.visits} v1 (urban milestone 21): the districts a layout-sixteen world's survivor has
- * walked and the buildings they have entered, which the map labels. Payload: int version, int
- * district count (at most {@link UrbanVisits#MAX_DISTRICTS}), that many district ids as longs in
- * strictly ascending order, then int building count (at most {@link UrbanVisits#MAX_BUILDINGS}) and
- * that many building ids likewise. Every layout-sixteen save writes it, empty or not.
+ * {@code urban.visits} v1 (urban milestone 21): the districts the survivor of a world from layout
+ * sixteen (generator 19) on has walked and the buildings they have entered, which the map labels.
+ * Payload: int version, int district count (at most {@link UrbanVisits#MAX_DISTRICTS}), that many
+ * district ids as longs in strictly ascending order, then int building count (at most
+ * {@link UrbanVisits#MAX_BUILDINGS}) and that many building ids likewise. Every such save writes it, empty or not.
  *
  * <p>Absent means nothing walked or entered, which is how a layout-sixteen save written before
  * package 21 loads. A world of an earlier layout refuses the section, and a wrong kind of id, a

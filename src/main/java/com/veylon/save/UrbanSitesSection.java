@@ -21,8 +21,8 @@ import java.util.Set;
 
 /**
  * urban.sites v1 (urban milestone 16): the people of every survivor camp and hidden refuge the
- * player has come near, and how they stand with the player. Required for generators 15 and 16,
- * rejected in any other world. From generator 16 (milestone 17) its rows also hold strongholds and
+ * player has come near, and how they stand with the player. Required from generator 15 on,
+ * rejected in any earlier world. From generator 16 (milestone 17) its rows also hold strongholds and
  * raider yards (kind codes 3 and 4) in the same layout: a compound records its own discovery like
  * a camp, never relocates or leaves its stash, and a raider yard is never betrayed, never treats
  * the player and never trusts above {@link UrbanSite#RAIDER_TRUST}.
@@ -249,7 +249,7 @@ final class UrbanSitesSection {
         };
     }
 
-    /** A generator-15 save without the section would resurrect nobody, but silently forget everyone: reject it. */
+    /** A save of generator 15 or later without the section would resurrect nobody, but silently forget everyone: reject it. */
     static void finishLoad(Game g) throws IOException {
         if (UrbanSiteDirector.manages(g.world) && !g.settlementManager.urbanSites.restored) {
             throw new IOException("missing required " + ID);

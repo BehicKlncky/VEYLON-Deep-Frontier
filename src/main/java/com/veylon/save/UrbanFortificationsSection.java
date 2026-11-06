@@ -19,8 +19,9 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * urban.fortifications v1 (urban milestone 18): the strength left in a layout-fourteen city's
- * damaged barricades and braced doors. Required for generator 17, rejected in any other world.
+ * urban.fortifications v1 (urban milestone 18): the strength left in a city's damaged
+ * barricades and braced doors. Required from generator 17 (layout fourteen) on, rejected in any earlier
+ * world.
  *
  * <p>Payload: int version (1); int count of damaged barricade cells (at most
  * {@value UrbanFortifications#MAX_DAMAGED}), then per cell int x, y, z and float strength; int
@@ -33,7 +34,7 @@ import java.util.Map;
  * above none and at most a brace's full strength. The section is read once every other section is
  * in, so the order sections appear in never matters. A duplicate, a count over its cap or not
  * matching the length, a non-finite value or anything above fails the whole load and leaves the
- * live world alone; without the section a generator-17 save is rejected rather than having its
+ * live world alone; without the section a save of generator 17 or later is rejected rather than having its
  * battered barricades come back whole.
  */
 final class UrbanFortificationsSection {
@@ -116,7 +117,7 @@ final class UrbanFortificationsSection {
         return cell;
     }
 
-    /** A generator-17 save without the section would bring battered barricades back whole: reject it. */
+    /** A save of generator 17 or later without the section would bring battered barricades back whole: reject it. */
     static void finishLoad(Game g) throws IOException {
         if (manages(g) && !g.world.urban.fortifications.sectionRestored()) {
             throw new IOException("missing required " + ID);

@@ -21,7 +21,7 @@ import java.util.Set;
  * <ul>
  *   <li><b>Version 1</b> (encounter catalogues one to four): Veilbound only, fixed 47-byte rows,
  *       each bound to a core NPC index or -1. Unchanged since milestone 09.</li>
- *   <li><b>Version 2</b> (catalogue five, urban milestone 15): the same row with the species'
+ *   <li><b>Version 2</b> (catalogues five and six, urban milestones 15 and 23): the same row with the species'
  *       stable id ({@link UrbanSpecies}) in place of the fixed string, so rows vary in length,
  *       and a binding into the core NPC list for a humanoid species or the core creature list for
  *       a creature species. A creature's yaw lives only here; the frozen creature record has

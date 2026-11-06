@@ -14,8 +14,9 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 
 /**
- * urban.missions v1 (urban milestone 20): what a layout-sixteen city's survivor has learned and done
- * toward restoring its communications. Required for generator 19, rejected in any other world.
+ * urban.missions v1 (urban milestone 20): what a city's survivor has learned and done toward
+ * restoring its communications. Required from generator 19 (layout sixteen) on, rejected in any earlier
+ * world.
  *
  * <p>Payload: int version (1); a byte of flags (bit 0 the relay rumoured, bit 1 the relay found, bit
  * 2 a radio built, bit 3 the objective complete; no other bit); long the site that spoke of the
@@ -40,7 +41,7 @@ import java.io.IOException;
  * failure only when failed and a reward exactly when complete; and no more than
  * {@value UrbanMissions#MAX_ACTIVE} in hand.
  * Anything else, or trailing bytes, fails the whole load and leaves the live world alone; without the
- * section a generator-19 save is rejected rather than forgetting what its survivor learned or did.
+ * section a save of generator 19 or later is rejected rather than forgetting what its survivor learned or did.
  */
 final class UrbanMissionsSection {
     static final String ID = "urban.missions";
@@ -219,7 +220,7 @@ final class UrbanMissionsSection {
         return site != null && site.id() == id ? site.kind() : null;
     }
 
-    /** A generator-19 save without the section would forget what its survivor learned: reject it. */
+    /** A save of generator 19 or later without the section would forget what its survivor learned: reject it. */
     static void finishLoad(Game g) throws IOException {
         if (manages(g) && !g.world.urban.missions.sectionRestored()) {
             throw new IOException("missing required " + ID);

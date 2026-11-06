@@ -12,10 +12,10 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * {@code urban.discovery} v1 (milestone 14): the transit stations and hidden cellars a layout-ten
- * world's survivor has found. Payload: int version, int count (at most
+ * {@code urban.discovery} v1 (milestone 14): the transit stations and hidden cellars the survivor of a
+ * world from layout ten (generator 13) on has found. Payload: int version, int count (at most
  * {@link UrbanDiscovery#MAX_SITES}), then that many site ids as longs in strictly ascending order.
- * Every layout-ten save writes it, empty or not; absent means nothing has been found. A world
+ * Every such save writes it, empty or not; absent means nothing has been found. A world
  * without routes rejects it, and an invalid, duplicate or unordered id fails the whole load.
  */
 final class UrbanDiscoverySection {
