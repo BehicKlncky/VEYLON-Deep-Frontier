@@ -13,9 +13,9 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.lwjgl.stb.STBTruetype.*;
 
 /**
- * The screens a new city survivor reads first (urban milestone 21): the new-world choice describes
- * the abandoned city only when this session's new worlds are cities, keeps the truthful replace
- * notice and says the ordinary default is unchanged; the pause menu keeps the wilderness's reference
+ * The screens a new city survivor reads first (urban milestones 21 and 26): the new-world choice
+ * opens on the abandoned city, offers the wilderness as the legacy world, describes each and keeps
+ * a truthful replace notice naming the world chosen; the pause menu keeps the wilderness's reference
  * for its worlds and gives a city its own keys and goals. Every line fits where it is drawn.
  */
 class CityOnboardingScreensTest {
@@ -40,30 +40,42 @@ class CityOnboardingScreensTest {
     }
 
     @Test
-    void theNewWorldChoiceDescribesTheCityOnlyForACityAndKeepsTheReplaceNotice() {
+    void theNewWorldChoiceOpensOnTheCityOffersTheWildernessAndKeepsATruthfulNotice() {
         NewFrontierScreen screen = new NewFrontierScreen();
-        screen.open(true);
-        assertFalse(screen.showsCity(), "an ordinary session creates the wilderness");
+        screen.open(true, false);
+        assertFalse(screen.showsCity(), "a wilderness choice describes the wilderness");
         assertEquals("Hunger, weather, wounds and wildlife.", screen.description(GameMode.SURVIVAL)[0]);
-        screen.open(true, true);
-        assertTrue(screen.showsCity());
+        assertEquals("Saving this new frontier will replace your current save.", screen.replaceNotice());
+        screen.open(true);
+        assertTrue(screen.showsCity(), "every opening starts on the city");
         assertTrue(screen.showsReplaceNotice(), "the shared slot's notice stays");
-        assertEquals("Saving this new frontier will replace your current save.", NewFrontierScreen.REPLACE_NOTICE);
+        assertEquals("Saving this new city will replace your current save.", screen.replaceNotice());
         assertTrue(String.join(" ", screen.description(GameMode.SURVIVAL)).contains("Search buildings"));
         assertTrue(String.join(" ", screen.description(GameMode.CREATIVE)).contains("Fly"));
         assertEquals(GameMode.SURVIVAL, screen.selectedMode(), "Survival is still the default choice");
+        assertTrue(NewFrontierScreen.WILDERNESS_TITLE.contains("legacy"), "the wilderness is labelled as legacy");
 
         ToDoubleFunction<String> card = regular(1.15f);
-        for (GameMode mode : GameMode.values()) {
-            for (String line : screen.description(mode)) {
-                assertTrue(card.applyAsDouble(line) <= 300, "fits a 320-wide card: " + line);
+        for (boolean city : new boolean[]{true, false}) {
+            screen.open(false, city);
+            for (GameMode mode : GameMode.values()) {
+                for (String line : screen.description(mode)) {
+                    assertTrue(card.applyAsDouble(line) <= 300, "fits a 320-wide card: " + line);
+                }
             }
         }
-        ToDoubleFunction<String> note = regular(1.2f);
-        for (String line : new String[]{NewFrontierScreen.CITY_NOTICE, NewFrontierScreen.CITY_DEFAULT_NOTE,
-                NewFrontierScreen.REPLACE_NOTICE}) {
-            assertTrue(note.applyAsDouble(line) <= 1240, "fits a 1280-wide screen: " + line);
+        for (String tab : new String[]{NewFrontierScreen.CITY_TITLE, NewFrontierScreen.WILDERNESS_TITLE}) {
+            assertTrue(card.applyAsDouble(tab) <= 300, "fits a 320-wide tab: " + tab);
         }
+        // The narrowest screen drawn: 1280 x 720 at interface scale 1.5 is 853 units wide.
+        ToDoubleFunction<String> note = regular(1.1f), notice = regular(1.2f), keys = regular(1.05f);
+        for (String line : new String[]{NewFrontierScreen.CITY_NOTE, NewFrontierScreen.WILDERNESS_NOTE}) {
+            assertTrue(note.applyAsDouble(line) <= 820, "fits an 853-wide screen: " + line);
+        }
+        for (String line : new String[]{NewFrontierScreen.REPLACE_NOTICE, NewFrontierScreen.CITY_REPLACE_NOTICE}) {
+            assertTrue(notice.applyAsDouble(line) <= 820, "fits an 853-wide screen: " + line);
+        }
+        assertTrue(keys.applyAsDouble(NewFrontierScreen.KEYS) <= 820, "fits an 853-wide screen: " + NewFrontierScreen.KEYS);
     }
 
     @Test

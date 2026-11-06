@@ -90,11 +90,14 @@ final class AutomatedRunDriver {
         frontendQa = frontendScreen != null && !frontendScreen.isBlank();
         boolean automated = smoke || (scene != null && !scene.isBlank())
                 || (shotEnv != null && !shotEnv.isBlank()) || frontendQa;
-        int generator = configuredGenerator(System.getenv("VEYLON_GENERATOR"),
-                AppPaths.isolatedFromPlayerData());
+        String selector = System.getenv("VEYLON_GENERATOR");
+        int generator = configuredGenerator(selector, AppPaths.isolatedFromPlayerData());
         game.frontend.newWorldGenerator = generator;
 
         sceneSession = automated && !frontendQa;
+        if (sceneSession) {
+            generator = sceneGenerator(scene, selector, generator, AppPaths.isolatedFromPlayerData());
+        }
         if (sceneSession) {
             game.newWorld(game.sessionSeed, true, generator,
                     UrbanApartmentQaScene.manualNavigation(scene) ? GameMode.SURVIVAL
@@ -136,14 +139,17 @@ final class AutomatedRunDriver {
 
     /** The {@code VEYLON_GENERATOR} value that selects the urban development generator. */
     static final String URBAN_DEVELOPMENT_GENERATOR = "urban-dev";
+    /** The {@code VEYLON_GENERATOR} value that selects the wilderness, NEW FRONTIER's legacy world. */
+    static final String WILDERNESS_GENERATOR = "wilderness";
 
     /**
-     * The development selector: {@code VEYLON_GENERATOR=urban-dev} makes NEW
-     * FRONTIER and automated worlds urban; unset keeps the ordinary default.
+     * The QA selector of this session's new world, which NEW FRONTIER opens on and automated worlds
+     * build: unset is the ordinary default, the abandoned city; {@code wilderness} the legacy world;
+     * {@code urban-dev} the newest urban layout, today the default city itself.
      *
-     * <p>It refuses to run unless {@code veylon.dataDir} points away from the
-     * player's data directory, so a development world can never be saved over a
-     * real save. Invalid values fail explicitly, like {@code VEYLON_GAME_MODE}.
+     * <p>{@code urban-dev} refuses to run unless {@code veylon.dataDir} points away from the
+     * player's data directory, so a development layout can never be saved over a real save.
+     * Invalid values fail explicitly, like {@code VEYLON_GAME_MODE}.
      *
      * @param isolatedDataDirectory {@link AppPaths#isolatedFromPlayerData()}
      */
@@ -151,8 +157,12 @@ final class AutomatedRunDriver {
         if (configured == null || configured.isBlank()) {
             return World.DEFAULT_NEW_WORLD_GENERATOR;
         }
-        if (!URBAN_DEVELOPMENT_GENERATOR.equals(configured.trim().toLowerCase(Locale.ROOT))) {
-            throw new IllegalArgumentException("VEYLON_GENERATOR must be "
+        String value = configured.trim().toLowerCase(Locale.ROOT);
+        if (WILDERNESS_GENERATOR.equals(value)) {
+            return World.WILDERNESS_NEW_WORLD_GENERATOR;
+        }
+        if (!URBAN_DEVELOPMENT_GENERATOR.equals(value)) {
+            throw new IllegalArgumentException("VEYLON_GENERATOR must be " + WILDERNESS_GENERATOR + ", "
                     + URBAN_DEVELOPMENT_GENERATOR + " or unset: " + configured);
         }
         if (!isolatedDataDirectory) {
@@ -161,6 +171,29 @@ final class AutomatedRunDriver {
                     + " with -Dveylon.dataDir=<dir> (Gradle: -PveylonDataDir=build/qa/<name>)");
         }
         return UrbanRevision.DEVELOPMENT_GENERATOR;
+    }
+
+    /**
+     * The world a scripted scene plays. A city tour ({@code urban_*}) and the save audit play the
+     * session's world, and only from an isolated data directory, since they press F5 into the
+     * ordinary slot path, as they always did behind {@code urban-dev}. Every other scene was made
+     * for the wilderness and keeps it unless {@code VEYLON_GENERATOR} names a world.
+     *
+     * @param generator the session's world from {@link #configuredGenerator}
+     */
+    static int sceneGenerator(String scene, String selector, int generator, boolean isolatedDataDirectory) {
+        if (scene == null || scene.isBlank()) {
+            return generator;
+        }
+        String name = scene.trim().toLowerCase(Locale.ROOT);
+        if (name.startsWith("urban_") || name.equals("save_audit")) {
+            if (World.isUrbanGenerator(generator) && !isolatedDataDirectory) {
+                throw new IllegalStateException("VEYLON_SCENE=" + name + " plays a city and saves into the"
+                        + " slot: run with -Dveylon.dataDir=<dir> (Gradle: -PveylonDataDir=build/qa/<name>)");
+            }
+            return generator;
+        }
+        return selector == null || selector.isBlank() ? World.WILDERNESS_NEW_WORLD_GENERATOR : generator;
     }
 
     /** {@code VEYLON_SHOT="5,10"} captures the framebuffer at those elapsed seconds. */

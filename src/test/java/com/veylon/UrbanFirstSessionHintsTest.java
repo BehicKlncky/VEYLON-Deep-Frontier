@@ -75,14 +75,17 @@ class UrbanFirstSessionHintsTest {
     }
 
     @Test
-    void newFrontierDescribesTheCityWhenTheSessionMakesCities() {
+    void newFrontierDescribesTheWorldTheSessionMakes() {
         Game game = new Game();
         game.frontend.savePath = temporary.resolve("absent.sav");
         game.frontend.openNewFrontier(false);
-        assertFalse(game.newFrontierScreen.showsCity(), "an ordinary session's new world is the wilderness");
+        assertTrue(game.newFrontierScreen.showsCity(), "an ordinary session's new world is the city");
+        game.frontend.newWorldGenerator = World.WILDERNESS_NEW_WORLD_GENERATOR;
+        game.frontend.openNewFrontier(true);
+        assertFalse(game.newFrontierScreen.showsCity(), "a wilderness session opens on the wilderness");
+        assertTrue(game.newFrontierScreen.showsReplaceNotice());
         game.frontend.newWorldGenerator = World.GEN_URBAN_MISSIONS;
         game.frontend.openNewFrontier(true);
         assertTrue(game.newFrontierScreen.showsCity());
-        assertTrue(game.newFrontierScreen.showsReplaceNotice());
     }
 }

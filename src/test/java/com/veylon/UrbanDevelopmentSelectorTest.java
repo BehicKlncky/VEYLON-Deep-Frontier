@@ -22,9 +22,10 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * The development selector reaches the urban generator only on request, only
- * with an isolated data directory, and through the same frontend and bootstrap
- * path a player's new world takes; without it nothing changes.
+ * The QA selector of a session's new world: unset is the ordinary default, the abandoned city;
+ * {@code wilderness} the legacy world; {@code urban-dev} the newest urban layout only with an
+ * isolated data directory. Each reaches the same frontend and bootstrap path a player's new world
+ * takes, and a scripted city scene never runs where it could save over a real save.
  */
 class UrbanDevelopmentSelectorTest {
 
@@ -39,6 +40,39 @@ class UrbanDevelopmentSelectorTest {
                 AutomatedRunDriver.configuredGenerator(null, false));
         assertEquals(World.DEFAULT_NEW_WORLD_GENERATOR,
                 AutomatedRunDriver.configuredGenerator("  ", false));
+    }
+
+    @Test
+    void wildernessSelectsTheLegacyWorldAnywhere() {
+        assertEquals(World.WILDERNESS_NEW_WORLD_GENERATOR,
+                AutomatedRunDriver.configuredGenerator("wilderness", false),
+                "the wilderness is an ordinary world a player can choose, so it needs no isolation");
+        assertEquals(World.GEN_CAVE_IDENTITIES, AutomatedRunDriver.configuredGenerator(" Wilderness ", true));
+    }
+
+    @Test
+    void scenesPlayTheWorldTheyWereMadeForAndCityScenesOnlyFromAnIsolatedDirectory() {
+        int city = World.DEFAULT_NEW_WORLD_GENERATOR;
+        assertEquals(city, AutomatedRunDriver.sceneGenerator("urban_slice", null, city, true));
+        assertEquals(city, AutomatedRunDriver.sceneGenerator("Save_Audit", null, city, true));
+        for (String scene : new String[]{"urban_missions", "save_audit", "urban_apartments_manual"}) {
+            IllegalStateException unsafe = assertThrows(IllegalStateException.class,
+                    () -> AutomatedRunDriver.sceneGenerator(scene, null, city, false), scene);
+            assertTrue(unsafe.getMessage().contains("veylon.dataDir"), unsafe.getMessage());
+        }
+        assertEquals(World.WILDERNESS_NEW_WORLD_GENERATOR,
+                AutomatedRunDriver.sceneGenerator("urban_slice", "wilderness",
+                        World.WILDERNESS_NEW_WORLD_GENERATOR, false),
+                "a city scene on the wilderness saves nothing of a city; it reports itself inactive");
+        assertEquals(World.WILDERNESS_NEW_WORLD_GENERATOR,
+                AutomatedRunDriver.sceneGenerator("day", null, city, false),
+                "a wilderness scene keeps its world when no selector names one");
+        assertEquals(World.WILDERNESS_NEW_WORLD_GENERATOR,
+                AutomatedRunDriver.sceneGenerator("hud_showcase", "", city, false));
+        assertEquals(city, AutomatedRunDriver.sceneGenerator("day", "urban-dev", city, true),
+                "a selector that names a world wins");
+        assertEquals(city, AutomatedRunDriver.sceneGenerator(null, null, city, false),
+                "smoke and timed captures play the session's world");
     }
 
     @Test
@@ -108,17 +142,34 @@ class UrbanDevelopmentSelectorTest {
     }
 
     @Test
-    void anOrdinaryNewFrontierIsUnchanged() {
-        Game game = new Game();
-        game.sessionSeed = SEED;
-        game.frontend.savePath = temporary.resolve("absent.sav");
+    void anOrdinaryNewFrontierIsTheCityAndTheWildernessIsOneKeyAway() {
+        Game city = new Game();
+        city.sessionSeed = SEED;
+        city.frontend.savePath = temporary.resolve("absent.sav");
+        startNewFrontier(city);
+        assertEquals(World.GEN_URBAN_ECONOMY, city.world.generatorVersion, "the default is the economy city");
+        assertEquals(UrbanRevision.CURRENT_CONTENT, city.world.urban.contentRevision());
+        assertEquals(com.veylon.world.urban.ParcelPlan.Use.REFUGE, city.world.urban.parcelAt((int) Math.floor(city.player.pos.x),
+                (int) Math.floor(city.player.pos.z)).use(), "the survivor wakes in the starter refuge");
 
-        startNewFrontier(game);
+        Game wild = new Game();
+        wild.sessionSeed = SEED;
+        wild.frontend.savePath = temporary.resolve("absent.sav");
+        wild.frontend.applyTitle(TitleScreen.Action.NEW_GAME);
+        assertEquals("Mapping the abandoned city...", wild.frontend.loadingDetail(), "the city is on offer first");
+        wild.newFrontierScreen.open(false, false); // what W does on the screen (ModeSelectionRoutingTest)
+        wild.frontend.applyNewFrontier(NewFrontierScreen.Action.START);
+        assertEquals("Mapping atmosphere and terrain...", wild.frontend.loadingDetail());
+        assertTrue(wild.frontend.performLoad());
+        assertEquals(World.WILDERNESS_NEW_WORLD_GENERATOR, wild.world.generatorVersion);
+        assertNull(wild.world.urban);
+        assertNotNull(wild.world.campPos, "the legacy crash camp is still raised");
+        assertFalse(wild.entities.npcs.isEmpty());
 
-        assertEquals(World.DEFAULT_NEW_WORLD_GENERATOR, game.world.generatorVersion);
-        assertNull(game.world.urban);
-        assertNotNull(game.world.campPos, "the legacy crash camp is still raised");
-        assertFalse(game.entities.npcs.isEmpty());
+        wild.frontend.returnToTitle();
+        startNewFrontier(wild);
+        assertEquals(World.DEFAULT_NEW_WORLD_GENERATOR, wild.world.generatorVersion,
+                "the wilderness choice does not carry into the next new frontier");
     }
 
     @Test
@@ -135,7 +186,14 @@ class UrbanDevelopmentSelectorTest {
         ordinary.sessionSeed = SEED;
         ordinary.frontend.openForQa("pause-creative");
         assertEquals(World.DEFAULT_NEW_WORLD_GENERATOR, ordinary.world.generatorVersion);
+        assertTrue(ordinary.world.isUrban(), "an ordinary staged capture shows the city");
         assertEquals(GameMode.CREATIVE, ordinary.gameMode());
+
+        Game wild = new Game();
+        wild.sessionSeed = SEED;
+        wild.frontend.newWorldGenerator = AutomatedRunDriver.configuredGenerator("wilderness", false);
+        wild.frontend.openForQa("pause");
+        assertEquals(World.WILDERNESS_NEW_WORLD_GENERATOR, wild.world.generatorVersion);
     }
 
     @Test

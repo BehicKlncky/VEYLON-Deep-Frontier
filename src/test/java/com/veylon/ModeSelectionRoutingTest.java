@@ -63,9 +63,34 @@ class ModeSelectionRoutingTest {
     }
 
     @Test
-    void startingCreativeBuildsACreativeWorldWithTheSurvivalTerrainCampAndKit() throws Exception {
-        Game creative = startFromNewFrontier(GLFW_KEY_C);
-        Game survival = startFromNewFrontier(GLFW_KEY_S);
+    void wSwitchesTheWorldAndEveryOpeningReturnsToTheCity() throws Exception {
+        Game game = new Game();
+        NewFrontierScreen screen = game.newFrontierScreen;
+        screen.open(true);
+        assertTrue(screen.showsCity(), "26: the abandoned city is the new world");
+        assertEquals(NewFrontierScreen.CITY_REPLACE_NOTICE, screen.replaceNotice(), "P-05: the notice names the city");
+        assertEquals(NewFrontierScreen.CITY_NOTE, screen.worldNote());
+        press(game, screen, GLFW_KEY_C);
+        assertEquals(NewFrontierScreen.Action.NONE, press(game, screen, GLFW_KEY_W));
+        assertFalse(screen.showsCity(), "26: W chooses the wilderness");
+        assertEquals(GameMode.CREATIVE, screen.selectedMode(), "the world key leaves the mode alone");
+        assertEquals(NewFrontierScreen.REPLACE_NOTICE, screen.replaceNotice(), "D7: the wilderness keeps its notice");
+        assertEquals(NewFrontierScreen.WILDERNESS_NOTE, screen.worldNote());
+        assertEquals("Hunger, weather, wounds and wildlife.", screen.description(GameMode.SURVIVAL)[0]);
+        press(game, screen, GLFW_KEY_W);
+        assertTrue(screen.showsCity(), "W switches back");
+        press(game, screen, GLFW_KEY_W);
+        screen.open(false);
+        assertTrue(screen.showsCity(), "26: every opening returns to the city");
+        assertEquals(GameMode.SURVIVAL, screen.selectedMode());
+    }
+
+    @Test
+    void startingCreativeBuildsACreativeWildernessWithTheSurvivalTerrainCampAndKit() throws Exception {
+        Game creative = startFromNewFrontier(GLFW_KEY_W, GLFW_KEY_C);
+        Game survival = startFromNewFrontier(GLFW_KEY_W, GLFW_KEY_S);
+        assertEquals(World.WILDERNESS_NEW_WORLD_GENERATOR, creative.world.generatorVersion, "26: W chose the wilderness");
+        assertEquals(World.WILDERNESS_NEW_WORLD_GENERATOR, survival.world.generatorVersion);
         assertEquals(Game.AppState.PLAYING, creative.appState, "R2: the load completes into play");
         assertEquals(GameMode.CREATIVE, creative.gameMode(), "R2: the chosen mode reaches the new world");
         assertTrue(creative.creativeMarked(), "R1: a Creative world starts marked");
@@ -90,6 +115,35 @@ class ModeSelectionRoutingTest {
                 "Creative welcome hints replace the Survival instruction");
         assertTrue(survival.eventLog.recent(10).stream().anyMatch(line -> line.endsWith("Survive.")),
                 "Survival keeps its welcome lines");
+    }
+
+    @Test
+    void startingCreativeBuildsACreativeCityWithTheSurvivalStreetsRefugeAndKit() throws Exception {
+        Game creative = startFromNewFrontier(GLFW_KEY_C);
+        Game survival = startFromNewFrontier(GLFW_KEY_S);
+        assertEquals(World.DEFAULT_NEW_WORLD_GENERATOR, creative.world.generatorVersion, "26: the city by default");
+        assertEquals(World.DEFAULT_NEW_WORLD_GENERATOR, survival.world.generatorVersion);
+        assertEquals(GameMode.CREATIVE, creative.gameMode(), "R2: the chosen mode reaches the new city");
+        assertTrue(creative.creativeMarked(), "R1: a Creative city starts marked");
+        assertEquals(GameMode.SURVIVAL, survival.gameMode());
+        assertEquals(survival.spawnPos, creative.spawnPos, "R7: the same refuge bed");
+        assertEquals(survival.world.urban.refugeBuilding, creative.world.urban.refugeBuilding, "R7: the same refuge");
+        for (int dx = -40; dx <= 40; dx += 8) {
+            for (int dz = -40; dz <= 40; dz += 8) {
+                int x = (int) survival.spawnPos.x + dx, z = (int) survival.spawnPos.z + dz;
+                assertEquals(survival.world.urban.groundY(x, z), creative.world.urban.groundY(x, z),
+                        "R7: the same streets at " + x + "," + z);
+                assertEquals(survival.world.urban.parcelAt(x, z), creative.world.urban.parcelAt(x, z));
+            }
+        }
+        for (ItemType type : ItemType.values()) {
+            assertEquals(survival.player.inventory.count(type), creative.player.inventory.count(type),
+                    "R7: same starter kit for " + type);
+        }
+        assertTrue(creative.eventLog.recent(10).stream().anyMatch(line -> line.contains("City refuge, in Creative mode")),
+                "the city's Creative first session: " + creative.eventLog.recent(10));
+        assertTrue(survival.eventLog.recent(10).stream().anyMatch(line -> line.contains("City refuge: this flat is home")),
+                "the city's Survival first session: " + survival.eventLog.recent(10));
     }
 
     @Test
@@ -186,12 +240,14 @@ class ModeSelectionRoutingTest {
                 "R2: an abandoned Creative choice does not carry over");
     }
 
-    private Game startFromNewFrontier(int modeKey) throws Exception {
+    private Game startFromNewFrontier(int... keys) throws Exception {
         Game game = new Game();
         game.sessionSeed = 20260910L;
         game.frontend.savePath = temporary.resolve("absent.sav");
         game.frontend.applyTitle(TitleScreen.Action.NEW_GAME);
-        press(game, game.newFrontierScreen, modeKey);
+        for (int key : keys) {
+            press(game, game.newFrontierScreen, key);
+        }
         game.frontend.applyNewFrontier(press(game, game.newFrontierScreen, GLFW_KEY_ENTER));
         assertEquals(Game.AppState.LOADING, game.appState, "R2: Start begins the two-frame loading");
         assertTrue(game.frontend.performLoad(), "R2: the new frontier loads");

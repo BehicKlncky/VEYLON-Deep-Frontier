@@ -31,8 +31,10 @@ class UrbanGeneratorDispatchTest {
 
     @Test
     void generatorGatesNameTheirVersionsExplicitly() {
-        assertEquals(World.GEN_CAVE_IDENTITIES, World.DEFAULT_NEW_WORLD_GENERATOR,
-                "ordinary new worlds stay on generator 3 until the urban rollout (package 26)");
+        assertEquals(World.GEN_URBAN_ECONOMY, World.DEFAULT_NEW_WORLD_GENERATOR,
+                "ordinary new worlds are the abandoned city since the urban rollout (package 26)");
+        assertEquals(World.GEN_CAVE_IDENTITIES, World.WILDERNESS_NEW_WORLD_GENERATOR,
+                "the wilderness on offer is the world every release from 0.3.0 to 0.8.1 created");
         assertEquals(4, World.GEN_URBAN, "the first unused version after 1-3");
         assertEquals(5, World.GEN_URBAN_STREETS, "the street network got its own version (D-35)");
         assertEquals(6, World.GEN_URBAN_PLANS);

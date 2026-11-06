@@ -120,8 +120,16 @@ public class World implements VoxelAccess {
      * cannot be turned into more than they are worth, and the first session's encounter pressure.
      */
     public static final int GEN_URBAN_ECONOMY = 20;
-    /** The generator of every ordinary new world; generator 3 until the urban rollout. */
-    public static final int DEFAULT_NEW_WORLD_GENERATOR = GEN_CAVE_IDENTITIES;
+    /**
+     * The generator of every ordinary new world: the abandoned city since the urban rollout
+     * (urban milestone 26). Saved worlds keep the generator they were made with.
+     */
+    public static final int DEFAULT_NEW_WORLD_GENERATOR = GEN_URBAN_ECONOMY;
+    /**
+     * The wilderness NEW FRONTIER still offers beside the city, labelled as the legacy world: the
+     * generator every release from 0.3.0 to 0.8.1 gave its new worlds.
+     */
+    public static final int WILDERNESS_NEW_WORLD_GENERATOR = GEN_CAVE_IDENTITIES;
     /** The highest generator version a save may name; a load rejects anything above it. */
     public static final int MAX_SUPPORTED_GENERATOR = GEN_URBAN_ECONOMY;
 
