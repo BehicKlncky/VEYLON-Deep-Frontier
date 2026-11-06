@@ -52,20 +52,14 @@ class UrbanEconomyAuditTest {
     }
 
     /**
-     * The planned buildings of a region. A parcel whose plan cannot be built is skipped and reported: one
-     * such parcel exists under template seven (seed 987654321, region (-2, -3), parcel 44), a planner
-     * defect recorded for packages 24 and 25 that this economy audit does not own.
+     * The planned buildings of a region. Every parcel plans: the one parcel this audit used to skip
+     * (seed 987654321, region (-2, -3), parcel 44) plans since package 25 (D-248).
      */
     private static List<BuildingPlan> buildings(World w, int rx, int rz) {
         List<BuildingPlan> out = new java.util.ArrayList<>();
         for (var p : w.urban.regionPlan(rx, rz).parcels()) {
-            try {
-                BuildingPlan b = w.urban.buildingAt(p.x0(), p.z0());
-                if (b != null) { out.add(b); }
-            } catch (IllegalStateException unplannable) {
-                System.out.println("[economy-audit] unplannable parcel " + com.veylon.world.urban.UrbanIds.format(p.id())
-                        + " of seed " + w.seed + " at " + p.x0() + "," + p.z0() + " skipped");
-            }
+            BuildingPlan b = w.urban.buildingAt(p.x0(), p.z0());
+            if (b != null) { out.add(b); }
         }
         return out;
     }

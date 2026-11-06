@@ -61,6 +61,19 @@ public final class RouteCatalogue {
             int u = u(x, z), v = v(x, z);
             return u >= core() - 1 && u <= core() + 4 && v <= 7;
         }
+
+        /**
+         * True when the roof cell just inside a parapet cell of the outline is the bulkhead's: an
+         * opening there is a notch in the stair house's wall that nobody on the roof can reach. It
+         * happens where the bulkhead's far wall stands on the last column inside the parapet, as in
+         * a building 13 or 14 cells wide (package 25, D-248).
+         */
+        boolean facesBulkhead(Vec3i cell) {
+            int x = cell.x(), z = cell.z();
+            int dx = x == parcel.x0() ? 1 : x == parcel.x1() ? -1 : 0;
+            int dz = z == parcel.z0() ? 1 : z == parcel.z1() ? -1 : 0;
+            return bulkhead(x + dx, z + dz);
+        }
     }
 
     /** Two leaves of a service door in a basement side wall, lower cells at {@link #SERVICE_Y}. */
@@ -83,6 +96,20 @@ public final class RouteCatalogue {
         }
         public boolean roofRoute() { return !fireEscapes.isEmpty() || !openings.isEmpty(); }
         public boolean none() { return serviceDoors.isEmpty() && !hiddenCellar && !roofRoute(); }
+
+        /**
+         * These features without the parapet openings whose two cells both face the stair house
+         * ({@link Expect#facesBulkhead}), or these very features when there is none. A bridge's
+         * openings stand past the bulkhead, so only an opening between abutting roofs is ever left
+         * out; the other roof keeps its own opening, which then looks onto a whole parapet.
+         */
+        public Features withoutOpeningsFacingTheBulkhead(Expect e) {
+            List<Opening> kept = new ArrayList<>();
+            for (Opening o : openings) {
+                if (!(e.facesBulkhead(o.first()) && e.facesBulkhead(o.second()))) { kept.add(o); }
+            }
+            return kept.size() == openings.size() ? this : new Features(serviceDoors, hiddenCellar, fireEscapes, kept);
+        }
     }
 
     private static final Features NONE = new Features(List.of(), false, List.of(), List.of());

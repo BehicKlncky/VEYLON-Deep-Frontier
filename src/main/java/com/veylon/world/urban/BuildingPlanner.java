@@ -92,6 +92,12 @@ public final class BuildingPlanner {
      * exactly their revision-six plans. Every other parcel keeps its district family, storeys
      * and variant, an apartment always gets its first basement, and {@link RouteTemplates}
      * overlays the parcel's routes on every attempt of the same finite repair sequence.
+     *
+     * <p>Only when all three attempts fail, the sequence runs once more without the parapet
+     * openings that face the stair house (attempts four to six, package 25, D-248): such an opening
+     * is a notch nobody on the roof can reach, so every attempt with it failed and its building
+     * could not be planned at all. A parcel that planned before never reaches this step, so its
+     * plan is unchanged.
      */
     public static Result planRoutes(long seed, ParcelPlan parcel, DistrictPlan district, RouteCatalogue routes) {
         if (UrbanStarterSite.isNeighbour(parcel) || parcel.use() == ParcelPlan.Use.REFUGE) {
@@ -100,18 +106,31 @@ public final class BuildingPlanner {
         RouteCatalogue.Expect expect = routes.expected(parcel.index());
         RouteCatalogue.Features features = routes.features(parcel.index());
         boolean flooded = district.district == UrbanDistrict.FLOODED;
-        int base = expect.family().walkUp() ? UrbanRevision.BUILDING_TEMPLATE_STARTER : UrbanRevision.BUILDING_TEMPLATE_CIVIC;
         List<String> repairs = new ArrayList<>();
-        BuildingPlan candidate = null;
-        for (int attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-            Variant variant = attempt == 1 ? expect.variant() : Variant.INTACT;
-            candidate = RouteTemplates.apply(BuildingTemplates.propose(parcel, base, expect.family(), variant,
-                    expect.storeys(), expect.basement(), attempt == 3), expect, features, flooded);
-            AccessibilityValidator.Report report = AccessibilityValidator.inspect(candidate);
-            if (report.ok()) { return new Result(candidate, attempt, repairs, report); }
-            repairs.add("attempt=" + attempt + " " + identity(candidate) + " " + report.summary());
+        Result planned = routeAttempts(parcel, expect, features, flooded, repairs, 0);
+        if (planned != null) { return planned; }
+        RouteCatalogue.Features reachable = features.withoutOpeningsFacingTheBulkhead(expect);
+        if (reachable != features) {
+            planned = routeAttempts(parcel, expect, reachable, flooded, repairs, MAX_ATTEMPTS);
+            if (planned != null) { return planned; }
         }
         throw new IllegalStateException("no valid building in finite fallback: " + repairs);
+    }
+
+    /** The finite repair sequence with one set of route features; null when every attempt fails. */
+    private static Result routeAttempts(ParcelPlan parcel, RouteCatalogue.Expect expect,
+                                        RouteCatalogue.Features features, boolean flooded, List<String> repairs,
+                                        int earlier) {
+        int base = expect.family().walkUp() ? UrbanRevision.BUILDING_TEMPLATE_STARTER : UrbanRevision.BUILDING_TEMPLATE_CIVIC;
+        for (int attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+            Variant variant = attempt == 1 ? expect.variant() : Variant.INTACT;
+            BuildingPlan candidate = RouteTemplates.apply(BuildingTemplates.propose(parcel, base, expect.family(),
+                    variant, expect.storeys(), expect.basement(), attempt == 3), expect, features, flooded);
+            AccessibilityValidator.Report report = AccessibilityValidator.inspect(candidate);
+            if (report.ok()) { return new Result(candidate, earlier + attempt, repairs, report); }
+            repairs.add("attempt=" + (earlier + attempt) + " " + identity(candidate) + " " + report.summary());
+        }
+        return null;
     }
 
     /** Candidate, intact alternate, then minimal rooms on the same footprint and vertical envelope. */
