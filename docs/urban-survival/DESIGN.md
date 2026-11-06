@@ -669,7 +669,7 @@ Deterministic, re-run in every build: the bands of §16.2, the starter guarantee
 
 ### 16.6 Findings left to later packages
 
-- **Two parcels cannot be planned** under building template 7 (generators 13–20): seed 987654321 region (−2, −3) parcel 44 at (−440, −681) and seed −9000000000000000000 region (−3, 0) parcel 116 at (−637, 219). Generating either chunk throws `IllegalStateException` ("no valid building in finite fallback"). Found by this package's three-region audit sweep; owned by packages 24 and 25 (streaming and the regression audit). **24:** left to 25: any fallback changes frozen template-7 output, a compatibility decision for the regression audit (D-247).
+- **Two parcels cannot be planned** under building template 7 (generators 13–20): seed 987654321 region (−2, −3) parcel 44 at (−440, −681) and seed −9000000000000000000 region (−3, 0) parcel 116 at (−637, 219). Generating either chunk throws `IllegalStateException` ("no valid building in finite fallback"). Found by this package's three-region audit sweep; owned by packages 24 and 25 (streaming and the regression audit). **24:** left to 25: any fallback changes frozen template-7 output, a compatibility decision for the regression audit (D-247). **25:** resolved: such a building is planned once more without the roof opening that faced its own stair house, which changes nothing that planned before (D-248).
 - **The city is generous in total.** The pressure the economy applies is distance, time, noise, risk and spoilage, not a running-out of food; whether that is enough is for the playtest.
 
 ## 17. Dense-city performance and the memory model (package 24)
@@ -714,6 +714,29 @@ Taken from the 60 fps frame and asserted in `UrbanCityPerformanceTest`, not cali
 ### 17.5 What remains open
 
 - **Planning hitches.** A first-touch building plan costs 1.1–2.5 ms and is bounded only by count. Fast travel still meets a 23–30 ms slow tick about every ten seconds where it enters new regions (their sites and anchors) and 6–10 ms generation frames; walking meets a 15 ms slow tick there. A main-thread planner working ahead of the streaming edge within a time budget is the next step (D-247).
-- **Save and load time** grow with the places a save names (D-246); the codec-side fix is package 25's.
+- **Save and load time** grow with the places a save names (D-246). **25:** the writers keep their read-back as the guard on the last good save (D-250).
 - **The reference machine** has not run the city profile or the calibrated gates for this package.
-- **The two unplannable parcels** (§16.6) remain package 25's.
+- **The two unplannable parcels** (§16.6) were planned by package 25 (D-248).
+
+## 18. The integrated save and regression audit (package 25)
+
+Package 25 audited what every package saves, all together, as a durability gate rather than a first serialization pass. Decisions D-248 to D-252. The section inventory, the corruption policy and the compatibility directions are in `docs/ARCHITECTURE.md` ("Save / load"); the evidence is in VALIDATION, milestone 25.
+
+### 18.1 What the audit checked and found
+
+- **The inventory.** Every row of §13 was checked against its codec: its stable id and version, the generators that write it, its bounds on the writing and the reading side, what absence means, whether it is persistent or transient, and its owner and reset. No accidental persistence was found: every saved field is an irreversible fact or a value its package chose to keep (needs clocks, trust, fear, alarm, passes, debts and hunt cooldowns by D-146 and D-167). The transient state stays transient: AI brains and routes, an open container and its timer (search progress is kept, D-72), warnings, knocks and hunts in progress, a pending refuge give-up, noise timers, map sketches and presentation. No consequential fact was found unsaved: every fact of the integrated fixture comes back.
+- **Fixed.** The two unplannable parcels (D-248); a core writer that could publish what no load reads (D-249); codec documentation that named only the generator a section was introduced with ("from generator N on" now); the architecture record's stale save section (rewritten).
+- **Kept.** The writers' read-back (D-250), and the core's block edits and crates in hash order: a load may change that order, their contents are equal, no reader depends on it, and every extension section is written again byte for byte.
+
+### 18.2 The integrated fixture
+
+One economy city (generator 20, seed 20260731, Survival) carries every kind of irreversible fact a city records, each made through the game's own commands (`IntegratedCityFixture`): in the flat beside the starter refuge a cupboard searched and partly emptied, a search left half done, a container destroyed, a door opened, another barred and braced, a pane shattered, a wall breached, the street door barricaded and battered, the first floor claimed as home, water drawn from its taps and a generator fuelled and running a lamp; out in the city an infected and a Veilmaw killed where they lived; the nearest camp's rumour of the relay and three missions, one done for the hidden civilians found behind their loose panel; and the nearest raider yard's people all dead, the yard taken and the stronghold told of it and grateful once.
+
+`UrbanIntegratedSaveTest` carries it through complete round trips; revisits in either order with three rounds of dormancy (nothing refilled, resurrected, duplicated or paid twice); loads over three populated live worlds (the same city carried on, another seed's city, a legacy world); its chunks regenerated in any order and after they were dropped; a new world of the same or another seed, which inherits nothing; failed loads over the populated world; and its sections in shuffled order. `UrbanSaveCorruptionTest` applies the corruption policy to each of its twelve city sections.
+
+### 18.3 What stays open
+
+- The human checks of D-80, unchanged.
+- The writer's 128 MiB check has no test (D-249).
+- Save and load time still grow with the places a save names (D-246, D-250), and first-touch planning hitches remain (D-247).
+- The reference machine has not run package 24's figures.

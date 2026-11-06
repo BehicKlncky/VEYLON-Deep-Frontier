@@ -278,7 +278,7 @@ The **always** set runs for every code package, together with the portable build
 | 22 | `engine.*` audio tests, `gfx.*` | Material, model and state checks; audio selection and reset | Before and after captures; manual listening with normal and dry-fallback devices |
 | 23 | 08 and 20 tests | Resource, prerequisite and transaction tests; a multi-day production integration | Fresh extended play with day count, revision, seed, gear and choices |
 | 24 | `qa.RuntimeBoundsTest` and allocation tests | Bounds, allocation and state; eviction and revisit order if eviction is chosen. **24:** `ChunkRetentionTest`, `ChunkStreamingScheduleTest`, `ChunkMesherFingerprintTest`, `world.ChunkMapTest`, `entity.ChunkUnloadCachesTest`, `ai.NavigationCacheUnloadTest`, `UrbanPerformanceQaSceneTest` and `RuntimeBoundsTest`'s threat budgets | `.\gradlew.bat performanceTest --console=plain` (opt-in, calibrated host) plus native city measurements |
-| 25 | `save.*`, fingerprints, quest, settlement and parity tests | Integrated urban fixture across orders and revisits; corruption and atomic replacement | A genuine legacy world and the integrated urban state, from isolated saves |
+| 25 | `save.*`, fingerprints, quest, settlement and parity tests | Integrated urban fixture across orders and revisits; corruption and atomic replacement. **25:** `UrbanIntegratedSaveTest`, `save.UrbanSaveCorruptionTest`, `save.CorruptSaveResilienceTest`, `save.HistoricalV3SaveCompatibilityTest`, `save.UrbanEarlierRevisionSaveTest`, `world.urban.RoofOpeningFallbackTest` and `SaveAuditQaSceneTest` | A genuine legacy world and the integrated urban state, from isolated saves. **25:** `VEYLON_SCENE=save_audit` on the integrated city and on the v0.3.0 and v0.8.1 Survival and Creative saves |
 | 26 | Everything relevant | Rollout path tests | Default-path smoke and the manual acceptance scenario from the pack README |
 
 Test names in the table are relative to `com.veylon.`. Run them with `.\gradlew.bat test --tests "com.veylon.<name>" --console=plain`.
@@ -3971,3 +3971,192 @@ ran.
 
 Next: package 25, the integrated save and regression audit, with the consolidated human
 playtest and listening pass still due under D-80.
+
+## Milestone 25 — integrated save and regression audit (2026-11-05 to 2026-11-06)
+
+### Scope and baseline
+
+- Branch `feature/urban-survival` at `40b110c` (the 24 records), clean tree. Read the
+  revised base, the prompt, `AGENTS.md`, `docs/COMMIT_WORKFLOW.md`, the
+  save-compatibility skill, every save codec and its tests, and these records. The
+  consolidated human playtest (D-80) has not run; this package went ahead on the
+  owner's instruction to execute 25.
+- Added: a planner fallback for two unplannable parcels (D-248), write-side guards in
+  the core (D-249), corrected codec documentation, an integrated urban fixture with
+  its round-trip and corruption suites, genuine saves of v0.3.0, v0.8.1 and package 20
+  (D-251) and a native save audit (D-252). No block, item, icon, ordinal, save
+  section, generator, plan or content change; the default new world is unchanged.
+- Host, the second machine: AMD Ryzen 5 5600X, Windows 11 Pro 10.0.26200, NVIDIA
+  GeForce RTX 3060 Ti, OpenGL 3.3.0 NVIDIA 621.01 with KHR_debug, the repository-local
+  Temurin 25.0.4.1+1; windowed 1280 × 720 natives with isolated data directories.
+
+### The two unplannable parcels
+
+A scratch sweep (compiled classes, no test) asked `UrbanWorldState.buildingAt` for every
+parcel of seeds 20260731, −4242, 7, 0, 987654321, −9000000000000000000, 1, 42, 999 and
+−1234567, regions −3..3 on both axes: 39,776 parcels a generator.
+
+| Generators | Before | After |
+| --- | --- | --- |
+| 13, 14, 15, 16, 17, 18, 19, 20 | 2 unplannable each: seed 987654321 `urban:parcel:-2,-3:44` and seed −9000000000000000000 `urban:parcel:-3,0:116`, all three attempts `ROUTE: unreachable` at the opening's first cell | 0 on 20 and 13 (the others plan the same buildings) |
+
+Diagnosis: both openings sit on the parcel's side edge (u = width − 1) of a 14- and a
+13-cell building whose bulkhead's far wall stands at u = core + 4 = width − 2, rows 6–7
+of 0–7, so the two parapet cells open onto the stair house's wall. The repaired plans
+keep their variants (DAMAGED, OCCUPIED), storeys (4, 2) and basements, plan in the
+fourth attempt, and fingerprint 7865289980778632171 and 6754843376405436927 on every
+generator 13–20. The roof next door (parcels 42 and 114) keeps its opening and declares
+its route; in a generated chunk its two cells are open and the repaired roof's are a
+whole parapet with its rail (`RoofOpeningFallbackTest`). A catalogue scan of the same
+seeds and regions finds those two openings facing a stair house and no other, and no
+bridge opening does.
+
+### Integrated fixture, corruption and limits
+
+- The integrated save is 8,536 bytes with 24 sections; the city's are `world.fixtures`,
+  `urban.population`, `urban.meta`, `urban.refuges`, `urban.containers`, `urban.sites`,
+  `urban.compounds`, `urban.fortifications`, `urban.utilities`, `urban.missions`,
+  `urban.discovery` and `urban.visits`. Its facts, as described after the save: a
+  cupboard SEARCHED with four fibre left, a search at 0.6 s holding medicine, a
+  container DESTROYED, a door open (state 1), a door barred (state 4) and braced at 70,
+  a broken window, a breached wall, a barricade at 35, claims on the starter's ground
+  floor and the flat's first floor (home), 2 litres drawn, a generator on with 296.25 s
+  of fuel at condition 99.8 and a lamp lit, a dead Veilbound and a dead Veilmaw without
+  bodies, the camp (trust 10), the hidden refuge (found, trust 8), the raider yard
+  (taken, rewarded, four dead), the stronghold (trust 25), the comms rumour, two
+  missions active and the hidden-aid mission completed and rewarded.
+- `UrbanIntegratedSaveTest` (7): round trips with every extension section rewritten
+  byte for byte and the core equal through a digest; revisits camp-first and
+  flat-first with three rounds of dormancy (every site's people asleep far away and
+  awake again one body each, the dead infected and Veilmaw never activated again, no
+  report or reward paid twice); loads over the same city carried on, another seed's
+  city and a legacy world; chunks generated forward, reversed, shuffled, dropped by
+  retention and dropped entirely, the same hashes each time and the same as in the
+  world the facts were made in; new worlds of the same and another seed equal to a
+  fresh session; three failed loads over the populated world (a truncated file, a cut
+  `urban.missions`, no `urban.containers`) leaving it, its save and the good file
+  unchanged; four section orders.
+- `UrbanSaveCorruptionTest` (6): each of the twelve city sections missing (all refused
+  but `urban.visits`, whose absence loads as nothing visited), repeated, at its version
+  ±1 and `Integer.MIN_VALUE`, cut by a byte, cut to three bytes, empty and followed by a
+  stray byte; every first count at −1, one more than held, 2^20 and `Integer.MAX_VALUE`;
+  bytes flipped at fixed points (refused 92, accepted as other valid state 13, each of
+  those saved and loaded again); an unknown section skipped and dropped by the next
+  save; a clock set back before the claims, refused by the writer with the last save
+  byte for byte and no temporary file. Every refusal kept the live world, its player and
+  the good file.
+- `CorruptSaveResilienceTest` (16, three new): 100,001 discovered places refused by the
+  writer and 100,000 saved and loaded (D-249); a file one byte over 128 MiB refused
+  before any world is replaced; a slot path that is a folder holding a file refused at
+  the final replacement with the folder untouched and no temporary file left.
+
+### Genuine saves and older builds
+
+Detached worktrees of `v0.3.0` (`bc11020`), `v0.8.1` (`615c146`) and package 20
+(`e764168`); each tree's main sources (and package 20's test sources) compiled alone
+with javac 25.0.4.1 against LWJGL 3.3.6 and JOML 1.10.8; a writer compiled against
+those classes only and run with `-Dveylon.dataDir=build/m25-historical/<build>/data`,
+which every run left empty.
+
+| Fixture | Writer | SHA-256 | Bytes | What it holds |
+| --- | --- | --- | --- | --- |
+| `v0.3.0-authentic.sav.b64` | v0.3.0 | `b149f4611908dbe5620f6f495b9de49a2ff65ea9f7c1be22b715191a732576a3` | 44,606 | Seed 30017717, generator 3, day 4 13:25: needs, blueprints, an affliction, a crate, a campfire, a dug block, beacon stage 1, a discovered POI, the camp's FETCH request, 92 settlements of regions −6..6 with one hostile changed, reputation, a resident, a deer, a carcass, an event |
+| `v0.8.1-survival-authentic.sav.b64` | v0.8.1 | `2a82e1f5a580ea6223b581d40e5bd5d5efd706e9427876962e388974e3f207c3` | 37,466 | The same staging on seed 81081928, 74 settlements |
+| `v0.8.1-creative-authentic.sav.b64` | v0.8.1 | `0d1f33df0cd8a3ef5f6b9c0aecd54abb54ea39f43463d459e7cf4eafa53da7d3` | 6,236 | Seed 81081929, Creative, marked, flying, dusk frozen, weather locked, spawning paused, four planks placed |
+| `urban-gen19-m20-authentic.sav.b64` | package 20 | `8678b640e2600491e4ebd939fbd2dcaf6749603f0b2dffad04c611c468671ad1` | 8,458 | The integrated fixture on generator 19 (content 3, no `urban.visits`), with package 20's fact locations and description |
+
+The v0.3.0 writer ran the release's faction tick to open its quest offer, which let
+the camp's alarm fall from 12 to 0 before the save; the test expects what the file
+holds. `HistoricalV3SaveCompatibilityTest` (3) and `UrbanEarlierRevisionSaveTest` (1)
+pass, and the v0.2.0 test still does.
+
+The same archived classes then tried, over a live world of their own, three saves this
+build wrote (`build/m25-historical/downgrade/`):
+
+| Build | City, generator 20 | City, generator 19, saved by this build | v0.8.1 world saved by this build |
+| --- | --- | --- | --- |
+| v0.8.1 | refused: unsupported world generator version 20; live world kept | refused: version 19; live world kept | loaded |
+| package 20 | refused: version 20; live world kept | loaded, `urban.visits` skipped | loaded |
+
+The legacy world saved again by this build is 37,466 bytes, as the release wrote it.
+
+### Native save audit
+
+From the main checkout with the package's final code, each slot filled first:
+
+```powershell
+$env:VEYLON_SCENE='save_audit'
+.\gradlew.bat run -PveylonDataDir=build/qa/m25-save-audit-<name> --console=plain
+```
+
+| Slot | Result | Timeline |
+| --- | --- | --- |
+| `city` (the integrated save) | `pass=true generator=20` | walk to the half-searched cabinet, its screen (search finished: medicine), pack, map, F5 and F9 (12 lines equal) |
+| `v0.8.1-survival` | `pass=true generator=3` | walk to the release's crate, its screen (three bandages), pack, map, F5 and F9 (10 lines) |
+| `v0.8.1-creative` | `pass=true generator=3 mode=creative` | no container within 24 blocks: a walk of 11 blocks; the catalog opened and closed with E; map; F5 and F9 (12 lines) |
+| `v0.3.0-survival` | `pass=true generator=3` | walk to the release's crate, its screen, pack, map, F5 and F9 (8 lines) |
+
+Every run: 0 `glGetError`, 0 KHR errors (7–8 medium performance notes), captures
+`01-loaded` to `05-after-f9` checked by eye: the claimed flat at day 3 with the yard
+taken and "Game loaded", the cabinet's screen, the city map with home, the found refuge
+and the journal (two missions under way, "The people below" done), the release worlds'
+crates, quest, camp standing, storm event and bleeding, and the Creative catalog at the
+frozen dusk. A first city run showed the tour's own bug: it pressed the closing key in
+the frame it captured, so the screens were already shut when drawn; the tour now waits
+before closing, and the runs above are after the fix.
+
+### Commands and portable builds
+
+Every code commit was validated by the full portable build (`.\gradlew.bat build
+--console=plain`, javadoc and check included) on its exact tree in a detached worktree
+(`build/m12-check`, `m13-check`, `m14-check`, `m21-check`), each tree assembled by one
+script from `40b110c` and the chosen file versions through a temporary index (its `git
+write-tree` hash recorded) and laid in with `git read-tree -u --reset`, four at a time;
+each was then committed with `git read-tree <tree>` and `git commit -F`, its tree checked:
+
+| Commit | Tree | Tests | Classes | Build |
+| --- | --- | --- | --- | --- |
+| `5b4b6ad` | `d34b52e` | 2,332 | 299 | BUILD SUCCESSFUL in 21m 50s |
+| `00f476a` | `0bd3d7a` | 2,333 | 299 | BUILD SUCCESSFUL in 21m 50s |
+| `f9ef49b` | `df89d9e` | 2,333 | 299 | BUILD SUCCESSFUL in 21m 55s |
+| `14f1bcb` | `80a8f96` | 2,340 | 300 | BUILD SUCCESSFUL in 21m 51s |
+| `1ea0bce` | `69fe11c` | 2,348 | 301 | BUILD SUCCESSFUL in 20m 33s |
+| `7695db4` | `6bfd3d1` | 2,351 | 302 | BUILD SUCCESSFUL in 20m 36s |
+| `69b7753` | `3e8b347` | 2,352 | 303 | BUILD SUCCESSFUL in 20m 30s |
+| `0041013` | `0bac6ca` | 2,355 | 304 | see below |
+
+Each skipped one test, the existing Windows skip. At `0041013` every assertion passed, but
+JUnit could not delete `save.UrbanEarlierRevisionSaveTest`'s temporary directory
+(`DirectoryNotEmptyException`, the Windows cleanup flake recorded since package 22) while
+four builds ran, so that build reported BUILD FAILED in 20m 46s; the class run alone on
+the same tree passed (BUILD SUCCESSFUL in 3s) and `build -x test` completed javadoc and
+check. The final code was then built once more alone in the main checkout: 2,355 tests in 304 classes, one skipped, BUILD SUCCESSFUL in 17m 29s.
+
+Focused runs while iterating (`.\gradlew.bat test --tests ... --console=plain`, the
+classes read back from `build/test-results`): `world.urban.RoofOpeningFallbackTest`,
+`UrbanEconomyAuditTest`, `world.urban.RouteCatalogueTest`,
+`world.WorldGeneratorFingerprintTest`, `world.urban.BuildingPlannerTest`,
+`world.UrbanUndergroundGenerationTest`, the whole `save.*` package with
+`UrbanIntegratedSaveTest` (BUILD SUCCESSFUL in 3m 46s, every class passing),
+`save.HistoricalV3SaveCompatibilityTest`, `save.HistoricalV020SaveCompatibilityTest`,
+`save.UrbanEarlierRevisionSaveTest`, `save.UrbanSaveCorruptionTest` and
+`SaveAuditQaSceneTest`. They found, and the commits avoid: a byte-for-byte re-save check
+that the core's hash-ordered edits cannot meet (the sections are compared instead), a
+dormancy check that accepted a mission the check itself offered, an eviction check that
+expected chunks the running generator pins, a v3 fixture check that expected a later
+release's sections in a v0.3.0 save, the release fixture's alarm, which its writer's own
+faction tick had lowered, and the tour's crate opened with F beside a carcass, which F
+butchers first.
+
+`graphify update . --no-cluster` on the final code: 12,157 nodes and 51,159 edges, with the usual extractor warnings for `build.gradle` and `settings.gradle`.
+
+### Limits and next gate
+
+- Human checks (D-80) of packages 09–23 are still pending.
+- The writer's 128 MiB check has no test (D-249).
+- Generator 2 was never a release default and has no genuine save; its fingerprints
+  stand.
+- Save and load time still grow with the places a save names (D-246, D-250); planning
+  hitches (D-247) and the reference machine's rerun are unchanged.
+- Next gate: package 26 (default urban rollout and final acceptance), after the
+  consolidated human pass.

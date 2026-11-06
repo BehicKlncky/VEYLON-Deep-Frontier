@@ -6,10 +6,10 @@ This is the running record for the 26-package urban-survival roadmap. The pack i
 
 | Item | Value |
 | --- | --- |
-| Last completed package | **24 — Dense-city performance and streaming** (2026-11-05): the dense city's costs are measured part by part, headless and natively, and its long journeys are bounded. A generated city drops its farthest chunks past 2,048 and regenerates them block for block (a fast 8 km journey holds 1,803 chunks and 72.6 MiB after collection instead of 6,664 and 199.4 MiB, and a world that dropped 1,000+ chunks saves byte for byte as its twin that kept them), each city mesh is built once from a finished neighbourhood (fast travel's frame p99 8.4–10.1 → 1.9–3.4 ms natively), the chunk map no longer collides diagonals, the mesher skips block light where no emitter can reach and each region's threat budget is planned once (a stronghold's slow tick 8.4 → 0.4 ms). Measured on the second machine; the reference-machine rerun is pending, and first-touch planning hitches and save/load time growth remain, recorded. Package 23 before it: survival economy and extended play (2026-10-31): the economy city (generator 20, content revision 4, encounter catalogue 6) supplies a survivor through scavenging, salvage, survivors and utilities alone. A flat holds a serving or two and half a litre, the starter block keeps its guarantees but its refuge cannot fund the first upgrade, salvage and trade cannot be turned into more than they are worth, a trader keeps back what its people live on, a rain of blows no longer pain-locks the infected and the starter block holds one apartment's two encounter slots. An acceptance route reaches the city's answer without anyone's help and lives four more days with no tree or ore; the native tour lives two and a half real-time days. Human extended play is pending under D-80. Package 22 before it: ruined-city visuals and sound (2026-10-30). |
-| Source revision | 24: `71ce6af` 23's records → `ab42cb8` the city profile → `3438751` the native tour → `6babe85` the chunk map → `da53372` threat budgets once → `34b4c34` block light only near emitters → `ee280ee` each mesh once → `0dd758c` far chunks dropped and regenerated; the documents and records follow in their own commits. 23: `cf1a96f` 22's records → `e214f52` generator 20 and content 4 → `c382717` salvage loops → `de7eff9` the trader's reserve → `0873c1e` the pain guard → `6f60e54` catalogue 6 → `b3de774` audit → `7d10039` the multi-day route → `24540b0` the economy tour; the records follow in their own commit. 22: `728c47b` 21's records → `6903ac8` atmosphere tour → `99a8f24` walls stop light → `2877256` toxic fog's look → `9b48d0b` acoustic zones → `ea0e6a2` sound bank and footsteps → `eabf5cc` soundscape → `a97d86d` tells in the dark → `d7a3a0a` city shading → `8d0dcbf` district dressing → `6a13d71` door marks → `a90ca1c` guards' bark → `96d7c4a` fainter veil → `bfe6e5c` poster stain → `4f6299e` art direction → `21cbb0d` audio direction; the records follow in their own commit. 21: `e764168` 20's records → `4ee6b89` visits → `2749358` rumours → `8f0d89b` city map → `d762cdf` interactions → `1df1e21` onboarding text → `dd121c1` onboarding tour; records `728c47b`. |
+| Last completed package | **25 — Integrated save and regression audit** (2026-11-05 to 2026-11-06): every city section audited and carried together through one integrated city (a partly looted flat, a destroyed container, changed doors, pane and wall, a claimed home, a battered barricade, water, fuel and power, the dead, the hidden civilians found, missions and a faction's reward) across round trips, revisit orders, dormancy, live-world loads, eviction, new worlds, failed loads and shuffled sections; the corruption policy applied to each city section; genuine saves of v0.3.0, v0.8.1 and package 20 pinning every direction a save travels, with the archived builds reading this build's saves back; two parcels that crashed any template-7 world near them now planned (D-248); a core writer that can no longer publish what no load reads (D-249); and a native save audit from an isolated slot (D-252). Human checks under D-80 are unchanged. Package 24 before it: dense-city performance and streaming (2026-11-05): the dense city's costs are measured part by part, headless and natively, and its long journeys are bounded. A generated city drops its farthest chunks past 2,048 and regenerates them block for block (a fast 8 km journey holds 1,803 chunks and 72.6 MiB after collection instead of 6,664 and 199.4 MiB, and a world that dropped 1,000+ chunks saves byte for byte as its twin that kept them), each city mesh is built once from a finished neighbourhood (fast travel's frame p99 8.4–10.1 → 1.9–3.4 ms natively), the chunk map no longer collides diagonals, the mesher skips block light where no emitter can reach and each region's threat budget is planned once (a stronghold's slow tick 8.4 → 0.4 ms). Measured on the second machine; the reference-machine rerun is pending, and first-touch planning hitches and save/load time growth remain, recorded. |
+| Source revision | 25: `40b110c` 24's records → `5b4b6ad` the roof openings → `00f476a` the write guards → `f9ef49b` the codecs' documentation → `14f1bcb` the integrated city → `1ea0bce` corruption → `7695db4` the release saves → `69b7753` the package-20 city → `0041013` the save audit; the documents and records follow in their own commits. 24: `71ce6af` 23's records → `ab42cb8` the city profile → `3438751` the native tour → `6babe85` the chunk map → `da53372` threat budgets once → `34b4c34` block light only near emitters → `ee280ee` each mesh once → `0dd758c` far chunks dropped and regenerated; the documents and records follow in their own commits. 23: `cf1a96f` 22's records → `e214f52` generator 20 and content 4 → `c382717` salvage loops → `de7eff9` the trader's reserve → `0873c1e` the pain guard → `6f60e54` catalogue 6 → `b3de774` audit → `7d10039` the multi-day route → `24540b0` the economy tour; the records follow in their own commit. 22: `728c47b` 21's records → `6903ac8` atmosphere tour → `99a8f24` walls stop light → `2877256` toxic fog's look → `9b48d0b` acoustic zones → `ea0e6a2` sound bank and footsteps → `eabf5cc` soundscape → `a97d86d` tells in the dark → `d7a3a0a` city shading → `8d0dcbf` district dressing → `6a13d71` door marks → `a90ca1c` guards' bark → `96d7c4a` fainter veil → `bfe6e5c` poster stain → `4f6299e` art direction → `21cbb0d` audio direction; the records follow in their own commit. 21: `e764168` 20's records → `4ee6b89` visits → `2749358` rumours → `8f0d89b` city map → `d762cdf` interactions → `1df1e21` onboarding text → `dd121c1` onboarding tour; records `728c47b`. |
 | Default new world | Legacy (`World.DEFAULT_NEW_WORLD_GENERATOR = GEN_CAVE_IDENTITIES`), unchanged until 26 passes. Isolated `VEYLON_GENERATOR=urban-dev` creates generator 20 (`GEN_URBAN_ECONOMY`, layout 17 / template 7 / content 4, encounter catalogue 6). Generators 1–19 stay loadable with their original geometry, content and encounters. |
-| Next package | **The consolidated human playtest and listening pass (D-80), with package 23's extended play, then 25 — Integrated save and regression audit, NOT STARTED** (with the two unplannable parcels of DESIGN §16.6 and the save writers' re-planning of D-246). Keep `ChunkRetentionTest`, `ChunkStreamingScheduleTest`, `world.ChunkMesherFingerprintTest`, `world.ChunkMapTest`, `UrbanPerformanceQaSceneTest`, `UrbanEconomyCensusTest`, `UrbanEconomyAuditTest`, `UrbanEconomyRouteTest`, `UrbanEconomyQaSceneTest`, `UrbanEconomySalvageTest`, `UrbanEconomyTradeTest`, `UrbanEconomyCombatTest`, `UrbanEconomyEncounterTest`, `UrbanSliceRouteTest` (generators 10–20), `UrbanCatalogueQaSceneTest`, `UrbanDistrictQaSceneTest`, `UrbanUndergroundQaSceneTest`, `UrbanEcologyQaSceneTest`, `UrbanSurvivorQaSceneTest`, `UrbanStrongholdQaSceneTest`, `UrbanRefugeQaSceneTest`, `UrbanUtilityQaSceneTest`, `UrbanMissionRouteTest`, `UrbanMissionQaSceneTest`, `UrbanOnboardingQaSceneTest`, `ui.CityMapTest`, `UrbanInteractionPromptsTest`, `UrbanAtmosphereQaSceneTest`, `UrbanAcousticsTest`, `CitySoundscapeTest`, `world.urban.UrbanDressingTest` and `UrbanTracesTest` as regression gates. Owner question P-15 (the inverted day/night temperature curve) is open. |
+| Next package | **The consolidated human playtest and listening pass (D-80), with package 23's extended play, then 26 — Default urban rollout and final acceptance, NOT STARTED**. Keep `UrbanIntegratedSaveTest`, `save.UrbanSaveCorruptionTest`, `save.HistoricalV3SaveCompatibilityTest`, `save.UrbanEarlierRevisionSaveTest`, `world.urban.RoofOpeningFallbackTest`, `SaveAuditQaSceneTest`, `ChunkRetentionTest`, `ChunkStreamingScheduleTest`, `world.ChunkMesherFingerprintTest`, `world.ChunkMapTest`, `UrbanPerformanceQaSceneTest`, `UrbanEconomyCensusTest`, `UrbanEconomyAuditTest`, `UrbanEconomyRouteTest`, `UrbanEconomyQaSceneTest`, `UrbanEconomySalvageTest`, `UrbanEconomyTradeTest`, `UrbanEconomyCombatTest`, `UrbanEconomyEncounterTest`, `UrbanSliceRouteTest` (generators 10–20), `UrbanCatalogueQaSceneTest`, `UrbanDistrictQaSceneTest`, `UrbanUndergroundQaSceneTest`, `UrbanEcologyQaSceneTest`, `UrbanSurvivorQaSceneTest`, `UrbanStrongholdQaSceneTest`, `UrbanRefugeQaSceneTest`, `UrbanUtilityQaSceneTest`, `UrbanMissionRouteTest`, `UrbanMissionQaSceneTest`, `UrbanOnboardingQaSceneTest`, `ui.CityMapTest`, `UrbanInteractionPromptsTest`, `UrbanAtmosphereQaSceneTest`, `UrbanAcousticsTest`, `CitySoundscapeTest`, `world.urban.UrbanDressingTest` and `UrbanTracesTest` as regression gates. Owner question P-15 (the inverted day/night temperature curve) is open. |
 | Human testing schedule | Owner instruction (2026-10-11, D-80): consolidated human playtesting/listening after milestone 22. Package 22 is complete, so it is due now: a human walk of the slice and the city, and the listening pass package 22 asks for (positional and indoor cues, with an EFX device and with `VEYLON_NO_EFX=1`). Until it runs, every human-only gate from 09 to 23 stays pending; package 23 adds human extended play (several in-game days on the economy city, noting the day count, revision, seed, gear, choices and failures). |
 | Commits | Separate `feat`, `test`, `docs` and `chore` commits on `feature/urban-survival`; see the reconstruction ledger below. `main` stays at `923345f`. Original combined commit retained at `backup/urban-m01-m04-before-split`. No merge, push, tag or publication. |
 
@@ -43,7 +43,7 @@ The status vocabulary is NOT STARTED, IN PROGRESS, PARTIAL, BLOCKED or COMPLETE.
 | 22 | Ruined-city visuals and sound | 21 | Materials, lighting (D-19), `AmbienceSystem`, `AudioSceneState`, `engine/ReverbPresets`, `engine/AudioManager` | Districts, sites and threats are recognisable in day, night and fog. Props, lights and audio stay bounded. Dry fallback works. A manual listening pass. | **COMPLETE** (2026-10-30; its human listening pass is due under D-80) |
 | 23 | Survival economy and extended play | 22 | Generator 20 and content revision 4 (`world/World`, `world/urban/{UrbanRevision,UrbanWorldState,LootTables,UrbanStarterSite,UrbanContainers}`), salvage (`world/urban/SalvageTable`, `Dismantling`), trade (`settlement/UrbanSiteDialogue`), the pain guard (`entity/Npc`, `ai/InfectedAI`), catalogue 6 (`world/urban/EncounterAnchors`), the tour `UrbanEconomyQaScene`; the balance record DESIGN §16 | One route reaches the objective plus several days without trees or ore. Other seeds have reachability. Conservation holds. Fresh extended play recorded. | **COMPLETE** (2026-10-31; human extended play pending under D-80) |
 | 24 | Dense-city performance and streaming | 23 | `world/World` retention and eviction or a finite city (D-24); plan caches; queues; `docs/PERFORMANCE_BENCHMARKS.md` | Bounded queues and caches. Measured scenes meet calibrated gates. A long-travel CPU, GPU and save-growth policy with no lost state. | **COMPLETE** (2026-11-05; measured on the second machine, the reference-machine rerun pending; human checks under D-80 unchanged) |
-| 25 | Integrated save and regression audit | 24 | `save/*`, all `urban.*` sections, fixtures | Historical worlds and earlier urban revisions are preserved. An integrated urban fixture survives every order and revisit. Corruption policy and atomic replacement hold. | NOT STARTED |
+| 25 | Integrated save and regression audit | 24 | `save/*`, all `urban.*` sections, fixtures | Historical worlds and earlier urban revisions are preserved. An integrated urban fixture survives every order and revisit. Corruption policy and atomic replacement hold. | **COMPLETE** (2026-11-06; human checks under D-80 unchanged) |
 | 26 | Default urban rollout and final acceptance | 25, 11, 23, 24 | `DEFAULT_NEW_WORLD_GENERATOR` switch; frontend labels; README and docs | A normal new Survival session starts in the city. The pack README final scenario passes on the default path. Legacy and Creative pass. Fresh evidence and a local milestone commit. No tag or publication. | NOT STARTED |
 
 ### Group gates
@@ -3589,6 +3589,139 @@ publication was performed.
 **Next:** the consolidated human playtest and listening pass (D-80), then package 25,
 the integrated save and regression audit (with the two unplannable parcels and the save
 writers' re-planning).
+
+## Milestone 25 — integrated save and regression audit (2026-11-05 to 2026-11-06)
+
+**Status: COMPLETE for its headless, historical and scripted native gates.** The human
+checks of earlier packages (D-80) are unchanged and still pending. Decisions D-248 to
+D-252; the design record is [DESIGN.md §18](DESIGN.md#18-the-integrated-save-and-regression-audit-package-25);
+the section inventory, corruption policy and compatibility directions are in
+`docs/ARCHITECTURE.md` ("Save / load").
+
+### Start state
+
+- Branch `feature/urban-survival` at `40b110c` (the 24 records), clean tree. The
+  consolidated human playtest (D-80) has not run; this package went ahead on the
+  owner's instruction to execute 25 and leaves every human-only gate pending.
+- Read the revised base, the prompt, `AGENTS.md`, `docs/COMMIT_WORKFLOW.md`, the
+  save-compatibility skill, the save codecs and their tests, and these records.
+
+### What the audit found and changed
+
+- **The inventory** (DESIGN §18.1, ARCHITECTURE's section table): every city section's
+  id, version, generators, bounds on both sides, absence meaning, persistence and
+  reset checked against its codec. No accidental persistence and no unsaved
+  consequential fact was found.
+- **Two parcels could not be planned** under template 7, crashing any world whose
+  survivor neared them: a roof opening facing its own stair house. Planned now by a
+  last pass without such openings, which nothing that planned before reaches (D-248).
+- **The core writer could publish what no load reads**: its counts and the 128 MiB
+  file cap were checked only on reading. The writer now refuses them (D-249).
+- **The writers' re-planning** handed over by package 24 (D-246) is kept as the guard
+  on the last good save (D-250).
+- **Codec documentation** named only the generator a section arrived with; it now
+  says "from generator N on". The architecture record's save section was stale and
+  is rewritten.
+- **Genuine saves** of v0.3.0 and v0.8.1 (Survival and Creative) and of the package-20
+  city now pin every direction a save travels, and the archived builds read this
+  build's saves back (D-251).
+- **An integrated city** carries every kind of irreversible fact through round trips,
+  revisit orders, dormancy, live-world loads, eviction, new worlds, failed loads and
+  shuffled sections; the corruption policy is applied to each of its city sections.
+- **A native save audit** (`VEYLON_SCENE=save_audit`) plays any save from an isolated
+  slot with ordinary controls, then F5 and F9 (D-252).
+
+### Changed paths
+
+**Production** (`src/main/java/com/veylon/`):
+
+- New: `SaveAuditQaScene.java`.
+- Edited: `QaHarness.java` (one label on an existing line), `UrbanQaScenes.java`,
+  `save/SaveSystem.java`, `save/Urban{Compounds,Discovery,Fortifications,Missions,
+  Population,Refuges,Sites,Utilities,Visits}Section.java` (documentation),
+  `world/urban/{BuildingPlanner,RouteCatalogue}.java`.
+
+**Tests** (`src/test/java/com/veylon/`):
+
+- New: `IntegratedCityFixture`, `SaveEnvelope`, `UrbanIntegratedSaveTest`,
+  `SaveAuditQaSceneTest`, `save/UrbanSaveCorruptionTest`,
+  `save/HistoricalV3SaveCompatibilityTest`, `save/UrbanEarlierRevisionSaveTest`,
+  `world/urban/RoofOpeningFallbackTest`; resources
+  `src/test/resources/com/veylon/save/{v0.3.0-authentic,v0.8.1-survival-authentic,
+  v0.8.1-creative-authentic,urban-gen19-m20-authentic}.sav.b64` and the package-20
+  fixture's `.facts.txt` and `.describe.txt`.
+- Edited: `UrbanEconomyAuditTest` (no parcel skipped), `save/CorruptSaveResilienceTest`.
+
+**Records and docs:** this file, [DESIGN.md](DESIGN.md) (§16.6, §17.5, §18),
+[DECISIONS.md](DECISIONS.md) (D-248 to D-252, C-6, C-13, §3),
+[VALIDATION.md](VALIDATION.md#milestone-25--integrated-save-and-regression-audit-2026-11-05-to-2026-11-06)
+(the matrix row and the milestone section), `docs/ARCHITECTURE.md` and
+`docs/DEVELOPING.md`.
+
+### Compatibility
+
+- No generator, plan, template, content revision, catalogue, block, item, icon,
+  ordinal or section changes; every generator keeps its pins. The two repaired
+  buildings had no output before (planning them threw).
+- The core's byte layout is unchanged at every count a load accepts.
+- Directions, each with genuine evidence: this build reads v0.2.0, v0.3.0 and v0.8.1
+  saves and the package-06 and package-20 cities; v0.8.1 refuses this build's city
+  saves before touching its live world and opens a legacy world this build saved;
+  the package-20 build refuses generator 20 and opens a generator-19 city this build
+  saved, skipping `urban.visits`. No downgrade is promised.
+
+### Commands and results
+
+Exact commands and outputs are in
+[VALIDATION.md](VALIDATION.md#milestone-25--integrated-save-and-regression-audit-2026-11-05-to-2026-11-06).
+In short:
+
+- Every code commit was validated with the full portable build on its exact tree in a
+  detached worktree: `5b4b6ad` 2,332 tests in 299 classes, `00f476a` 2,333 in 299,
+  `f9ef49b` 2,333 in 299, `14f1bcb` 2,340 in 300, `1ea0bce` 2,348 in 301, `7695db4`
+  2,351 in 302, `69b7753` 2,352 in 303 and `0041013` 2,355 in 304 (one class's temporary
+  directory failed to delete under four parallel builds and passed alone), none failing.
+  The final code built alone in the main checkout: 2,355 tests in 304 classes, BUILD
+  SUCCESSFUL in 17m 29s.
+- The planner sweep: two unplannable parcels of 39,776 on each of generators 13–20
+  before, none on 13 and 20 after.
+- Genuine saves: the v0.3.0, v0.8.1 Survival and Creative and package-20 fixtures load
+  here; the archived v0.8.1 and package-20 builds read this build's saves as recorded.
+- Native, 1280 × 720, isolated data directories: `save_audit` on the integrated city and
+  the v0.3.0 and v0.8.1 Survival and Creative saves, each `pass=true` with 0 GL and KHR
+  errors and its captures checked by eye.
+- These records: relative links and anchors checked, `git diff --check` clean.
+- `graphify update . --no-cluster` on the final code: 12,157 nodes and 51,159 edges.
+- No reviewer subagents ran.
+
+The commits:
+
+| Commit | Subject |
+| --- | --- |
+| `5b4b6ad` | `fix(urban): plan the buildings whose roof opening faced their stair house` |
+| `00f476a` | `fix(save): never publish a save no load would read` |
+| `f9ef49b` | `docs(save): name every generator each city section applies to` |
+| `14f1bcb` | `test(save): carry an integrated city through every round trip and revisit` |
+| `1ea0bce` | `test(save): fail every damaged city section whole and keep the last save` |
+| `7695db4` | `test(save): load genuine saves of the first and last v3 releases` |
+| `69b7753` | `test(save): load a city saved by package 20 fact for fact` |
+| `0041013` | `feat(qa): audit any save natively from an isolated slot` |
+
+The documents and these records follow in their own commits. No push, merge, tag or
+publication was performed.
+
+### Limits and next concrete step
+
+- **Human checks (D-80)** of packages 09–23 are still pending.
+- **The writer's 128 MiB check** has no test (D-249); every count guard below it does.
+- **Save and load time** still grow with the places a save names (D-246, D-250), and
+  first-touch planning hitches remain (D-247).
+- **The reference machine** has not run package 24's figures.
+- **Day/night temperature (P-15)** is still inverted in every world; unchanged.
+
+**Next:** the consolidated human playtest and listening pass (D-80), then package 26,
+the default urban rollout and final acceptance.
+
 
 ## Resume rules
 
