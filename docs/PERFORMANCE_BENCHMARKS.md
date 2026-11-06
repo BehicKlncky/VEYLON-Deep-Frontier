@@ -489,3 +489,13 @@ and 0 KHR errors. The wilderness figures match package 24's run on `0dd758c`
 (1,495 FPS, fortress 1,580). The city smoke streams no long approach, so a city's
 streaming cost is still measured by `VEYLON_SCENE=urban_performance` (above); the
 reference machine has not run either.
+
+### Release run (v0.9.0, 2026-11-06)
+
+`performanceTest` on the release tree, same host: the city profile (5 tests) and the
+rain gates (2) pass, and nine of ten benchmarks pass: chunk tick 0.635 ms (budget
+0.92), entity tick 0.675 ms (0.95), settlement tick 0.017 ms (0.52), all-living
+presentation 0.095 ms per frame (0.50). The durable `save` gate fails at 5.295 ms
+against 2.20, the host gap recorded since 0.7.4, so `load` was not timed. A cold city
+`newWorld` takes 487.1 ms (warm 149.5 ms mean). The release fat JAR's and packaged
+launcher's city smokes ran at 1,026.1 and 1,015.5 FPS. No budget changed.

@@ -40,10 +40,14 @@ find blueprints, master the crafting stations and **repair the distress beacon**
 
 ---
 
-**In development, not yet released: the abandoned city.** This branch makes the city
-the default new world and keeps the wilderness as the labelled legacy world. Releases up
-to 0.8.1 cannot open a city save. The work and its evidence are recorded in
-[the urban survival records](docs/urban-survival/PROGRESS.md).
+Version **0.9.0 — The Abandoned City** makes an abandoned city the new world: six
+districts whose every building can be entered and searched, infected and alien
+threats, survivor camps, hidden civilians, guarded strongholds and a raider yard, a
+refuge to claim, barricade and power from salvage, and the old radio relay to bring
+back. The wilderness of earlier releases stays on NEW FRONTIER as the legacy world, and
+existing saves keep their world. Releases up to 0.8.1 cannot open a city save. See the
+[release notes](docs/releases/v0.9.0.md) and the
+[urban survival records](docs/urban-survival/PROGRESS.md).
 
 Version **0.8.1 — Living Bodies & Fire** extends lethal blast dismemberment to
 every animal and the Survival player. Flames cling to living bodies, make people
@@ -159,9 +163,9 @@ Windows x64 (PowerShell):
 ```powershell
 .\gradlew.bat build             # compile + unit tests + jar
 .\gradlew.bat performanceTest   # opt-in benchmarks calibrated for the reference PC
-.\gradlew.bat fatJar            # build\libs\veylon-0.8.1-all.jar
+.\gradlew.bat fatJar            # build\libs\veylon-0.9.0-all.jar
 .\gradlew.bat jpackage          # build\jpackage\Veylon\Veylon.exe
-.\gradlew.bat appImageZip       # build\distributions\veylon-0.8.1-windows-x64.zip
+.\gradlew.bat appImageZip       # build\distributions\veylon-0.9.0-windows-x64.zip
 .\gradlew.bat releaseArtifacts  # tests + all host-specific release artifacts
 ```
 
@@ -171,7 +175,7 @@ macOS Intel or Apple Silicon (Terminal):
 ./gradlew build
 ./gradlew fatJar
 ./gradlew jpackage          # build/jpackage/Veylon.app
-./gradlew appImageZip       # build/distributions/veylon-0.8.1-macos-{x64|arm64}.zip
+./gradlew appImageZip       # build/distributions/veylon-0.9.0-macos-{x64|arm64}.zip
 ./gradlew releaseArtifacts
 ```
 
@@ -222,7 +226,7 @@ See [CHANGELOG.md](CHANGELOG.md) for release notes.
 Run the fat JAR with the same JVM options used by the packaged launchers:
 
 ```powershell
-java --enable-native-access=ALL-UNNAMED -Xmx2G -jar build\libs\veylon-0.8.1-all.jar
+java --enable-native-access=ALL-UNNAMED -Xmx2G -jar build\libs\veylon-0.9.0-all.jar
 ```
 
 ---
