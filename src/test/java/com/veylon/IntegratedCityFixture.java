@@ -77,7 +77,17 @@ public final class IntegratedCityFixture {
 
     /** Builds the fixture: about a game day of history, ending with the survivor at home. */
     public static Built build() {
-        Game g = session();
+        return build(session());
+    }
+
+    /**
+     * Builds the fixture on a fresh Survival session of the fixture's city however it was made: by
+     * {@link #session()} or by NEW FRONTIER's defaults (urban milestone 26).
+     */
+    public static Built build(Game g) {
+        if (g.world.seed != SEED || g.world.generatorVersion != GENERATOR) {
+            throw new IllegalArgumentException("the fixture needs seed " + SEED + " on generator " + GENERATOR);
+        }
         BuildingPlan flat = RefugeWorldArena.neighbour(g);
         g.player.inventory.add(ItemType.IRON_PICKAXE, 1);
 
