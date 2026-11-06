@@ -67,6 +67,19 @@ class CityOnboardingScreensTest {
     }
 
     @Test
+    void aCityDeathCardSaysWhereTheSurvivorWakes() {
+        assertEquals("THE CITY CLAIMS YOU", PresentationOverlay.deathText(true)[0]);
+        assertTrue(PresentationOverlay.deathText(true)[1].contains("refuge"), "a city respawns at its refuge (D-178)");
+        assertFalse(PresentationOverlay.deathText(true)[1].contains("crash site"));
+        assertTrue(PresentationOverlay.deathText(false)[1].contains("crash site"), "the wilderness card is unchanged");
+        ToDoubleFunction<String> line = regular(1.35f);
+        for (boolean city : new boolean[]{true, false}) {
+            assertTrue(line.applyAsDouble(PresentationOverlay.deathText(city)[1]) <= 820,
+                    "fits an 853-wide screen: " + PresentationOverlay.deathText(city)[1]);
+        }
+    }
+
+    @Test
     void thePauseMenuKeepsTheWildernessReferenceAndGivesACityItsOwn() {
         String[] wild = PauseMenu.controls(false, false);
         assertTrue(Arrays.stream(wild).anyMatch(l -> l.contains("Repair the distress beacon")), "historical worlds unchanged");

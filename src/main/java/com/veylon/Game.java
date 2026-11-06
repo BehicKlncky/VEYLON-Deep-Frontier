@@ -518,7 +518,7 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
             simulationPanel.render(this);
         }
         if (appState == AppState.DEATH) {
-            PresentationOverlay.death(ui, deathTimer);
+            PresentationOverlay.death(ui, deathTimer, world.urban != null && world.urban.hasStarter());
         } else if (appState == AppState.VICTORY) {
             PresentationOverlay.victory(ui, totalTime, creativeMarked(), world.isUrban());
         }

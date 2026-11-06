@@ -25,13 +25,23 @@ public final class PresentationOverlay {
     }
 
     public static void death(UiRenderer ui, float secondsRemaining) {
+        death(ui, secondsRemaining, false);
+    }
+
+    /** The death card's title and line: a city's survivor wakes at their refuge, not a crash site. */
+    public static String[] deathText(boolean urban) {
+        return urban
+                ? new String[]{"THE CITY CLAIMS YOU", "You wake at your refuge, with what you carried."}
+                : new String[]{"THE FRONTIER CLAIMS YOU", "Your emergency transponder recalls you to the crash site."};
+    }
+
+    /** The death card; in a city ({@code urban}) it says where the survivor wakes (P-08, D-178). */
+    public static void death(UiRenderer ui, float secondsRemaining, boolean urban) {
         int w = ui.screenW(), h = ui.screenH();
+        String[] text = deathText(urban);
         ui.rect(0, 0, w, h, 0.08f, 0.01f, 0.015f, 0.72f);
-        ui.textCentered(w / 2f, h / 2f - 54, 2.8f, "THE FRONTIER CLAIMS YOU",
-                0.88f, 0.52f, 0.48f, 1f);
-        ui.textCentered(w / 2f, h / 2f, 1.35f,
-                "Your emergency transponder recalls you to the crash site.",
-                0.86f, 0.82f, 0.78f, 1f);
+        ui.textCentered(w / 2f, h / 2f - 54, 2.8f, text[0], 0.88f, 0.52f, 0.48f, 1f);
+        ui.textCentered(w / 2f, h / 2f, 1.35f, text[1], 0.86f, 0.82f, 0.78f, 1f);
         ui.textCentered(w / 2f, h / 2f + 28, 1.1f,
                 "Respawn in " + Math.max(0, (int) Math.ceil(secondsRemaining)) + "  /  Enter to continue",
                 0.62f, 0.64f, 0.68f, 1f);
