@@ -217,6 +217,32 @@ class CorruptSaveResilienceTest {
         assertEquals(liveHealth, target.player.health);
     }
 
+    /**
+     * Urban package 25: a count beyond what any load accepts is refused by the writer, since publishing
+     * it would replace the last good save with a file nothing can open; at the limit it saves and loads.
+     */
+    @Test
+    void aSnapshotNoLoadWouldAcceptIsNeverPublished(@TempDir Path dir) throws IOException {
+        Game game = new Game();
+        game.newWorld(40_114L, true);
+        Path save = dir.resolve("limit.dat");
+        assertTrue(SaveSystem.save(game, save));
+        byte[] complete = Files.readAllBytes(save);
+        for (int i = 0; i <= 100_000; i++) {
+            game.world.discoveredPois.add(new Vec3i(i, 64, -i));
+        }
+        assertFalse(SaveSystem.save(game, save), "100,001 discovered places is more than a load reads");
+        assertArrayEquals(complete, Files.readAllBytes(save), "the last complete save is untouched");
+        try (var files = Files.list(dir)) {
+            assertEquals(java.util.List.of(save), files.toList(), "and no temporary file is left beside it");
+        }
+        game.world.discoveredPois.remove(new Vec3i(0, 64, 0));
+        assertTrue(SaveSystem.save(game, save), "at the reader's limit the save is published");
+        Game target = new Game();
+        assertTrue(SaveSystem.load(target, save));
+        assertEquals(100_000, target.world.discoveredPois.size());
+    }
+
     @Test
     void unsupportedGeneratorVersionIsRejectedBeforeWorldReplacement(@TempDir Path dir)
             throws IOException {

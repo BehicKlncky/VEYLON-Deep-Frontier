@@ -173,14 +173,14 @@ public final class SaveSystem {
                 out.writeInt(p.hotbarSel);
 
                 // Afflictions.
-                out.writeInt(p.afflictions.size());
+                writeCount(out, p.afflictions.size(), MAX_SERIALIZED_ENTRIES, "affliction");
                 for (var e : p.afflictions.entrySet()) {
                     out.writeInt(e.getKey().ordinal());
                     out.writeFloat(e.getValue());
                 }
 
                 // Blueprints.
-                out.writeInt(p.blueprints.size());
+                writeCount(out, p.blueprints.size(), MAX_SERIALIZED_ENTRIES, "blueprint");
                 for (String id : p.blueprints) {
                     out.writeUTF(id);
                 }
@@ -191,28 +191,29 @@ public final class SaveSystem {
                 }
 
                 // Changed blocks.
-                out.writeInt(g.world.changedBlocks.size());
+                writeCount(out, g.world.changedBlocks.size(), MAX_SERIALIZED_BLOCK_EDITS, "changed block");
                 for (Map.Entry<Vec3i, Byte> e : g.world.changedBlocks.entrySet()) {
                     writeVec(out, e.getKey());
                     out.writeByte(e.getValue());
                 }
 
                 // Campfire fuel.
-                out.writeInt(g.world.campfireFuel.size());
+                writeCount(out, g.world.campfireFuel.size(), MAX_SERIALIZED_ENTRIES, "campfire");
                 for (Map.Entry<Vec3i, Float> e : g.world.campfireFuel.entrySet()) {
                     writeVec(out, e.getKey());
                     out.writeFloat(e.getValue());
                 }
 
                 // Crates.
-                out.writeInt(g.world.crateContents.size());
+                writeCount(out, g.world.crateContents.size(), com.veylon.world.urban.UrbanContainers.manages(g.world)
+                        ? com.veylon.world.urban.UrbanContainers.MAX_ENTRIES : MAX_SERIALIZED_ENTRIES, "crate");
                 for (Map.Entry<Vec3i, Inventory> e : g.world.crateContents.entrySet()) {
                     writeVec(out, e.getKey());
                     writeInventory(out, e.getValue());
                 }
 
                 // Drying racks.
-                out.writeInt(g.world.rackBatches.size());
+                writeCount(out, g.world.rackBatches.size(), MAX_SERIALIZED_ENTRIES, "drying rack");
                 for (Map.Entry<Vec3i, RackBatch> e : g.world.rackBatches.entrySet()) {
                     writeVec(out, e.getKey());
                     out.writeInt(e.getValue().input.ordinal());
@@ -221,14 +222,14 @@ public final class SaveSystem {
                 }
 
                 // Rain collectors.
-                out.writeInt(g.world.collectorWater.size());
+                writeCount(out, g.world.collectorWater.size(), MAX_SERIALIZED_ENTRIES, "rain collector");
                 for (Map.Entry<Vec3i, Float> e : g.world.collectorWater.entrySet()) {
                     writeVec(out, e.getKey());
                     out.writeFloat(e.getValue());
                 }
 
                 // Discovered POIs.
-                out.writeInt(g.world.discoveredPois.size());
+                writeCount(out, g.world.discoveredPois.size(), MAX_SERIALIZED_ENTRIES, "discovered POI");
                 for (Vec3i pos : g.world.discoveredPois) {
                     writeVec(out, pos);
                 }
@@ -266,7 +267,7 @@ public final class SaveSystem {
 
                 // NPCs (v3 appends residency/loadout fields per entry).
                 List<Npc> npcs = g.entities.npcs;
-                out.writeInt(npcs.size());
+                writeCount(out, npcs.size(), MAX_SERIALIZED_ENTRIES, "NPC");
                 for (Npc n : npcs) {
                     out.writeUTF(n.name);
                     out.writeFloat(n.pos.x);
@@ -292,7 +293,7 @@ public final class SaveSystem {
 
                 // Creatures.
                 List<Creature> creatures = g.entities.creatures;
-                out.writeInt(creatures.size());
+                writeCount(out, creatures.size(), MAX_SERIALIZED_ENTRIES, "creature");
                 for (Creature c : creatures) {
                     out.writeInt(c.type.ordinal());
                     out.writeFloat(c.pos.x);
@@ -304,7 +305,7 @@ public final class SaveSystem {
                 }
 
                 // Carcasses.
-                out.writeInt(g.entities.carcasses.size());
+                writeCount(out, g.entities.carcasses.size(), MAX_SERIALIZED_ENTRIES, "carcass");
                 for (Carcass c : g.entities.carcasses) {
                     out.writeInt(c.type.ordinal());
                     out.writeFloat(c.pos.x);
@@ -316,7 +317,7 @@ public final class SaveSystem {
                 }
 
                 // Active events.
-                out.writeInt(g.events.active.size());
+                writeCount(out, g.events.active.size(), MAX_SERIALIZED_ENTRIES, "active event");
                 for (EventSystem.ActiveEvent e : g.events.active) {
                     out.writeInt(e.type.ordinal());
                     out.writeFloat(e.remaining);
@@ -325,7 +326,7 @@ public final class SaveSystem {
 
                 // Event log tail.
                 List<String> log = g.eventLog.recent(30);
-                out.writeInt(log.size());
+                writeCount(out, log.size(), MAX_SERIALIZED_ENTRIES, "event log line");
                 for (String s : log) {
                     out.writeUTF(s);
                 }
@@ -345,6 +346,12 @@ public final class SaveSystem {
                     out.writeFloat(e.getValue());
                 }
                 writeV3Extension(out, g, npcs);
+                // A file larger than any load reads would replace the last good save with one
+                // nothing can open; refuse it like any other invalid snapshot.
+                if (out.size() > MAX_SAVE_BYTES) {
+                    throw new IOException("save of " + out.size() + " bytes exceeds the "
+                            + MAX_SAVE_BYTES + " a load reads");
+                }
                 out.flush();
                 channel.force(true);
             }
@@ -739,7 +746,7 @@ public final class SaveSystem {
         // Urban survivor sites are written by urban.sites (milestone 16), never by the legacy codec.
         List<Settlement> settlements = g.world.settlements.values().stream()
                 .filter(s -> !(s instanceof com.veylon.settlement.UrbanSite)).toList();
-        out.writeInt(settlements.size());
+        writeCount(out, settlements.size(), MAX_SERIALIZED_ENTRIES, "settlements");
         for (Settlement s : settlements) {
             out.writeInt(s.regionX);
             out.writeInt(s.regionZ);
@@ -758,7 +765,7 @@ public final class SaveSystem {
             out.writeBoolean(s.occupied);
             out.writeFloat(s.counterattackTimer);
             out.writeFloat(s.replenishTimer);
-            out.writeInt(s.residents.size());
+            writeCount(out, s.residents.size(), MAX_SERIALIZED_ENTRIES, "settlement residents");
             for (Settlement.Resident r : s.residents) {
                 out.writeUTF(r.name);
                 out.writeUTF(r.archetype.id);
@@ -846,12 +853,12 @@ public final class SaveSystem {
     }
 
     private static void writeFactionState(DataOutputStream out, Game g) throws IOException {
-        out.writeInt(g.world.factionReputation.size());
+        writeCount(out, g.world.factionReputation.size(), MAX_SERIALIZED_ENTRIES, "faction reputation entries");
         for (Map.Entry<String, Float> e : g.world.factionReputation.entrySet()) {
             out.writeUTF(e.getKey());
             out.writeFloat(e.getValue());
         }
-        out.writeInt(g.world.factionBounty.size());
+        writeCount(out, g.world.factionBounty.size(), MAX_SERIALIZED_ENTRIES, "faction bounty entries");
         for (Map.Entry<String, Float> e : g.world.factionBounty.entrySet()) {
             out.writeUTF(e.getKey());
             out.writeFloat(e.getValue());
@@ -881,7 +888,7 @@ public final class SaveSystem {
         out.writeInt(V3_EXTENSION_MAGIC);
         out.writeInt(V3_EXTENSION_VERSION);
 
-        out.writeInt(g.world.gateTimers.size());
+        writeCount(out, g.world.gateTimers.size(), MAX_SERIALIZED_ENTRIES, "gate timers");
         for (Map.Entry<Vec3i, Float> entry : g.world.gateTimers.entrySet()) {
             writeVec(out, entry.getKey());
             out.writeFloat(entry.getValue());
@@ -889,7 +896,7 @@ public final class SaveSystem {
 
         List<Settlement> legacySettlements = g.world.settlements.values().stream()
                 .filter(s -> !(s instanceof com.veylon.settlement.UrbanSite)).toList();
-        out.writeInt(legacySettlements.size());
+        writeCount(out, legacySettlements.size(), MAX_SERIALIZED_ENTRIES, "extended settlements");
         for (Settlement s : legacySettlements) {
             out.writeLong(s.id);
             out.writeBoolean(s.commandNeutralized);
@@ -898,7 +905,7 @@ public final class SaveSystem {
             out.writeBoolean(s.rumored);
             out.writeLong(s.dormantStep);
             out.writeFloat(s.dormantAccumulator);
-            out.writeInt(s.residents.size());
+            writeCount(out, s.residents.size(), MAX_SERIALIZED_ENTRIES, "extended residents");
             for (Settlement.Resident resident : s.residents) {
                 out.writeBoolean(resident.routed);
                 out.writeBoolean(resident.surrendered);
@@ -908,7 +915,7 @@ public final class SaveSystem {
             }
         }
 
-        out.writeInt(npcs.size());
+        writeCount(out, npcs.size(), MAX_SERIALIZED_ENTRIES, "extended NPCs");
         for (Npc npc : npcs) {
             out.writeUTF(npc.partyFactionId == null ? "" : npc.partyFactionId);
             out.writeLong(npc.originSettlementId);
@@ -993,6 +1000,20 @@ public final class SaveSystem {
 
     static int readCount(DataInputStream in, String label) throws IOException {
         return readCount(in, label, MAX_SERIALIZED_ENTRIES);
+    }
+
+    /**
+     * Writes an entry count the reader bounds with {@link #readCount}, refusing one it would reject.
+     * Publishing such a save would replace the last good one with a file no load accepts, so the
+     * write fails instead and the previous save stays (urban package 25).
+     */
+    private static void writeCount(DataOutputStream out, int count, int max, String label)
+            throws IOException {
+        if (count > max) {
+            throw new IOException("too many " + label + " entries to save: " + count
+                    + "; a load accepts " + max);
+        }
+        out.writeInt(count);
     }
 
     /**
@@ -1132,7 +1153,7 @@ public final class SaveSystem {
     }
 
     private static void writeInventory(DataOutputStream out, Inventory inv) throws IOException {
-        out.writeInt(inv.size());
+        writeCount(out, inv.size(), PlayerConstants.INVENTORY_SLOTS, "inventory slot");
         for (int i = 0; i < inv.size(); i++) {
             writeStack(out, inv.get(i));
         }
