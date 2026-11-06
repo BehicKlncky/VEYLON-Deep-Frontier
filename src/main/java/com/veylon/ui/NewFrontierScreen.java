@@ -146,7 +146,9 @@ public final class NewFrontierScreen {
         boolean click = g.input.wasMousePressed(GLFW_MOUSE_BUTTON_LEFT);
         float cardW = Math.min(CARD_MAX_W, (w - 96 - CARD_GAP) / 2f);
         float left = w / 2f - cardW - CARD_GAP / 2f;
-        float tabY = h * 0.12f + 64;
+        // Where the title's rule stood, so the tabs keep their place among the title and the
+        // cards at every interface scale, but never on the line above them.
+        float tabY = Math.max(h * 0.12f + 62, h * 0.24f - TAB_H / 2f);
         for (int i = 0; i < 2; i++) {
             boolean cityTab = i == 0;
             float x = left + i * (cardW + CARD_GAP);

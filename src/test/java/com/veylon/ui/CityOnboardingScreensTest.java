@@ -67,15 +67,16 @@ class CityOnboardingScreensTest {
         for (String tab : new String[]{NewFrontierScreen.CITY_TITLE, NewFrontierScreen.WILDERNESS_TITLE}) {
             assertTrue(card.applyAsDouble(tab) <= 300, "fits a 320-wide tab: " + tab);
         }
-        // The narrowest screen drawn: 1280 x 720 at interface scale 1.5 is 853 units wide.
+        // Kept within 820 units: UiRenderer never draws fewer than 720 logical rows, so a 16:9
+        // screen is at least 1280 units wide, and a 4:3 one 960.
         ToDoubleFunction<String> note = regular(1.1f), notice = regular(1.2f), keys = regular(1.05f);
         for (String line : new String[]{NewFrontierScreen.CITY_NOTE, NewFrontierScreen.WILDERNESS_NOTE}) {
-            assertTrue(note.applyAsDouble(line) <= 820, "fits an 853-wide screen: " + line);
+            assertTrue(note.applyAsDouble(line) <= 820, "fits within 820 units: " + line);
         }
         for (String line : new String[]{NewFrontierScreen.REPLACE_NOTICE, NewFrontierScreen.CITY_REPLACE_NOTICE}) {
-            assertTrue(notice.applyAsDouble(line) <= 820, "fits an 853-wide screen: " + line);
+            assertTrue(notice.applyAsDouble(line) <= 820, "fits within 820 units: " + line);
         }
-        assertTrue(keys.applyAsDouble(NewFrontierScreen.KEYS) <= 820, "fits an 853-wide screen: " + NewFrontierScreen.KEYS);
+        assertTrue(keys.applyAsDouble(NewFrontierScreen.KEYS) <= 820, "fits within 820 units: " + NewFrontierScreen.KEYS);
     }
 
     @Test
@@ -87,7 +88,7 @@ class CityOnboardingScreensTest {
         ToDoubleFunction<String> line = regular(1.35f);
         for (boolean city : new boolean[]{true, false}) {
             assertTrue(line.applyAsDouble(PresentationOverlay.deathText(city)[1]) <= 820,
-                    "fits an 853-wide screen: " + PresentationOverlay.deathText(city)[1]);
+                    "fits within 820 units: " + PresentationOverlay.deathText(city)[1]);
         }
     }
 
