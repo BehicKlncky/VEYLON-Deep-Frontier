@@ -68,6 +68,8 @@ final class AutomatedRunDriver {
     private static final int MAX_SCENE_CAPTURES = 16;
     private boolean sceneSession;
     private boolean finishAfterCaptures;
+    /** The native default-path route ({@code VEYLON_FRONTEND=route}), or null. */
+    private FrontendRouteQa frontendRoute;
     private final Path smokeSave =
             AppPaths.dataDirectory().resolve("build/qa/smoke-save.dat");
 
@@ -109,7 +111,13 @@ final class AutomatedRunDriver {
             game.appState = Game.AppState.TITLE;
             game.window.captureCursor(false, game.input);
             if (frontendQa) {
-                game.frontend.openForQa(frontendScreen.trim().toLowerCase(Locale.ROOT));
+                String screen = frontendScreen.trim().toLowerCase(Locale.ROOT);
+                if (FrontendRouteQa.names(screen)) {
+                    frontendRoute = new FrontendRouteQa(game, this, screen,
+                            configuredGameMode(System.getenv("VEYLON_GAME_MODE")));
+                } else {
+                    game.frontend.openForQa(screen);
+                }
             }
         }
 
@@ -231,7 +239,7 @@ final class AutomatedRunDriver {
 
     /** A scripted scene asks for a labelled capture of the frame about to render; inert headless. */
     void requestCapture(String label) {
-        if (sceneSession && sceneCaptures.size() < MAX_SCENE_CAPTURES) {
+        if ((sceneSession || frontendRoute != null) && sceneCaptures.size() < MAX_SCENE_CAPTURES) {
             sceneCaptures.add(label.replaceAll("[^A-Za-z0-9._-]", "_"));
         }
     }
@@ -278,6 +286,9 @@ final class AutomatedRunDriver {
     /** Advances the scripted smoke session; inert outside a smoke run. */
     void advanceSmokeRun(double now) {
         double elapsed = now - sessionStart;
+        if (frontendRoute != null) {
+            frontendRoute.advance(elapsed);
+        }
         if (smoke) game.creativeQa.sampleBody();
         if (!smoke || game.world == null || game.appState != Game.AppState.PLAYING) {
             return;

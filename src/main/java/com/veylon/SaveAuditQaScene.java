@@ -108,6 +108,11 @@ final class SaveAuditQaScene extends UrbanRouteScene {
      * what they hold, the mode and its controls, and the city's or the wilderness's records.
      */
     List<String> durable() {
+        return durable(game);
+    }
+
+    /** {@link #durable()} of any live session; the native frontend route compares its saves by it. */
+    static List<String> durable(Game game) {
         List<String> out = new ArrayList<>();
         World w = game.world;
         out.add("world seed=" + w.seed + " generator=" + w.generatorVersion + " mode=" + game.gameMode()
@@ -138,7 +143,7 @@ final class SaveAuditQaScene extends UrbanRouteScene {
         return out;
     }
 
-    private static String contents(Inventory inv) {
+    static String contents(Inventory inv) {
         StringBuilder out = new StringBuilder();
         for (int i = 0; i < inv.size(); i++) {
             ItemStack s = inv.get(i);
