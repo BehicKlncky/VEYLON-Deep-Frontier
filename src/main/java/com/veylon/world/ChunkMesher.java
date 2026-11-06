@@ -5,6 +5,11 @@ import com.veylon.gfx.MaterialRegistry;
 import com.veylon.gfx.MaterialRegistry.BlockMaterial;
 import com.veylon.gfx.MaterialRegistry.TintMode;
 import com.veylon.util.FloatList;
+import com.veylon.world.urban.StreetNetwork;
+import com.veylon.world.urban.UrbanDatum;
+import com.veylon.world.urban.UrbanDistrict;
+import com.veylon.world.urban.UrbanDressing;
+import com.veylon.world.urban.UrbanTraces;
 
 /**
  * Builds chunk meshes with hidden-face removal, per-vertex ambient occlusion,
@@ -53,6 +58,8 @@ public class ChunkMesher {
     private final float[] faceAo = new float[4];
     private final float[] faceSky = new float[4];
     private final float[] faceBlock = new float[4];
+    /** Scratch box for {@link FixtureGeometry#thinBox}. */
+    private final float[] thinBox = new float[6];
     private static final int[] QUAD_ORDER = {0, 1, 2, 0, 2, 3};
     private static final int[] FLIPPED_QUAD_ORDER = {1, 2, 3, 1, 3, 0};
 
@@ -64,8 +71,64 @@ public class ChunkMesher {
     private final byte[] lightSet = new byte[CW * CH * CW];
     private int baseX, baseZ;
     private World world;
+    /**
+     * Whether any light block stands in the 5 x 5 chunks around the one being built. A light reaches
+     * at most 11.25 blocks ({@code World.blockLight}), less than a chunk, so with none there every
+     * cached cell's block light is exactly 0 and is not asked of the world. Most city chunks have no
+     * emitter near them, and the world's answer walks nine chunks' light lists for every cell
+     * (urban milestone 24).
+     */
+    private boolean lightsNear;
+
+    // Urban milestone 22 dressing: district grade and wall decals in generated cities.
+    private boolean dressing;
+    private int decals;
+    /** The traces people left on this chunk's walls (UrbanTraces), gathered once per build. */
+    private final java.util.List<UrbanTraces.Trace> traces = new java.util.ArrayList<>();
+    private final float[] grade = new float[3];
+    private final UrbanDistrict[] districts = new UrbanDistrict[Chunk.SX * Chunk.SZ];
+    private final boolean[] districtKnown = new boolean[Chunk.SX * Chunk.SZ];
+    /** How far a decal stands off its wall, in blocks: clear of depth fighting, too thin to see edge-on. */
+    private static final float DECAL_OFFSET = 0.012f;
 
     public void buildChunk(World world, Chunk c) {
+        tessellate(world, c);
+        if (c.meshOpaque == null) {
+            c.meshOpaque = new Mesh(ATTRIBS);
+            c.meshesCreated();
+        }
+        if (c.meshWater == null) {
+            c.meshWater = new Mesh(WATER_ATTRIBS);
+        }
+        c.meshOpaque.upload(opaque.array(), opaque.size());
+        c.meshWater.upload(water.array(), water.size());
+        c.dirty = false;
+    }
+
+    /** Floats the last {@link #tessellate} wrote for the opaque and water meshes. */
+    public int opaqueFloats() { return opaque.size(); }
+    public int waterFloats() { return water.size(); }
+
+    /** A 64-bit hash of every float the last {@link #tessellate} wrote, for meshing regression tests. */
+    public long fingerprint() {
+        return hash(hash(0xcbf29ce484222325L, opaque), water);
+    }
+
+    private static long hash(long h, FloatList list) {
+        float[] data = list.array();
+        h = (h ^ list.size()) * 0x100000001b3L;
+        for (int i = 0; i < list.size(); i++) {
+            h = (h ^ Float.floatToRawIntBits(data[i])) * 0x100000001b3L;
+        }
+        return h;
+    }
+
+    /**
+     * The CPU half of a rebuild: fills this mesher's vertex lists for one chunk and touches no
+     * GL state, so a headless measurement can time city meshing ({@link #buildChunk} uploads).
+     * It needs {@link MaterialRegistry} registered, by {@code init} or {@code initCatalog}.
+     */
+    public void tessellate(World world, Chunk c) {
         this.world = world;
         opaque.clear();
         water.clear();
@@ -73,6 +136,15 @@ public class ChunkMesher {
         baseZ = c.cz * Chunk.SZ;
         java.util.Arrays.fill(solidCache, (byte) 0);
         java.util.Arrays.fill(lightSet, (byte) 0);
+        lightsNear = lightsAround(world, c.cx, c.cz);
+        dressing = world.urban != null && world.urban.hasGeneratedBuildings();
+        decals = 0;
+        java.util.Arrays.fill(districtKnown, false);
+        traces.clear();
+        if (dressing) {
+            UrbanTraces.collect(world.urban, StreetNetwork.regionOf(baseX), StreetNetwork.regionOf(baseZ),
+                    baseX, baseZ, baseX + Chunk.SX - 1, baseZ + Chunk.SZ - 1, traces);
+        }
 
         for (int y = 0; y < Chunk.SY; y++) {
             for (int lz = 0; lz < Chunk.SZ; lz++) {
@@ -95,6 +167,18 @@ public class ChunkMesher {
                                         wx, y, wz, lit ? 1f : 0.55f,
                                         lit ? 1f : 0.58f, lit ? 1f : 0.62f);
                                 box(wx + 0.40f, y + 0.52f, wz + 0.40f, wx + 0.60f, y + 0.62f, wz + 0.60f,
+                                        layer("anvil_metal"), wx, y, wz, 1f, 1f, 1f);
+                            } else if (t == BlockType.ELECTRIC_LAMP) {
+                                // Milestone 19: a work lamp on a short stand, its dome lit only while fed.
+                                boolean lit = world.isLampLit(wx, y, wz);
+                                box(wx + 0.34f, y, wz + 0.34f, wx + 0.66f, y + 0.08f, wz + 0.66f,
+                                        layer("anvil_metal"), wx, y, wz, 1f, 1f, 1f);
+                                box(wx + 0.47f, y + 0.08f, wz + 0.47f, wx + 0.53f, y + 0.34f, wz + 0.53f,
+                                        layer("anvil_metal"), wx, y, wz, 1f, 1f, 1f);
+                                box(wx + 0.32f, y + 0.34f, wz + 0.32f, wx + 0.68f, y + 0.62f, wz + 0.68f,
+                                        layer(lit ? "lantern_glass" : "lantern_glass_unlit"),
+                                        wx, y, wz, lit ? 1f : 0.55f, lit ? 1f : 0.58f, lit ? 1f : 0.62f);
+                                box(wx + 0.30f, y + 0.62f, wz + 0.30f, wx + 0.70f, y + 0.67f, wz + 0.70f,
                                         layer("anvil_metal"), wx, y, wz, 1f, 1f, 1f);
                             } else if (t == BlockType.TRAIL_MARKER) {
                                 box(wx + 0.46f, y, wz + 0.46f, wx + 0.54f, y + 0.55f, wz + 0.54f,
@@ -121,7 +205,8 @@ public class ChunkMesher {
                         }
                         case PANEL -> {
                             BlockMaterial m = MaterialRegistry.of(t);
-                            float ph = t == BlockType.ANVIL ? 0.55f : (t == BlockType.CAMP_BED ? 0.40f : 0.18f);
+                            float ph = t == BlockType.ANVIL ? 0.55f : t == BlockType.CAMP_BED ? 0.40f
+                                    : t == BlockType.DEBRIS ? 0.06f : 0.18f;
                             box(wx + 0.06f, y, wz + 0.06f, wx + 0.94f, y + ph, wz + 0.94f,
                                     m.topLayer[0], wx, y, wz, 1f, 1f, 1f);
                             if (t == BlockType.BEDROLL || t == BlockType.CAMP_BED) {
@@ -164,6 +249,9 @@ public class ChunkMesher {
                                     layer("water_still"), wx, y, wz, 0.7f, 0.85f, 1f);
                         }
                         case LIQUID -> emitWater(wx, y, wz);
+                        case LEAF, PANE -> emitThin(t, wx, y, wz);
+                        case TABLE -> emitTable(t, wx, y, wz);
+                        case STAIRS -> emitStairs(t, wx, y, wz);
                         case NONE -> {
                         }
                     }
@@ -171,15 +259,6 @@ public class ChunkMesher {
             }
         }
 
-        if (c.meshOpaque == null) {
-            c.meshOpaque = new Mesh(ATTRIBS);
-        }
-        if (c.meshWater == null) {
-            c.meshWater = new Mesh(WATER_ATTRIBS);
-        }
-        c.meshOpaque.upload(opaque.array(), opaque.size());
-        c.meshWater.upload(water.array(), water.size());
-        c.dirty = false;
         this.world = null;
     }
 
@@ -202,22 +281,39 @@ public class ChunkMesher {
     private boolean opaqueAt(int x, int y, int z) {
         int i = cidx(x, y, z);
         if (i < 0) {
-            return world.getBlock(x, y, z).opaque;
+            return occludesFace(world.getBlock(x, y, z));
         }
         byte v = solidCache[i];
         if (v == 0) {
-            v = world.getBlock(x, y, z).opaque ? (byte) 1 : (byte) 2;
+            v = occludesFace(world.getBlock(x, y, z)) ? (byte) 1 : (byte) 2;
             solidCache[i] = v;
         }
         return v == 1;
     }
 
+    private static boolean occludesFace(BlockType block) {
+        // Thin closed doors still block world light, but leave the jamb faces visible.
+        return block.opaque && !FixtureGeometry.isThin(block);
+    }
+
     private void ensureLight(int x, int y, int z, int i) {
         if (lightSet[i] == 0) {
             skyCache[i] = world.skyLight(x, y, z);
-            blockCache[i] = world.blockLight(x, y, z);
+            // A cached cell lies within one block of the chunk, so every light World.blockLight
+            // would weigh for it stands in the 5 x 5 chunks lightsNear looked at.
+            blockCache[i] = lightsNear ? world.blockLight(x, y, z) : 0f;
             lightSet[i] = 1;
         }
+    }
+
+    private static boolean lightsAround(World world, int cx, int cz) {
+        for (int dx = -2; dx <= 2; dx++) {
+            for (int dz = -2; dz <= 2; dz++) {
+                Chunk n = world.getChunk(cx + dx, cz + dz);
+                if (n != null && !n.lights.isEmpty()) { return true; }
+            }
+        }
+        return false;
     }
 
     private float skyAt(int x, int y, int z) {
@@ -247,11 +343,18 @@ public class ChunkMesher {
         int variant = m.variantOf(x, y, z);
         // Subtle per-block value jitter breaks up large same-material areas.
         float jitter = 0.95f + hash(x, y, z) * 0.1f;
-
+        boolean dress = dressing && UrbanDressing.dressed(t);
+        UrbanDistrict district = dress ? districtAt(x, z) : null;
         for (int d = 0; d < 6; d++) {
             int[] n = NORMAL[d];
             int nx = x + n[0], ny = y + n[1], nz = z + n[2];
             if (opaqueAt(nx, ny, nz)) {
+                continue;
+            }
+            if ((t == BlockType.WINDOW || t == BlockType.RAILING) && world.getBlock(nx, ny, nz) == t) {
+                // Panes of one opening share faces; drawing them would put a
+                // sheet of glass inside the window at an angle. A run of rail
+                // likewise reads as one rail, not a row of cages.
                 continue;
             }
             int layer = switch (d) {
@@ -263,7 +366,59 @@ public class ChunkMesher {
             if (m.tint == TintMode.FOLIAGE || (m.tint == TintMode.GRASS_TOP && d == 0)) {
                 flags |= FLAG_FOLIAGE;
             }
-            emitFace(d, x, y, z, layer, flags, jitter, jitter, jitter);
+            if (!dress) {
+                emitFace(d, x, y, z, layer, flags, jitter, jitter, jitter);
+                continue;
+            }
+            // A generated city's surfaces wear their district (urban milestone 22): a grade on
+            // the face, and now and then a decal laid over a wall. Presentation only.
+            boolean exterior = skyAt(nx, ny, nz) >= 0.99f;
+            UrbanDressing.grade(district, t, d, y, exterior, grade);
+            emitFace(d, x, y, z, layer, flags, jitter * grade[0], jitter * grade[1], jitter * grade[2]);
+            if (decals < UrbanDressing.MAX_DECALS_PER_CHUNK) {
+                UrbanTraces.Trace trace = traceOn(t, x, y, z, d);
+                UrbanDressing.Decal decal = trace != null ? null : UrbanDressing.decal(district, t, d, x, y, z,
+                        exterior, opaqueAt(nx, UrbanDatum.STREET_Y, nz));
+                if (trace != null || decal != null) {
+                    emitDecal(d, layer(trace != null ? trace.kind().tile() : decal.tile()), jitter);
+                    decals++;
+                }
+            }
+        }
+    }
+
+    /** The trace on a wall face of this chunk, or null; walls only, so a broken-out wall loses its mark. */
+    private UrbanTraces.Trace traceOn(BlockType t, int x, int y, int z, int d) {
+        if (traces.isEmpty() || y != UrbanTraces.EYE_Y
+                || (t != BlockType.BRICK && t != BlockType.PLASTER && t != BlockType.CONCRETE)) { return null; }
+        for (int i = 0; i < traces.size(); i++) {
+            if (traces.get(i).on(x, y, z, d)) { return traces.get(i); }
+        }
+        return null;
+    }
+
+    /** The district of a column of this chunk, read once per build from the pure plan. */
+    private UrbanDistrict districtAt(int x, int z) {
+        int i = (z - baseZ) * Chunk.SX + (x - baseX);
+        if (!districtKnown[i]) {
+            districts[i] = world.urban.districtAt(x, z);
+            districtKnown[i] = true;
+        }
+        return districts[i];
+    }
+
+    /**
+     * A decal over the face {@link #emitFace} just wrote, standing {@value #DECAL_OFFSET} blocks
+     * off it with the same corners, texture coordinates, light and occlusion.
+     */
+    private void emitDecal(int d, int layer, float shade) {
+        int[] n = NORMAL[d];
+        float ox = n[0] * DECAL_OFFSET, oy = n[1] * DECAL_OFFSET, oz = n[2] * DECAL_OFFSET;
+        boolean flip = faceAo[0] + faceAo[2] < faceAo[1] + faceAo[3];
+        int[] order = flip ? FLIPPED_QUAD_ORDER : QUAD_ORDER;
+        for (int oi : order) {
+            vertex(faceX[oi] + ox, faceY[oi] + oy, faceZ[oi] + oz, faceU[oi], faceV[oi], layer, d,
+                    faceSky[oi], faceBlock[oi], faceAo[oi], shade, shade, shade, 0);
         }
     }
 
@@ -343,6 +498,61 @@ public class ChunkMesher {
 
     private static int cornerAxis(int[] corner, int axis) {
         return corner[axis];
+    }
+
+    // ------------------------------------------------------------------
+    // Urban fixtures: door halves, thin leaves and panes, tables
+    // ------------------------------------------------------------------
+
+    /** The panel tile of a door cell: the upper panel when the cell below is the same door. */
+    private int doorLayer(BlockType t, int x, int y, int z) {
+        Fixtures.Kind kind = Fixtures.kindOf(t);
+        boolean upper = kind != null && Fixtures.kindOf(world.getBlock(x, y - 1, z)) == kind;
+        boolean metal = kind == Fixtures.Kind.METAL_DOOR;
+        return layer(metal ? (upper ? "door_metal_upper" : "door_metal_lower")
+                : (upper ? "door_wood_upper" : "door_wood_lower"));
+    }
+
+    /** Door panels, open leaves and broken frames, at exactly the box the raycast targets. */
+    private void emitThin(BlockType t, int x, int y, int z) {
+        if (!FixtureGeometry.thinBox(world, x, y, z, t, thinBox)) {
+            return;
+        }
+        Fixtures.Kind kind = Fixtures.kindOf(t);
+        int layer = kind != null && kind.door && kind != Fixtures.Kind.HIDDEN_PANEL
+                ? doorLayer(t, x, y, z) : MaterialRegistry.of(t).sideLayer[0];
+        box(thinBox[0], thinBox[1], thinBox[2], thinBox[3], thinBox[4], thinBox[5],
+                layer, x, y, z, 1f, 1f, 1f);
+    }
+
+    /** A table top on four legs; the collider is the whole cell, as for any solid block. */
+    private void emitTable(BlockType t, int x, int y, int z) {
+        BlockMaterial m = MaterialRegistry.of(t);
+        int top = m.topLayer[0];
+        int leg = m.sideLayer[0];
+        box(x, y + 0.84f, z, x + 1, y + 1, z + 1, top, x, y, z, 1f, 1f, 1f);
+        float a = 0.06f, b = 0.17f;
+        box(x + a, y, z + a, x + b, y + 0.84f, z + b, leg, x, y, z, 0.9f, 0.9f, 0.9f);
+        box(x + 1 - b, y, z + a, x + 1 - a, y + 0.84f, z + b, leg, x, y, z, 0.9f, 0.9f, 0.9f);
+        box(x + a, y, z + 1 - b, x + b, y + 0.84f, z + 1 - a, leg, x, y, z, 0.9f, 0.9f, 0.9f);
+        box(x + 1 - b, y, z + 1 - b, x + 1 - a, y + 0.84f, z + 1 - a, leg, x, y, z, 0.9f, 0.9f, 0.9f);
+    }
+
+    /** Two real treads. Internal faces are omitted; the upper riser starts at half height. */
+    private void emitStairs(BlockType t, int x, int y, int z) {
+        BlockMaterial m = MaterialRegistry.of(t);
+        float sky = skyAt(x, y + 1, z), blk = blockAt(x, y + 1, z);
+        for (int part = 0; part < 2; part++) {
+            for (int d = 0; d < 6; d++) {
+                boolean internal = d == StairGeometry.internalFace(t, part);
+                if (internal && part == 0) { continue; }
+                int tile = d == 0 ? m.topLayer[0] : d == 1 ? m.bottomLayer[0] : m.sideLayer[0];
+                boxFace(d, x + StairGeometry.minX(t, part), internal ? y + .5f : y,
+                        z + StairGeometry.minZ(t, part), x + StairGeometry.maxX(t, part),
+                        y + StairGeometry.height(part), z + StairGeometry.maxZ(t, part),
+                        tile, sky, blk, 1f, 1f, 1f);
+            }
+        }
     }
 
     // ------------------------------------------------------------------

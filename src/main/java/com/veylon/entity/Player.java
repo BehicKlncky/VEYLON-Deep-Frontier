@@ -9,7 +9,12 @@ import com.veylon.simulation.FireConstants;
 import com.veylon.simulation.ShelterSystem;
 import com.veylon.util.MathUtil;
 import com.veylon.world.Biome;
+import com.veylon.world.BlockType;
 import com.veylon.world.World;
+import com.veylon.world.urban.DistrictRules;
+import com.veylon.world.urban.StreetNetwork;
+import com.veylon.world.urban.UrbanDistrict;
+import com.veylon.world.urban.UrbanPlaces;
 
 import java.util.EnumMap;
 import java.util.HashSet;
@@ -28,6 +33,8 @@ public class Player extends Entity {
     /** Worn gear, indexed by {@link EquipSlot#ordinal()}. */
     public final ItemStack[] equipment = new ItemStack[EquipSlot.values().length];
     public int hotbarSel;
+    /** Discrete harm received (blows, falls, burns, blasts); over-time drains subtract health directly. */
+    public int harmEvents;
 
     public float hunger = MAX_NEED;
     public float thirst = MAX_NEED;
@@ -49,6 +56,13 @@ public class Player extends Entity {
     /** Cached environment readings, updated each fast tick. */
     public float envTemp = STARTING_ENV_TEMP;
     public Biome biome = Biome.MEADOW;
+    /** The six-district city's district underfoot (milestone 13); null in every other world. */
+    public UrbanDistrict district;
+    /** The district last announced or started in; a crossing is announced off the boundary avenue. */
+    private UrbanDistrict announcedDistrict;
+    /** The route place underfoot in a layout-ten city (milestone 14); NONE in every other world. */
+    public UrbanPlaces.Place place = UrbanPlaces.Place.NONE;
+    private int placeX = Integer.MIN_VALUE, placeY, placeZ;
     public boolean exposedToSky = true;
     /** Cached shelter evaluation (refreshed on the medium tick). */
     public ShelterSystem.Shelter shelter = ShelterSystem.OPEN;
@@ -240,7 +254,9 @@ public class Player extends Entity {
     /** Direct environmental damage shares the same body gate as weapon damage. */
     @Override
     public void hurt(float dmg, boolean byPlayer) {
-        if (!abilities.invulnerable()) super.hurt(dmg, byPlayer);
+        if (abilities.invulnerable()) return;
+        if (dmg > 0 && !dead) harmEvents++;
+        super.hurt(dmg, byPlayer);
     }
 
     @Override
@@ -287,13 +303,10 @@ public class Player extends Entity {
     public void tickNeeds(Game g, float dt) {
         int bx = (int) Math.floor(pos.x), bz = (int) Math.floor(pos.z);
         biome = world.biomeAt(bx, bz);
+        trackDistrict(g, bx, bz);
+        trackPlace(g, bx, (int) Math.floor(pos.y + 0.01f), bz);
         envTemp = g.temperature.envTempAt(g, pos.x, pos.y, pos.z);
-        int surface = 0;
-        var chunk = world.getChunk(Math.floorDiv(bx, 16), Math.floorDiv(bz, 16));
-        if (chunk != null) {
-            surface = chunk.height(Math.floorMod(bx, 16), Math.floorMod(bz, 16));
-        }
-        exposedToSky = pos.y + SKY_EXPOSURE_EYE_OFFSET >= surface;
+        exposedToSky = world.isSkyExposed(bx, (int) Math.floor(pos.y + SKY_EXPOSURE_EYE_OFFSET), bz);
 
         damageFlash = Math.max(0, damageFlash - DAMAGE_FLASH_DECAY_PER_SECOND * dt);
         noise = Math.max(0, noise - NOISE_DECAY_PER_SECOND * dt);
@@ -523,6 +536,78 @@ public class Player extends Entity {
     }
 
     /**
+     * Follows the district underfoot in a six-district city and, on crossing into another one,
+     * logs what it means: its name and what to expect there. The district the player starts or
+     * loads in is noted silently, so only real transitions are announced. Every district
+     * boundary runs down an avenue's centre line, so the announcement waits until the player
+     * steps off the avenue on the new side; drifting back and forth across the centre line
+     * changes the HUD but logs nothing.
+     */
+    private void trackDistrict(Game g, int bx, int bz) {
+        UrbanDistrict here = world.urban != null && world.urban.hasDistricts() ? world.urban.districtAt(bx, bz) : null;
+        district = here;
+        if (here == null || announcedDistrict == null) {
+            announcedDistrict = here;
+        } else if (here != announcedDistrict && !StreetNetwork.onBoundaryAvenue(bx, bz)) {
+            DistrictRules.Profile rules = DistrictRules.of(here);
+            g.log("Entering " + rules.displayName() + ". " + rules.arrival());
+            announcedDistrict = here;
+        }
+    }
+
+    /**
+     * Follows the route place underfoot (milestone 14) whenever the feet cell changes, and records
+     * a station or hidden cellar the first time the player stands in it, with one log line.
+     */
+    private void trackPlace(Game g, int x, int y, int z) {
+        if (x == placeX && y == placeY && z == placeZ) { return; }
+        placeX = x; placeY = y; placeZ = z;
+        UrbanPlaces.Observation seen = UrbanPlaces.at(world, x, y, z);
+        place = seen.place();
+        com.veylon.world.urban.UrbanVisits.observe(world, x, y, z); // what the map may label (urban 21)
+        if (seen.site() != 0 && world.urban.discovery.discover(seen.site())) {
+            g.log(UrbanPlaces.discoveryLine(seen.place()));
+        }
+        if (seen.place() == UrbanPlaces.Place.HIDDEN_CELLAR) {
+            g.settlementManager.urbanSites.onCellarFound(g, seen.site());
+        } else if (seen.place() == UrbanPlaces.Place.CAMP) {
+            g.settlementManager.urbanSites.onCampEntered(g, x, y, z);
+        } else if (seen.place() == UrbanPlaces.Place.STRONGHOLD || seen.place() == UrbanPlaces.Place.RAIDER_YARD) {
+            g.settlementManager.urbanSites.onCompoundEntered(g, x, y, z);
+        }
+    }
+
+    /** Asks the next tick to read the place underfoot again: a claim changed what it is (milestone 18). */
+    public void forgetPlace() {
+        placeX = Integer.MIN_VALUE;
+    }
+
+    /**
+     * The HUD's location line: the district in a six-district city, the climate biome elsewhere,
+     * then the route place underfoot when there is one.
+     */
+    public String locationLine() {
+        String line = district != null ? "District / " + DistrictRules.of(district).displayName()
+                : "Biome / " + biome.displayName;
+        return place == UrbanPlaces.Place.NONE ? line : line + " / " + place.label;
+    }
+
+    /** The Creative panel's terrain value: the district name where there is one, else the biome. */
+    public String terrainLabel() {
+        return district != null ? DistrictRules.of(district).displayName() : biome.displayName;
+    }
+
+    /**
+     * Whether toxic fog sickens where the player stands, should it be about. In a six-district
+     * city the fog is the quarantine's own hazard: it drifts over the whole city but only sickens
+     * inside the cordon (milestone 13). Every other world: everywhere. The screen draws the fog as
+     * harmful only where this holds (milestone 22).
+     */
+    public boolean toxicFogHarmfulHere() {
+        return district == null || district == UrbanDistrict.QUARANTINE;
+    }
+
+    /**
      * Rolls for sickness while a toxic-fog event has the player out in the
      * open. Driven from the medium tick, which is what evaluates shelter.
      *
@@ -534,13 +619,42 @@ public class Player extends Entity {
      * @return true only when this call inflicted sickness
      */
     public boolean tickToxicFogExposure(Game g) {
-        if (abilities.invulnerable() || !g.events.toxicFog() || !exposedToSky || shelter.roofed()
+        boolean harmless = !toxicFogHarmfulHere();
+        if (abilities.invulnerable() || !g.events.toxicFog() || harmless || !exposedToSky || shelter.roofed()
                 || has(Affliction.SICKNESS)
                 || rng.nextDouble() >= TOXIC_FOG_SICKNESS_CHANCE) {
             return false;
         }
         addAffliction(Affliction.SICKNESS, TOXIC_FOG_SICKNESS_SECONDS);
         g.log("The toxic fog claws at your lungs... SICKNESS takes hold.");
+        return true;
+    }
+
+    /**
+     * Rolls for sickness while the player stands on contaminated ground: chemical spills in the
+     * industrial yards and quarantine runoff (milestone 13). Driven from the medium tick beside
+     * the toxic-fog roll and drawing on the same seeded generator, but only on that ground, so
+     * worlds without it consume nothing. Worn boots cut the chance to a quarter; a Creative
+     * body is immune.
+     *
+     * @return true only when this call inflicted sickness
+     */
+    public boolean tickContaminationExposure(Game g) {
+        if (abilities.invulnerable() || dead || !onGround || has(Affliction.SICKNESS)) {
+            return false;
+        }
+        BlockType under = world.getBlock((int) Math.floor(pos.x), (int) Math.floor(pos.y - 0.05f),
+                (int) Math.floor(pos.z));
+        if (under != BlockType.CONTAMINATED_GROUND) {
+            return false;
+        }
+        double chance = equipped(EquipSlot.FEET) != null
+                ? BOOTED_CONTAMINATION_SICKNESS_CHANCE : CONTAMINATION_SICKNESS_CHANCE;
+        if (rng.nextDouble() >= chance) {
+            return false;
+        }
+        addAffliction(Affliction.SICKNESS, CONTAMINATION_SICKNESS_SECONDS);
+        g.log("The contaminated ground seeps through... SICKNESS takes hold. Get off it.");
         return true;
     }
 

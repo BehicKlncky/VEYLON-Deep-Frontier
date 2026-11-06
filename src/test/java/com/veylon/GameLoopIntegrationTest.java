@@ -2,6 +2,7 @@ package com.veylon;
 
 import com.veylon.combat.ProjectileLethality;
 import com.veylon.entity.Affliction;
+import com.veylon.entity.GameMode;
 import com.veylon.entity.Npc;
 import com.veylon.item.ItemStack;
 import com.veylon.item.ItemType;
@@ -10,6 +11,8 @@ import com.veylon.simulation.SimulationScheduler;
 import com.veylon.util.AppPaths;
 import com.veylon.util.Vec3i;
 import com.veylon.world.BlockType;
+import com.veylon.world.World;
+import com.veylon.world.urban.UrbanRevision;
 import org.junit.jupiter.api.Test;
 
 import java.nio.file.Path;
@@ -156,9 +159,14 @@ class GameLoopIntegrationTest {
     @Test
     void newWorldClearsSimulationQueuesAndPlayerActionState() {
         Game game = new Game();
-        game.newWorld(4242L, true);
+        game.newWorld(4242L, true, World.GEN_CAVE_IDENTITIES);
 
         // Dirty every category of cross-world state the reset is meant to clear.
+        game.entities.encounters.restored = true;
+        game.entities.encounters.lastSpawns = 2;
+        game.settlementManager.urbanSites.restored = true;
+        game.settlementManager.urbanSites.compoundsRestored = true;
+        game.settlementManager.urbanSites.lastSteps = 3;
         game.uiMode = Game.UiMode.INVENTORY;
         game.simPaused = true;
         game.miningProgress = 0.7f;
@@ -207,8 +215,14 @@ class GameLoopIntegrationTest {
         game.targetHit = new com.veylon.world.Raycaster.Hit(fx, fy, fz, 0, 1, 0, 1, BlockType.LOG);
         game.mine(0.01f);
         assertTrue(game.blockActions.creativeBreakRemaining() > 0, "precondition: Creative break timer is active");
-        game.newWorld(4242L, true);
+        game.newWorld(4242L, true, World.GEN_CAVE_IDENTITIES);
         assertEquals(0, game.blockActions.creativeBreakRemaining(), "R19: Creative break timing resets with the world");
+        assertFalse(game.entities.encounters.restored);
+        assertEquals(0, game.entities.encounters.lastSpawns);
+        assertEquals(0, game.entities.encounters.size());
+        assertFalse(game.settlementManager.urbanSites.restored, "survivor sites are per world (milestone 16)");
+        assertFalse(game.settlementManager.urbanSites.compoundsRestored, "compound memories are per world (milestone 17)");
+        assertEquals(0, game.settlementManager.urbanSites.lastSteps);
         assertEquals("", game.creativeCatalogScreen.query(),
                 "R16: the catalog query does not survive into a new world");
         assertFalse(game.creativeCatalogScreen.inventoryTab() || game.creativeCatalogScreen.searchFocused(),
@@ -299,7 +313,7 @@ class GameLoopIntegrationTest {
     @Test
     void meleeCooldownDoesNotCarryIntoTheNextWorld() {
         Game game = new Game();
-        game.newWorld(7717L, true);
+        game.newWorld(7717L, true, World.GEN_CAVE_IDENTITIES);
 
         // Land a swing so the melee cooldown is genuinely running, and confirm
         // it is: a second immediate swing must be refused.
@@ -308,7 +322,7 @@ class GameLoopIntegrationTest {
         assertFalse(game.performPlayerAttack(wolfInReach(game)),
                 "precondition: the melee cooldown blocks an immediate second swing");
 
-        game.newWorld(7717L, true);
+        game.newWorld(7717L, true, World.GEN_CAVE_IDENTITIES);
 
         assertTrue(game.performPlayerAttack(wolfInReach(game)),
                 "the first swing in a new world must not be eaten by the previous world's cooldown");
@@ -326,9 +340,9 @@ class GameLoopIntegrationTest {
     @Test
     void twoWorldsFromTheSameSeedAgreeOnSpawnAndTerrain() {
         Game first = new Game();
-        first.newWorld(31337L, true);
+        first.newWorld(31337L, true, World.GEN_CAVE_IDENTITIES);
         Game second = new Game();
-        second.newWorld(31337L, true);
+        second.newWorld(31337L, true, World.GEN_CAVE_IDENTITIES);
 
         assertEquals(first.player.pos.x, second.player.pos.x, 1e-4f);
         assertEquals(first.player.pos.y, second.player.pos.y, 1e-4f);
@@ -349,7 +363,7 @@ class GameLoopIntegrationTest {
     @Test
     void aSaveLoadCycleThroughTheRealGameLoopKeepsNeedsInventoryAndWorldEdits() {
         Game game = new Game();
-        game.newWorld(90210L, true);
+        game.newWorld(90210L, true, World.GEN_CAVE_IDENTITIES);
 
         // Make the world and the player distinguishable from a fresh start.
         int bx = (int) game.player.pos.x + 2;
@@ -402,7 +416,7 @@ class GameLoopIntegrationTest {
     @Test
     void loadingOverALiveWorldReplacesItRatherThanMerging() {
         Game game = new Game();
-        game.newWorld(555L, true);
+        game.newWorld(555L, true, World.GEN_CAVE_IDENTITIES);
         int markX = (int) game.player.pos.x + 4;
         int markZ = (int) game.player.pos.z + 4;
         int markY = game.world.surfaceHeight(markX, markZ) + 1;
@@ -417,7 +431,7 @@ class GameLoopIntegrationTest {
         assertTrue(SaveSystem.save(game, savePath));
 
         // A second, different world in the same Game instance, then load back.
-        game.newWorld(556L, true);
+        game.newWorld(556L, true, World.GEN_CAVE_IDENTITIES);
         assertNotNull(game.world);
         game.entities.spawnCreature(game.world, com.veylon.entity.Creature.CreatureType.WOLF,
                 game.player.pos.x + 3, game.player.pos.y, game.player.pos.z);
@@ -443,6 +457,69 @@ class GameLoopIntegrationTest {
         assertEquals(savedPieces, game.fragments.settledCount(),
                 "the pieces lying in the world are the save's, not the discarded world's as well");
         assertNoWoundOrBlastRecordSurvives(game, marked);
+    }
+
+    @Test
+    void urbanAndLegacyWorldsInheritNothingFromEachOther() {
+        // The legacy camp lives partly outside World (the faction's camp
+        // position) and the urban revision lives inside it; new worlds and loads
+        // over a live world, in both directions, must start clean of the other.
+        Game game = new Game();
+        game.newWorld(777L, true, World.GEN_CAVE_IDENTITIES);
+        assertNotNull(game.faction.campPos, "precondition: the legacy camp is raised");
+        assertFalse(game.entities.npcs.isEmpty(), "precondition: the camp has residents");
+        Path legacySave = AppPaths.dataDirectory().resolve("build/qa/game-loop-legacy.dat");
+        assertTrue(SaveSystem.save(game, legacySave));
+
+        game.newWorld(778L, true, World.GEN_URBAN, GameMode.SURVIVAL);
+        assertUrbanFoundationOnly(game);
+        Path urbanSave = AppPaths.dataDirectory().resolve("build/qa/game-loop-urban.dat");
+        assertTrue(SaveSystem.save(game, urbanSave));
+        // Door and window state belongs to its world (package 04).
+        game.world.fixtures.set(5, 41, 5, com.veylon.world.FixtureStates.LOCK_KEYED);
+        game.world.fixtures.transitTimers().put(new com.veylon.util.Vec3i(5, 41, 5), 3f);
+
+        game.newWorld(777L, true, World.GEN_CAVE_IDENTITIES);
+        assertNull(game.world.urban, "a legacy world carries no urban state");
+        assertNotNull(game.faction.campPos);
+        assertTrue(game.world.fixtures.isEmpty(), "no fixture state carried over");
+        assertTrue(game.world.fixtures.transitTimers().isEmpty(), "no residents' doors carried over");
+
+        assertTrue(SaveSystem.load(game, urbanSave), "an urban load over a live legacy world");
+        assertUrbanFoundationOnly(game);
+
+        assertTrue(SaveSystem.load(game, legacySave), "a legacy load over a live urban world");
+        assertNull(game.world.urban);
+        assertEquals(World.GEN_CAVE_IDENTITIES, game.world.generatorVersion);
+        assertNotNull(game.faction.campPos, "the legacy load raises its own camp again");
+    }
+
+    @Test
+    void whatASurvivorDiscoveredBelongsToItsOwnWorld() {
+        // Milestone 14: stations and hidden cellars found in one world never follow the player.
+        Game game = new Game();
+        game.newWorld(779L, true, World.GEN_URBAN_UNDERGROUND, GameMode.SURVIVAL);
+        long station = game.world.urban.segment(true, 0, 0).station().id();
+        assertTrue(game.world.urban.discovery.discover(station));
+        Path found = AppPaths.dataDirectory().resolve("build/qa/game-loop-discovery.dat");
+        assertTrue(SaveSystem.save(game, found));
+        game.newWorld(779L, true, World.GEN_URBAN_UNDERGROUND, GameMode.SURVIVAL);
+        assertEquals(0, game.world.urban.discovery.size(), "a new world has found nothing");
+        assertEquals(com.veylon.world.urban.UrbanPlaces.Place.NONE, game.player.place);
+        assertTrue(SaveSystem.load(game, found));
+        assertTrue(game.world.urban.discovery.discovered(station), "a load brings back its own world's finds");
+        game.newWorld(780L, true, World.GEN_URBAN_UNDERGROUND, GameMode.SURVIVAL);
+        assertFalse(game.world.urban.discovery.discovered(station));
+    }
+
+    private static void assertUrbanFoundationOnly(Game game) {
+        assertTrue(game.world.isUrban());
+        assertEquals(UrbanRevision.contentFor(game.world.generatorVersion), game.world.urban.contentRevision());
+        assertNull(game.world.campPos);
+        assertNull(game.faction.campPos, "the previous world's camp must not follow the player");
+        assertTrue(game.entities.npcs.isEmpty(), "no camp residents carried over");
+        assertTrue(game.world.crateContents.isEmpty(), "no camp crates carried over");
+        assertTrue(game.world.settlements.isEmpty());
     }
 
     /** Blows a person apart two blocks from the player, the way a blast death does. */

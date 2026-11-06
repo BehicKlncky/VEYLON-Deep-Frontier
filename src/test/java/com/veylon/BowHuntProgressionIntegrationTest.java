@@ -10,6 +10,7 @@ import com.veylon.item.ItemType;
 import com.veylon.item.Recipe;
 import com.veylon.world.BlockType;
 import com.veylon.world.Chunk;
+import com.veylon.world.World;
 import org.joml.Vector3f;
 import org.junit.jupiter.api.Test;
 
@@ -24,7 +25,7 @@ class BowHuntProgressionIntegrationTest {
     @Test
     void craftedBowHuntsRealCreatureRecoversLodgedArrowAndIsQuieterThanFirearm() {
         Game game = new Game();
-        game.newWorld(987654321L, true);
+        game.newWorld(987654321L, true, World.GEN_CAVE_IDENTITIES);
         flattenArena(game);
         game.entities.creatures.clear();
         game.entities.npcs.clear();

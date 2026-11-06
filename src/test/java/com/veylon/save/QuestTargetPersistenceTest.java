@@ -5,6 +5,7 @@ import com.veylon.ai.Quest;
 import com.veylon.entity.Npc;
 import com.veylon.settlement.NpcArchetype;
 import com.veylon.settlement.Settlement;
+import com.veylon.world.World;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -65,7 +66,7 @@ class QuestTargetPersistenceTest {
 
     private static Game targetedRescueGame() {
         Game game = new Game();
-        game.newWorld(20260716L, true);
+        game.newWorld(20260716L, true, World.GEN_CAVE_IDENTITIES);
         Settlement providerHome = null;
         boolean captiveExists = false;
         for (int rx = -10; rx <= 10; rx++) {

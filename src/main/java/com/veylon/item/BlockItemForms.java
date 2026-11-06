@@ -19,5 +19,7 @@ public final class BlockItemForms {
 
     private BlockItemForms() { }
 
-    public static ItemType of(BlockType block) { return FORMS.get(block); }
+    public static ItemType of(BlockType block) {
+        return com.veylon.world.StairGeometry.isStair(block) ? ItemType.STAIRS : FORMS.get(block);
+    }
 }

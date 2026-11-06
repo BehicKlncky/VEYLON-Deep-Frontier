@@ -215,7 +215,7 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
     final FrontendController frontend = new FrontendController(this);
 
     /** VEYLON_* benchmark scenes, timed captures and the release smoke gate. */
-    private final AutomatedRunDriver automation = new AutomatedRunDriver(this);
+    final AutomatedRunDriver automation = new AutomatedRunDriver(this);
     final CreativeQaScenes creativeQa = new CreativeQaScenes(this);
 
     /** Global keys: screens, debug overlays, quick save/load, hotbar. */
@@ -223,6 +223,8 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
 
     /** Shelter, smoke, vents, discovery and the stations within reach. */
     private final PlayerEnvironmentSystem environment = new PlayerEnvironmentSystem(this);
+    /** Chunk generation and mesh rebuilds near the player, budgeted and timed per frame. */
+    final ChunkStreaming streaming = new ChunkStreaming(this);
 
     /** Melee, bow, firearm and thrown-weapon rules; see the delegates below. */
     final PlayerCombatSystem combat = new PlayerCombatSystem(this);
@@ -239,6 +241,9 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
     /** Eating, drinking, treating wounds and wearing gear. */
     final PlayerConsumables consumables = new PlayerConsumables(this);
 
+    /** Death transition, remains and respawn rules. */
+    private final PlayerLifeCycle lifeCycle = new PlayerLifeCycle(this);
+
     /** F-key and right-click handlers against world state, NPCs and stations. */
     final WorldInteractions interactions = new WorldInteractions(this);
 
@@ -247,6 +252,8 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
 
     /** Sleep eligibility, quality scoring and the night's effects. */
     final SleepSystem sleep = new SleepSystem(this);
+    /** Claimed refuges of a layout-fourteen city: claiming at a bed, home and respawn (urban 18). */
+    final RefugeSystem refuges = new RefugeSystem(this);
 
     // Ranged-weapon aim state the HUD draws. The rules live in PlayerCombatSystem;
     // these stay here because Hud reads them straight off the Game instance.
@@ -399,8 +406,9 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
     // World setup
     // ------------------------------------------------------------------
 
-    public void newWorld(long seed, boolean fresh) {
-        newWorld(seed, fresh, World.CURRENT_GENERATOR);
+    /** A Survival world of the named generator; every caller names the world it builds. */
+    public void newWorld(long seed, boolean fresh, int generatorVersion) {
+        newWorld(seed, fresh, generatorVersion, GameMode.SURVIVAL);
     }
 
     /**
@@ -408,12 +416,8 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
      * loading and by the QA harness. See {@link WorldBootstrap} for the reset
      * ordering it guarantees and the tests that pin it.
      */
-    public void newWorld(long seed, boolean fresh, int generatorVersion) {
-        bootstrap.newWorld(seed, fresh, generatorVersion);
-    }
-
-    public void newWorld(long seed, boolean fresh, GameMode mode) {
-        bootstrap.newWorld(seed, fresh, World.CURRENT_GENERATOR, mode);
+    public void newWorld(long seed, boolean fresh, int generatorVersion, GameMode mode) {
+        bootstrap.newWorld(seed, fresh, generatorVersion, mode);
     }
 
     public GameMode gameMode() { return gameModes.mode(); }
@@ -469,19 +473,60 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
                 appState = AppState.PLAYING;
             }
         } else if (appState == AppState.VICTORY) {
-            if (input.wasKeyPressed(GLFW_KEY_ESCAPE)) {
+            if (input.wasKeyPressed(GLFW_KEY_ESCAPE) && !world.isUrban()) { // a city's card never ends the game (urban 20)
                 frontend.returnToTitle();
                 frontend.frame(dt);
                 return;
             }
-            if (input.wasKeyPressed(GLFW_KEY_ENTER)) {
+            if (input.wasKeyPressed(GLFW_KEY_ENTER) || input.wasKeyPressed(GLFW_KEY_ESCAPE)) {
                 appState = AppState.PLAYING;
             }
         } else {
             hotkeys.update();
         }
         window.captureCursor(appState == AppState.PLAYING && uiMode == UiMode.NONE, input);
+        playStep(dt, dtD);
+        streaming.frame(); // stream chunks and rebuild meshes near the player
 
+        // Render world + UI.
+        renderer.render(this, dt);
+        beginUiFrame();
+        hud.render(this);
+        switch (uiMode) {
+            case INVENTORY -> inventoryScreen.update(this);
+            case CRAFTING -> craftingScreen.update(this);
+            case CRATE -> crateScreen.update(this);
+            case NPC -> npcScreen.update(this);
+            case MAP -> mapScreen.update(this);
+            case PAUSE -> pauseMenu.update(this);
+            case OPTIONS -> frontend.handlePauseOptions(graphicsOptionsScreen.update(this));
+            case AUDIO_OPTIONS -> frontend.handlePauseAudio(audioOptionsScreen.update(this));
+            case GAME_MODE -> gameModes.handleScreen(gameModeScreen.update(this));
+            case WORLD_CONTROLS -> creativeControls.handleScreen(worldControlsScreen.update(this));
+            case CREATIVE_CATALOG -> {
+                if (creativeCatalogScreen.update(this) == com.veylon.ui.CreativeCatalogScreen.Action.CLOSE) {
+                    closeScreens();
+                }
+            }
+            case NONE -> {
+            }
+        }
+        if (debugShown) {
+            debugOverlay.render(this);
+        }
+        if (simPanelShown) {
+            simulationPanel.render(this);
+        }
+        if (appState == AppState.DEATH) {
+            PresentationOverlay.death(ui, deathTimer, world.urban != null && world.urban.hasStarter());
+        } else if (appState == AppState.VICTORY) {
+            PresentationOverlay.victory(ui, totalTime, creativeMarked(), world.isUrban());
+        }
+        ui.end();
+    }
+
+    /** Controls, simulation and the eye for one frame; deterministic routes run it headless. */
+    void playStep(float dt, double dtD) {
         boolean simulate = simulates();
 
         swingTimer = Math.max(0, swingTimer - dt);
@@ -519,48 +564,6 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
         audio.update(dt);
 
         enterDeathIfDue();
-
-        // Stream chunks and rebuild meshes near the player.
-        world.ensureChunks((int) player.pos.x, (int) player.pos.z, renderer.renderRadius(), 2);
-        int pcx = Math.floorDiv((int) player.pos.x, 16);
-        int pcz = Math.floorDiv((int) player.pos.z, 16);
-        renderer.buildDirtyMeshes(world, pcx, pcz, 3);
-
-        // Render world + UI.
-        renderer.render(this, dt);
-        beginUiFrame();
-        hud.render(this);
-        switch (uiMode) {
-            case INVENTORY -> inventoryScreen.update(this);
-            case CRAFTING -> craftingScreen.update(this);
-            case CRATE -> crateScreen.update(this);
-            case NPC -> npcScreen.update(this);
-            case MAP -> mapScreen.update(this);
-            case PAUSE -> pauseMenu.update(this);
-            case OPTIONS -> frontend.handlePauseOptions(graphicsOptionsScreen.update(this));
-            case AUDIO_OPTIONS -> frontend.handlePauseAudio(audioOptionsScreen.update(this));
-            case GAME_MODE -> gameModes.handleScreen(gameModeScreen.update(this));
-            case WORLD_CONTROLS -> creativeControls.handleScreen(worldControlsScreen.update(this));
-            case CREATIVE_CATALOG -> {
-                if (creativeCatalogScreen.update(this) == com.veylon.ui.CreativeCatalogScreen.Action.CLOSE) {
-                    closeScreens();
-                }
-            }
-            case NONE -> {
-            }
-        }
-        if (debugShown) {
-            debugOverlay.render(this);
-        }
-        if (simPanelShown) {
-            simulationPanel.render(this);
-        }
-        if (appState == AppState.DEATH) {
-            PresentationOverlay.death(ui, deathTimer);
-        } else if (appState == AppState.VICTORY) {
-            PresentationOverlay.victory(ui, totalTime, creativeMarked());
-        }
-        ui.end();
     }
 
     void beginUiFrame() {
@@ -607,6 +610,7 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
 
 
     public void closeScreens() {
+        crates.closeSearch();
         if (player != null && player.abilities.instantBuild()) blockActions.reset();
         uiMode = UiMode.NONE;
         openCrate = null;
@@ -653,9 +657,8 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
             footstepTimer -= dt;
             if (footstepTimer <= 0) {
                 footstepTimer = p.crouching ? 0.62f : (p.sprinting ? 0.31f : 0.45f);
-                BlockType under = world.getBlock((int) Math.floor(p.pos.x),
-                        (int) Math.floor(p.pos.y - 0.1f), (int) Math.floor(p.pos.z));
-                audio.playFootstep(under, p.inWater);
+                audio.playFootstep(com.veylon.engine.FootstepSurface.underfoot(world, p.pos.x, p.pos.y, p.pos.z),
+                        p.inWater, com.veylon.engine.FootstepSurface.loudness(p.sprinting, p.crouching));
                 emitPlayerFootstepNoise(p.sprinting, p.crouching);
             }
         }
@@ -901,42 +904,34 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
     public int transferCrateItemToPlayer(int slot) {
         return crates.transferCrateItemToPlayer(slot);
     }
+    public int transferCrateItemToPlayer(int slot, int count) {
+        return crates.transferCrateItemToPlayer(slot,count);
+    }
 
     /** Real crate-UI deposit command; returned supplies are attributed by crate position. */
     public int transferPlayerItemToCrate(int slot) {
         return crates.transferPlayerItemToCrate(slot);
     }
+    public int transferPlayerItemToCrate(int slot, int count) {
+        return crates.transferPlayerItemToCrate(slot,count);
+    }
+
+    public boolean crateSearching() { return crates.searching(); }
+    public float crateSearchProgress() { return crates.searchProgress(); }
+    public String crateStatus() { return crates.storageStatus(); }
+    public String crateTitle() { return crates.containerTitle(); }
+    /** Blast/fire attribution captured from the actual container before its removal. */
+    public void onSurvivorStorageDestroyed(long ownerId) {
+        crates.onSurvivorStorageDestroyed(ownerId);
+    }
 
     /** The player's one death transition; a lethal blast's also leaves the player's remains. */
     void enterDeathIfDue() {
-        if (player.dead && !player.abilities.invulnerable() && appState == AppState.PLAYING) {
-            appState = AppState.DEATH;
-            deathTimer = 3f;
-            fragments.spawnPlayerRemains(this, player);
-            closeScreens();
-        }
+        lifeCycle.enterDeathIfDue();
     }
 
     void respawn() {
-        if (player.abilities.invulnerable()) {
-            player.restoreCreativeBody();
-            return;
-        }
-        log("You died. The frontier reclaims you... (respawned at the crash site)");
-        player.dead = false;
-        player.clearBlastDeath();
-        combustion.clear(player);
-        player.health = 55;
-        player.hunger = Math.max(player.hunger, 50);
-        player.thirst = Math.max(player.thirst, 50);
-        player.bodyTemp = 37;
-        player.afflictions.clear();
-        player.smokeExposure = 0;
-        player.protein = Math.max(player.protein, 40);
-        player.vitamins = Math.max(player.vitamins, 40);
-        player.vel.set(0, 0, 0);
-        player.pos.set(spawnPos);
-        sleeping = false;
+        lifeCycle.respawn();
     }
 
     // ------------------------------------------------------------------
@@ -949,6 +944,7 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
         combustion.fastTick(this, dt);
         entities.fastTick(this, dt);
         settlementManager.fastTick(this, dt);
+        crates.fastTick(dt);
     }
 
     @Override
@@ -960,6 +956,8 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
         liquidFire.mediumTick(this, dt);
         environment.mediumTick(dt);
         ambience.updateAmbienceMix();
+        settlementManager.urbanSites.listen(this, dt);
+        refuges.mediumTick(dt);
     }
 
     @Override

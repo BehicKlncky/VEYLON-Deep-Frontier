@@ -9,6 +9,7 @@ import com.veylon.item.ItemType;
 import com.veylon.save.SaveSystem;
 import com.veylon.util.Vec3i;
 import com.veylon.world.BlockType;
+import com.veylon.world.World;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -28,7 +29,7 @@ class CaptiveRescueGameplayTest {
     void generatedCageBlocksNormalRescueUntilPlayerBreaksBarsAndTheResultPersists(
             @TempDir Path dir) {
         Game initial = new Game();
-        initial.newWorld(SEED, true);
+        initial.newWorld(SEED, true, World.GEN_CAVE_IDENTITIES);
         Settlement offerHome = firstFriendlySettlement(initial);
         assertNotNull(offerHome, "expected a generated settlement quest provider");
         Npc provider = new Npc(initial.world, "Rescue coordinator");

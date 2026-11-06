@@ -7,8 +7,11 @@ import com.veylon.save.SaveSystem;
 import com.veylon.simulation.WeatherSystem;
 import com.veylon.util.AppPaths;
 import com.veylon.world.BlockType;
+import com.veylon.world.World;
+import com.veylon.world.urban.UrbanRevision;
 
 import java.nio.file.Path;
+import java.util.ArrayDeque;
 import java.util.Locale;
 
 /**
@@ -60,6 +63,13 @@ final class AutomatedRunDriver {
     private boolean smokeSaveOk;
     private boolean smokeLoadOk;
     private String smokeGateFailure;
+    /** Labelled captures a scripted scene requested, written after their frames render. */
+    private final ArrayDeque<String> sceneCaptures = new ArrayDeque<>();
+    private static final int MAX_SCENE_CAPTURES = 16;
+    private boolean sceneSession;
+    private boolean finishAfterCaptures;
+    /** The native default-path route ({@code VEYLON_FRONTEND=route}), or null. */
+    private FrontendRouteQa frontendRoute;
     private final Path smokeSave =
             AppPaths.dataDirectory().resolve("build/qa/smoke-save.dat");
 
@@ -70,8 +80,8 @@ final class AutomatedRunDriver {
     /**
      * Reads the environment and puts the game into its starting state.
      *
-     * @return true when this is an automated session, which suppresses mouse
-     *         look so a capture is not steered by a stray cursor
+     * @return true when this session needs suppressed mouse look; start-only
+     *         manual apartment QA retains ordinary player controls
      */
     boolean configure() {
         smoke = System.getenv("VEYLON_SMOKE") != null;
@@ -82,9 +92,18 @@ final class AutomatedRunDriver {
         frontendQa = frontendScreen != null && !frontendScreen.isBlank();
         boolean automated = smoke || (scene != null && !scene.isBlank())
                 || (shotEnv != null && !shotEnv.isBlank()) || frontendQa;
+        String selector = System.getenv("VEYLON_GENERATOR");
+        int generator = configuredGenerator(selector, AppPaths.isolatedFromPlayerData());
+        game.frontend.newWorldGenerator = generator;
 
-        if (automated && !frontendQa) {
-            game.newWorld(game.sessionSeed, true, configuredGameMode(System.getenv("VEYLON_GAME_MODE")));
+        sceneSession = automated && !frontendQa;
+        if (sceneSession) {
+            generator = sceneGenerator(scene, selector, generator, AppPaths.isolatedFromPlayerData());
+        }
+        if (sceneSession) {
+            game.newWorld(game.sessionSeed, true, generator,
+                    UrbanApartmentQaScene.manualNavigation(scene) ? GameMode.SURVIVAL
+                            : configuredGameMode(System.getenv("VEYLON_GAME_MODE")));
             game.qa.applyBenchmarkScene(scene);
             game.appState = Game.AppState.PLAYING;
             game.window.captureCursor(true, game.input);
@@ -92,7 +111,13 @@ final class AutomatedRunDriver {
             game.appState = Game.AppState.TITLE;
             game.window.captureCursor(false, game.input);
             if (frontendQa) {
-                game.frontend.openForQa(frontendScreen.trim().toLowerCase(Locale.ROOT));
+                String screen = frontendScreen.trim().toLowerCase(Locale.ROOT);
+                if (FrontendRouteQa.names(screen)) {
+                    frontendRoute = new FrontendRouteQa(game, this, screen,
+                            configuredGameMode(System.getenv("VEYLON_GAME_MODE")));
+                } else {
+                    game.frontend.openForQa(screen);
+                }
             }
         }
 
@@ -106,7 +131,7 @@ final class AutomatedRunDriver {
         }
         shotMarks = parseShotMarks(shotEnv);
         capturePrefix = resolveCapturePrefix();
-        return automated;
+        return automated && !UrbanApartmentQaScene.manualNavigation(scene);
     }
 
     /** Strict, locale-independent parsing is only invoked for automated worlds. */
@@ -118,6 +143,65 @@ final class AutomatedRunDriver {
             throw new IllegalArgumentException("VEYLON_GAME_MODE must be survival or creative: " + configured,
                     invalid);
         }
+    }
+
+    /** The {@code VEYLON_GENERATOR} value that selects the urban development generator. */
+    static final String URBAN_DEVELOPMENT_GENERATOR = "urban-dev";
+    /** The {@code VEYLON_GENERATOR} value that selects the wilderness, NEW FRONTIER's legacy world. */
+    static final String WILDERNESS_GENERATOR = "wilderness";
+
+    /**
+     * The QA selector of this session's new world, which NEW FRONTIER opens on and automated worlds
+     * build: unset is the ordinary default, the abandoned city; {@code wilderness} the legacy world;
+     * {@code urban-dev} the newest urban layout, today the default city itself.
+     *
+     * <p>{@code urban-dev} refuses to run unless {@code veylon.dataDir} points away from the
+     * player's data directory, so a development layout can never be saved over a real save.
+     * Invalid values fail explicitly, like {@code VEYLON_GAME_MODE}.
+     *
+     * @param isolatedDataDirectory {@link AppPaths#isolatedFromPlayerData()}
+     */
+    static int configuredGenerator(String configured, boolean isolatedDataDirectory) {
+        if (configured == null || configured.isBlank()) {
+            return World.DEFAULT_NEW_WORLD_GENERATOR;
+        }
+        String value = configured.trim().toLowerCase(Locale.ROOT);
+        if (WILDERNESS_GENERATOR.equals(value)) {
+            return World.WILDERNESS_NEW_WORLD_GENERATOR;
+        }
+        if (!URBAN_DEVELOPMENT_GENERATOR.equals(value)) {
+            throw new IllegalArgumentException("VEYLON_GENERATOR must be " + WILDERNESS_GENERATOR + ", "
+                    + URBAN_DEVELOPMENT_GENERATOR + " or unset: " + configured);
+        }
+        if (!isolatedDataDirectory) {
+            throw new IllegalStateException("VEYLON_GENERATOR=" + URBAN_DEVELOPMENT_GENERATOR
+                    + " needs an isolated data directory so it cannot replace a real save: run"
+                    + " with -Dveylon.dataDir=<dir> (Gradle: -PveylonDataDir=build/qa/<name>)");
+        }
+        return UrbanRevision.DEVELOPMENT_GENERATOR;
+    }
+
+    /**
+     * The world a scripted scene plays. A city tour ({@code urban_*}) and the save audit play the
+     * session's world, and only from an isolated data directory, since they press F5 into the
+     * ordinary slot path, as they always did behind {@code urban-dev}. Every other scene was made
+     * for the wilderness and keeps it unless {@code VEYLON_GENERATOR} names a world.
+     *
+     * @param generator the session's world from {@link #configuredGenerator}
+     */
+    static int sceneGenerator(String scene, String selector, int generator, boolean isolatedDataDirectory) {
+        if (scene == null || scene.isBlank()) {
+            return generator;
+        }
+        String name = scene.trim().toLowerCase(Locale.ROOT);
+        if (name.startsWith("urban_") || name.equals("save_audit")) {
+            if (World.isUrbanGenerator(generator) && !isolatedDataDirectory) {
+                throw new IllegalStateException("VEYLON_SCENE=" + name + " plays a city and saves into the"
+                        + " slot: run with -Dveylon.dataDir=<dir> (Gradle: -PveylonDataDir=build/qa/<name>)");
+            }
+            return generator;
+        }
+        return selector == null || selector.isBlank() ? World.WILDERNESS_NEW_WORLD_GENERATOR : generator;
     }
 
     /** {@code VEYLON_SHOT="5,10"} captures the framebuffer at those elapsed seconds. */
@@ -143,7 +227,9 @@ final class AutomatedRunDriver {
             return tag.trim().replaceAll("[^A-Za-z0-9._-]", "_");
         }
         if (scene != null && !scene.isBlank()) {
-            return scene;
+            return scene.equals("urban_apartments") || scene.equals("urban_apartments_night")
+                    || scene.equals("urban_apartments_lit_night")
+                    ? scene + "_scripted_camera" : scene;
         }
         if (frontendQa) {
             return "frontend_" + frontendScreen.trim().toLowerCase(Locale.ROOT);
@@ -151,16 +237,39 @@ final class AutomatedRunDriver {
         return "shot";
     }
 
+    /** A scripted scene asks for a labelled capture of the frame about to render; inert headless. */
+    void requestCapture(String label) {
+        if ((sceneSession || frontendRoute != null) && sceneCaptures.size() < MAX_SCENE_CAPTURES) {
+            sceneCaptures.add(label.replaceAll("[^A-Za-z0-9._-]", "_"));
+        }
+    }
+
+    /** Closes a scripted scene's session once its queued captures are written; inert headless. */
+    void finishScriptedRun() {
+        finishAfterCaptures = sceneSession;
+    }
+
     /** Captures any screenshot due by {@code now}, after the frame has rendered. */
     void captureDueScreenshots(double now) {
+        if (!sceneCaptures.isEmpty()) {
+            capture(capturePrefix + "_" + sceneCaptures.remove());
+        } else if (finishAfterCaptures) {
+            game.window.requestClose();
+        }
         double elapsed = now - sessionStart;
         if (shotIndex >= shotMarks.length || elapsed < shotMarks[shotIndex]) {
             return;
         }
-        ScreenshotUtil.capture(game.window.framebufferWidth(),
-                game.window.framebufferHeight(),
-                capturePrefix + "_" + (int) shotMarks[shotIndex] + "s");
-        System.out.println("[capture] tag=" + capturePrefix
+        capture(capturePrefix + "_" + (int) shotMarks[shotIndex] + "s");
+        shotIndex++;
+        if (shotIndex >= shotMarks.length && !smoke) {
+            game.window.requestClose();
+        }
+    }
+
+    private void capture(String name) {
+        ScreenshotUtil.capture(game.window.framebufferWidth(), game.window.framebufferHeight(), name);
+        System.out.println("[capture] name=" + name + " tag=" + capturePrefix
                 + " scene=" + (scene == null ? "frontend" : scene)
                 + " framebuffer=" + game.window.framebufferWidth()
                 + "x" + game.window.framebufferHeight()
@@ -172,15 +281,14 @@ final class AutomatedRunDriver {
                 + " triangles=" + game.renderer.trianglesRendered
                 + " glErrors=" + game.window.glErrorCount()
                 + " khrErrors=" + game.window.glDebugErrorCount());
-        shotIndex++;
-        if (shotIndex >= shotMarks.length && !smoke) {
-            game.window.requestClose();
-        }
     }
 
     /** Advances the scripted smoke session; inert outside a smoke run. */
     void advanceSmokeRun(double now) {
         double elapsed = now - sessionStart;
+        if (frontendRoute != null) {
+            frontendRoute.advance(elapsed);
+        }
         if (smoke) game.creativeQa.sampleBody();
         if (!smoke || game.world == null || game.appState != Game.AppState.PLAYING) {
             return;
@@ -244,7 +352,9 @@ final class AutomatedRunDriver {
     private void igniteStressStack() {
         int fx = (int) game.player.pos.x + 4;
         int fz = (int) game.player.pos.z + 4;
-        int fy = game.world.surfaceHeight(fx, fz) + 1;
+        // A city's column top may be a tree crown; its plan knows the ground.
+        int fy = (game.world.isUrban() ? game.world.urban.groundY(fx, fz)
+                : game.world.surfaceHeight(fx, fz)) + 1;
         game.world.setBlock(fx, fy, fz, BlockType.LOG, true);
         game.world.setBlock(fx, fy + 1, fz, BlockType.LOG, true);
         game.world.setBlock(fx + 1, fy, fz, BlockType.PLANK, true);

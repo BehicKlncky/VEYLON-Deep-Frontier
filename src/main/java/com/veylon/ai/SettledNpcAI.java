@@ -20,15 +20,12 @@ import java.util.List;
  * (sleep, work, patrol, guard), perception (occluded sight, hearing via world
  * noise events), alarm/search/return-to-duty, ranged and melee combat with
  * friendly-fire awareness, morale-driven flight, and gate handling — all on
- * top of bounded A* with steering fallback.
+ * top of shared bounded indoor routing with safe waiting.
  */
 public final class SettledNpcAI {
 
     /** Seconds between perception (LOS) evaluations per NPC. */
     public static final float PERCEPTION_INTERVAL = 0.3f;
-
-    /** Seconds between repath attempts. */
-    private static final float REPATH_COOLDOWN = 1.6f;
 
     private SettledNpcAI() {
     }
@@ -124,7 +121,7 @@ public final class SettledNpcAI {
         if (n.decideTimer > 0) {
             return;
         }
-        n.decideTimer = PERCEPTION_INTERVAL;
+        n.decideTimer = PERCEPTION_INTERVAL + g.entities.nextSettledNpcAiFloat() * .15f;
         n.perceptionChecks++;
         var p = g.player;
         if (p == null || p.dead) {
@@ -170,9 +167,10 @@ public final class SettledNpcAI {
         }
 
         // Hearing: world noise events.
-        WorldNoise.NoiseEvent heard = g.noise.loudestAudible(
-                n.pos.x, n.pos.y, n.pos.z, n.archetype.hearRange * 0.3f);
+        WorldNoise.NoiseEvent heard = g.noise.loudestAudible(g.world,
+                n.pos.x, n.pos.y, n.pos.z, n.archetype.hearRange * 0.3f, n.lastHeard, n);
         if (heard != null && (heard.playerSource || heard.intensity > 0.6f)) {
+            n.lastHeard = heard;
             if (heard.playerSource && hostile) {
                 n.lastKnown.set(heard.x, heard.y, heard.z);
                 n.lastKnownAge = Math.min(n.lastKnownAge, 6f);
@@ -205,18 +203,7 @@ public final class SettledNpcAI {
     }
 
     private static boolean hasLineOfSight(Game g, Npc n, float tx, float ty, float tz) {
-        float ox = n.pos.x, oy = n.pos.y + 1.55f, oz = n.pos.z;
-        float dx = tx - ox, dy = ty - oy, dz = tz - oz;
-        float dist = (float) Math.sqrt(dx * dx + dy * dy + dz * dz);
-        int steps = Math.max(1, (int) (dist * 1.6f));
-        for (int i = 1; i < steps; i++) {
-            float f = i / (float) steps;
-            if (g.world.getBlock((int) Math.floor(ox + dx * f), (int) Math.floor(oy + dy * f),
-                    (int) Math.floor(oz + dz * f)).opaque) {
-                return false;
-            }
-        }
-        return true;
+        return InfectedAI.clearSight(g.world, n.pos.x, n.pos.y + 1.55f, n.pos.z, tx, ty, tz);
     }
 
     /** First contact: scouts sprint for the bell; others shout (noise event). */
@@ -571,7 +558,8 @@ public final class SettledNpcAI {
     private static void meleeCombatPlayer(Game g, Npc n, NpcArchetype a, double dist, float dt) {
         var p = g.player;
         n.attackCooldown -= dt;
-        if (dist < 1.9) {
+        if (dist < 1.9 && Math.abs(n.pos.y - p.pos.y) < .8f
+                && hasLineOfSight(g, n, p.pos.x, p.pos.y + 1.4f, p.pos.z)) {
             Steering.stop(n);
             faceToward(n, p.pos.x, p.pos.z);
             if (n.attackCooldown <= 0 && !p.abilities.invulnerable()) {
@@ -581,9 +569,6 @@ public final class SettledNpcAI {
                 g.audio.playHit();
                 g.log(n.name + " strikes you!");
             }
-        } else if (n.lastKnownAge < 1.0f) {
-            moveTo(g, n, new Vec3i((int) p.pos.x, (int) p.pos.y, (int) p.pos.z),
-                    a.speed * 1.1f, 1.6f);
         } else {
             moveTo(g, n, new Vec3i((int) n.lastKnown.x, (int) n.lastKnown.y,
                     (int) n.lastKnown.z), a.speed, 2f);
@@ -861,70 +846,16 @@ public final class SettledNpcAI {
     }
 
     // ------------------------------------------------------------------
-    // Movement: cached A* with steering fallback and gate handling
+    // Movement: shared bounded paths and fixture handling
     // ------------------------------------------------------------------
 
     /**
      * Moves toward a target using the cached path; returns false when arrived.
-     * Falls back to direct steering when pathing fails or the target is close.
+     * Waits safely when a route is blocked or the shared allowance is exhausted.
+     * Package-private so navigation tests drive the production path follower.
      */
-    private static boolean moveTo(Game g, Npc n, Vec3i target, float speed, float arrive) {
-        double flat = Math.sqrt((n.pos.x - target.x() - 0.5) * (n.pos.x - target.x() - 0.5)
-                + (n.pos.z - target.z() - 0.5) * (n.pos.z - target.z() - 0.5));
-        if (flat < arrive && Math.abs(n.pos.y - target.y()) < 3) {
-            Steering.stop(n);
-            n.path = null;
-            return false;
-        }
-
-        // Validate / advance the cached path.
-        if (n.path != null) {
-            if (n.pathIndex >= n.path.size()) {
-                n.path = null;
-            } else {
-                Vec3i last = n.path.getLast();
-                if (last.distSq(target.x() + 0.5, target.y() + 0.5, target.z() + 0.5) > 6 * 6) {
-                    n.path = null; // target moved too far from the planned goal
-                }
-            }
-        }
-
-        if (n.path == null && n.repathCooldown <= 0) {
-            n.repathCooldown = REPATH_COOLDOWN
-                    + g.entities.nextSettledNpcAiFloat() * 0.7f;
-            n.path = Pathfinder.find(g.world,
-                    (int) Math.floor(n.pos.x), (int) Math.floor(n.pos.y), (int) Math.floor(n.pos.z),
-                    target.x(), target.y(), target.z(), Pathfinder.DEFAULT_BUDGET);
-            n.pathIndex = 0;
-        }
-
-        if (n.path != null && n.pathIndex < n.path.size()) {
-            Vec3i cell = n.path.get(n.pathIndex);
-            // Gates along the path get shoved open.
-            BlockType inCell = g.world.getBlock(cell.x(), cell.y(), cell.z());
-            BlockType headCell = g.world.getBlock(cell.x(), cell.y() + 1, cell.z());
-            if (inCell == BlockType.GATE) {
-                g.settlementManager.openGate(g, cell);
-            }
-            if (headCell == BlockType.GATE) {
-                g.settlementManager.openGate(g, new Vec3i(cell.x(), cell.y() + 1, cell.z()));
-            }
-            double cd = n.distSqTo(cell.x() + 0.5f, n.pos.y, cell.z() + 0.5f);
-            if (cd < 0.55 * 0.55 && Math.abs(n.pos.y - cell.y()) < 1.6f) {
-                n.pathIndex++;
-            } else {
-                Steering.moveToward(n, cell.x() + 0.5f, cell.z() + 0.5f, speed);
-                // Climb ladders along the path.
-                if (cell.y() > n.pos.y + 0.6f && n.onLadder) {
-                    n.vel.y = 2.4f;
-                }
-            }
-            return true;
-        }
-
-        // Fallback: direct steering (existing behavior).
-        Steering.moveToward(n, target.x() + 0.5f, target.z() + 0.5f, speed);
-        return true;
+    static boolean moveTo(Game g, Npc n, Vec3i target, float speed, float arrive) {
+        return IndoorNavigation.moveTo(g, n, target, speed, arrive);
     }
 
     private static void faceToward(Npc n, float tx, float tz) {

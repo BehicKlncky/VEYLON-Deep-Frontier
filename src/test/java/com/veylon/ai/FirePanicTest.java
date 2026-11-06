@@ -21,6 +21,7 @@ import com.veylon.simulation.WeatherSystem.Weather;
 import com.veylon.util.Vec3i;
 import com.veylon.world.BlockType;
 import com.veylon.world.Chunk;
+import com.veylon.world.World;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -970,7 +971,7 @@ class FirePanicTest {
     /** A flat stone arena over chunks 18-22, clear noon, nobody about, no camp. */
     static Game arena(GameMode mode) {
         Game g = new Game();
-        g.newWorld(777L, true, mode);
+        g.newWorld(777L, true, World.GEN_CAVE_IDENTITIES, mode);
         for (int cx = 18; cx <= 22; cx++) {
             for (int cz = 18; cz <= 22; cz++) {
                 Chunk c = g.world.getOrCreateChunk(cx, cz);

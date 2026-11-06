@@ -18,6 +18,7 @@ import com.veylon.item.ItemType;
 import com.veylon.settlement.NpcArchetype;
 import com.veylon.world.BlockType;
 import com.veylon.world.Chunk;
+import com.veylon.world.World;
 import org.joml.Matrix4f;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -135,7 +136,7 @@ class RemainsSectionTest {
             assertEquals(was.pos.y, is.pos.y, 0f);
             assertEquals(was.pos.z, is.pos.z, 0f);
         }
-        assertEquals(5, recordsBefore.size(), "precondition: one record per species that leaves a carcass");
+        assertEquals(carcassSpecies(), recordsBefore.size(), "precondition: one record per species that leaves a carcass");
         Carcass deer = loaded.entities.carcasses.get(0);
         assertEquals(CreatureType.DEER.meatYield - 1, deer.meatLeft, "precondition: the deer was partly taken");
         assertEquals(0, deer.hideLeft);
@@ -287,7 +288,7 @@ class RemainsSectionTest {
         assertTrue(SaveSystem.load(live, withRemains));
         int pieces = live.fragments.settledCount();
         List<Carcass> first = List.copyOf(live.entities.carcasses);
-        assertEquals(5, first.size());
+        assertEquals(carcassSpecies(), first.size());
 
         assertTrue(SaveSystem.load(live, without));
         assertEquals(0, live.fragments.settledCount(), "the other world's pieces are gone");
@@ -495,6 +496,11 @@ class RemainsSectionTest {
      * partly taken and the wolf carries three iron arrows; the first bodies
      * have rotted a little longer than the last.
      */
+    /** How many harvest records {@link #mixedWorld} leaves: one per species that leaves a carcass. */
+    private static int carcassSpecies() {
+        return (int) java.util.Arrays.stream(CreatureType.values()).filter(CreatureType::leavesCarcass).count();
+    }
+
     private static Game mixedWorld(long seed) {
         Game g = arena(seed);
         g.totalTime = 17.25;
@@ -578,7 +584,7 @@ class RemainsSectionTest {
 
     private static Game arena(long seed) {
         Game game = new Game();
-        game.newWorld(seed, true);
+        game.newWorld(seed, true, World.GEN_CAVE_IDENTITIES);
         for (int cx = 17; cx <= 21; cx++) {
             for (int cz = 17; cz <= 21; cz++) {
                 Chunk c = game.world.getOrCreateChunk(cx, cz);
@@ -658,8 +664,8 @@ class RemainsSectionTest {
         }
         assertEquals(loadedOf.size(), new IdentityHashMap<>(invert(loadedOf)).size(),
                 "and no two bodies are merged into one pose");
-        assertEquals(8, loadedOf.size(),
-                "precondition: six animals and a person died in their own poses, the player's remains lie at rest");
+        assertEquals(CreatureType.values().length + 2, loadedOf.size(),
+                "precondition: every species and a person died in their own poses, the player's remains lie at rest");
     }
 
     private static Map<FragmentPose, FragmentPose> invert(Map<FragmentPose, FragmentPose> map) {

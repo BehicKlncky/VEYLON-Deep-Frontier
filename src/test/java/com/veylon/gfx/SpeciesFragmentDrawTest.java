@@ -796,7 +796,7 @@ class SpeciesFragmentDrawTest {
     /** A flat stone arena far from the camp, nothing alive, pieces cleared. */
     private static Game arena(long seed) {
         Game game = new Game();
-        game.newWorld(seed, true);
+        game.newWorld(seed, true, World.GEN_CAVE_IDENTITIES);
         for (int cx = 18; cx <= 21; cx++) {
             for (int cz = 18; cz <= 21; cz++) {
                 Chunk c = game.world.getOrCreateChunk(cx, cz);

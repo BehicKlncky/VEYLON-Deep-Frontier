@@ -140,10 +140,12 @@ final class HotkeyRouter {
         if (game.uiMode == Game.UiMode.PAUSE && game.input.wasKeyPressed(GLFW_KEY_Q)) {
             game.window.requestClose();
         }
-        // F closes a crate or NPC screen, mirroring the key that opened it.
+        // F closes a crate or NPC screen, mirroring the key that opened it. The press is
+        // consumed so the same frame's interaction pass cannot reopen what it faces.
         if ((game.uiMode == Game.UiMode.CRATE || game.uiMode == Game.UiMode.NPC)
                 && game.input.wasKeyPressed(GLFW_KEY_F)) {
             game.closeScreens();
+            game.input.consumePress(GLFW_KEY_F);
         }
     }
 

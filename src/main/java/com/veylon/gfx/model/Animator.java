@@ -17,6 +17,11 @@ import java.util.List;
  * movement speed so transitions read naturally without clip infrastructure.
  */
 public final class Animator {
+    /**
+     * How far a sleeper is raised after being laid on its back about its feet, so that its back,
+     * legs and head rest on the floor it sleeps on; whatever is strapped to its back lies under it.
+     */
+    static final float SLEEP_LIFT = 0.09f;
 
     private Animator() {
     }
@@ -32,6 +37,10 @@ public final class Animator {
         float phase = c.bobPhase * 3.2f;
         float swing = (float) Math.sin(phase) * run;
         float t = (float) time;
+        if (c.type == Creature.CreatureType.VEILMAW) {
+            poseVeilmaw(m, c, t, run, phase);
+            return;
+        }
 
         ModelPart body = m.part("body");
         ModelPart head = m.part("head");
@@ -117,6 +126,62 @@ public final class Animator {
         if (c.type == Creature.CreatureType.THORNHORN && c.state == Creature.CreatureState.ATTACK) {
             head.rotX = -0.5f + (float) Math.abs(Math.sin(t * 8)) * 0.7f; // horn toss
         }
+    }
+
+    /** A Veilbound's or Breacher's veil glow at rest, and what a strike's full windup adds (urban 22). */
+    public static final float VEIL_GLOW = 0.07f, VEIL_STRIKE_GLOW = 0.5f;
+    private static final String[] VEILMAW_LEGS = {"leg_fl", "leg_fr", "leg_bl", "leg_br"};
+
+    /**
+     * The Veilmaw (urban milestone 15). Folded, it lies pressed to its membrane with legs splayed
+     * flat, hood laid forward over the maw and veins barely lit, so at a glance it is part of the
+     * growth. The telegraph raises the hood and brightens the veins over the windup, with a
+     * tremor; the lunge pitches it forward with the hood flared back; recoiling and walking home
+     * it stays half raised. The glow is set on every pose because the model is shared.
+     */
+    private static void poseVeilmaw(EntityModel m, Creature c, float t, float run, float phase) {
+        float wake = switch (c.state) {
+            case FOLDED -> 0f;
+            case STIRRING -> c.windup <= 0f ? 1f
+                    : 1f - Math.min(1f, c.windup / com.veylon.ai.VeilmawAI.WINDUP);
+            case RECOILING, RETURNING, CREEPING -> 0.55f;
+            default -> 1f;
+        };
+        float fold = 1f - wake;
+        float swing = (float) Math.sin(phase) * run;
+        float amp = 0.5f + 0.4f * run;
+        for (int i = 0; i < VEILMAW_LEGS.length; i++) {
+            ModelPart leg = m.part(VEILMAW_LEGS[i]);
+            float side = i % 2 == 0 ? -1f : 1f;
+            leg.rotZ = side * 1.25f * fold; // splayed outward, flat to the ground
+            leg.rotX = (i == 0 || i == 3 ? swing : -swing) * amp * Math.max(wake, 0.3f);
+        }
+        ModelPart body = m.part("body");
+        body.poseY = -0.22f * fold + (float) Math.sin(t * 1.6 + c.bobPhase) * 0.01f;
+        body.scale = 1f + (float) Math.sin(t * 1.3 + c.bobPhase) * 0.015f; // the membrane breathes
+        ModelPart neck = m.part("neck");
+        neck.poseY = -0.22f * fold;
+        neck.rotX = -1.40f * fold; // the hood laid flat forward
+        float glow;
+        switch (c.state) {
+            case FOLDED -> glow = 0.10f + 0.04f * (float) Math.sin(t * 1.2 + c.bobPhase);
+            case STIRRING -> {
+                neck.rotZ = (float) Math.sin(t * 22) * 0.04f * wake;
+                glow = 0.25f + 0.75f * wake * (0.75f + 0.25f * (float) Math.sin(t * 16));
+            }
+            case LUNGING -> {
+                body.rotX = -0.16f;
+                neck.rotX = 0.25f;
+                glow = 1f;
+            }
+            case RECOILING -> glow = 0.45f;
+            default -> glow = 0.3f;
+        }
+        m.part("vein_l").emissive = glow;
+        m.part("vein_r").emissive = glow;
+        m.part("vein_c").emissive = glow;
+        m.part("tail").emissive = 0.15f + 0.45f * glow;
+        m.part("tail_tip").emissive = 0.15f + 0.45f * glow;
     }
 
     /**
@@ -265,6 +330,43 @@ public final class Animator {
         torso.poseY = Math.abs((float) Math.sin(phase)) * 0.04f * run;
         torso.rotX = 0.05f * run;
 
+        if (n.infected()) {
+            boolean breacher = n.archetype == com.veylon.settlement.NpcArchetype.BREACHER;
+            // Urban milestone 22: the veil growing through the body glows faintly, so one standing in
+            // a dark room is a dim sickly shape rather than nothing, and it brightens through a strike's
+            // windup in step with the strike's sound: the tell reads in the dark as well as the light.
+            float strikeTell = n.strikeWindup >= 0 ? 1 - Math.max(0f, n.strikeWindup)
+                    / (breacher ? com.veylon.ai.BreacherAI.WINDUP : com.veylon.ai.InfectedAI.WINDUP) : 0f;
+            float veil = VEIL_GLOW + VEIL_STRIKE_GLOW * Math.min(1f, strikeTell);
+            m.part("veilRibs").emissive = veil;
+            m.part("veilShoulder").emissive = veil;
+            m.part("breacherSeal").emissive = breacher ? veil : 0f;
+            m.part("breacherHump").emissive = breacher ? veil * 0.8f : 0f;
+            torso.rotX = n.painTimer > 0 ? -0.18f : breacher ? 0.34f : 0.22f;
+            m.part("head").rotZ = breacher ? 0f : -0.13f;
+            m.part("head").rotX = breacher ? 0.26f : 0f; // the sealed face hangs, listening
+            m.part("arm_l").rotX = swing * 0.3f;
+            m.part("arm_r").rotX = breacher ? -0.12f : -0.4f;
+            m.part("arm_r").rotZ = breacher ? -0.05f : -0.16f;
+            if (n.strikeWindup >= 0) {
+                float windup = breacher ? com.veylon.ai.BreacherAI.WINDUP : com.veylon.ai.InfectedAI.WINDUP;
+                float progress = 1 - n.strikeWindup / windup;
+                m.part("arm_r").rotX = -0.4f - (breacher ? 2.3f : 1.8f) * progress;
+                m.part("arm_l").rotX = -0.3f - 0.7f * progress;
+                torso.rotX = 0.10f + 0.25f * progress;
+            } else if (breacher && n.breachDoor != null) {
+                // The ram climbs between blows and drops on the door with each one.
+                float raise = 1f - Math.max(0f, n.breachTimer) / com.veylon.ai.BreacherAI.BLOW_SECONDS;
+                m.part("arm_r").rotX = -0.3f - 2.2f * raise;
+                torso.rotX = 0.18f + 0.2f * raise;
+            }
+            if (n.panic.active()) {
+                m.part("arm_l").rotX = -1.4f;
+                m.part("arm_r").rotX = -1.2f;
+            }
+            return;
+        }
+
         // Idle sway + breathing.
         if (run < 0.1f) {
             torso.rotZ = (float) Math.sin(t * 1.3 + n.bobPhase) * 0.02f;
@@ -281,7 +383,7 @@ public final class Animator {
             case SLEEP -> {
                 ModelPart root = m.part("root");
                 root.rotX = 1.5f;
-                root.poseY = -0.62f;
+                root.poseY = SLEEP_LIFT;
                 m.part("arm_l").rotX = 0.25f;
                 m.part("arm_r").rotX = 0.25f;
             }
@@ -403,5 +505,22 @@ public final class Animator {
         m.part("warPaint").visible = headhunter;
         m.part("medicSash").visible = a == com.veylon.settlement.NpcArchetype.MEDIC;
         m.part("guardPlate").visible = a == com.veylon.settlement.NpcArchetype.GUARD;
+        boolean infected = a != null && a.infected();
+        boolean breacher = a == com.veylon.settlement.NpcArchetype.BREACHER;
+        m.part("veilShoulder").visible = infected && !breacher;
+        m.part("veilRibs").visible = infected;
+        m.part("breacherSeal").visible = breacher;
+        m.part("breacherHump").visible = breacher;
+        m.part("breacherRam").visible = breacher;
+        m.part("friendlyBadge").visible &= !infected;
+        m.part("head").color(breacher ? 0x8f957a : infected ? 0xa1aa8e : 0xd8ad8a);
+        m.part("torso").color(breacher ? 0x55584a : infected ? 0x666954 : 0x33566e);
+        m.part("vest").color(breacher ? 0x63664f : infected ? 0x777965 : vest);
+        int arms = breacher ? 0x7f8668 : infected ? 0x929a7d : 0x3d5468;
+        int legs = breacher ? 0x3f4339 : infected ? 0x494e46 : 0x2e3a44;
+        m.part("arm_l").color(arms); m.part("arm_r").color(arms);
+        m.part("forearm_l").color(arms); m.part("forearm_r").color(arms);
+        m.part("leg_l").color(legs); m.part("leg_r").color(legs);
+        m.part("shin_l").color(legs); m.part("shin_r").color(legs);
     }
 }

@@ -96,6 +96,8 @@ final class SpeciesDismemberQaScene {
             new Body(Kind.CREATURE, CreatureType.WOLF, 3.5f, 75f, CreatureState.ATTACK, 0.3f, 0.2f),
             new Body(Kind.CREATURE, CreatureType.DEER, 5.4f, 105f, CreatureState.GRAZE, 0f, 0.3f),
             new Body(Kind.CREATURE, CreatureType.THORNHORN, 7.8f, 215f, CreatureState.ATTACK, 0.2f, 0.6f),
+            // Urban milestone 15: hood raised mid-lunge, so its pieces show the fan and glow sac.
+            new Body(Kind.CREATURE, CreatureType.VEILMAW, -6.6f, 200f, CreatureState.LUNGING, 0.5f, 0.4f),
     };
     /** A person's running speed in {@code Animator.poseNpc}. */
     private static final float PERSON_RUN = 3.5f;

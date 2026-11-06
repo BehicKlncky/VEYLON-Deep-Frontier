@@ -34,7 +34,8 @@ public class Input {
         }
     }
 
-    void onMouseButton(int button, int action) {
+    /** GLFW mouse-button events; also the production input seam for deterministic routes. */
+    public void onMouseButton(int button, int action) {
         if (button < 0 || button >= 8) {
             return;
         }
@@ -91,6 +92,13 @@ public class Input {
 
     public boolean wasKeyPressed(int key) {
         return key >= 0 && key <= GLFW_KEY_LAST && keyPressed[key];
+    }
+
+    /** Marks this frame's press of {@code key} as handled, so a later reader cannot act on it again. */
+    public void consumePress(int key) {
+        if (key >= 0 && key <= GLFW_KEY_LAST) {
+            keyPressed[key] = false;
+        }
     }
 
     public boolean isMouseDown(int button) {

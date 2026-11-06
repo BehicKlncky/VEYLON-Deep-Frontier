@@ -10,14 +10,20 @@ import com.veylon.world.World;
 
 /**
  * Top-down map of explored terrain around the player. Shows the NPC camp,
- * discovered points of interest and the distress beacon.
+ * discovered points of interest and the distress beacon. A layout-sixteen
+ * city draws its own map instead ({@link CityMap}, urban milestone 21).
  */
 public class MapScreen {
 
     private static final int CELLS = 64;
     private static final int STEP = 2;
+    private final CityMapView city = new CityMapView();
 
     public void update(Game g) {
+        if (CityMap.applies(g.world)) {
+            city.draw(g);
+            return;
+        }
         UiRenderer ui = g.ui;
         int w = ui.screenW(), h = ui.screenH();
         float size = Math.min(w, h) * 0.72f;
@@ -83,6 +89,23 @@ public class MapScreen {
                 boolean lit = world.beaconStage >= 3;
                 ui.rect(x0 + dx * cell - 3, y0 + dz * cell - 3, 7, 7,
                         lit ? 0.4f : 0.3f, lit ? 0.95f : 0.6f, 1f, 1f);
+            }
+        }
+
+        // Layout fourteen: the player's claimed refuges, home ringed in white (urban milestone 18).
+        if (world.urban != null && world.urban.hasRefuges()) {
+            for (var claim : world.urban.refuges.claims()) {
+                if (claim.sleep == null) {
+                    continue;
+                }
+                int dx = (claim.sleep.x() - px) / STEP + half;
+                int dz = (claim.sleep.z() - pz) / STEP + half;
+                if (dx >= 0 && dx < CELLS && dz >= 0 && dz < CELLS) {
+                    boolean home = claim.floor == world.urban.refuges.homeFloor();
+                    ui.rect(x0 + dx * cell - 3, y0 + dz * cell - 3, 7, 7, 0.2f, 0.85f, 0.75f, 1f);
+                    ui.rectOutline(x0 + dx * cell - 4, y0 + dz * cell - 4, 9, 9, 1,
+                            home ? 1f : 0f, home ? 1f : 0f, home ? 1f : 0f, 1f);
+                }
             }
         }
 
@@ -175,7 +198,8 @@ public class MapScreen {
         ui.rectOutline(x0 + half * cell - 4, y0 + half * cell - 4, 9, 9, 1, 0f, 0f, 0f, 1f);
 
         ui.textCentered(w / 2f, y0 + size + 8, 1.2f,
-                "White = you   Orange = camp   Cyan = beacon   ? = settlement rumor   Gold ! = objective   "
+                (world.urban != null && world.urban.hasRefuges() ? "Teal = your refuges (white ring: home)   " : "")
+                + "White = you   Orange = camp   Cyan = beacon   ? = settlement rumor   Gold ! = objective   "
                         + "Green/yellow/red = discovered settlement (C/V/F/K/X; $/+/Z services)   POIs: " + discovered
                         + "/" + world.pois.size(), 0.75f, 0.75f, 0.75f, 1f);
         // POI legend (wraps into rows now that cave POIs exist).

@@ -101,7 +101,7 @@ class FortressGameplayIntegrationTest {
         boolean coveredNegativeWorldCoordinates = false;
         for (long seed : REQUIRED_SEEDS) {
             Game game = new Game();
-            game.newWorld(seed, true);
+            game.newWorld(seed, true, World.GEN_CAVE_IDENTITIES);
             Settlement fortress = findFortress(game.world, true);
             assertNotNull(fortress, "hostile fortress for seed " + seed);
             SettlementBuilder.Layout layout = game.world.layoutFor(fortress);
@@ -213,7 +213,7 @@ class FortressGameplayIntegrationTest {
     void providerTargetedCaptureQuestCompletesThroughRescueMeleeAlarmAndCampfireThenPersists(
             @TempDir Path dir) {
         Game game = new Game();
-        game.newWorld(20_260_716L, true);
+        game.newWorld(20_260_716L, true, World.GEN_CAVE_IDENTITIES);
         Settlement fortress = findFortress(game.world, true);
         assertNotNull(fortress);
         SettlementBuilder.Layout layout = game.world.layoutFor(fortress);
@@ -324,7 +324,7 @@ class FortressGameplayIntegrationTest {
     void placedAndIgnitedKegFuseSurvivesSaveThenBreachesGeneratedHostileGate(
             @TempDir Path dir) {
         Game game = new Game();
-        game.newWorld(987_654_321L, true);
+        game.newWorld(987_654_321L, true, World.GEN_CAVE_IDENTITIES);
         Settlement fortress = findFortress(game.world, true);
         assertNotNull(fortress);
         game.world.layoutFor(fortress);

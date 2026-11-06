@@ -21,15 +21,29 @@ public final class QuestObjectiveView {
         RETURN_TO_PROVIDER
     }
 
-    /** Exact target identity and world position shared by the HUD and map. */
+    /**
+     * Exact target identity and world position shared by the HUD and map; {@code label} names it on
+     * the navigation line, or is null for the legacy wording. In a city, {@code discovered} is false
+     * for a rumoured place: a rough area the survivor was told of, not a point they know.
+     */
     public record Objective(String questId, String targetId, Vec3i position,
-                            Phase phase, boolean discovered) {
+                            Phase phase, boolean discovered, String label) {
+        /** A marker with the legacy navigation wording. */
+        public Objective(String questId, String targetId, Vec3i position, Phase phase, boolean discovered) {
+            this(questId, targetId, position, phase, discovered, null);
+        }
     }
 
     private QuestObjectiveView() {
     }
 
     public static Objective resolve(Game game) {
+        // Layout sixteen: the first mission in hand, or else the communications objective's next place.
+        if (game != null && com.veylon.settlement.UrbanComms.applies(game.world)) {
+            com.veylon.settlement.UrbanComms.Target t = com.veylon.settlement.UrbanMissionBoard.target(game);
+            if (t == null) { t = com.veylon.settlement.UrbanComms.target(game); }
+            return t == null ? null : new Objective(t.id(), t.id(), t.position(), Phase.TARGET, t.exact(), t.label());
+        }
         if (game == null || game.world == null || game.faction.quest == null) {
             return null;
         }
@@ -43,15 +57,24 @@ public final class QuestObjectiveView {
 
     /** Generic navigation text; it deliberately contains no hidden settlement metadata. */
     public static String navigationLabel(Game game) {
-        Objective objective = resolve(game);
+        return navigationLabel(game, resolve(game));
+    }
+
+    /** The navigation text for one objective from where the player stands; empty for none. */
+    public static String navigationLabel(Game game, Objective objective) {
         if (objective == null) {
             return "";
         }
         double dx = objective.position.x() + 0.5 - game.player.pos.x;
         double dz = objective.position.z() + 0.5 - game.player.pos.z;
         int metres = (int) Math.round(Math.hypot(dx, dz));
-        String action = objective.phase == Phase.TARGET
-                ? "Marked objective" : "Return to request provider";
+        if (objective.label != null) {
+            // A city's rumour is a rough place, never a point (urban milestone 21).
+            boolean rumour = !objective.discovered;
+            return objective.label + " - " + (rumour ? "~" : "") + metres + "m " + compass(dx, dz)
+                    + (rumour ? " (rumour)" : "") + "  [M]";
+        }
+        String action = objective.phase == Phase.TARGET ? "Marked objective" : "Return to request provider";
         return action + " - " + metres + "m " + compass(dx, dz) + "  [M]";
     }
 

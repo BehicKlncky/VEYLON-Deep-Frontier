@@ -2,12 +2,13 @@ package com.veylon;
 
 import com.veylon.engine.ParticleSystem;
 import com.veylon.simulation.WeatherSystem.Weather;
+import com.veylon.world.World;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class AmbienceRainTest {
     private static Game scene() {
-        Game g=new Game(); g.newWorld(711,true);
+        Game g=new Game(); g.newWorld(711, true, World.GEN_CAVE_IDENTITIES);
         new RainQaScene(g).stage();
         g.player.envTemp=20;
         g.weather.current=g.weather.next=Weather.STORM; g.weather.blend=1;

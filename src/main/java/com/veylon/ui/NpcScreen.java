@@ -32,6 +32,12 @@ public class NpcScreen {
         UiRenderer ui = g.ui;
         int w = ui.screenW(), h = ui.screenH();
 
+        com.veylon.settlement.UrbanSite site = com.veylon.settlement.UrbanSiteDirector.siteOf(g.world, n);
+        if (site != null) {
+            updateSite(g, n, site, ui, w, h);
+            return;
+        }
+
         com.veylon.settlement.Settlement home =
                 n.settled() ? g.world.settlements.get(n.settlementId) : null;
         boolean friendly = home != null
@@ -119,7 +125,7 @@ public class NpcScreen {
         oy += 36;
 
         if (!lastResponse.isEmpty()) {
-            ui.textShadow(x0 + 30, oy, 1.4f, '"' + lastResponse + '"', 0.95f, 0.9f, 0.7f, 1f);
+            response(ui, lastResponse, x0 + 30, oy, pw - 60, y0 + ph - 30);
         }
         ui.textCentered(w / 2f, y0 + ph - 24, 1.2f, "[Esc or F] leave", 0.7f, 0.7f, 0.7f, 1f);
 
@@ -158,8 +164,156 @@ public class NpcScreen {
         }
     }
 
+    /**
+     * A conversation with someone of an urban survivor camp or hidden refuge (milestone 16): no
+     * legacy quests or wilderness trades, only what those people deal in.
+     */
+    private void updateSite(Game g, Npc n, com.veylon.settlement.UrbanSite site, UiRenderer ui, int w, int h) {
+        float pw = 600, ph = 470;
+        float x0 = w / 2f - pw / 2f, y0 = h / 2f - ph / 2f;
+        ui.panel(x0, y0, pw, ph);
+        ui.textCentered(w / 2f, y0 + 12, 2f, n.name, 1f, 1f, 0.9f, 1f);
+        ui.textCentered(w / 2f, y0 + 36, 1.3f, n.jobName() + " - " + site.label(), 0.8f, 0.85f, 0.9f, 1f);
+        ui.textCentered(w / 2f, y0 + 54, 1.2f, com.veylon.settlement.UrbanSiteDialogue.status(g, n),
+                0.7f, 0.7f, 0.7f, 1f);
+        float oy = y0 + 86;
+        for (String line : siteOptions(g, n)) {
+            option(ui, x0 + 30, oy, line);
+            oy += 26;
+        }
+        oy += 10;
+        if (!lastResponse.isEmpty()) {
+            response(ui, lastResponse, x0 + 30, oy, pw - 60, y0 + ph - 30);
+        }
+        ui.textCentered(w / 2f, y0 + ph - 24, 1.2f, "[Esc or F] leave", 0.7f, 0.7f, 0.7f, 1f);
+        for (int key = 1; key <= 9; key++) {
+            if (g.input.wasKeyPressed(GLFW_KEY_0 + key)) {
+                performSiteChoice(g, n, key);
+                break;
+            }
+        }
+        if (g.input.wasKeyPressed(GLFW_KEY_0)) {
+            performSiteChoice(g, n, 10);
+        }
+    }
+
+    /**
+     * The numbered choices a survivor-site conversation offers, as shown: talk, aid and a gift
+     * for anyone; then a camp or stronghold trader's two offers, a medic's dressing, for hidden
+     * civilians the word of a safe camp, or a stronghold gatekeeper's leave to come in; then a
+     * threat and an attack; to a stronghold, news of a raider yard the player has taken; and, in layout
+     * sixteen, the old radio relay ({@link com.veylon.settlement.UrbanComms}) and, on the key 0 (choice 10),
+     * their missions ({@link com.veylon.settlement.UrbanMissionBoard}).
+     */
+    public java.util.List<String> siteOptions(Game g, Npc n) {
+        com.veylon.settlement.UrbanSite site = com.veylon.settlement.UrbanSiteDirector.siteOf(g.world, n);
+        java.util.List<String> out = new java.util.ArrayList<>();
+        out.add("[1] Talk");
+        out.add("[2] Give food and water");
+        ItemStack sel = g.player.selected();
+        out.add("[3] Give held item" + (sel != null ? " (" + com.veylon.item.ItemNames.of(sel.type, true) + ")" : " (nothing held)"));
+        if (site != null) {
+            var offers = com.veylon.settlement.UrbanSiteDialogue.offers(g, n);
+            var role = site.resident(n.residentIndex).role;
+            if (!offers.isEmpty()) {
+                out.add("[4] Trade " + offers.get(0).describe());
+                out.add("[5] Trade " + offers.get(1).describe());
+            } else if ((site.camp() || site.stronghold()) && role == com.veylon.world.urban.SurvivorSites.Role.MEDIC) {
+                out.add("[4] Ask to have your wounds dressed");
+            } else if (site.refuge()) {
+                out.add(com.veylon.settlement.UrbanSiteDialogue.campFor(g, site) == null
+                        ? "[4] Tell them of a safe place (you know none)" : "[4] Tell them about the camp you found");
+            } else if (site.stronghold() && role == com.veylon.world.urban.SurvivorSites.Role.GATEKEEPER) {
+                out.add(com.veylon.settlement.CompoundAccess.hasPass(g, site)
+                        ? "[4] Ask to be let through (you have a visitor's pass)" : "[4] Ask to be let in");
+            }
+        }
+        out.add("[6] Demand their supplies");
+        out.add("[7] Attack");
+        if (site != null && site.stronghold() && com.veylon.settlement.CompoundAccess.unpaidYard(g) != null) {
+            out.add("[8] Tell them the raider yard is taken");
+        }
+        // Layout sixteen: the old relay, its rumour and its codes (urban milestone 20).
+        String radio = com.veylon.settlement.UrbanComms.radioOption(g, n);
+        if (radio != null) { out.add(radio); }
+        String work = com.veylon.settlement.UrbanMissionBoard.missionOption(g, n);
+        if (work != null) { out.add(work); }
+        return out;
+    }
+
+    /**
+     * Gameplay command behind a numbered choice in a survivor-site conversation, shared by the
+     * keys and the tests. Returns false for a number the conversation does not offer.
+     */
+    public boolean performSiteChoice(Game g, Npc n, int choice) {
+        com.veylon.settlement.UrbanSite site = com.veylon.settlement.UrbanSiteDirector.siteOf(g.world, n);
+        if (n == null || n.dead || site == null) { return false; }
+        boolean trader = !com.veylon.settlement.UrbanSiteDialogue.offers(g, n).isEmpty();
+        var role = site.resident(n.residentIndex).role;
+        switch (choice) {
+            case 1 -> lastResponse = com.veylon.settlement.UrbanSiteDialogue.talk(g, n);
+            case 2 -> lastResponse = com.veylon.settlement.UrbanSiteDialogue.giveSupplies(g, n);
+            case 3 -> lastResponse = com.veylon.settlement.UrbanSiteDialogue.giveHeld(g, n);
+            case 4 -> {
+                if (trader) {
+                    lastResponse = com.veylon.settlement.UrbanSiteDialogue.trade(g, n, 0);
+                } else if ((site.camp() || site.stronghold()) && role == com.veylon.world.urban.SurvivorSites.Role.MEDIC) {
+                    lastResponse = com.veylon.settlement.UrbanSiteDialogue.treat(g, n);
+                } else if (site.refuge()) {
+                    lastResponse = com.veylon.settlement.UrbanSiteDialogue.guide(g, n);
+                } else if (site.stronghold() && role == com.veylon.world.urban.SurvivorSites.Role.GATEKEEPER) {
+                    var plan = site.compoundPlan(g.world.urban);
+                    if (plan == null) { return false; }
+                    lastResponse = com.veylon.settlement.CompoundAccess.admit(g, site, plan, n);
+                } else {
+                    return false;
+                }
+            }
+            case 5 -> {
+                if (!trader) { return false; }
+                lastResponse = com.veylon.settlement.UrbanSiteDialogue.trade(g, n, 1);
+            }
+            case 6 -> lastResponse = com.veylon.settlement.UrbanSiteDialogue.demand(g, n);
+            case 7 -> performAttack(g, n);
+            case 8 -> {
+                if (!site.stronghold() || com.veylon.settlement.CompoundAccess.unpaidYard(g) == null) { return false; }
+                lastResponse = com.veylon.settlement.CompoundAccess.reward(g, site);
+            }
+            case 9 -> {
+                if (com.veylon.settlement.UrbanComms.radioOption(g, n) == null) { return false; }
+                lastResponse = com.veylon.settlement.UrbanComms.askAboutRadio(g, n);
+            }
+            // The key 0 (urban milestone 20): work, a report or a price.
+            case 10 -> {
+                if (com.veylon.settlement.UrbanMissionBoard.missionOption(g, n) == null) { return false; }
+                lastResponse = com.veylon.settlement.UrbanMissionBoard.askForWork(g, n);
+            }
+            default -> { return false; }
+        }
+        return true;
+    }
+
     private void option(UiRenderer ui, float x, float y, String s) {
         ui.textShadow(x, y, 1.5f, s, 0.9f, 0.95f, 1f, 1f);
+    }
+
+    /**
+     * The last answer, wrapped inside the panel above its footer (urban milestone 21): a long answer,
+     * such as where the relay stands, no longer runs past the panel's edge.
+     */
+    public static java.util.List<String> responseLines(String said, float width, float height,
+                                                java.util.function.ToDoubleFunction<String> measure) {
+        int room = Math.max(1, Math.min(4, (int) (height / RESPONSE_PITCH)));
+        return HudLayout.wrap('"' + said + '"', width, room, measure);
+    }
+
+    private static final float RESPONSE_SCALE = 1.4f, RESPONSE_PITCH = 20;
+
+    private static void response(UiRenderer ui, String said, float x, float y, float width, float bottom) {
+        for (String line : responseLines(said, width, bottom - y, s -> ui.textWidth(s, RESPONSE_SCALE))) {
+            ui.textShadow(x, y, RESPONSE_SCALE, line, 0.95f, 0.9f, 0.7f, 1f);
+            y += RESPONSE_PITCH;
+        }
     }
 
     private void tradeOption(UiRenderer ui, float x, float y, String key,

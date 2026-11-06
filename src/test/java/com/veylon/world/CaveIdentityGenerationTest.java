@@ -31,7 +31,7 @@ class CaveIdentityGenerationTest {
     @Test
     void requiredSeedsGenerateRootLifeAndBasaltHazardsAtNegativeCoordinates() {
         for (long seed : REQUIRED_SEEDS) {
-            World world = new World(seed, World.CURRENT_GENERATOR);
+            World world = new World(seed, World.GEN_CAVE_IDENTITIES);
             for (int cx = -4; cx <= 4; cx++) {
                 for (int cz = -4; cz <= 4; cz++) {
                     world.getOrCreateChunk(cx, cz);
@@ -82,8 +82,8 @@ class CaveIdentityGenerationTest {
                 chunks.add(new int[]{cx, cz});
             }
         }
-        World forward = new World(seed, World.CURRENT_GENERATOR);
-        World reverse = new World(seed, World.CURRENT_GENERATOR);
+        World forward = new World(seed, World.GEN_CAVE_IDENTITIES);
+        World reverse = new World(seed, World.GEN_CAVE_IDENTITIES);
         for (int[] chunk : chunks) {
             forward.getOrCreateChunk(chunk[0], chunk[1]);
         }
@@ -114,7 +114,7 @@ class CaveIdentityGenerationTest {
     void generatedFumaroleHazardCanBeMinedAndStaysRemovedAfterSaveLoad(
             @TempDir Path tempDir) {
         Game game = new Game();
-        game.newWorld(20260716L, true);
+        game.newWorld(20260716L, true, World.GEN_CAVE_IDENTITIES);
         Vec3i vent = null;
         for (int radius = 0; radius <= 6 && vent == null; radius++) {
             for (int cx = -radius; cx <= radius && vent == null; cx++) {
@@ -151,7 +151,7 @@ class CaveIdentityGenerationTest {
         assertTrue(SaveSystem.save(game, save));
         Game loaded = new Game();
         assertTrue(SaveSystem.load(loaded, save));
-        assertEquals(World.CURRENT_GENERATOR, loaded.world.generatorVersion);
+        assertEquals(World.GEN_CAVE_IDENTITIES, loaded.world.generatorVersion);
         assertEquals(BlockType.AIR, loaded.world.getBlock(
                 sulfurSource.x(), sulfurSource.y(), sulfurSource.z()));
         assertFalse(loaded.world.isBasaltFumarole(vent.x(), vent.y(), vent.z()),

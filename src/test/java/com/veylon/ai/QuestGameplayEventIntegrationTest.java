@@ -14,6 +14,7 @@ import com.veylon.ui.NpcScreen;
 import com.veylon.util.Vec3i;
 import com.veylon.world.BlockType;
 import com.veylon.world.Poi;
+import com.veylon.world.World;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -402,7 +403,7 @@ class QuestGameplayEventIntegrationTest {
 
     private static Context generatedContext(long seed) {
         Game game = new Game();
-        game.newWorld(seed, true);
+        game.newWorld(seed, true, World.GEN_CAVE_IDENTITIES);
         Settlement home = null;
         for (int rx = -12; rx <= 12; rx++) {
             for (int rz = -12; rz <= 12; rz++) {

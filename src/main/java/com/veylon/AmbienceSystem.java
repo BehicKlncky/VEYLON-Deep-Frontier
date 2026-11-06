@@ -1,5 +1,6 @@
 package com.veylon;
 
+import com.veylon.engine.AudioEnvironment;
 import com.veylon.engine.ParticleSystem;
 import com.veylon.entity.Affliction;
 import com.veylon.simulation.LiquidFireSystem;
@@ -7,6 +8,7 @@ import com.veylon.simulation.WeatherSystem;
 import com.veylon.util.Vec3i;
 import com.veylon.world.Biome;
 import com.veylon.world.BlockType;
+import com.veylon.world.urban.UrbanDistrict;
 import org.joml.Vector3f;
 
 import java.util.List;
@@ -75,6 +77,8 @@ final class AmbienceSystem {
     /** Blocks below the surface at which cave ambience takes over. */
     private static final float CAVE_DEPTH = 5f;
     private static final float CAVE_GAIN = 0.9f;
+    /** A city cellar's low room tone, on the cave channel (urban milestone 22). */
+    private static final float CELLAR_GAIN = 0.45f;
     private static final float CRICKET_GAIN = 0.8f;
     /** Blocks within which the lit beacon is audible. */
     private static final double BEACON_AUDIO_RANGE = 22.0;
@@ -82,6 +86,13 @@ final class AmbienceSystem {
     private final Game game;
     /** What burning bodies give off and how they sound. */
     final BodyFireEffects bodyFire;
+    /** The last ambient mix computed, for QA reports: rain, wind, fire, cave, crickets, beacon. */
+    final float[] lastMix = new float[6];
+    /** The generated city's own sounds around the survivor (urban milestone 22). */
+    final CitySoundscape soundscape = new CitySoundscape();
+    /** The acoustic zone of the last mix, and how much of the weather outside reached the listener. */
+    AudioEnvironment.Zone lastZone = AudioEnvironment.Zone.OPEN;
+    float lastReach = 1f;
     private final Vector3f firePosition = new Vector3f();
     private final Random emitterRng = new Random();
     private float emitterTimer;
@@ -98,6 +109,9 @@ final class AmbienceSystem {
         emitterRng.setSeed(seed);
         rainField.reset();
         bodyFire.reset();
+        soundscape.reseed(seed);
+        lastZone = AudioEnvironment.Zone.OPEN;
+        lastReach = 1f;
         emitterTimer = breathTimer = coughTimer = 0;
     }
 
@@ -119,6 +133,7 @@ final class AmbienceSystem {
         emitFires(px, py, pz);
         emitLiquidFire(px, py, pz);
         bodyFire.update(EMITTER_INTERVAL, emitterRng);
+        soundscape.update(game, EMITTER_INTERVAL, lastZone, lastMix[1]);
         emitBeacon(px, py, pz);
         emitPlayerEffects();
     }
@@ -145,8 +160,8 @@ final class AmbienceSystem {
                         pz + (rng.nextFloat() * 2 - 1) * ASHFALL_RADIUS);
             }
         }
-        // Toxic fog carries slow, sickly motes at eye and ground level.
-        if (game.events.toxicFog()) {
+        // Toxic fog carries slow, sickly motes at eye and ground level, only where it sickens.
+        if (game.events.toxicFog() && game.player.toxicFogHarmfulHere()) {
             for (int i = 0; i < TOXIC_PARTICLES; i++) {
                 game.particles.toxicMote(px + (rng.nextFloat() * 2 - 1) * TOXIC_RADIUS,
                         py + 0.3f + rng.nextFloat() * 2.2f,
@@ -285,16 +300,40 @@ final class AmbienceSystem {
             }
         }
 
-        int surface = game.world.surfaceHeight((int) game.player.pos.x, (int) game.player.pos.z);
-        float caveGain = game.player.pos.y < surface - CAVE_DEPTH ? CAVE_GAIN : 0f;
-        if (game.audio.isEnabled()) game.audio.setEnvironment(
-                AudioSceneState.environment(game, surface - game.player.pos.y));
+        boolean generatedUrban = game.world.urban != null && game.world.urban.hasGeneratedBuildings();
+        int px = generatedUrban ? (int) Math.floor(game.player.pos.x) : (int) game.player.pos.x;
+        int pz = generatedUrban ? (int) Math.floor(game.player.pos.z) : (int) game.player.pos.z;
+        float depth = game.world.environmentDepth(px, game.player.pos.y, pz);
+        float caveGain = depth > CAVE_DEPTH ? CAVE_GAIN : 0f;
+        AudioEnvironment.Zone zone = generatedUrban || game.audio.isEnabled()
+                ? AudioSceneState.environment(game, depth) : AudioEnvironment.Zone.OPEN;
+        if (game.audio.isEnabled()) game.audio.setEnvironment(zone);
+        float reach = 1f;
+        if (generatedUrban) {
+            // Urban milestone 22: the weather a listener hears follows where they stand: all of it
+            // in the street, less under a porch, a little deep in a room and more beside its
+            // window, a trace in a cellar. A cellar has its own low room tone and drips.
+            reach = game.player.exposedToSky ? 1f : AudioSceneState.weatherReach(zone, game.world.skyLight(px,
+                    (int) Math.floor(game.player.pos.y + game.player.eyeHeight()), pz));
+            rainGain = game.weather.isPrecip() && !snow ? game.weather.intensity() * reach : 0f;
+            windGain *= reach;
+            if (zone == AudioEnvironment.Zone.BASEMENT && caveGain == 0f) { caveGain = CELLAR_GAIN; }
+        }
 
         boolean cricketBiome = game.player.biome == Biome.MEADOW
                 || game.player.biome == Biome.PINE_FOREST
                 || game.player.biome == Biome.MARSH;
         float cricketGain = game.time.isNight() && !game.weather.isPrecip()
                 && caveGain == 0 && cricketBiome ? CRICKET_GAIN : 0f;
+        if (generatedUrban) {
+            // Night insects keep to the overgrown housing and the flooded quarter, and are heard
+            // indoors only as much as the weather is.
+            UrbanDistrict district = game.player.district;
+            boolean insects = district == null || district == UrbanDistrict.RESIDENTIAL || district == UrbanDistrict.FLOODED;
+            cricketGain = insects ? cricketGain * reach : 0f;
+        }
+        lastZone = zone;
+        lastReach = reach;
 
         float beaconGain = 0f;
         if (game.world.beaconStage >= 3 && game.world.beaconPos != null) {
@@ -304,9 +343,15 @@ final class AmbienceSystem {
                 beaconGain = (float) (1.0 - Math.sqrt(d) / BEACON_AUDIO_RANGE);
             }
         }
-        if (game.audio.isEnabled()) game.audio.setMusicMood(AudioSceneState.music(game, surface - game.player.pos.y));
+        if (game.audio.isEnabled()) game.audio.setMusicMood(AudioSceneState.music(game, depth));
         game.audio.setSheltered(!game.player.exposedToSky);
         game.audio.setWeatherIntensity(game.weather.intensity());
         game.audio.setAmbience(rainGain, windGain, fireGain, caveGain, cricketGain, beaconGain);
+        lastMix[0] = rainGain;
+        lastMix[1] = windGain;
+        lastMix[2] = fireGain;
+        lastMix[3] = caveGain;
+        lastMix[4] = cricketGain;
+        lastMix[5] = beaconGain;
     }
 }

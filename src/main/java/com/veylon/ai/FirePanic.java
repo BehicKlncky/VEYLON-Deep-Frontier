@@ -1,5 +1,6 @@
 package com.veylon.ai;
 
+import com.veylon.FixtureActions;
 import com.veylon.Game;
 import com.veylon.entity.BodyCombustion;
 import com.veylon.entity.Creature;
@@ -9,6 +10,7 @@ import com.veylon.entity.Npc;
 import com.veylon.entity.Npc.NpcState;
 import com.veylon.util.Vec3i;
 import com.veylon.world.BlockType;
+import com.veylon.world.Fixtures;
 import com.veylon.world.Chunk;
 import com.veylon.world.World;
 
@@ -410,6 +412,12 @@ public final class FirePanic {
                 g.settlementManager.openGate(g, new Vec3i(x, y + dy, z));
             }
         }
+        // And an unlocked door, which swings shut behind them.
+        if (Fixtures.isClosedDoor(w.getBlock(x, y, z))) {
+            FixtureActions.residentOpens(g, x, y, z);
+        } else if (Fixtures.isClosedDoor(w.getBlock(x, y + 1, z))) {
+            FixtureActions.residentOpens(g, x, y + 1, z);
+        }
     }
 
     // ------------------------------------------------------------------
@@ -563,7 +571,8 @@ public final class FirePanic {
 
     /** The feet level a walker at {@code (fromX, y, fromZ)} would stand at in column {@code (x, z)}. */
     private static int footing(World w, int fromX, int y, int fromZ, int x, int z, boolean opensGates) {
-        if (!opensGates && (w.getBlock(x, y, z) == BlockType.GATE || w.getBlock(x, y + 1, z) == BlockType.GATE)) {
+        if (!opensGates && (w.getBlock(x, y, z) == BlockType.GATE || w.getBlock(x, y + 1, z) == BlockType.GATE
+                || Fixtures.isClosedDoor(w.getBlock(x, y, z)) || Fixtures.isClosedDoor(w.getBlock(x, y + 1, z)))) {
             return NO_FOOTING;
         }
         if (Pathfinder.standable(w, x, y, z)) {

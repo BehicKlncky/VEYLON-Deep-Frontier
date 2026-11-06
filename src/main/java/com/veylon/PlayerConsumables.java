@@ -42,8 +42,8 @@ final class PlayerConsumables {
     static final float POISON_DURATION_MIN = 90f;
     static final float POISON_DURATION_RANGE = 60f;
 
-    // Drinking.
-    private static final float CLEAN_WATER_THIRST = 60f;
+    // Drinking. A clean litre's relief is read by the urban sustainability check (milestone 19).
+    static final float CLEAN_WATER_THIRST = 60f;
     private static final float DIRTY_WATER_THIRST = 35f;
     private static final double DIRTY_WATER_POISON_CHANCE = 0.30;
 
@@ -118,13 +118,12 @@ final class PlayerConsumables {
     void drink(ItemStack held) {
         Player p = game.player;
         boolean clean = held.type == ItemType.WATERSKIN_CLEAN;
+        if (!p.abilities.unlimitedItems() && !SurvivalTransfers.exchange(game, held.type, ItemType.WATERSKIN_EMPTY)) {
+            return;
+        }
         p.thirst = Math.min(MAX_NEED,
                 p.thirst + (clean ? CLEAN_WATER_THIRST : DIRTY_WATER_THIRST));
         // R22: a free drink keeps the filled skin and returns no extra empty one.
-        if (!p.abilities.unlimitedItems()) {
-            p.inventory.shrink(p.hotbarSel, 1);
-            p.inventory.add(ItemType.WATERSKIN_EMPTY, 1);
-        }
         game.audio.playDrink();
         if (clean) {
             game.log("You drink clean water (+" + (int) CLEAN_WATER_THIRST + " thirst).");

@@ -10,6 +10,7 @@ import com.veylon.settlement.NpcArchetype;
 import com.veylon.settlement.Settlement;
 import com.veylon.settlement.SettlementType;
 import com.veylon.util.Vec3i;
+import com.veylon.world.World;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -130,7 +131,7 @@ class MapScreenTest {
 
     private static Game targetedSettlementQuestGame(Quest.Type type) {
         Game game = new Game();
-        game.newWorld(20260716L, true);
+        game.newWorld(20260716L, true, World.GEN_CAVE_IDENTITIES);
         Settlement provider = null;
         boolean hasCaptive = false;
         for (int rx = -10; rx <= 10; rx++) {

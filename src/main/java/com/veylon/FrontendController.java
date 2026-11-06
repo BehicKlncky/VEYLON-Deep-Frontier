@@ -7,6 +7,7 @@ import com.veylon.ui.AudioOptionsScreen;
 import com.veylon.ui.NewFrontierScreen;
 import com.veylon.ui.PresentationOverlay;
 import com.veylon.ui.TitleScreen;
+import com.veylon.world.World;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -39,6 +40,14 @@ final class FrontendController {
     private boolean loadingPresented;
     /** The mode chosen on the new-frontier screen; transient, consumed by one load. */
     private GameMode newWorldMode = GameMode.SURVIVAL;
+    /**
+     * This session's new world: the one NEW FRONTIER opens on and staged frontend captures build.
+     * The city unless the {@code VEYLON_GENERATOR} QA selector says otherwise
+     * ({@code AutomatedRunDriver.configuredGenerator}).
+     */
+    int newWorldGenerator = World.DEFAULT_NEW_WORLD_GENERATOR;
+    /** The generator chosen on the new-frontier screen; transient, consumed by one load. */
+    private int chosenGenerator = World.DEFAULT_NEW_WORLD_GENERATOR;
     /** The single save slot. Visible for testing so routing tests use an isolated file. */
     Path savePath = SaveSystem.SAVE_PATH;
 
@@ -87,17 +96,32 @@ final class FrontendController {
         }
     }
 
-    /** Opens the worldless mode choice; the save check happens once, not every frame. */
+    /**
+     * Opens the worldless choice of world and mode on this session's world; the save check happens
+     * once, not every frame.
+     */
     void openNewFrontier(boolean saveExists) {
-        game.newFrontierScreen.open(saveExists);
+        game.newFrontierScreen.open(saveExists, World.isUrbanGenerator(newWorldGenerator));
         game.appState = Game.AppState.TITLE_NEW_WORLD;
     }
 
-    /** START carries the chosen mode into the two-frame loading; BACK creates nothing. */
+    /**
+     * The generator a choice on the new-frontier screen builds: the session's own world for its kind,
+     * the other kind's default otherwise.
+     */
+    int generatorFor(boolean city) {
+        if (city == World.isUrbanGenerator(newWorldGenerator)) {
+            return newWorldGenerator;
+        }
+        return city ? World.DEFAULT_NEW_WORLD_GENERATOR : World.WILDERNESS_NEW_WORLD_GENERATOR;
+    }
+
+    /** START carries the chosen world and mode into the two-frame loading; BACK creates nothing. */
     void applyNewFrontier(NewFrontierScreen.Action action) {
         switch (action) {
             case START -> {
                 newWorldMode = game.newFrontierScreen.selectedMode();
+                chosenGenerator = generatorFor(game.newFrontierScreen.showsCity());
                 beginLoading(LoadRequest.NEW_GAME);
             }
             case BACK -> game.appState = Game.AppState.TITLE;
@@ -134,9 +158,18 @@ final class FrontendController {
         game.uiMode = Game.UiMode.PAUSE;
     }
 
+    /** The loading line: what is being restored or made. */
+    String loadingDetail() {
+        if (loadRequest == LoadRequest.LOAD_GAME) {
+            return "Restoring your frontier...";
+        }
+        int generator = loadRequest == LoadRequest.NEW_GAME ? chosenGenerator : newWorldGenerator;
+        return World.isUrbanGenerator(generator) ? "Mapping the abandoned city..."
+                : "Mapping atmosphere and terrain...";
+    }
+
     private void presentLoading() {
-        String detail = loadRequest == LoadRequest.LOAD_GAME
-                ? "Restoring your frontier..." : "Mapping atmosphere and terrain...";
+        String detail = loadingDetail();
         PresentationOverlay.loading(game.ui, detail, game.totalTime);
         loadingPresented = true;
     }
@@ -175,11 +208,12 @@ final class FrontendController {
         if (loadRequest == LoadRequest.LOAD_GAME) {
             loaded = SaveSystem.load(game, savePath);
         } else {
-            game.newWorld(game.sessionSeed, true, newWorldMode);
+            game.newWorld(game.sessionSeed, true, chosenGenerator, newWorldMode);
             loaded = true;
         }
         loadRequest = null;
         newWorldMode = GameMode.SURVIVAL;
+        chosenGenerator = newWorldGenerator;
         if (loaded) {
             game.appState = Game.AppState.PLAYING;
             game.closeScreens();
@@ -237,7 +271,8 @@ final class FrontendController {
     /**
      * Opens a specific screen for the VEYLON_FRONTEND QA captures. A
      * {@code -creative} suffix stages the world in Creative; {@code newworld-save}
-     * shows the replace notice without writing a save file.
+     * shows the replace notice without writing a save file. Staged worlds use the
+     * session's new-world generator, so the development selector applies to them too.
      */
     void openForQa(String screen) {
         GameMode qaMode = screen.endsWith("-creative") ? GameMode.CREATIVE : GameMode.SURVIVAL;
@@ -258,7 +293,7 @@ final class FrontendController {
             case "newworld" -> openNewFrontier(Files.exists(savePath));
             case "newworld-save" -> openNewFrontier(true);
             case "pause", "pause-creative", "gamemode", "gamemode-creative" -> {
-                game.newWorld(game.sessionSeed, true, qaMode);
+                game.newWorld(game.sessionSeed, true, newWorldGenerator, qaMode);
                 game.appState = Game.AppState.PLAYING;
                 game.uiMode = Game.UiMode.PAUSE;
                 if (screen.startsWith("gamemode")) {
@@ -266,17 +301,17 @@ final class FrontendController {
                 }
             }
             case "worldcontrols", "worldcontrols-held" -> {
-                game.newWorld(game.sessionSeed, true, GameMode.CREATIVE);
+                game.newWorld(game.sessionSeed, true, newWorldGenerator, GameMode.CREATIVE);
                 game.appState = Game.AppState.PLAYING;
                 game.creativeQa.openWorldControlsForQa(screen);
             }
             case "catalog", "catalog-tools", "catalog-search", "catalog-inventory" -> {
-                game.newWorld(game.sessionSeed, true, GameMode.CREATIVE);
+                game.newWorld(game.sessionSeed, true, newWorldGenerator, GameMode.CREATIVE);
                 game.appState = Game.AppState.PLAYING;
                 game.creativeQa.openCatalogForQa(screen);
             }
             case "death", "victory", "victory-creative" -> {
-                game.newWorld(game.sessionSeed, true, qaMode);
+                game.newWorld(game.sessionSeed, true, newWorldGenerator, qaMode);
                 game.appState = "death".equals(screen)
                         ? Game.AppState.DEATH : Game.AppState.VICTORY;
                 game.deathTimer = 30f;

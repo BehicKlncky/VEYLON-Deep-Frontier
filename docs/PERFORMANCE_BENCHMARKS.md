@@ -383,3 +383,119 @@ the fast tick; the benchmark above measures it at full load instead. The `save`
 failure is the host gap recorded for 0.7.4 and 0.8.0. Details and the native
 frame times are in the
 [engineering record](engineering/ALL_LIVING_COMBAT_FIRE.md#performance).
+
+## Dense city (urban milestone 24, 2026-11-05)
+
+Urban milestone 24 adds no calibrated budget and changes none. It adds a city
+profile and a native tour, and records what the dense city costs before and
+after the package's changes on the **second machine**: AMD Ryzen 5 5600X (6
+cores, 12 threads), 31.9 GB, Windows 11 Pro 10.0.26200, NVIDIA GeForce RTX 3060
+Ti with OpenGL 3.3.0 NVIDIA 621.01 (Windows driver 32.0.16.2101), Temurin
+25.0.4.1+1, launcher `-Xmx2G`. Nothing here re-baselines anything. "Before" is
+`3438751` (the instruments on the unoptimized engine), "after" is `0dd758c`.
+
+### City profile (`cityPerformanceTest`)
+
+`UrbanCityPerformanceTest` on the economy city (generator 20, seed 20260731,
+render distance 6) in its own worker under a 2 GiB heap. Figures are single
+runs, read as shapes; its targets are DESIGN §17.4's, from the 60 fps frame.
+
+| Measure | Before | After |
+| --- | ---: | ---: |
+| City chunk generation, plans warm, 1,536 chunks, p50 / p95 / p99 | 0.057 / 0.229 / 0.434 ms | 0.053 / 0.214 / 0.409 ms |
+| City chunk CPU meshing, 1,176 chunks, mean / p95 / p99 | 1.70 / 2.95 / 4.32 ms | 1.71 / 2.90 / 3.85 ms |
+| Meshes built per generated chunk, walk / sprint / flight | 2.82 / 2.75 / 2.59 | 1.15 / 1.07 / 0.93 |
+| Streaming CPU frame p99, walk / sprint / flight (target 8.3 ms) | 9.24 / 9.39 / 10.80 ms | 6.47 / 6.57 / 7.64 ms |
+| Meshing share of that frame p99, walk / flight | 7.35 / 8.88 ms | 4.97 / 5.19 ms |
+| Slow tick, street / stronghold yard (max of two) | 18.5 / 8.5 ms | 5.6 / 0.4 ms |
+| 8 km of fast flight: retained chunks at 1, 4, 8 km | 975, 3,419, 6,664 | 1,155, 1,916, 1,803 |
+| 8 km: heap after collection at 1, 4, 8 km | 50.8, 114.9, 199.4 MiB | 55.0, 75.5, 72.6 MiB |
+| 8 km: both chunk selections a frame, at 1 and 8 km (mean) | 0.020, 0.153 ms | 0.002, 0.002 ms |
+| 8 km: save at 1 and 8 km (12.4 and 43.7 KB) | 21.9, 128.5 ms | 21.2, 109.8 ms |
+| 8 km: load at 1 and 8 km | 140.8, 459.2 ms | 124.6, 401.5 ms |
+
+A cold `newWorld` took 441 ms before and 522 ms after in one sample each (121
+chunks; the first world of the worker); three warm ones took 138–157 and 121–142
+ms. Each streaming run's world start carries one 69–77 ms frame, the first slow
+tick planning the spawn's sites and anchors, in both. Region plans cost 1.4–4.7
+ms, a region's buildings 88–180 ms (1.1–2.5 ms each). One retained city chunk
+costs about 27 KB of heap in steady state.
+
+### Native tour (`VEYLON_SCENE=urban_performance`)
+
+Survival, 1280 × 720, VSync off, render distance 6, shadows 1, bloom and FXAA
+on, seed 20260731, no concurrent build. Each leg measures after a 2 s settle.
+Both runs: `pass=true`, 0 `glGetError`, 0 KHR errors, 0 OpenAL errors.
+
+| Leg | Before avg FPS, p99 / max ms | After avg FPS, p99 / max ms |
+| --- | ---: | ---: |
+| Street walk, 28 s | 1,094, 1.44 / 28.5 | 1,126, 1.29 / 23.3 |
+| Apartment kitchen / upper floor / basement | 1,073 / 1,046 / 1,123, ≤ 1.38 / ≤ 11.3 | 1,021 / 1,017 / 1,059, ≤ 1.39 / ≤ 14.0 |
+| Transit platform / tunnel | 1,087 / 1,088, ≤ 1.39 / ≤ 10.6 | 1,077 / 1,066, ≤ 1.29 / ≤ 10.3 |
+| Stronghold yard | 1,074, 1.30 / 16.6 | 1,081, 1.33 / 21.8 |
+| Quarantine growth | 1,130, 1.23 / 22.9 | 1,096, 1.27 / 18.9 |
+| Storm with a building fire | 1,011, 1.51 / 24.7 | 961, 1.56 / 26.7 |
+| Fast travel, five minutes | 778–881, 8.36–10.11 / 27.9–66.7 | 889–1,082, 1.85–3.40 / 24.7–33.8 |
+| Fast travel: retained chunks, heap after collection | 6,113, 188.0 MiB | 1,977, 81.4 MiB |
+| F5 / F9 frame after the journey | 120.2 / 736.9 ms | 104.4 / 546.4 ms |
+
+The world's CPU submission takes 0.16–0.24 ms a frame in every leg; the frame is
+GPU-bound near a millisecond. During travel meshing fell from 6.7–8.4 ms to
+0.01–1.6 ms at p99 (1,053 chunks generated and 2,703–2,732 meshes built a minute
+before, 1,215 and 1,053–1,083 after). The remaining maxima are the simulation
+step's slow ticks (23–30 ms in travel, 15–18 ms arriving at a stronghold or a
+growth site) planning new regions' sites and anchors (DESIGN §17.5).
+
+### Calibrated gates on this host
+
+`performanceTest` on `0dd758c`: the city and rain profiles pass; chunk tick
+0.634, entity tick 0.605, settlement tick 0.016 ms; all-living contact 0.079,
+fragment step 0.032, presentation 0.095 ms; ragdoll 0.455 ms a fixed tick;
+audio occlusion 0.0019 ms, synthesis 441.5 ms and 43,443,964 PCM bytes, music
+0.000004 ms; `TickProfileTest`'s whole cycle 0.105 ms. The durable `save` gate
+fails at 5.879 ms against 2.20, the host gap recorded since 0.7.4 (5.217 ms on
+`3438751` the same afternoon), so `load` was not timed.
+
+The whole-task chunk and entity ticks also read 0.410 and 0.433 ms on
+`3438751` against 0.642 and 0.644 ms on `0dd758c` with the profiles excluded,
+but `PerformanceBenchmarkTest` run alone twice on each tree gives 0.640/0.647 and
+0.613/0.629 ms (chunk) and 0.700/0.705 and 0.711/0.719 ms (entity): the same.
+The difference is class order: the new test classes moved the benchmark to run
+first, on a colder JVM, instead of after the other benchmark classes had warmed
+the shared world code. These two figures depend on what ran before them in the
+worker.
+
+The release smoke (`VEYLON_SMOKE=30`, seed 20260910, a legacy world, 1280 ×
+720, VSync off) on `0dd758c` passes: 1,495 FPS, p99 0.88 ms, max 16.2 ms,
+fortress approach 1,580 FPS, save and load, every hard limit, 0 GL and KHR
+errors; a legacy world dropped no chunk (`chunks={retained=600,unloaded=0}`).
+
+## Default urban rollout (urban milestone 26, 2026-11-06)
+
+The abandoned city is now the default new world, so the release smoke runs in the
+city unless `VEYLON_GENERATOR=wilderness` is set. Measured on the second machine
+(AMD Ryzen 5 5600X, NVIDIA GeForce RTX 3060 Ti, OpenGL 3.3.0 NVIDIA 621.01), 1280 ×
+720, VSync off, seed 20260910, each with its own isolated data directory and no
+concurrent build work, on `011cdc3`'s code with the NEW FRONTIER layout fix:
+
+| Smoke | Average FPS | p95 / p99 / max ms | Notes |
+| --- | --- | --- | --- |
+| City, Survival (the default) | 1,036.9 | 1.07 / 1.11 / 9.44 | 225 chunks loaded, 362 meshes built, none dropped; 4 residents and 2 infected awake; no fortress approach (none exists in a city) |
+| City, Creative | 1,057.0 | 1.07 / 1.11 / 9.04 | 240 chunks after the flight leg |
+| Wilderness, Survival | 1,491.3 | 0.83 / 0.89 / 16.33 | fortress approach 1,574.5 FPS (p99 0.89 ms) toward the fortress 2,218 blocks away; 600 chunks |
+
+Every run: save and load, every hard limit, 139 of 139 item icons, 0 `glGetError`
+and 0 KHR errors. The wilderness figures match package 24's run on `0dd758c`
+(1,495 FPS, fortress 1,580). The city smoke streams no long approach, so a city's
+streaming cost is still measured by `VEYLON_SCENE=urban_performance` (above); the
+reference machine has not run either.
+
+### Release run (v0.9.0, 2026-11-06)
+
+`performanceTest` on the release tree, same host: the city profile (5 tests) and the
+rain gates (2) pass, and nine of ten benchmarks pass: chunk tick 0.635 ms (budget
+0.92), entity tick 0.675 ms (0.95), settlement tick 0.017 ms (0.52), all-living
+presentation 0.095 ms per frame (0.50). The durable `save` gate fails at 5.295 ms
+against 2.20, the host gap recorded since 0.7.4, so `load` was not timed. A cold city
+`newWorld` takes 487.1 ms (warm 149.5 ms mean). The release fat JAR's and packaged
+launcher's city smokes ran at 1,026.1 and 1,015.5 FPS. No budget changed.

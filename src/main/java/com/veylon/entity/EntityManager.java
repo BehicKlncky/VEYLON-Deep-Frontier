@@ -23,6 +23,7 @@ public class EntityManager {
 
     public final List<Creature> creatures = new ArrayList<>();
     public final List<Npc> npcs = new ArrayList<>();
+    public final UrbanEncounterDirector encounters = new UrbanEncounterDirector();
     public final List<Carcass> carcasses = new ArrayList<>();
     /**
      * Settled human bodies. Deliberately a list of its own rather than dead
@@ -41,8 +42,15 @@ public class EntityManager {
     private final Random panicRng = new Random();
 
     public void fastTick(Game g, float dt) {
+        g.world.navigation.budget.beginTick();
+        g.noise.beginTick();
         for (Iterator<Creature> it = creatures.iterator(); it.hasNext(); ) {
             Creature c = it.next();
+            if (c.encounterId != 0 && !c.dead
+                    && !UrbanEncounterDirector.bodyLoaded(g.world, c.pos.x, c.pos.z, c.width * 0.5f)) {
+                // As for the infected below: frozen until the slow director makes it dormant.
+                c.vel.zero(); continue;
+            }
             CreatureAI.update(g, c, dt);
             c.applyPhysics(dt, !c.type.flying);
             updateTrail(c, dt);
@@ -58,11 +66,23 @@ public class EntityManager {
         }
         for (Iterator<Npc> it = npcs.iterator(); it.hasNext(); ) {
             Npc n = it.next();
+            if ((n.infected() || n.settled() && !n.warParty) && !n.abstractTravel && !n.dead
+                    && !UrbanEncounterDirector.bodyLoaded(g.world, n.pos.x, n.pos.z)) {
+                // The slow director will make it dormant. Freeze gravity too until then,
+                // otherwise unloaded AIR would corrupt the durable feet height.
+                n.vel.zero(); n.path = null; continue;
+            }
             NpcAI.update(g, n, dt);
             if (!n.abstractTravel) {
                 n.applyPhysics(dt, true);
             }
             if (n.dead) {
+                if (n.infected()) {
+                    finishInfectedDeath(g, n);
+                    it.remove();
+                    forgetTarget(n);
+                    continue;
+                }
                 if (n.isTrader && n.partyMissionId != null && !n.partyMissionId.isBlank()) {
                     g.faction.failMission(n.partyMissionId, "the escorted trader was lost");
                 }
@@ -103,6 +123,60 @@ public class EntityManager {
         }
     }
 
+    private void finishInfectedDeath(Game g, Npc n) {
+        if (!reallyDied(n)) { depart(g, n); return; }
+        encounters.onDeath(n);
+        if (n.lastHitByPlayer) { g.settlementManager.urbanSites.onInfectedKilled(g, n); }
+        g.log("The " + n.archetype.displayName + " collapses.");
+        g.audio.playInfected(com.veylon.engine.InfectedSounds.Cue.DEATH, n.pos.x, n.pos.y, n.pos.z);
+        if (n.dismemberOnDeath) {
+            g.fragments.spawnFromNpc(g, n, g.fragments.deathPose(n),
+                    n.blastX, n.blastY, n.blastZ, n.blastStrength);
+        } else { g.ragdolls.spawn(g, n); }
+    }
+
+    /**
+     * A save between projectile impact and the next fast tick must commit that death once: an
+     * infected body's, and (milestone 15) a managed creature's, with its tombstone and remains.
+     */
+    public void flushInfectedDeaths(Game g) {
+        for (int i = npcs.size() - 1; i >= 0; i--) {
+            Npc n = npcs.get(i);
+            if (n.infected() && n.dead) {
+                finishInfectedDeath(g, n); npcs.remove(i); forgetTarget(n);
+            }
+        }
+        for (int i = creatures.size() - 1; i >= 0; i--) {
+            Creature c = creatures.get(i);
+            if (c.encounterId != 0 && c.dead) {
+                onCreatureDied(g, c);
+                creatures.remove(i);
+                if (reallyDied(c)) { forgetTarget(c); } else { depart(g, c); }
+            }
+        }
+    }
+
+    /**
+     * As {@link #flushInfectedDeaths} for the people of urban survivor sites (milestone 16): a
+     * death between a blow and the next fast tick is committed once before a save, with its
+     * tombstone and body, so the saved list never holds a fallen resident.
+     */
+    public void flushSiteDeaths(Game g) {
+        for (int i = npcs.size() - 1; i >= 0; i--) {
+            Npc n = npcs.get(i);
+            if (!n.dead || com.veylon.settlement.UrbanSiteDirector.siteOf(g.world, n) == null) { continue; }
+            if (n.health <= 0 && !n.hostileToPlayer()) { g.log(n.name + " has died."); }
+            onSettledNpcDied(g, n);
+            if (reallyDied(n) && n.dismemberOnDeath) {
+                g.fragments.spawnFromNpc(g, n, g.fragments.deathPose(n), n.blastX, n.blastY, n.blastZ, n.blastStrength);
+            } else if (reallyDied(n)) {
+                g.ragdolls.spawn(g, n);
+            }
+            npcs.remove(i);
+            if (reallyDied(n)) { forgetTarget(n); } else { depart(g, n); }
+        }
+    }
+
     /**
      * A person leaving the world without dying — a settlement going dormant,
      * a party going abstract or being retired, a captive led away, a trader or
@@ -114,6 +188,12 @@ public class EntityManager {
      * health and standing are whatever the leaving code wrote back.
      */
     public void depart(Game g, Npc n) {
+        n.path = null; n.navigationGoal = null; n.combatTarget = null;
+        n.lastHeard = null; n.searchTimer = 0; n.strikeWindup = -1;
+        if (n.infected()) {
+            var resident = encounters.resident(n.encounterId);
+            if (resident != null && !resident.dead()) { resident.capture(n); resident.live = null; }
+        }
         g.combustion.clear(n);
         FirePanic.forget(n);
         forgetTarget(n);
@@ -128,6 +208,10 @@ public class EntityManager {
 
     /** An animal leaving the world without dying, as {@link #depart(Game, Npc)} does for a person. */
     public void depart(Game g, Creature c) {
+        if (c.encounterId != 0) {
+            var resident = encounters.resident(c.encounterId);
+            if (resident != null && resident.creature == c && !resident.dead()) { resident.capture(c); resident.creature = null; }
+        }
         g.combustion.clear(c);
         FirePanic.forget(c);
         forgetTarget(c);
@@ -225,7 +309,10 @@ public class EntityManager {
                 g.settlementManager.onSettlementDefended(g, n.partyTargetSettlementId,
                         n.pos.x, n.pos.z);
             }
-            if (n.hostileToPlayer() && n.archetype != null) {
+            // A raider yard's belongings are its finite stash (urban milestone 17), never conjured.
+            if (n.hostileToPlayer() && n.archetype != null
+                    && !(com.veylon.settlement.UrbanSiteDirector.siteOf(g.world, n) instanceof com.veylon.settlement.UrbanSite site
+                    && site.compound())) {
                 switch (n.archetype) {
                     case SCOUT -> g.player.inventory.add(ItemType.ARROW, 2 + rng.nextInt(4));
                     case POWDERMAN -> {
@@ -255,6 +342,10 @@ public class EntityManager {
                     resident.alive = false;
                 }
                 resident.live = null;
+                if (s instanceof com.veylon.settlement.UrbanSite site) {
+                    resident.health = 0f;
+                    g.settlementManager.urbanSites.onDied(g, site);
+                }
             }
         }
     }
@@ -275,7 +366,15 @@ public class EntityManager {
         if (c.lastHitByPlayer) {
             g.onCreatureKilled(c);
         }
-        if (c.type == Creature.CreatureType.BIRD) {
+        if (reallyDied(c) && c.encounterId != 0) {
+            encounters.onDeath(c);
+        }
+        if (c.type.territorial()) {
+            g.audio.playEcology(com.veylon.engine.EcologySounds.Cue.DEATH, c.pos.x, c.pos.y, c.pos.z);
+            if (c.lastHitByPlayer) {
+                g.log("The " + c.type.displayName + " is down. Cut the membrane sacs from its remains with [F].");
+            }
+        } else if (c.type == Creature.CreatureType.BIRD) {
             // Too small to leave a carcass; it still tumbles before it is gone.
             if (c.lastHitByPlayer) {
                 g.player.inventory.add(ItemType.RAW_MEAT, 1);
@@ -383,11 +482,13 @@ public class EntityManager {
 
     /** Population control: spawn/despawn wildlife around the player. */
     public void slowTick(Game g) {
+        encounters.slowTick(g);
         float px = g.player.pos.x, pz = g.player.pos.z;
 
         for (int i = creatures.size() - 1; i >= 0; i--) {
             Creature c = creatures.get(i);
-            if (c.distSqTo(px, c.pos.y, pz) > 170 * 170) {
+            // A city creature is the encounter director's, which made it dormant above already.
+            if (c.encounterId == 0 && c.distSqTo(px, c.pos.y, pz) > 170 * 170) {
                 creatures.remove(i);
                 depart(g, c);
             }
@@ -407,6 +508,12 @@ public class EntityManager {
         if (g.spawningPaused()) {
             return; // R25: natural spawning only; despawning above still runs.
         }
+        if (g.world.isUrban()) {
+            // Wildlife lands at surfaceHeight + 1, which in a city is a roof or a
+            // tree crown. Urban worlds spawn none until anchor-based encounters
+            // replace it (decision D-28).
+            return;
+        }
 
         int deer = 0, wolves = 0, birds = 0, hares = 0, thornhorns = 0, stalkers = 0;
         for (Creature c : creatures) {
@@ -417,6 +524,7 @@ public class EntityManager {
                 case HARE -> hares++;
                 case THORNHORN -> thornhorns++;
                 case STALKER -> stalkers++;
+                case VEILMAW -> { } // only ever a planned urban encounter
             }
         }
         float seasonMul = g.seasons.spawnMul(g.time);
@@ -442,10 +550,11 @@ public class EntityManager {
         int playerSurface = g.world.surfaceHeight((int) px, (int) pz);
         WorldGenerator.CaveZone playerZone = g.world.generator.caveZoneAt(
                 (int) px, (int) g.player.pos.y, (int) pz);
-        boolean playerInBasalt = g.world.generatorVersion >= World.GEN_CAVE_IDENTITIES
+        // Urban worlds have no Basalt depths: a basement under a roof is not one.
+        boolean playerInBasalt = World.hasCaveIdentities(g.world.generatorVersion)
                 ? (playerZone == WorldGenerator.CaveZone.BASALT
                 || playerZone == WorldGenerator.CaveZone.RESONANT)
-                : g.player.pos.y < playerSurface - 6;
+                : !g.world.isUrban() && g.player.pos.y < playerSurface - 6;
         if (playerInBasalt && stalkers < 2 && rng.nextFloat() < 0.4f) {
             trySpawnStalker(g, px, pz);
         }

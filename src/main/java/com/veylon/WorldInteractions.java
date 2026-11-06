@@ -100,6 +100,16 @@ final class WorldInteractions {
     // ------------------------------------------------------------------
 
     void rightClick() {
+        // Layout sixteen: a part fitted to the aimed relay (urban milestone 20).
+        if (game.refuges.comms.rightClick(game.player.selected())) {
+            game.swingTimer = Math.max(game.swingTimer, SECONDARY_SWING_SECONDS);
+            return;
+        }
+        // Layout fifteen: fuel, parts and water used on an aimed device come before drinking or placing.
+        if (game.refuges.utilities.rightClick(game.player.selected())) {
+            game.swingTimer = Math.max(game.swingTimer, SECONDARY_SWING_SECONDS);
+            return;
+        }
         // Interactable blocks first.
         if (game.targetHit != null) {
             switch (game.targetHit.type()) {
@@ -107,7 +117,7 @@ final class WorldInteractions {
                     game.uiMode = Game.UiMode.CRAFTING;
                     return;
                 }
-                case CRATE -> {
+                case CRATE, SHELF, CABINET, LOCKER -> {
                     game.openCrateAt(targetPos());
                     return;
                 }
@@ -140,6 +150,10 @@ final class WorldInteractions {
         }
         if (held.type.isEdible()) {
             game.consumables.eat(held);
+            return;
+        }
+        // Layout fourteen: boarding up, bracing, repairs and hanging doors (urban milestone 18).
+        if (Fortification.rightClick(game, held)) {
             return;
         }
         BlockType place = held.type.places();
@@ -182,8 +196,18 @@ final class WorldInteractions {
             return clearPathToNpc(npc)
                     ? Game.NpcInteraction.RESCUE_READY : Game.NpcInteraction.RESCUE_BLOCKED;
         }
+        // Survivor-site people (urban milestone 16) are spoken to face to face, never through a
+        // wall: a hidden refuge is found by its panel, not by a voice beside the plaster.
+        if (com.veylon.settlement.UrbanSiteDirector.siteOf(game.world, npc) != null && !clearPathToNpc(npc)) {
+            return Game.NpcInteraction.NONE;
+        }
         return canOpenNpcInteraction(npc)
                 ? Game.NpcInteraction.TALK : Game.NpcInteraction.NONE;
+    }
+
+    /** Whether nothing solid lies between the player's eye and a person's chest. */
+    boolean clearPathTo(Npc npc) {
+        return clearPathToNpc(npc);
     }
 
     /** Ignores closer hostile guards so a reachable prisoner remains selectable. */
@@ -257,18 +281,22 @@ final class WorldInteractions {
     /**
      * Gameplay block-interaction command shared by the real F-key path and
      * integration tests. It deliberately covers world-state interactions;
-     * UI-only containers and stations remain on their existing screen path.
+     * Container searching is a timed world-state interaction; stations keep their screen path.
      */
     boolean interactWithBlockAt(Vec3i pos) {
         if (pos == null) {
             return false;
         }
         return switch (game.world.getBlock(pos.x(), pos.y(), pos.z())) {
+            case CRATE, SHELF, CABINET, LOCKER -> game.openCrateAt(pos);
             case CAMPFIRE -> {
                 campfireInteract(pos);
                 yield true;
             }
             case LANTERN -> interactLantern(pos);
+            case RAIN_COLLECTOR -> { collectorInteract(pos); yield true; }
+            case CAMP_BED -> { rest(pos, true); yield true; }
+            case BEDROLL -> { rest(pos, false); yield true; }
             case POWDER_KEG -> {
                 lightKegFuse(pos);
                 yield true;
@@ -291,6 +319,15 @@ final class WorldInteractions {
             }
             case BEACON_LIT -> {
                 game.log("The beacon thrums steadily, its signal cutting through the sky.");
+                yield true;
+            }
+            case WOOD_DOOR, WOOD_DOOR_OPEN, METAL_DOOR, METAL_DOOR_OPEN, WINDOW, WINDOW_OPEN ->
+                    FixtureActions.interact(game, pos.x(), pos.y(), pos.z());
+            // Layout fifteen: a device's switch (urban milestone 19).
+            case GENERATOR, ELECTRIC_LAMP, WATER_PURIFIER, RADIO -> game.refuges.utilities.toggle(pos);
+            // Layout sixteen: F at the relay says what it still lacks (urban milestone 20).
+            case RELAY -> {
+                game.log(game.refuges.comms.relayPrompt() + ".");
                 yield true;
             }
             default -> false;
@@ -327,6 +364,12 @@ final class WorldInteractions {
      * talked to, not harvested past.
      */
     void interact() {
+        // An aimed door or window comes first: doorways are where people stand,
+        // and F on the door must not open a conversation instead (D-50).
+        if (game.targetHit != null && FixtureActions.interact(game,
+                game.targetHit.x(), game.targetHit.y(), game.targetHit.z())) {
+            return;
+        }
         if (interactWithNearbyNpc() || recoverNearbyArrow() || interactWithNearbyCarcass()) {
             return;
         }
@@ -354,18 +397,39 @@ final class WorldInteractions {
             }
             case CAMPFIRE, LANTERN, POWDER_KEG, GATE, ALARM_BELL, BEACON, BEACON_LIT ->
                     interactWithBlockAt(pos);
-            case CRATE -> game.openCrateAt(pos);
+            case GENERATOR, ELECTRIC_LAMP, WATER_PURIFIER, RADIO, RELAY -> {
+                if (!interactWithBlockAt(pos)) {
+                    return false;
+                }
+            }
+            case CRATE, SHELF, CABINET, LOCKER -> game.openCrateAt(pos);
             case WORKBENCH, FURNACE, ANVIL, TANNERY, HERB_STATION, MAP_TABLE ->
                     game.uiMode = Game.UiMode.CRAFTING;
             case DRYING_RACK -> rackInteract(pos);
             case RAIN_COLLECTOR -> collectorInteract(pos);
-            case BEDROLL -> game.startSleep(false);
-            case CAMP_BED -> sleepInBed(pos);
+            case BEDROLL -> rest(pos, false);
+            case CAMP_BED -> rest(pos, true);
             default -> {
                 return false;
             }
         }
         return true;
+    }
+
+    /**
+     * F on a bed. In a layout-fourteen city a crouched press claims its storey or gives a refuge up
+     * instead of sleeping, and a bed of a claimed refuge becomes its sleeping place and home
+     * (urban milestone 18); then the sleep goes ahead as it always has.
+     */
+    private void rest(Vec3i pos, boolean campBed) {
+        if (game.refuges.atBed(pos)) {
+            return;
+        }
+        if (campBed) {
+            sleepInBed(pos);
+        } else {
+            game.startSleep(false);
+        }
     }
 
     private void sleepInBed(Vec3i pos) {
@@ -394,20 +458,30 @@ final class WorldInteractions {
             return;
         }
         if (game.player.inventory.count(ItemType.WATERSKIN_EMPTY) > 0) {
-            game.player.inventory.remove(ItemType.WATERSKIN_EMPTY, 1);
-            game.player.inventory.add(ItemType.WATERSKIN_DIRTY, 1);
+            if (!SurvivalTransfers.exchange(game, ItemType.WATERSKIN_EMPTY, ItemType.WATERSKIN_DIRTY)) { return; }
             game.audio.playDrink();
             game.log("Filled a waterskin with untreated water. Boil it at a campfire.");
             return;
         }
+        drinkUntreated(null);
+    }
+
+    /**
+     * Drinking untreated water where it stands: open water, or a layout-fifteen tap (urban milestone
+     * 19). It quenches as much either way and risks the same sickness.
+     *
+     * @param what what was drunk, for the log, or null for open water's own words
+     */
+    void drinkUntreated(String what) {
         game.player.thirst = Math.min(MAX_NEED, game.player.thirst + WATER_THIRST);
         game.audio.playDrink();
         if (!game.player.abilities.invulnerable() && rng.nextFloat() < WATER_POISON_CHANCE) {
             game.player.addAffliction(Affliction.FOOD_POISONING,
                     PlayerConsumables.rollPoisonDuration(rng));
-            game.log("You drank dirty water and feel ill...");
+            game.log(what == null ? "You drank dirty water and feel ill..." : "You drank " + what + " and feel ill...");
         } else {
-            game.log("You drink from the water (+" + (int) WATER_THIRST + " thirst).");
+            game.log((what == null ? "You drink from the water" : "You drink " + what)
+                    + " (+" + (int) WATER_THIRST + " thirst).");
         }
     }
 
@@ -444,6 +518,10 @@ final class WorldInteractions {
     }
 
     private void harvestCarcass(Carcass carcass) {
+        if (carcass.type.territorial()) {
+            harvestMembrane(carcass);
+            return;
+        }
         ItemType meatType = carcass.rotten() ? ItemType.SPOILED_MEAT : ItemType.RAW_MEAT;
         if (game.playerHasKnife()) {
             skinCarcass(carcass, meatType);
@@ -457,6 +535,35 @@ final class WorldInteractions {
             game.log("Nothing left worth taking.");
         }
         game.player.scent = Math.min(1f, game.player.scent + HARVEST_SCENT);
+    }
+
+    /**
+     * An alien's remains (urban milestone 15) give their membrane sacs by hand or knife, and
+     * never meat: a hostile body reusing the creature infrastructure is not food. Only what fits
+     * leaves the remains, so a full inventory loses nothing.
+     */
+    private void harvestMembrane(Carcass carcass) {
+        if (carcass.hideLeft <= 0) {
+            game.log("Nothing left worth taking.");
+            return;
+        }
+        int taken = carcass.hideLeft - game.player.inventory.add(carcass.type.hideProduct(), carcass.hideLeft);
+        if (taken <= 0) {
+            game.log("No room for the membrane sacs.");
+            return;
+        }
+        carcass.hideLeft -= taken;
+        game.particles.blood(carcass.pos.x, carcass.pos.y + 0.3f, carcass.pos.z);
+        game.log("You cut " + taken + " membrane sac" + (taken == 1 ? "" : "s") + " from the "
+                + carcass.type.displayName + " remains.");
+        if (carcass.stuckArrows > 0) {
+            ItemType arrowType = carcass.stuckArrowType != null ? carcass.stuckArrowType : ItemType.ARROW;
+            int left = game.player.inventory.add(arrowType, carcass.stuckArrows);
+            if (left < carcass.stuckArrows) {
+                game.log("Recovered " + (carcass.stuckArrows - left) + "x " + arrowType.displayName + ".");
+            }
+            carcass.stuckArrows = left;
+        }
     }
 
     private void skinCarcass(Carcass carcass, ItemType meatType) {
@@ -510,23 +617,26 @@ final class WorldInteractions {
         }
         boolean lit = game.world.campfireFuel.getOrDefault(pos, 0f) > 0;
         if (lit && game.player.inventory.has(ItemType.RAW_MEAT, 1)) {
-            game.player.inventory.remove(ItemType.RAW_MEAT, 1);
-            game.player.inventory.add(ItemType.COOKED_MEAT, 1);
+            if (!SurvivalTransfers.exchange(game, ItemType.RAW_MEAT, ItemType.COOKED_MEAT)) { return; }
             game.audio.playClick();
             game.particles.smoke(pos.x() + 0.5f, pos.y() + 0.8f, pos.z() + 0.5f, 1f);
             game.log("Cooked meat over the campfire.");
         } else if (lit && game.player.inventory.has(ItemType.WATERSKIN_DIRTY, 1)) {
-            game.player.inventory.remove(ItemType.WATERSKIN_DIRTY, 1);
-            game.player.inventory.add(ItemType.WATERSKIN_CLEAN, 1);
+            if (!SurvivalTransfers.exchange(game, ItemType.WATERSKIN_DIRTY, ItemType.WATERSKIN_CLEAN)) { return; }
             game.audio.playBoil();
             game.log("Boiled the waterskin - the water is safe to drink now.");
+        } else if (game.world.isUrban() && game.player.inventory.has(ItemType.PLANK, 1)) {
+            game.player.inventory.remove(ItemType.PLANK, 1);
+            game.world.campfireFuel.merge(pos, 60f, Float::sum);
+            game.log("Added recovered wood (+60s fuel). Cook outside; roofed fires build smoke.");
         } else if (game.player.inventory.has(ItemType.LOG, 1)) {
             game.player.inventory.remove(ItemType.LOG, 1);
             game.world.campfireFuel.merge(pos, LOG_FUEL_SECONDS, Float::sum);
             game.audio.playClick();
             game.log("Added a log to the fire (+" + (int) LOG_FUEL_SECONDS + "s fuel).");
         } else {
-            game.log(lit ? "Bring raw meat to cook, dirty water to boil, or a log for fuel."
+            game.log(game.world.isUrban() ? "Bring recovered planks for fuel, dirty water to boil or raw food to cook."
+                    : lit ? "Bring raw meat to cook, dirty water to boil, or a log for fuel."
                     : "The fire is out. Add a log to relight it.");
         }
     }
@@ -538,19 +648,22 @@ final class WorldInteractions {
             return false;
         }
         ItemStack held = game.player.selected();
-        if (held != null && held.type == ItemType.CHARCOAL
+        boolean recoveredFuel = held != null && game.world.isUrban() && held.type == ItemType.PLANK;
+        if (held != null && (held.type == ItemType.CHARCOAL || recoveredFuel)
                 && state.fuelSeconds() < World.LANTERN_MAX_FUEL) {
             game.player.inventory.shrink(game.player.hotbarSel, 1);
-            float fuel = game.world.addLanternFuel(pos, World.LANTERN_FUEL_PER_CHARCOAL);
+            float fuel = game.world.addLanternFuel(pos, recoveredFuel ? 450f : World.LANTERN_FUEL_PER_CHARCOAL);
             game.audio.playClick();
+            String fuelName = recoveredFuel ? "recovered wood" : "charcoal";
             game.log(state.lit()
-                    ? "Added charcoal to the lit lantern (" + (int) fuel + "s fuel)."
-                    : "Added charcoal to the lantern (" + (int) fuel
+                    ? "Added " + fuelName + " to the lit lantern (" + (int) fuel + "s fuel)."
+                    : "Added " + fuelName + " to the lantern (" + (int) fuel
                     + "s fuel). Press [F] again to light it.");
             return true;
         }
         if (state.fuelSeconds() <= 0) {
-            game.log("The lantern is empty. Hold charcoal and press [F] to refuel it.");
+            game.log(game.world.isUrban() ? "Hold recovered planks and press [F] to fuel the lantern."
+                    : "The lantern is empty. Hold charcoal and press [F] to refuel it.");
             return true;
         }
         boolean light = !state.lit();
@@ -596,11 +709,14 @@ final class WorldInteractions {
     }
 
     private void collectorInteract(Vec3i pos) {
+        // Layout fifteen: a planned basin is a tap on its building's pipes, not a rain collector.
+        if (game.refuges.utilities.tap(pos)) {
+            return;
+        }
         float liters = game.world.collectorWater.getOrDefault(pos, 0f);
         if (liters >= COLLECTOR_LITRES_PER_USE
                 && game.player.inventory.count(ItemType.WATERSKIN_EMPTY) > 0) {
-            game.player.inventory.remove(ItemType.WATERSKIN_EMPTY, 1);
-            game.player.inventory.add(ItemType.WATERSKIN_CLEAN, 1);
+            if (!SurvivalTransfers.exchange(game, ItemType.WATERSKIN_EMPTY, ItemType.WATERSKIN_CLEAN)) { return; }
             game.world.collectorWater.put(pos, liters - COLLECTOR_LITRES_PER_USE);
             game.audio.playDrink();
             game.log("Filled a waterskin with clean rainwater.");

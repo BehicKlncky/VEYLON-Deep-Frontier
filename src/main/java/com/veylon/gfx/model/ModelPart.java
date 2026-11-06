@@ -20,7 +20,9 @@ public class ModelPart {
     // Box center relative to this pivot, and box size.
     public float boxX, boxY, boxZ, sizeX, sizeY, sizeZ;
     public float r, g, b;
+    /** Glow written by {@link #emissive(float)}; an animator may raise it per pose until {@link #resetPose}. */
     public float emissive;
+    private float restEmissive;
     public boolean visible = true;
     /**
      * Draw this part's own half of a {@link #split} even while the chain is
@@ -113,6 +115,7 @@ public class ModelPart {
 
     public ModelPart emissive(float e) {
         emissive = e;
+        restEmissive = e;
         return this;
     }
 
@@ -122,6 +125,7 @@ public class ModelPart {
     }
 
     public void resetPose() {
+        emissive = restEmissive;
         rotX = rotY = rotZ = 0;
         poseX = poseY = poseZ = 0;
         scale = 1f;

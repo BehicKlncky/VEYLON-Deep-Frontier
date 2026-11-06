@@ -93,6 +93,8 @@ public class Renderer {
     private final Vector3f camUp = new Vector3f();
     private final Vector3f shadowFocus = new Vector3f();
     private final List<Chunk> visible = new ArrayList<>();
+    /** This frame's mesh rebuilds, nearest first; reused so selection allocates nothing. */
+    private final List<Chunk> dirtyQueue = new ArrayList<>();
 
     private float fogStart = 60, fogEnd = 110;
 
@@ -109,6 +111,8 @@ public class Renderer {
     public int burningBodiesDrawn;
     public int chunkMeshRebuildsLastFrame;
     public long chunkMeshRebuildsTotal;
+    /** CPU time the last {@link #render} call took to submit the world, in nanoseconds (urban QA). */
+    public long renderNanos;
 
     public int renderRadius() {
         return settings.renderDistance;
@@ -230,24 +234,89 @@ public class Renderer {
     /** Rebuilds up to budget dirty chunk meshes near the player. */
     public void buildDirtyMeshes(World world, int pcx, int pcz, int budget) {
         chunkMeshRebuildsLastFrame = 0;
-        List<Chunk> dirty = new ArrayList<>();
-        for (Chunk c : world.loadedChunks()) {
-            if (c.dirty && c.generated
-                    && Math.max(Math.abs(c.cx - pcx), Math.abs(c.cz - pcz)) <= renderRadius()) {
-                dirty.add(c);
-            }
-        }
-        dirty.sort((a, b2) -> Integer.compare(
-                Math.abs(a.cx - pcx) + Math.abs(a.cz - pcz),
-                Math.abs(b2.cx - pcx) + Math.abs(b2.cz - pcz)));
-        for (int i = 0; i < Math.min(budget, dirty.size()); i++) {
+        List<Chunk> dirty = selectDirty(world, pcx, pcz, budget);
+        for (int i = 0; i < dirty.size(); i++) {
             mesher.buildChunk(world, dirty.get(i));
             chunkMeshRebuildsLastFrame++;
             chunkMeshRebuildsTotal++;
         }
     }
 
+    /**
+     * The nearest dirty chunks to rebuild, at most {@code budget}: generated chunks inside the
+     * render radius whose eight neighbours are generated too, nearest first by chunk steps.
+     * Touches no GL state and allocates nothing.
+     *
+     * <p>A chunk's border faces, corner shading and light depend on its neighbours, so one meshed
+     * before a neighbour exists is meshed again when it arrives: streaming built a city chunk about
+     * 2.6 times. Waiting for the ring beyond the render radius, which {@code ChunkStreaming}
+     * generates, builds each final mesh once; the meshes themselves are the same (urban milestone
+     * 24). The walk covers only the render window, however many chunks the world holds.
+     */
+    public List<Chunk> selectDirty(World world, int pcx, int pcz, int budget) {
+        dirtyQueue.clear();
+        int r = renderRadius();
+        for (int d = 0; d <= 2 * r && dirtyQueue.size() < budget; d++) {
+            // The cells d chunk steps away, inside the window: |dx| + |dz| == d.
+            int span = Math.min(d, r);
+            for (int dx = -span; dx <= span && dirtyQueue.size() < budget; dx++) {
+                int dz = d - Math.abs(dx);
+                if (dz > r) {
+                    continue;
+                }
+                queueIfReady(world, pcx + dx, pcz + dz, budget);
+                if (dz != 0) {
+                    queueIfReady(world, pcx + dx, pcz - dz, budget);
+                }
+            }
+        }
+        return dirtyQueue;
+    }
+
+    private void queueIfReady(World world, int cx, int cz, int budget) {
+        if (dirtyQueue.size() >= budget) {
+            return;
+        }
+        Chunk c = world.getChunk(cx, cz);
+        if (c == null || !c.dirty || !c.generated) {
+            return;
+        }
+        for (int dx = -1; dx <= 1; dx++) {
+            for (int dz = -1; dz <= 1; dz++) {
+                Chunk n = (dx | dz) == 0 ? c : world.getChunk(cx + dx, cz + dz);
+                if (n == null || !n.generated) {
+                    return;
+                }
+            }
+        }
+        dirtyQueue.add(c);
+    }
+
+    /**
+     * Fills the frame's visible list with the meshed chunks inside the render radius that the
+     * frustum last set by {@link #render} can see, and returns how many. Touches no GL state and
+     * walks only the render window, however many chunks the world holds.
+     */
+    public int selectVisible(World world, int pcx, int pcz) {
+        visible.clear();
+        int r = renderRadius();
+        for (int dx = -r; dx <= r; dx++) {
+            for (int dz = -r; dz <= r; dz++) {
+                Chunk c = world.getChunk(pcx + dx, pcz + dz);
+                if (c == null || !c.generated || c.meshOpaque == null) {
+                    continue;
+                }
+                float minX = c.cx * 16, minZ = c.cz * 16;
+                if (frustum.testAab(minX, 0, minZ, minX + 16, Chunk.SY, minZ + 16)) {
+                    visible.add(c);
+                }
+            }
+        }
+        return visible.size();
+    }
+
     public void render(Game game, float dt) {
+        long renderStart = System.nanoTime();
         Camera cam = game.camera;
         cam.fovDeg = settings.fov;
         int w = game.window.width(), h = game.window.height();
@@ -283,21 +352,8 @@ public class Renderer {
         int pcx = Math.floorDiv((int) Math.floor(cam.position.x), 16);
         int pcz = Math.floorDiv((int) Math.floor(cam.position.z), 16);
 
-        visible.clear();
         chunksRendered = 0;
-        for (Chunk c : game.world.loadedChunks()) {
-            if (!c.generated || c.meshOpaque == null) {
-                continue;
-            }
-            if (Math.max(Math.abs(c.cx - pcx), Math.abs(c.cz - pcz)) > renderRadius()) {
-                continue;
-            }
-            float minX = c.cx * 16, minZ = c.cz * 16;
-            if (!frustum.testAab(minX, 0, minZ, minX + 16, Chunk.SY, minZ + 16)) {
-                continue;
-            }
-            visible.add(c);
-        }
+        selectVisible(game.world, pcx, pcz);
 
         // ---- Shadow pass ----
         boolean shadowsOn = settings.shadowQuality > 0;
@@ -350,6 +406,7 @@ public class Renderer {
         chunkShader.set("uFoliageTint", env.foliageTint);
         chunkShader.set("uWetness", env.wetness);
         chunkShader.set("uFrost", env.frost);
+        chunkShader.set("uCity", env.city);
         chunkShader.set("uFogColor", env.fogColor);
         chunkShader.set("uFogStart", fogStart);
         chunkShader.set("uFogEnd", fogEnd);
@@ -412,6 +469,7 @@ public class Renderer {
         // ---- Composite to backbuffer ----
         post.composite(env, settings.bloom, settings.fxaa);
         drawCalls += settings.bloom ? 4 : 1;
+        renderNanos = System.nanoTime() - renderStart;
     }
 
     // ------------------------------------------------------------------

@@ -61,6 +61,8 @@ public class Npc extends Entity {
     /** Current path (world cell centers) and progress index. */
     public java.util.List<Vec3i> path;
     public int pathIndex;
+    /** Final hierarchical destination; never serialized. */
+    public Vec3i navigationGoal;
     public float repathCooldown;
     /** Patrol progress for guards/patrollers. */
     public int patrolIndex;
@@ -117,6 +119,26 @@ public class Npc extends Entity {
     /** Flight from the fire on this body; written only by the AI. Transient. */
     public final PanicIntent panic = new PanicIntent();
 
+    /** Stable generated encounter slot; zero for an unmanaged fixture body. */
+    public long encounterId;
+    /** Infected combat intent is transient; health and torso wounds are durable in the encounter ledger. */
+    public float strikeWindup = -1f, painTimer;
+    public boolean painSound;
+    public com.veylon.combat.WorldNoise.NoiseEvent lastHeard;
+    /**
+     * A Breacher's door (urban milestone 15): the bottom cell of the closed wooden door on its
+     * route that it is hammering down, the seconds to its next blow and the blows landed on the
+     * door itself. From urban milestone 18 the target may also be a plank barricade cell, and a
+     * door's brace takes blows before the door does; {@link #breachStruck} counts every blow on the
+     * target. Transient intent: a load, a departure or a lost scent forgets it, and the door keeps
+     * only what the blows did, which is nothing until the last one forces it (a barricade's and a
+     * brace's lost strength is kept by the world).
+     */
+    public Vec3i breachDoor;
+    public float breachTimer;
+    public int breachBlows;
+    public int breachStruck;
+
     public Npc(World world, String name) {
         super(world);
         this.name = name;
@@ -132,7 +154,22 @@ public class Npc extends Entity {
         return true;
     }
 
+    /**
+     * In a city people climb stairs of full-block steps by walking, as the
+     * player does (D-31): the jump that gets them up a ledge clears a step by
+     * only about 0.05 of a block. The path finder already demands the headroom
+     * a step-up needs. Legacy worlds keep the jump, unchanged.
+     */
+    @Override
+    protected float stepHeight() {
+        return world.isUrban() ? URBAN_STEP_HEIGHT : 0f;
+    }
+
+    /** Step-up of a person in an urban world: one full stair step. */
+    public static final float URBAN_STEP_HEIGHT = 1f;
+
     public boolean hostileToPlayer() {
+        if (infected()) { return true; }
         // Captives are protected prisoners, not members of the faction that
         // happens to hold them.  Keep this before settlement ownership so a
         // captive inside a hostile fort remains interactable and never becomes
@@ -154,6 +191,7 @@ public class Npc extends Entity {
 
     /** Runtime side used by targeting and friendly-fire checks. */
     public String sideId() {
+        if (infected()) { return "urban.infected"; }
         if (archetype == NpcArchetype.CAPTIVE) {
             return "protected-captive";
         }
@@ -200,7 +238,32 @@ public class Npc extends Entity {
     public boolean settled() {
         // Region (0,0) legitimately packs to id 0, so id 0 cannot be a sentinel.
         // Resident index distinguishes real residents from traveling parties.
-        return archetype != null && residentIndex >= 0;
+        return !infected() && archetype != null && residentIndex >= 0;
+    }
+
+    /** Species profile uses the shared humanoid appearance codec, not settlement ownership. */
+    public boolean infected() { return archetype != null && archetype.infected(); }
+
+    /**
+     * Layout seventeen (urban milestone 23): the seconds after a flinch in which an infected body shrugs
+     * off further pain, so a strike wound up under a rain of blows still lands (decision D-97's finding).
+     */
+    public static final float PAIN_GUARD_SECONDS = 1.2f;
+    /** Seconds left in which a fresh blow does not flinch this infected body again; transient. */
+    public float painGuard;
+
+    @Override
+    public void hurt(float damage, boolean byPlayer) {
+        boolean living = !dead;
+        super.hurt(damage, byPlayer);
+        if (living && !dead && damage > 0 && infected()) {
+            painSound = true;
+            if (painGuard <= 0f) {
+                painTimer = Math.max(painTimer, 0.35f);
+                strikeWindup = -1f;
+                if (world != null && world.urban != null && world.urban.hasEconomy()) { painGuard = PAIN_GUARD_SECONDS; }
+            }
+        }
     }
 
     public String jobName() {

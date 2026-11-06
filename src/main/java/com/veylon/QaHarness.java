@@ -60,6 +60,7 @@ final class QaHarness {
     private final MolotovQaScene molotovScene;
     private final BodyFireQaScene bodyFireScene;
     private final HudQaScene hudScene;
+    private final UrbanQaScenes urbanScene;
 
     // Render statistics sampled across an automated run.
     private long profiledRenderFrames;
@@ -109,6 +110,7 @@ final class QaHarness {
         molotovScene = new MolotovQaScene(game);
         bodyFireScene = new BodyFireQaScene(game);
         hudScene = new HudQaScene(game);
+        urbanScene = new UrbanQaScenes(game);
     }
 
     // ------------------------------------------------------------------
@@ -275,6 +277,7 @@ final class QaHarness {
         molotovScene.update(elapsed);
         bodyFireScene.update(elapsed);
         hudScene.update(elapsed);
+        urbanScene.update(elapsed);
     }
 
     /**
@@ -318,11 +321,7 @@ final class QaHarness {
         peakChunks = Math.max(peakChunks, game.renderer.chunksRendered);
         particleDrawCallSum += game.renderer.particleDrawCalls;
         peakParticleDrawCalls = Math.max(peakParticleDrawCalls, game.renderer.particleDrawCalls);
-        int resident = 0;
-        for (Chunk c : game.world.loadedChunks()) {
-            if (c.meshOpaque != null || c.meshWater != null) resident++;
-        }
-        peakResidentChunkMeshes = Math.max(peakResidentChunkMeshes, resident);
+        peakResidentChunkMeshes = Math.max(peakResidentChunkMeshes, Chunk.meshedChunks());
     }
 
     // ------------------------------------------------------------------
@@ -367,7 +366,7 @@ final class QaHarness {
         boolean materialsOk = com.veylon.gfx.MaterialRegistry.errors().isEmpty();
         RuntimeBudgetSnapshot runtime = RuntimeBudgetSnapshot.capture(game);
         boolean runtimeBoundsOk = runtime.withinHardLimits();
-        boolean fortressApproachOk = game.world.generatorVersion < World.GEN_DEEP
+        boolean fortressApproachOk = !World.hasDeepFrontier(game.world.generatorVersion)
                 || fortressApproachComplete && smokeFortress != null
                 && fortressTiming.frames() > 0 && fortressTiming.averageFps() >= 60.0;
 
@@ -512,8 +511,8 @@ final class QaHarness {
      */
     private String deterministicFortressSnapshot() {
         Settlement settlement = nearestPlannedFortress();
-        if (game.world.generatorVersion < World.GEN_DEEP) {
-            return "{available=false,generator=legacy}";
+        if (!World.hasDeepFrontier(game.world.generatorVersion)) {
+            return "{available=false,generator=" + (game.world.isUrban() ? "urban" : "legacy") + "}";
         }
         if (settlement == null) {
             return "{available=false,searchRadiusRegions=" + FORTRESS_SEARCH_RADIUS_REGIONS + "}";
@@ -527,7 +526,7 @@ final class QaHarness {
     }
 
     private Settlement nearestPlannedFortress() {
-        if (game.world == null || game.world.generatorVersion < World.GEN_DEEP) {
+        if (game.world == null || !World.hasDeepFrontier(game.world.generatorVersion)) {
             return null;
         }
         int originRx = SettlementPlanner.regionOfBlock((int) Math.floor(game.spawnPos.x));
@@ -770,6 +769,11 @@ final class QaHarness {
                 updateUiCycle(0);
             }
             case "creative_flight" -> game.creativeQa.stageFlightScene();
+            case "urban_streets", "urban_intersection", "urban_seam_walk", "urban_fixtures", "urban_refuge",
+                 "urban_fixtures_night", "urban_apartments", "urban_apartments_night", "urban_underground", "urban_ecology",
+                 "urban_apartments_manual", "urban_apartments_manual_night", "urban_slice", "urban_districts",
+                 "urban_apartments_lit_night", "urban_loot", "urban_starter_manual", "urban_catalogue", "urban_strongholds", "urban_missions", "urban_onboarding", "urban_atmosphere", "urban_economy", "urban_performance", "save_audit",
+                 "urban_infected_street", "urban_infected_apartment", "urban_navigation", "urban_survivors", "urban_utilities" -> urbanScene.stage(normalized);
             default -> System.out.println("[scene] unknown VEYLON_SCENE '" + scene + "'");
         }
         System.out.println("[scene] applied benchmark scene '" + scene + "'");

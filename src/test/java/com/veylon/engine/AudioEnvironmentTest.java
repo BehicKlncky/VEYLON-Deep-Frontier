@@ -32,6 +32,16 @@ class AudioEnvironmentTest {
         assertTrue(ReverbPresets.value(DEEP_CAVE, 0) > 8 * ReverbPresets.value(OPEN, 0));
     }
 
+    /** Urban milestone 22: a furnished room is shortest, then a cellar, a hall and a tunnel. */
+    @Test void cityZonesRingInOrderOfTheirSpace() {
+        float room = ReverbPresets.value(ROOM, 0), cellar = ReverbPresets.value(BASEMENT, 0);
+        float hall = ReverbPresets.value(HALL, 0), tunnel = ReverbPresets.value(TUNNEL, 0);
+        assertTrue(room < cellar && cellar < hall && hall < tunnel, room + " " + cellar + " " + hall + " " + tunnel);
+        assertTrue(room < ReverbPresets.value(STONE_STRUCTURE, 0) / 4, "a flat no longer rings like a fortress hall");
+        assertTrue(ReverbPresets.value(BASEMENT, 2) < ReverbPresets.value(HALL, 2), "a cellar is darker than a hall");
+        assertTrue(ReverbPresets.value(TUNNEL, 5) < ReverbPresets.value(HALL, 5), "a tunnel flutters more than it blooms");
+    }
+
     @Test void absentEfxIsDryAndEveryOperationIsSafeWithoutANativeContext() {
         EfxProcessor effects = new EfxProcessor();
         effects.init(false);

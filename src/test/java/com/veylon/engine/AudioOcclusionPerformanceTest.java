@@ -12,7 +12,7 @@ class AudioOcclusionPerformanceTest {
 
     @Test void aFullRayAllowanceStaysWithinBudget() {
         double best = Double.POSITIVE_INFINITY;
-        com.veylon.world.World world = new com.veylon.world.World(42);
+        com.veylon.world.World world = new com.veylon.world.World(42, com.veylon.world.World.GEN_CAVE_IDENTITIES);
         for (int cx = 0; cx < 15; cx++) {
             var chunk = world.getOrCreateChunk(cx, 0);
             for (int x = 0; x < 16; x++) for (int z = 0; z < 16; z++)

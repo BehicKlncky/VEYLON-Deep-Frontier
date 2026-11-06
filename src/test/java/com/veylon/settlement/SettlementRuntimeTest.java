@@ -5,6 +5,7 @@ import com.veylon.ai.SettledNpcAI;
 import com.veylon.entity.Npc;
 import com.veylon.item.ItemType;
 import com.veylon.util.Vec3i;
+import com.veylon.world.World;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -25,7 +26,7 @@ class SettlementRuntimeTest {
     @BeforeEach
     void setUp() {
         g = new Game();
-        g.newWorld(424242L, true);
+        g.newWorld(424242L, true, World.GEN_CAVE_IDENTITIES);
     }
 
     private Settlement findSettlement(Settlement.Alignment alignment) {
@@ -265,6 +266,7 @@ class SettlementRuntimeTest {
 
         // The player approaches and is genuinely perceived; contact is not
         // injected into party state by the test.
+        g.world.ensureChunks((int) scout.pos.x, (int) scout.pos.z, 1, 10_000);
         g.player.pos.set(scout.pos.x + 1.2f, scout.pos.y, scout.pos.z);
         scout.decideTimer = 0f;
         SettledNpcAI.update(g, scout, 0.31f);

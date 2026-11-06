@@ -3,6 +3,7 @@ package com.veylon;
 import com.veylon.item.ItemStack;
 import com.veylon.item.ItemType;
 import com.veylon.save.SaveSystem;
+import com.veylon.world.World;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -20,7 +21,7 @@ class PlayerReloadTest {
     @BeforeEach
     void setUp() {
         g = new Game();
-        g.newWorld(2468L, true);
+        g.newWorld(2468L, true, World.GEN_CAVE_IDENTITIES);
         g.player.inventory.clear();
         g.player.hotbarSel = 0;
     }

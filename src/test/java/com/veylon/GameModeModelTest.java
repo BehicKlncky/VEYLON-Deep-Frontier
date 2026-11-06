@@ -4,6 +4,7 @@ import com.veylon.entity.GameMode;
 import com.veylon.entity.PlayerAbilities;
 import com.veylon.item.ItemStack;
 import com.veylon.world.Chunk;
+import com.veylon.world.World;
 import org.junit.jupiter.api.Test;
 
 import java.util.Locale;
@@ -35,7 +36,7 @@ class GameModeModelTest {
     @Test
     void switchesMarkPermanentlyAndRestoreDoesNotHealOrLog() {
         Game game = new Game();
-        game.newWorld(20260910, true);
+        game.newWorld(20260910, true, World.GEN_CAVE_IDENTITIES);
         assertTrue(game.switchGameMode(GameMode.CREATIVE), "R1: first switch succeeds");
         int lines = game.eventLog.recent(30).size();
         assertFalse(game.switchGameMode(GameMode.CREATIVE), "R1: repeating a mode is inert");
@@ -57,8 +58,8 @@ class GameModeModelTest {
     void initialModeLeavesTerrainCampKitWildlifeAndAiDrawsIdentical() {
         Game survival = new Game();
         Game creative = new Game();
-        survival.newWorld(20260910, true);
-        creative.newWorld(20260910, true, GameMode.CREATIVE);
+        survival.newWorld(20260910, true, World.GEN_CAVE_IDENTITIES);
+        creative.newWorld(20260910, true, World.GEN_CAVE_IDENTITIES, GameMode.CREATIVE);
         assertEquals(survival.player.pos, creative.player.pos, "R7: mode cannot move spawn");
         assertEquals(survival.world.campPos, creative.world.campPos, "R7: mode cannot move camp");
         assertEquals(survival.world.changedBlocks, creative.world.changedBlocks,

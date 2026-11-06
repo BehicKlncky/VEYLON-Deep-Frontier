@@ -181,7 +181,58 @@ public enum ItemType {
             .color(0.78f, 0.76f, 0.66f)),
     GLOW_FUNGUS_BLOCK("Glow Fungus", p().places("GLOW_FUNGUS").weight(0.2f).color(0.42f, 0.78f, 0.62f)),
     STONE_BRICK_BLOCK("Stone Brick", p().places("STONE_BRICK").weight(1.7f).color(0.44f, 0.44f, 0.48f)),
-    CAGE_BARS_BLOCK("Cage Bars", p().places("CAGE_BARS").weight(1.5f).color(0.36f, 0.38f, 0.42f));
+    CAGE_BARS_BLOCK("Cage Bars", p().places("CAGE_BARS").weight(1.5f).color(0.36f, 0.38f, 0.42f)),
+
+    // ---- Urban materials and fixtures (urban package 04; append-only) ----
+    // Salvage forms: each block drops at most its own form, so breaking and
+    // placing never multiplies material. The two _BLOCK entries are Creative
+    // palette forms: rubble drops gravel and debris drops nothing.
+    ASPHALT("Asphalt", p().places("ASPHALT").weight(1.8f).color(0.20f, 0.20f, 0.22f)),
+    PAVING("Paving Slab", p().places("PAVING").weight(1.8f).color(0.58f, 0.57f, 0.55f)),
+    CONCRETE("Concrete", p().places("CONCRETE").weight(2.0f).color(0.62f, 0.62f, 0.60f)),
+    BRICK("Brick", p().places("BRICK").weight(1.6f).color(0.55f, 0.30f, 0.24f)),
+    PLASTER("Plaster", p().places("PLASTER").weight(0.8f).color(0.80f, 0.77f, 0.70f)),
+    SHEET_METAL("Sheet Metal", p().places("SHEET_METAL").weight(1.5f).color(0.45f, 0.48f, 0.50f)),
+    STAIRS("Concrete Stairs", p().places("STAIRS").weight(2.2f).color(0.60f, 0.60f, 0.58f)),
+    WOOD_DOOR("Wooden Door", p().stack(4).places("WOOD_DOOR").weight(6f).color(0.52f, 0.38f, 0.24f)),
+    METAL_DOOR("Metal Door", p().stack(2).places("METAL_DOOR").weight(14f).color(0.38f, 0.42f, 0.44f)),
+    WINDOW("Window", p().stack(8).places("WINDOW").weight(2.5f).color(0.62f, 0.72f, 0.78f)),
+    SHELF("Shelving Unit", p().stack(4).places("SHELF").weight(5f).color(0.55f, 0.44f, 0.30f)),
+    CABINET("Cabinet", p().stack(4).places("CABINET").weight(6f).color(0.62f, 0.52f, 0.38f)),
+    LOCKER("Metal Locker", p().stack(4).places("LOCKER").weight(9f).color(0.40f, 0.48f, 0.46f)),
+    TABLE("Table", p().stack(4).places("TABLE").weight(5f).color(0.58f, 0.44f, 0.28f)),
+    RUBBLE_BLOCK("Rubble", p().places("RUBBLE").weight(1.6f).color(0.50f, 0.48f, 0.45f)),
+    DEBRIS_BLOCK("Debris", p().places("DEBRIS").weight(0.3f).color(0.48f, 0.46f, 0.42f)),
+
+    // ---- Alien ecology (urban package 15; append-only) ----
+    // Taken from a Veilmaw's remains or a broken growth node; worked into a burn salve. Not food.
+    MEMBRANE_SAC("Membrane Sac", p().stack(8).weight(0.3f).color(0.62f, 0.56f, 0.70f)),
+
+    // ---- Safehouses and salvage (urban package 18; append-only) ----
+    // Gears, springs, wiring and fittings stripped from engines and workshop gear.
+    SPARE_PARTS("Spare Parts", p().stack(16).weight(0.4f).color(0.60f, 0.56f, 0.46f)),
+    // Fortification: boards or sheet metal to fix across an opening, and a beam to brace a barred door.
+    BARRICADE("Plank Barricade", p().stack(8).places("BARRICADE").weight(3.2f).color(0.56f, 0.42f, 0.26f)),
+    BARRICADE_METAL("Sheet-Metal Barricade", p().stack(4).places("BARRICADE_METAL").weight(4.5f).color(0.44f, 0.47f, 0.48f)),
+    DOOR_BRACE("Door Brace", p().stack(4).weight(2.4f).color(0.50f, 0.38f, 0.24f)),
+
+    // ---- Refuge utilities (urban package 19; append-only) ----
+    // What was left in the tank of a car that did not burn: a can runs a generator five minutes.
+    FUEL_CAN("Fuel Can", p().stack(4).weight(1.4f).color(0.66f, 0.22f, 0.16f)),
+    // A small petrol generator rebuilt from engine parts, and the wired lamp it lights.
+    GENERATOR("Generator", p().stack(1).places("GENERATOR").weight(16f).color(0.55f, 0.24f, 0.18f)),
+    WORK_LAMP("Work Lamp", p().stack(4).places("ELECTRIC_LAMP").weight(0.8f).color(0.86f, 0.84f, 0.70f)),
+    // A pump and filter unit that treats untreated water on a generator's power.
+    WATER_PURIFIER("Water Purifier", p().stack(1).places("WATER_PURIFIER").weight(9f).color(0.55f, 0.60f, 0.64f)),
+
+    // ---- Communications restoration (urban package 20; append-only) ----
+    // The three kinds of part the old relay and a radio workstation need, found in the city's
+    // security posts, warehouses, clinics and offices (CommsComponents), or kept by a stronghold.
+    TRANSMITTER_MODULE("Transmitter Module", p().stack(1).weight(1.6f).color(0.30f, 0.42f, 0.36f)),
+    POWER_CELL("Power Cells", p().stack(4).weight(1.2f).color(0.78f, 0.62f, 0.22f)),
+    ANTENNA_CABLE("Antenna Cable", p().stack(2).weight(1.8f).color(0.20f, 0.20f, 0.22f)),
+    // A radio workstation built at a workbench round a transmitter module.
+    RADIO("Radio Workstation", p().stack(1).places("RADIO").weight(7f).color(0.34f, 0.38f, 0.33f));
 
     public final String displayName;
     public final int maxStack;

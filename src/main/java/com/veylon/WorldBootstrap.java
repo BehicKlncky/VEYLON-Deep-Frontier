@@ -9,6 +9,7 @@ import com.veylon.util.Vec3i;
 import com.veylon.world.BlockType;
 import com.veylon.world.Chunk;
 import com.veylon.world.World;
+import com.veylon.world.urban.UrbanRevision;
 
 import java.util.Random;
 
@@ -26,7 +27,8 @@ import java.util.Random;
  *   <li>reseed every generator that affects outcomes;</li>
  *   <li>construct {@link World} and {@link Player};</li>
  *   <li>clear entities, log, faction standing and player action state;</li>
- *   <li>generate around spawn, find dry land, raise the camp.</li>
+ *   <li>generate around spawn, find dry land, raise the camp — or, in an
+ *       urban world, stand the player on the street ({@link UrbanBootstrap}).</li>
  * </ol>
  *
  * <p>Steps 2 through 5 are pinned by
@@ -52,15 +54,24 @@ final class WorldBootstrap {
         this.game = game;
     }
 
-    void newWorld(long seed, boolean fresh, int generatorVersion) {
-        newWorld(seed, fresh, generatorVersion, GameMode.SURVIVAL);
-    }
-
+    /**
+     * @param fresh true for a new world; false when a save load will restore
+     *        the persisted state, including an urban world's content revision
+     */
     void newWorld(long seed, boolean fresh, int generatorVersion, GameMode initialMode) {
         java.util.Objects.requireNonNull(initialMode, "initialMode");
+        if (!World.isSupportedGenerator(generatorVersion)) {
+            // Before the reset, so a bad request leaves the live world untouched.
+            throw new IllegalArgumentException("unsupported world generator version "
+                    + generatorVersion);
+        }
         resetForNewWorld(seed);
         game.gameModes.reset(initialMode);
         game.world = new World(seed, generatorVersion);
+        if (fresh && game.world.isUrban()) {
+            // Fixed before any chunk generates; a load restores the saved one instead.
+            game.world.urban.resolveContentRevision(UrbanRevision.contentFor(generatorVersion));
+        }
         game.audio.bindWorld(game.world);
         game.world.listener = game;
         game.player = new Player(game.world);
@@ -68,8 +79,13 @@ final class WorldBootstrap {
         if (game.player.abilities.invulnerable()) game.player.restoreCreativeBody();
         clearPerWorldState();
 
-        placePlayerOnDryLand();
-        setupCamp(fresh);
+        if (game.world.isUrban()) {
+            // No crash camp or camp faction track in a city (decision D-22).
+            UrbanBootstrap.placePlayerOnStreet(game, fresh);
+        } else {
+            placePlayerOnDryLand();
+            setupCamp(fresh);
+        }
         if (fresh) {
             grantStartingKit();
         }
@@ -98,6 +114,7 @@ final class WorldBootstrap {
         game.projectiles.reset();
         game.explosions.reset();
         game.settlementManager.reset();
+        game.entities.encounters.reset();
         game.ragdolls.reset();
         game.fragments.reset();
         // Fires live on the bodies a new world replaces; only the tallies stay here.
@@ -172,6 +189,8 @@ final class WorldBootstrap {
         game.faction.woodStock = 8;
         game.faction.hostile = false;
         game.faction.upgradeStage = 0;
+        // The camp is per world; only setupCamp places a new one.
+        game.faction.campPos = null;
         game.faction.resetQuestRuntime();
         game.faction.alliedGiftGiven = false;
         game.sleeping = false;
@@ -191,6 +210,7 @@ final class WorldBootstrap {
         game.combat.reset();
         game.blockActions.reset();
         game.crates.reset();
+        game.refuges.reset();
         game.creativeCatalogScreen.reset();
     }
 
@@ -315,6 +335,10 @@ final class WorldBootstrap {
     }
 
     private void grantStartingKit() {
+        if (game.world.urban != null && game.world.urban.hasStarter()) {
+            grantUrbanKit();
+            return;
+        }
         game.player.inventory.add(ItemType.BERRY, 4);
         game.player.inventory.add(ItemType.LOG, 2);
         game.player.inventory.add(ItemType.STICK, 2);
@@ -334,10 +358,51 @@ final class WorldBootstrap {
             game.log("You crash-landed on Veylon. Survive.");
             game.log("Gather wood and berries; craft tools with [C]. Watch your wounds.");
         }
-        game.log("An NPC camp lies somewhere nearby - and stranger things besides...");
+        game.log(game.world.isUrban() ? UrbanBootstrap.developmentNotice(game.world)
+                : "An NPC camp lies somewhere nearby - and stranger things besides...");
         // Populate the world with wildlife before the player sees the first frame.
         for (int i = 0; i < INITIAL_WILDLIFE_TICKS; i++) {
             game.entities.slowTick(game);
+        }
+    }
+
+    private void grantUrbanKit() {
+        game.player.inventory.add(ItemType.DRIED_BERRY, 1);
+        game.player.inventory.add(ItemType.WATERSKIN_CLEAN, 1);
+        game.player.inventory.add(ItemType.WATERSKIN_EMPTY, 1);
+        game.player.inventory.add(ItemType.BANDAGE, 1);
+        game.player.inventory.add(ItemType.TORCH, 1);
+        if (game.world.urban.hasMissions()) {
+            cityHints();
+            return;
+        }
+        if (game.gameMode() == GameMode.CREATIVE) {
+            game.log("City refuge - Creative mode. Press [E] for the catalog; Esc then [T] for world controls.");
+            game.log("Double-tap Space to fly; Space rises and Ctrl descends. Nothing here can hurt you.");
+        } else {
+            game.log("City refuge. Close the doors; the bedroom is a sheltered place to rest.");
+            game.log("Search [F] kitchen cabinets and the bathroom for food, water and treatment.");
+            game.log("Cross the courtyard to the apartments and corner shop; return here with salvage.");
+            game.log("The courtyard collector refills in rain. Burn recovered planks there to cook or boil.");
+            game.log("Use [C] by the kitchen workbench: scrap, planks and textiles make a reinforced spear.");
+        }
+    }
+
+    /**
+     * A new layout-sixteen city's first lines (urban milestone 21): home, barring a door, what
+     * searching costs, the map, and where work is. Each is short enough to stay whole on the HUD's
+     * log beside its timestamp; the map's journal says more. Creative's name only what Creative can do.
+     */
+    static final String[] CITY_HINTS = {
+            "City refuge: this flat is home.", "Crouch and press F to bar a door.",
+            "[F] searches. Searching is noisy.", "[M] city map and journal.", "Survivors may have work for you."};
+    static final String[] CITY_CREATIVE_HINTS = {
+            "City refuge, in Creative mode.", "[E] catalog. Esc, [T]: world.", "Double-tap Space to fly.",
+            "[M] city map and journal."};
+
+    private void cityHints() {
+        for (String line : game.gameMode() == GameMode.CREATIVE ? CITY_CREATIVE_HINTS : CITY_HINTS) {
+            game.log(line);
         }
     }
 }

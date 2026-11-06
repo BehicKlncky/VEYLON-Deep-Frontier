@@ -224,11 +224,16 @@ final class VoxelPhysics {
 
         float blockedX = entity.pos.x;
         float blockedZ = entity.pos.z;
-        entity.pos.set(startX, startY + stepHeight, startZ);
-        if (!entity.collidesAt(entity.pos.x, entity.pos.y, entity.pos.z)
-                && !moveAxis(entity, axis, distance)) {
-            entity.onGround = true;
-            return HORIZONTAL_STEPPED;
+        // Prefer a half-step when it fits the new treads. Full-block ledges
+        // still require and retain the original one-block allowance.
+        for (float rise = Math.min(.5f, stepHeight); ; rise = stepHeight) {
+            entity.pos.set(startX, startY + rise, startZ);
+            if (!entity.collidesAt(entity.pos.x, entity.pos.y, entity.pos.z)
+                    && !moveAxis(entity, axis, distance)) {
+                entity.onGround = true;
+                return HORIZONTAL_STEPPED;
+            }
+            if (rise >= stepHeight) { break; }
         }
 
         // The step was too tall or led into another obstruction. Keep the

@@ -3,6 +3,7 @@ package com.veylon.qa;
 import com.veylon.Game;
 import com.veylon.simulation.ShelterSystem;
 import com.veylon.simulation.SimulationScheduler;
+import com.veylon.world.World;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
@@ -145,7 +146,7 @@ class TickProfileTest {
 
     private static Game loadedWorld() {
         Game game = new Game();
-        game.newWorld(5150L, true);
+        game.newWorld(5150L, true, World.GEN_CAVE_IDENTITIES);
         int px = (int) game.player.pos.x;
         int pz = (int) game.player.pos.z;
         for (int radius = 3;

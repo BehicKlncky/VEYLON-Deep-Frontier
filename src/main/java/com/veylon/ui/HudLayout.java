@@ -17,7 +17,8 @@ public final class HudLayout {
     public static final float HELD_HEIGHT = 28, WEAPON_HEIGHT = 64, WEAPON_METER_X = 172;
     public static final float CONTEXT_HEIGHT = 120, MISSION_WIDTH = 420, MISSION_HEIGHT = 152;
     public static final float TARGET_WIDTH = 300, TARGET_HEIGHT = 40, TARGET_OFFSET = 26;
-    public static final float PROMPT_WIDTH = 440, PROMPT_HEIGHT = 36;
+    /** Wide enough for a prompt's cost or next step, narrow enough to clear the 720p side modules. */
+    public static final float PROMPT_WIDTH = 580, PROMPT_HEIGHT = 36;
 
     public record Rect(float x, float y, float width, float height) {
         public float right() { return x + width; }
@@ -75,6 +76,41 @@ public final class HudLayout {
             else hi = mid - 1;
         }
         return new String(points, 0, lo).stripTrailing() + ellipsis;
+    }
+
+    /**
+     * Word-wraps text into at most {@code maxLines} lines no wider than {@code width}, measured the
+     * way it will be drawn. A word too long for a line is fitted on its own; text left over after the
+     * last line ends that line with a visible ellipsis, never silent clipping.
+     */
+    public static java.util.List<String> wrap(String text, float width, int maxLines, ToDoubleFunction<String> measure) {
+        java.util.List<String> lines = new java.util.ArrayList<>();
+        if (text == null || width <= 0 || maxLines <= 0) return lines;
+        String[] words = text.replace('\n', ' ').replace('\r', ' ').replace('\t', ' ').trim().split(" +");
+        StringBuilder line = new StringBuilder();
+        int i = 0;
+        while (i < words.length && lines.size() < maxLines) {
+            String candidate = line.isEmpty() ? words[i] : line + " " + words[i];
+            if (measure.applyAsDouble(candidate) <= width) {
+                line.setLength(0);
+                line.append(candidate);
+                i++;
+                continue;
+            }
+            if (line.isEmpty()) {
+                lines.add(fit(words[i], width, measure));
+                i++;
+            } else {
+                lines.add(line.toString());
+                line.setLength(0);
+            }
+        }
+        if (!line.isEmpty() && lines.size() < maxLines) lines.add(line.toString());
+        if (i < words.length && !lines.isEmpty()) {
+            int last = lines.size() - 1;
+            lines.set(last, fit(lines.get(last) + " " + words[i] + "…", width, measure));
+        }
+        return lines;
     }
 
     /** State words are also rendered, so a warning never depends on hue alone. */

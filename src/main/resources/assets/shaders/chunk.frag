@@ -27,6 +27,7 @@ uniform vec3 uCamPos;
 uniform vec3 uFoliageTint;
 uniform float uWetness;      // 0..1 rain-wet surfaces
 uniform float uFrost;        // 0..1 frost accent on top faces
+uniform float uCity;         // 1 in a generated city: weather marks only open sky; rooms get a little bounce
 uniform vec3 uFogColor;
 uniform float uFogStart;
 uniform float uFogEnd;
@@ -68,11 +69,14 @@ void main() {
     vec3 N = normalize(vNormal);
     float topness = clamp(N.y, 0.0, 1.0);
 
-    // Wet surfaces darken and get glossier; frost whitens upward faces.
-    float wet = uWetness * (0.35 + 0.65 * topness) * vSky;
+    // Wet surfaces darken and get glossier; frost whitens upward faces. In a generated city only
+    // what the open sky reaches gets wet or frosted (direct sky is 1; light through windows and
+    // glass stays below 0.85), so a floor beside a window stays as dry as the simulation keeps it.
+    float exposed = mix(vSky, smoothstep(0.84, 0.97, vSky), uCity);
+    float wet = uWetness * (0.35 + 0.65 * topness) * exposed;
     base *= 1.0 - 0.28 * wet;
     rough = mix(rough, 0.18, wet * 0.8);
-    base = mix(base, vec3(0.82, 0.87, 0.95), uFrost * topness * vSky * 0.55);
+    base = mix(base, vec3(0.82, 0.87, 0.95), uFrost * topness * exposed * 0.55);
 
     // Sun/moon diffuse, gated by heightmap skylight (caves) and the shadow map.
     float skyGate = smoothstep(0.03, 0.85, vSky);
@@ -85,7 +89,10 @@ void main() {
     // Hemisphere ambient by normal, gated softly by skylight (floor keeps
     // under-canopy and shallow caves navigable).
     float hemi = N.y * 0.5 + 0.5;
-    vec3 ambient = mix(uAmbientGround, uAmbientSky, hemi) * mix(0.28, 1.0, vSky);
+    // A generated city's rooms above the street (sky 0.12 to 0.72) take a little of the day's
+    // ambient bounced in through their windows; cellars (0.075) and the deep fill (0.04) stay dark.
+    float room = uCity * smoothstep(0.09, 0.115, vSky) * (1.0 - smoothstep(0.76, 0.84, vSky));
+    vec3 ambient = mix(uAmbientGround, uAmbientSky, hemi) * (mix(0.28, 1.0, vSky) + 0.12 * room);
 
     // Torch/campfire light: cubic falloff keeps fire pools tight and warm.
     vec3 blockLight = uBlockLightColor * (vBlock * vBlock * vBlock * 1.5);

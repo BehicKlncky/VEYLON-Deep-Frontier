@@ -15,7 +15,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * A burning body sounds like fire, synthesized like every other sound: a
  * bright crackle, a dark rush as it catches, a hiss of steam as it is put
- * out. They are made last, from their own generator, so the rest of the
+ * out. They follow fixtures, from their own generator, so the earlier
  * catalog is untouched by their existence; and a headless game or a device
  * without audio plays them as silence.
  */
@@ -24,13 +24,14 @@ class BodyFireSoundsTest {
     private static final int RATE = ProceduralAudio.RATE;
 
     @Test
-    void theThreeSoundsComeLastAndFromTheirOwnGenerator() {
+    void theThreeSoundsFollowFixturesAndUseTheirOwnGenerator() {
         Map<String, float[]> catalog = new LinkedHashMap<>();
         new ProceduralAudio(new Random(60600)).synthesize(catalog::put);
         List<String> names = new ArrayList<>(catalog.keySet());
-        int n = names.size();
+        int n = names.indexOf(BodyFireSounds.CRACKLE);
         assertEquals(List.of(BodyFireSounds.CRACKLE, BodyFireSounds.FLARE, BodyFireSounds.SIZZLE),
-                names.subList(n - 3, n), "made after everything else");
+                names.subList(n, n + 3), "three adjacent independent body-fire recipes");
+        assertTrue(n > names.indexOf(UrbanFixtureSounds.WINDOW_SLIDE));
 
         Map<String, float[]> alone = new LinkedHashMap<>();
         BodyFireSounds.synthesize(new Random(BodyFireSounds.SEED), alone::put);

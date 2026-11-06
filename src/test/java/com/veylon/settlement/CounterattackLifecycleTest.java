@@ -6,6 +6,7 @@ import com.veylon.entity.Npc;
 import com.veylon.item.ItemStack;
 import com.veylon.item.ItemType;
 import com.veylon.save.SaveSystem;
+import com.veylon.world.World;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -26,7 +27,7 @@ class CounterattackLifecycleTest {
     @Test
     void activePartyLeavesARealHostileOriginAndContactLossDoesNotDeleteMission() {
         Game game = new Game();
-        game.newWorld(20260716L, true);
+        game.newWorld(20260716L, true, World.GEN_CAVE_IDENTITIES);
         Pair pair = hostilePair(game);
         configureOutpost(game, pair.target, 3);
         game.world.layoutFor(pair.origin);
@@ -80,7 +81,7 @@ class CounterattackLifecycleTest {
     @Test
     void realCombatDeathsDefendTheTargetAndCleanupReturnsCapacity() {
         Game game = new Game();
-        game.newWorld(42L, true);
+        game.newWorld(42L, true, World.GEN_CAVE_IDENTITIES);
         Pair pair = hostilePair(game);
         configureOutpost(game, pair.target, 4);
         Npc provider = outpostProvider(game, pair.target, 4);
@@ -163,7 +164,7 @@ class CounterattackLifecycleTest {
     @Test
     void outboundAssaultAndRetreatRoundTripWithoutDuplication(@TempDir Path dir) {
         Game game = new Game();
-        game.newWorld(987654321L, true);
+        game.newWorld(987654321L, true, World.GEN_CAVE_IDENTITIES);
         Pair pair = hostilePair(game);
         configureOutpost(game, pair.target, 8);
         game.player.pos.set(50_000, 50, 50_000);
@@ -208,7 +209,7 @@ class CounterattackLifecycleTest {
 
     private static Result runDormant(long seed, int defenders, int attackers) {
         Game game = new Game();
-        game.newWorld(seed, true);
+        game.newWorld(seed, true, World.GEN_CAVE_IDENTITIES);
         Pair pair = hostilePair(game);
         configureOutpost(game, pair.target, defenders);
         game.player.pos.set(50_000, 50, 50_000);

@@ -33,7 +33,30 @@ class SerializedEnumOrderTest {
             // 0.3.0 world expansion — appended, never reordered.
             "BASALT", "SULFUR_ORE", "SALTPETER_ORE", "GLOW_FUNGUS", "LADDER", "LANTERN",
             "TRAIL_MARKER", "POWDER_KEG", "GATE", "GATE_OPEN", "STONE_BRICK", "ALARM_BELL",
-            "CAGE_BARS");
+            "CAGE_BARS",
+            // Urban package 04 materials and fixtures — appended, never reordered.
+            "ASPHALT", "PAVING", "CONCRETE", "BRICK", "PLASTER", "SHEET_METAL", "RUBBLE",
+            "WOOD_DOOR", "WOOD_DOOR_OPEN", "METAL_DOOR", "METAL_DOOR_OPEN", "BROKEN_DOOR",
+            "WINDOW", "WINDOW_OPEN", "BROKEN_WINDOW", "STAIRS", "SHELF", "CABINET", "LOCKER",
+            "TABLE", "DEBRIS",
+            // Milestone 06 native-QA stair shapes; old STAIRS remains at its original ordinal.
+            "STAIRS_NORTH", "STAIRS_SOUTH", "STAIRS_WEST", "STAIRS_EAST",
+            // Milestone 12 frontage signs.
+            "SIGN",
+            // Milestone 13 district hazard ground.
+            "CONTAMINATED_GROUND",
+            // Milestone 14 guard rails and the loose panel over a hidden cellar, closed and open.
+            "RAILING", "HIDDEN_PANEL", "HIDDEN_PANEL_OPEN",
+            // Milestone 15 alien growth: a node and its membrane floor.
+            "GROWTH_NODE", "VEIL_MEMBRANE",
+            // Milestone 18 static salvage: a cell of a burnt-out car; fortification panels.
+            "CAR_WRECK", "BARRICADE", "BARRICADE_METAL",
+            // Urban milestone 19: refuge utilities.
+            "GENERATOR", "ELECTRIC_LAMP", "WATER_PURIFIER",
+            // Urban milestone 20: the relay mast's cabinet.
+            "RELAY",
+            // The radio workstation, a device on a refuge's wiring.
+            "RADIO");
 
     private static final List<String> ITEM_TYPE_ORDER = List.of(
             "DIRT", "STONE", "SAND", "GRAVEL", "CLAY", "SNOW", "LOG", "PLANK", "WALL", "STICK",
@@ -58,7 +81,19 @@ class SerializedEnumOrderTest {
             "COAL_ORE_BLOCK", "COPPER_ORE_BLOCK", "IRON_ORE_BLOCK", "ASH_BLOCK",
             "WRECKAGE_BLOCK", "POD_HULL_BLOCK", "RUIN_STONE_BLOCK", "BONE_PILE_BLOCK",
             "BASALT_BLOCK", "SULFUR_ORE_BLOCK", "SALTPETER_ORE_BLOCK", "GLOW_FUNGUS_BLOCK",
-            "STONE_BRICK_BLOCK", "CAGE_BARS_BLOCK");
+            "STONE_BRICK_BLOCK", "CAGE_BARS_BLOCK",
+            // Urban package 04 salvage and palette forms — appended, never reordered.
+            "ASPHALT", "PAVING", "CONCRETE", "BRICK", "PLASTER", "SHEET_METAL", "STAIRS",
+            "WOOD_DOOR", "METAL_DOOR", "WINDOW", "SHELF", "CABINET", "LOCKER", "TABLE",
+            "RUBBLE_BLOCK", "DEBRIS_BLOCK",
+            // Milestone 15 alien ecology.
+            "MEMBRANE_SAC",
+            // Milestone 18 salvage and fortification.
+            "SPARE_PARTS", "BARRICADE", "BARRICADE_METAL", "DOOR_BRACE",
+            // Urban milestone 19: refuge utilities.
+            "FUEL_CAN", "GENERATOR", "WORK_LAMP", "WATER_PURIFIER",
+            // Urban milestone 20: communications parts.
+            "TRANSMITTER_MODULE", "POWER_CELL", "ANTENNA_CABLE", "RADIO");
 
     private static final List<String> QUEST_TYPE_ORDER = List.of(
             "FETCH", "HUNT_PREDATOR", "INVESTIGATE",
@@ -72,7 +107,7 @@ class SerializedEnumOrderTest {
     private static final List<String> NPC_ARCHETYPE_ORDER = List.of(
             "VILLAGER", "GUARD", "MEDIC", "TRADER", "FARMER", "SMITH", "ARCHER",
             "SCAVENGER", "TRACKER", "SCOUT", "HUNTER", "BRUTE", "POWDERMAN", "LEADER",
-            "CAPTIVE");
+            "CAPTIVE", "VEILBOUND", "BREACHER");
 
     /** {@code world.fragments} stores the piece id as its ordinal. */
     private static final List<String> BODY_FRAGMENT_PIECE_ORDER = List.of(
@@ -81,11 +116,13 @@ class SerializedEnumOrderTest {
 
     /** The base v3 body stores creatures and carcasses by {@code CreatureType.ordinal()}. */
     private static final List<String> CREATURE_TYPE_ORDER = List.of(
-            "DEER", "WOLF", "BIRD", "HARE", "THORNHORN", "STALKER");
+            "DEER", "WOLF", "BIRD", "HARE", "THORNHORN", "STALKER",
+            // Urban milestone 15: the quarantine's alien organism.
+            "VEILMAW");
 
     /** {@code world.remains} stores a piece's body family by ordinal. */
     private static final List<String> BODY_FAMILY_ORDER = List.of(
-            "HUMANOID", "DEER", "WOLF", "BIRD", "HARE", "THORNHORN", "STALKER");
+            "HUMANOID", "DEER", "WOLF", "BIRD", "HARE", "THORNHORN", "STALKER", "VEILMAW");
 
     private static final List<String> QUADRUPED_PIECES = List.of(
             "torso", "head", "upper_leg_fl", "upper_leg_fr", "upper_leg_bl", "upper_leg_br",
@@ -100,7 +137,8 @@ class SerializedEnumOrderTest {
             BodyFamily.BIRD, List.of("torso", "head", "tail", "wing0_l", "wing0_r", "wing1_l", "wing1_r"),
             BodyFamily.HARE, List.of("torso", "head", "leg_fl", "leg_fr", "leg_bl", "leg_br", "tail"),
             BodyFamily.THORNHORN, withTailTip(QUADRUPED_PIECES),
-            BodyFamily.STALKER, withTailTip(QUADRUPED_PIECES)));
+            BodyFamily.STALKER, withTailTip(QUADRUPED_PIECES),
+            BodyFamily.VEILMAW, withTailTip(QUADRUPED_PIECES)));
 
     private static List<String> withTailTip(List<String> pieces) {
         List<String> all = new ArrayList<>(pieces);

@@ -48,7 +48,7 @@ class GameModeSectionTest {
     @Test
     void absentSectionLoadsAnOldV3WorldAsUnmarkedSurvival() throws Exception {
         Game original = new Game();
-        original.newWorld(20260910, true);
+        original.newWorld(20260910, true, World.GEN_CAVE_IDENTITIES);
         Path save = directory.resolve("without-mode.sav");
         assertTrue(SaveSystem.save(original, save));
         Files.write(save, CreativeSaveSections.replace(Files.readAllBytes(save), GameModeSection.ID, null));
@@ -63,11 +63,11 @@ class GameModeSectionTest {
     @Test
     void actualCreativeSaveRestoresModeMarkAndFlightOverALiveWorld() {
         Game original = new Game();
-        original.newWorld(20260910, true, GameMode.CREATIVE);
+        original.newWorld(20260910, true, World.GEN_CAVE_IDENTITIES, GameMode.CREATIVE);
         original.player.abilities.setFlying(true);
         Path save = directory.resolve("creative.sav");
         assertTrue(SaveSystem.save(original, save));
-        original.newWorld(4422, true);
+        original.newWorld(4422, true, World.GEN_CAVE_IDENTITIES);
         assertTrue(SaveSystem.load(original, save), "R15: real Creative save must load successfully");
         assertEquals(GameMode.CREATIVE, original.gameMode());
         assertTrue(original.creativeMarked() && original.player.abilities.flying());
@@ -82,7 +82,7 @@ class GameModeSectionTest {
                     new String(input.readAllBytes(), StandardCharsets.US_ASCII).trim()));
         }
         Game game = new Game();
-        game.newWorld(4422, true, GameMode.CREATIVE);
+        game.newWorld(4422, true, World.GEN_CAVE_IDENTITIES, GameMode.CREATIVE);
         assertTrue(SaveSystem.load(game, save), "R1: authentic v2 saves must still load");
         assertEquals(World.GEN_LEGACY, game.world.generatorVersion);
         assertEquals(GameMode.SURVIVAL, game.gameMode());
@@ -92,7 +92,7 @@ class GameModeSectionTest {
     @Test
     void malformedSectionsFailBeforeChangingTheLiveWorld() throws Exception {
         Game game = new Game();
-        game.newWorld(20260910, true, GameMode.CREATIVE);
+        game.newWorld(20260910, true, World.GEN_CAVE_IDENTITIES, GameMode.CREATIVE);
         Path save = directory.resolve("malformed-mode.sav");
         assertTrue(SaveSystem.save(game, save));
         byte[] validSave = Files.readAllBytes(save);
@@ -118,7 +118,7 @@ class GameModeSectionTest {
 
     private static Game minimalGame() {
         Game game = new Game();
-        game.world = new World(1);
+        game.world = new World(1, World.GEN_CAVE_IDENTITIES);
         game.player = new Player(game.world);
         return game;
     }

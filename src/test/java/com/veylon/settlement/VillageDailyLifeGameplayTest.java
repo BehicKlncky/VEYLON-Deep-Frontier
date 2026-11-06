@@ -5,6 +5,7 @@ import com.veylon.ai.Pathfinder;
 import com.veylon.entity.Npc;
 import com.veylon.save.SaveSystem;
 import com.veylon.util.Vec3i;
+import com.veylon.world.World;
 import org.joml.Vector3f;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -36,7 +37,7 @@ class VillageDailyLifeGameplayTest {
     void generatedFriendlyVillageResidentsWorkTradePatrolSleepAndPersist(
             @TempDir Path dir) {
         Game game = new Game();
-        game.newWorld(SEED, true);
+        game.newWorld(SEED, true, World.GEN_CAVE_IDENTITIES);
         Settlement village = generatedFriendlyVillageWithDailyRoles(game);
         assertNotNull(village,
                 "the deterministic search must find a friendly generated village"

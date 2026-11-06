@@ -179,7 +179,7 @@ final class PlayerCombatSystem {
         if (victim instanceof Npc n) {
             if (n.settled()) {
                 game.settlementManager.onNpcAttackedByPlayer(game, n);
-            } else if (!n.isTrader && !n.raider && !n.warParty) {
+            } else if (!n.infected() && !n.isTrader && !n.raider && !n.warParty) {
                 game.faction.addTrust(game, NPC_ATTACK_TRUST_PENALTY,
                         "You attacked " + n.name + "!");
             }
@@ -199,6 +199,11 @@ final class PlayerCombatSystem {
         }
         for (Npc n : game.entities.npcs) {
             double d = candidateDist(n, dir);
+            // A survivor-site resident behind a wall is out of reach (urban milestone 16).
+            if (d >= 0 && com.veylon.settlement.UrbanSiteDirector.siteOf(game.world, n) != null
+                    && !game.interactions.clearPathTo(n)) {
+                continue;
+            }
             if (d >= 0 && d < bestD) {
                 bestD = d;
                 best = n;

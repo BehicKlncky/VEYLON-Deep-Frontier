@@ -12,6 +12,7 @@ import com.veylon.simulation.SimulationScheduler;
 import com.veylon.util.AppPaths;
 import com.veylon.util.Vec3i;
 import com.veylon.world.BlockType;
+import com.veylon.world.World;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
@@ -104,7 +105,7 @@ class PerformanceBenchmarkTest {
     @Test
     void aFullTickCycleStaysWithinBudgetWithAHundredChunksLoaded() {
         Game game = new Game();
-        game.newWorld(5150L, true);
+        game.newWorld(5150L, true, World.GEN_CAVE_IDENTITIES);
         int loaded = loadChunks(game, CHUNK_TARGET);
         assertTrue(loaded >= CHUNK_TARGET,
                 "precondition: " + CHUNK_TARGET + " chunks loaded, was " + loaded);
@@ -115,7 +116,7 @@ class PerformanceBenchmarkTest {
     @Test
     void aFullTickCycleStaysWithinBudgetWithFortyEntitiesActive() {
         Game game = new Game();
-        game.newWorld(5151L, true);
+        game.newWorld(5151L, true, World.GEN_CAVE_IDENTITIES);
         loadChunks(game, 25);
         spawnEntities(game, ENTITY_TARGET);
         assertTrue(game.entities.creatureCount() + game.entities.npcCount() >= ENTITY_TARGET,
@@ -127,7 +128,7 @@ class PerformanceBenchmarkTest {
     @Test
     void aSettlementSlowTickStaysWithinBudgetWithTwentyResidents() {
         Game game = new Game();
-        game.newWorld(5152L, true);
+        game.newWorld(5152L, true, World.GEN_CAVE_IDENTITIES);
         Settlement settlement = populatedSettlement(game, RESIDENT_TARGET);
         assertTrue(settlement.aliveResidents() >= RESIDENT_TARGET,
                 "precondition: " + RESIDENT_TARGET + " residents");
@@ -149,7 +150,7 @@ class PerformanceBenchmarkTest {
     @Test
     void savingAndLoadingATypicalWorldStaysWithinBudget() {
         Game game = new Game();
-        game.newWorld(5153L, true);
+        game.newWorld(5153L, true, World.GEN_CAVE_IDENTITIES);
         loadChunks(game, 60);
         spawnEntities(game, 20);
         editBlocks(game, 400);

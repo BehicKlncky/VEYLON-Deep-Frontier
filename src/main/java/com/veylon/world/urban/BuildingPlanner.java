@@ -1,0 +1,162 @@
+package com.veylon.world.urban;
+
+import com.veylon.world.urban.BuildingPlan.Family;
+import com.veylon.world.urban.BuildingPlan.Variant;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
+
+/** Pure parcel-to-building planning, with a finite validated repair sequence. */
+public final class BuildingPlanner {
+    public static final int MAX_ATTEMPTS = 3;
+    public record Result(BuildingPlan plan, int attempts, List<String> repairs,
+                         AccessibilityValidator.Report validation) {
+        public Result { repairs = List.copyOf(repairs); }
+    }
+
+    private BuildingPlanner() { }
+
+    /**
+     * Recomputable without world state, content rolls, chunks or random streams. Revision five
+     * chooses families from the parcel's district, so it needs {@link #plan(long, int, ParcelPlan, DistrictPlan)}.
+     */
+    public static Result plan(long seed, int revision, ParcelPlan parcel) {
+        if (revision == UrbanRevision.BUILDING_TEMPLATE_CIVIC || revision == UrbanRevision.BUILDING_TEMPLATE_DISTRICTS
+                || revision == UrbanRevision.BUILDING_TEMPLATE_ROUTES) {
+            throw new IllegalArgumentException("template revision " + revision + " plans a parcel within its district");
+        }
+        Family family = parcel.use() == ParcelPlan.Use.COMMERCIAL ? Family.SHOP : Family.APARTMENT;
+        int storeys = family == Family.SHOP ? Math.min(2, parcel.maxStoreys()) : Math.min(5, parcel.maxStoreys());
+        // Revision three refines only treads; preserve revision-two occupation and basements.
+        int selectionRevision = revision == UrbanRevision.BUILDING_TEMPLATE_SHAPED_STAIRS
+                || revision == UrbanRevision.BUILDING_TEMPLATE_STARTER
+                ? UrbanRevision.BUILDING_TEMPLATE_FURNISHED : revision;
+        Variant variant = Variant.values()[UrbanHash.range(0, 3, seed, selectionRevision,
+                UrbanSalts.BUILDING_VARIANT, parcel.id(), 0, 0)];
+        boolean basement = family == Family.APARTMENT && UrbanHash.range(0, 1, seed, selectionRevision,
+                UrbanSalts.BUILDING_BASEMENT, parcel.id(), 0, 0) == 1;
+        if (revision == UrbanRevision.BUILDING_TEMPLATE_STARTER && UrbanStarterSite.isNeighbour(parcel)) {
+            variant = Variant.INTACT;
+            basement = family == Family.APARTMENT;
+        }
+        BuildingPlan candidate = BuildingTemplates.propose(parcel, revision, family, variant, storeys, basement, false);
+        return repair(candidate);
+    }
+
+    /**
+     * Any supported revision. Under revision five the catalogue picks the parcel's family; a
+     * walk-up there is exactly the revision-four plan, starter superblock included.
+     */
+    public static Result plan(long seed, int revision, ParcelPlan parcel, DistrictPlan district) {
+        if (revision == UrbanRevision.BUILDING_TEMPLATE_ROUTES) {
+            return planRoutes(seed, parcel, district, RouteCatalogue.of(seed, district));
+        }
+        if (revision == UrbanRevision.BUILDING_TEMPLATE_DISTRICTS) { return planDistrict(seed, parcel, district); }
+        if (revision != UrbanRevision.BUILDING_TEMPLATE_CIVIC) { return plan(seed, revision, parcel); }
+        Family family = CivicCatalogue.family(seed, district, parcel);
+        if (family.walkUp()) { return plan(seed, UrbanRevision.BUILDING_TEMPLATE_STARTER, parcel); }
+        int storeys = CivicTemplates.envelope(family).storeys(parcel);
+        BuildingPlan candidate = BuildingTemplates.propose(parcel, revision, family,
+                CivicCatalogue.variant(seed, parcel), storeys, CivicCatalogue.basement(seed, family, parcel), false);
+        return repair(candidate);
+    }
+
+    /**
+     * Revision six, the district catalogue: the family and variant follow the parcel's district
+     * ({@link DistrictCatalogue}); the plan itself comes from template four (walk-ups) or five
+     * (commercial and civic families). A walk-up whose district keeps template four's variant
+     * is exactly the revision-four plan.
+     */
+    private static Result planDistrict(long seed, ParcelPlan parcel, DistrictPlan district) {
+        Family family = DistrictCatalogue.family(seed, district, parcel);
+        if (family.walkUp()) {
+            Variant variant = DistrictCatalogue.walkUpVariant(seed, district, parcel);
+            if (variant == null) { return plan(seed, UrbanRevision.BUILDING_TEMPLATE_STARTER, parcel); }
+            // Template four's storeys and basement, with the district's abandonment variant.
+            int storeys = family == Family.SHOP ? Math.min(2, parcel.maxStoreys()) : Math.min(5, parcel.maxStoreys());
+            boolean basement = family == Family.APARTMENT && UrbanHash.range(0, 1, seed,
+                    UrbanRevision.BUILDING_TEMPLATE_FURNISHED, UrbanSalts.BUILDING_BASEMENT, parcel.id(), 0, 0) == 1;
+            return repair(BuildingTemplates.propose(parcel, UrbanRevision.BUILDING_TEMPLATE_STARTER, family, variant,
+                    storeys, basement, false));
+        }
+        int storeys = CivicTemplates.envelope(family).storeys(parcel);
+        BuildingPlan candidate = BuildingTemplates.propose(parcel, UrbanRevision.BUILDING_TEMPLATE_CIVIC, family,
+                DistrictCatalogue.variant(seed, district, parcel), storeys, CivicCatalogue.basement(seed, family, parcel),
+                false);
+        return repair(candidate);
+    }
+
+    /**
+     * Revision seven, the route catalogue (milestone 14). The starter superblock and refuge are
+     * exactly their revision-six plans. Every other parcel keeps its district family, storeys
+     * and variant, an apartment always gets its first basement, and {@link RouteTemplates}
+     * overlays the parcel's routes on every attempt of the same finite repair sequence.
+     *
+     * <p>Only when all three attempts fail, the sequence runs once more without the parapet
+     * openings that face the stair house (attempts four to six, package 25, D-248): such an opening
+     * is a notch nobody on the roof can reach, so every attempt with it failed and its building
+     * could not be planned at all. A parcel that planned before never reaches this step, so its
+     * plan is unchanged.
+     */
+    public static Result planRoutes(long seed, ParcelPlan parcel, DistrictPlan district, RouteCatalogue routes) {
+        if (UrbanStarterSite.isNeighbour(parcel) || parcel.use() == ParcelPlan.Use.REFUGE) {
+            return planDistrict(seed, parcel, district);
+        }
+        RouteCatalogue.Expect expect = routes.expected(parcel.index());
+        RouteCatalogue.Features features = routes.features(parcel.index());
+        boolean flooded = district.district == UrbanDistrict.FLOODED;
+        List<String> repairs = new ArrayList<>();
+        Result planned = routeAttempts(parcel, expect, features, flooded, repairs, 0);
+        if (planned != null) { return planned; }
+        RouteCatalogue.Features reachable = features.withoutOpeningsFacingTheBulkhead(expect);
+        if (reachable != features) {
+            planned = routeAttempts(parcel, expect, reachable, flooded, repairs, MAX_ATTEMPTS);
+            if (planned != null) { return planned; }
+        }
+        throw new IllegalStateException("no valid building in finite fallback: " + repairs);
+    }
+
+    /** The finite repair sequence with one set of route features; null when every attempt fails. */
+    private static Result routeAttempts(ParcelPlan parcel, RouteCatalogue.Expect expect,
+                                        RouteCatalogue.Features features, boolean flooded, List<String> repairs,
+                                        int earlier) {
+        int base = expect.family().walkUp() ? UrbanRevision.BUILDING_TEMPLATE_STARTER : UrbanRevision.BUILDING_TEMPLATE_CIVIC;
+        for (int attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+            Variant variant = attempt == 1 ? expect.variant() : Variant.INTACT;
+            BuildingPlan candidate = RouteTemplates.apply(BuildingTemplates.propose(parcel, base, expect.family(),
+                    variant, expect.storeys(), expect.basement(), attempt == 3), expect, features, flooded);
+            AccessibilityValidator.Report report = AccessibilityValidator.inspect(candidate);
+            if (report.ok()) { return new Result(candidate, earlier + attempt, repairs, report); }
+            repairs.add("attempt=" + (earlier + attempt) + " " + identity(candidate) + " " + report.summary());
+        }
+        return null;
+    }
+
+    /** Candidate, intact alternate, then minimal rooms on the same footprint and vertical envelope. */
+    public static Result repair(BuildingPlan candidate) {
+        List<String> repairs = new ArrayList<>();
+        for (int attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+            AccessibilityValidator.Report report = AccessibilityValidator.inspect(candidate);
+            if (report.ok()) { return new Result(candidate, attempt, repairs, report); }
+            repairs.add("attempt=" + attempt + " " + identity(candidate) + " " + report.summary());
+            if (attempt < MAX_ATTEMPTS) {
+                candidate = BuildingTemplates.propose(candidate.parcel(), candidate.templateRevision(),
+                        candidate.family(), Variant.INTACT, candidate.storeys(), candidate.basement(), attempt == 2);
+            }
+        }
+        throw new IllegalStateException("no valid building in finite fallback: " + repairs);
+    }
+
+    /**
+     * What an agent needs to find a failing template without scanning the city: its name and
+     * revision, family and variant, the parcel's canonical id, frontage, size and storeys.
+     */
+    public static String identity(BuildingPlan plan) {
+        ParcelPlan p = plan.parcel();
+        return String.format(Locale.ROOT, "template=%s revision=%d family=%s variant=%s parcel=%s facing=%s"
+                        + " size=%dx%d storeys=%d basement=%b", plan.template(), plan.templateRevision(),
+                plan.family(), plan.variant(), UrbanIds.format(p.id()), p.frontage(), p.width(), p.depth(),
+                plan.storeys(), plan.basement());
+    }
+}

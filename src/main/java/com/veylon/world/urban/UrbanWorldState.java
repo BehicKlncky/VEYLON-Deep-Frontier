@@ -1,0 +1,543 @@
+package com.veylon.world.urban;
+
+import com.veylon.world.Chunk;
+
+/**
+ * The urban state of one world: its layout and content revisions and, for the
+ * street-network layout, its bounded cache of district plans and the plan
+ * queries built on it.
+ *
+ * <p>{@code World} owns exactly one of these when its generator is urban and
+ * none otherwise, so a legacy world never carries urban state, and a new world
+ * or a load — each a new {@code World} — can never inherit the previous
+ * world's.
+ *
+ * <p>The layout revision follows from the generator version at construction.
+ * The content revision is resolved separately: bootstrap records the current
+ * one for a fresh world before any chunk generates, while a load leaves it
+ * unresolved until the {@code urban.meta} section (or its absent default) has
+ * been read. Reading it before then throws, so content can never be rolled
+ * against a revision a save is about to replace.
+ *
+ * <h2>Plans and queries</h2>
+ *
+ * <p>District plans are pure, so the cache holds at most
+ * {@value #MAX_REGION_PLANS} of them and rebuilds an evicted one identically;
+ * nothing persistent lives there. The queries answer from the plan, never from
+ * the column top, because {@code World.surfaceHeight} reports whatever is
+ * highest — a tree crown now, a roof once buildings exist:
+ * <ul>
+ *   <li>{@link #groundY}: the walkable ground slab of a column (the street
+ *       datum everywhere in layouts 1 and 2);</li>
+ *   <li>{@link UrbanDatum#slabY} and {@link UrbanDatum#floorContaining}: the
+ *       floors of the datum;</li>
+ *   <li>{@link #plannedRoofY}: the storey envelope over a parcel — a
+ *       reservation, not a built roof — and the ground elsewhere;</li>
+ *   <li>{@link #surfaceAt}, {@link #parcelAt} and {@link #districtAt}: plan
+ *       metadata for a column.</li>
+ * </ul>
+ * Queries never generate chunks and never touch world blocks.
+ */
+public final class UrbanWorldState {
+
+    /** Region plans kept at once (DESIGN §10, package 03). */
+    public static final int MAX_REGION_PLANS = 16;
+    /** Pure building plans only; no fixture or container state lives in this cache. */
+    public static final int MAX_BUILDING_PLANS = 256;
+    /** Transit segments of layout ten kept at once; a region reads two, a junction chunk four. */
+    public static final int MAX_TRANSIT_SEGMENTS = 64;
+    /**
+     * Route catalogues (one per cached region, at most {@value #MAX_REGION_PLANS}) and transit
+     * segments kept at once, the runtime snapshot's {@code routePlans} cap.
+     */
+    public static final int MAX_ROUTE_PLANS = MAX_REGION_PLANS + MAX_TRANSIT_SEGMENTS;
+
+    /** Spawn column of the street-datum placeholder (layout revision 1). */
+    static final int PLACEHOLDER_SPAWN_X = 8;
+    static final int PLACEHOLDER_SPAWN_Z = 8;
+
+    private static final int UNRESOLVED = 0;
+
+    private final long seed;
+    private final int layoutRevision;
+    private final BoundedPlanCache<Long, DistrictPlan> regionPlans;
+    private final int buildingTemplateRevision;
+    private final BoundedPlanCache<Long, BuildingPlan> buildingPlans;
+    /** Layout ten: each region's route catalogue, beside its plan. */
+    private final BoundedPlanCache<Long, RouteCatalogue> routeCatalogues;
+    private final BoundedPlanCache<Long, TransitNetwork.Segment> transitSegments;
+    /** Layout eleven: each region's growth sites and wildlife habitats, beside its plan. */
+    private final BoundedPlanCache<Long, EcologySites> ecologySites;
+    /** Layout twelve: each region's survivor camp and hidden refuge, beside its plan. */
+    private final BoundedPlanCache<Long, SurvivorSites> survivorSites;
+    /** Layout fourteen: each region's burnt-out cars, beside its plan. */
+    private final BoundedPlanCache<Long, VehicleSites> vehicleSites;
+    /** Encounter catalogues three to six: the parcels each region's threat budget occupies (milestone 24). */
+    private final BoundedPlanCache<Long, java.util.List<Integer>> threatBudgets;
+    private int contentRevision = UNRESOLVED;
+    /** Persistent sparse state, separate from evictable pure plan caches. */
+    public final UrbanContainers containers = new UrbanContainers();
+    /** Layout ten: the stations and hidden cellars this world's survivor has found. */
+    public final UrbanDiscovery discovery = new UrbanDiscovery();
+    /** Layout fourteen: the strength left in damaged barricades and in braced doors (milestone 18). */
+    public final UrbanFortifications fortifications = new UrbanFortifications();
+    /** Layout fourteen: the storeys the survivor has claimed as refuges, and home (milestone 18). */
+    public final UrbanRefuges refuges = new UrbanRefuges();
+    /** Layout fifteen: the water drawn from each building's taps (milestone 19). */
+    public final UrbanUtilities utilities = new UrbanUtilities();
+    /** Layout sixteen: what the survivor has learned and done toward the city's communications (milestone 20). */
+    public final UrbanMissions missions = new UrbanMissions();
+    /** Layout sixteen: the districts walked and buildings entered, which the map labels (milestone 21). */
+    public final UrbanVisits visits = new UrbanVisits();
+    /** Layout sixteen: the world's relay mast, planned once on first need (milestone 20). */
+    private RelaySites.Site relay;
+    private boolean relayPlanned;
+    /**
+     * The starter refuge and its ground-floor respawn anchor (milestone 08). In layout fourteen it
+     * is the fallback respawn behind the claimed refuges, and its ground floor is the first claim.
+     */
+    public long refugeBuilding;
+    public com.veylon.util.Vec3i refugeAnchor;
+    public boolean refugeSectionRestored;
+
+    /**
+     * @throws IllegalArgumentException for a generator that is not urban
+     */
+    public UrbanWorldState(long seed, int generatorVersion) {
+        this.seed = seed;
+        this.layoutRevision = UrbanRevision.layoutRevisionOf(generatorVersion);
+        this.buildingTemplateRevision = UrbanRevision.buildingTemplateRevisionOf(generatorVersion);
+        this.regionPlans = hasCityPlan() ? new BoundedPlanCache<>(MAX_REGION_PLANS) : null;
+        this.buildingPlans = buildingTemplateRevision == 0 ? null : new BoundedPlanCache<>(MAX_BUILDING_PLANS);
+        this.routeCatalogues = hasUnderground() ? new BoundedPlanCache<>(MAX_REGION_PLANS) : null;
+        this.transitSegments = hasUnderground() ? new BoundedPlanCache<>(MAX_TRANSIT_SEGMENTS) : null;
+        this.ecologySites = hasEcology() ? new BoundedPlanCache<>(MAX_REGION_PLANS) : null;
+        this.survivorSites = hasSurvivors() ? new BoundedPlanCache<>(MAX_REGION_PLANS) : null;
+        this.vehicleSites = hasRefuges() ? new BoundedPlanCache<>(MAX_REGION_PLANS) : null;
+        this.threatBudgets = hasCityPlan() ? new BoundedPlanCache<>(MAX_REGION_PLANS) : null;
+    }
+
+    public int layoutRevision() {
+        return layoutRevision;
+    }
+
+    /** True for a layout with streets, parcels and districts; false for the bare datum. */
+    public boolean hasCityPlan() {
+        return layoutRevision == UrbanRevision.LAYOUT_STREET_NETWORK
+                || layoutRevision == UrbanRevision.LAYOUT_BUILDING_PLANS || hasGeneratedBuildings();
+    }
+
+    /** Earlier urban generators keep their unbuilt parcel geometry. */
+    public boolean hasGeneratedBuildings() {
+        return layoutRevision == UrbanRevision.LAYOUT_GENERATED_APARTMENTS
+                || layoutRevision == UrbanRevision.LAYOUT_SHAPED_STAIRS || hasStarter();
+    }
+
+    public boolean hasStarter() {
+        return layoutRevision == UrbanRevision.LAYOUT_STARTER || hasEncounters() || hasCivicCatalogue();
+    }
+    public boolean hasEncounters() {
+        return layoutRevision == UrbanRevision.LAYOUT_ENCOUNTERS || hasCivicCatalogue();
+    }
+    /**
+     * Commercial and civic families exist: layout eight on the generator-ten starter city, and
+     * layout nine, whose district catalogue places them by district.
+     */
+    public boolean hasCivicCatalogue() { return layoutRevision == UrbanRevision.LAYOUT_CIVIC || hasDistricts(); }
+    /**
+     * Six districts with overlays and district climates: layout nine, and layout ten, which
+     * keeps that city exactly and adds its routes.
+     */
+    public boolean hasDistricts() { return layoutRevision == UrbanRevision.LAYOUT_DISTRICTS || hasUnderground(); }
+    /**
+     * Transit under the boundary avenues and template seven's routes (milestone 14): layout ten,
+     * and layout eleven, which keeps them exactly.
+     */
+    public boolean hasUnderground() { return layoutRevision == UrbanRevision.LAYOUT_UNDERGROUND || hasEcology(); }
+    /**
+     * Growth sites in the quarantine and city wildlife (milestone 15): layout eleven, and layout
+     * twelve, which keeps that city exactly.
+     */
+    public boolean hasEcology() { return layoutRevision == UrbanRevision.LAYOUT_ECOLOGY || hasSurvivors(); }
+    /**
+     * Survivor camps and the hidden civilians of the sealed cellars (milestone 16): layout twelve,
+     * and layout thirteen, which keeps them and adds the compounds.
+     */
+    public boolean hasSurvivors() { return layoutRevision == UrbanRevision.LAYOUT_SURVIVORS || hasStrongholds(); }
+    /**
+     * Guarded strongholds and a raider yard (milestone 17): layout thirteen, and layout fourteen,
+     * which keeps them exactly.
+     */
+    public boolean hasStrongholds() { return layoutRevision == UrbanRevision.LAYOUT_STRONGHOLDS || hasRefuges(); }
+    /**
+     * Layout fourteen (milestone 18): the burnt-out cars of the local streets, and the rules of
+     * claimed refuges, salvage and fortification; and layout fifteen, which keeps them exactly.
+     */
+    public boolean hasRefuges() { return layoutRevision == UrbanRevision.LAYOUT_REFUGES || hasUtilities(); }
+    /**
+     * Layout fifteen (milestone 19): layout fourteen's city under the rules of refuge utilities, a
+     * building's taps holding only the stale water left in its pipes, and generators, work lamps
+     * and water purifiers built from salvage; and layout sixteen, which keeps them exactly.
+     */
+    public boolean hasUtilities() { return layoutRevision == UrbanRevision.LAYOUT_UTILITIES || hasMissions(); }
+    /**
+     * Layout sixteen (milestone 20): layout fifteen's city and rules, plus the relay mast on one roof of
+     * the civic precinct nearest the spawn, under the rules of urban missions and the communications
+     * objective; and layout seventeen, which keeps them exactly.
+     */
+    public boolean hasMissions() { return layoutRevision == UrbanRevision.LAYOUT_MISSIONS || hasEconomy(); }
+    /**
+     * Layout seventeen (milestone 23): layout sixteen's city and rules under the survival economy:
+     * content revision four's supplies and the economy's salvage, trade and encounter rules.
+     */
+    public boolean hasEconomy() { return layoutRevision == UrbanRevision.LAYOUT_ECONOMY; }
+
+    public boolean contentRevisionResolved() {
+        return contentRevision != UNRESOLVED;
+    }
+
+    /**
+     * @throws IllegalStateException while a load has not yet restored the revision
+     */
+    public int contentRevision() {
+        if (contentRevision == UNRESOLVED) {
+            throw new IllegalStateException("urban content revision is not resolved yet");
+        }
+        return contentRevision;
+    }
+
+    /**
+     * Fixes this world's content revision. A world resolves it exactly once.
+     *
+     * @throws IllegalArgumentException for a revision this build cannot honour
+     * @throws IllegalStateException if the revision was already resolved
+     */
+    public void resolveContentRevision(int revision) {
+        UrbanRevision.requireSupportedContent(revision);
+        if (hasStarter() && revision < 3) {
+            throw new IllegalArgumentException("starter layout requires urban content revision 3 or later");
+        }
+        // The economy's supplies belong to its layout alone, in both directions (milestone 23).
+        if (hasEconomy() != (revision == UrbanRevision.ECONOMY_CONTENT)) {
+            throw new IllegalArgumentException(hasEconomy()
+                    ? "economy layout requires urban content revision " + UrbanRevision.ECONOMY_CONTENT
+                    : "urban content revision " + revision + " belongs to the economy layout only");
+        }
+        if (contentRevision != UNRESOLVED) {
+            throw new IllegalStateException("urban content revision is already resolved ("
+                    + contentRevision + ")");
+        }
+        contentRevision = revision;
+    }
+
+    // ---- generation ----------------------------------------------------------
+
+    /** Generates one chunk of this world's urban layout; writes only inside it. */
+    public void stamp(Chunk chunk, float soilMoisture) {
+        if (!hasCityPlan()) {
+            UrbanPlaceholderTerrain.stamp(chunk, soilMoisture);
+            return;
+        }
+        int rx = StreetNetwork.regionOf(chunk.cx * Chunk.SX);
+        int rz = StreetNetwork.regionOf(chunk.cz * Chunk.SZ);
+        if (!CityPlanner.isPlannable(rx, rz)) {
+            UrbanChunkStamper.stampDatum(chunk, soilMoisture);
+            return;
+        }
+        DistrictPlan district = regionPlan(rx, rz);
+        UrbanChunkStamper.stamp(chunk, district, soilMoisture);
+        if (hasGeneratedBuildings()) {
+            UrbanBuildingStamper.stamp(chunk, district, this);
+            if (hasDistricts()) { UrbanOverlayStamper.stamp(chunk, district); }
+            if (hasStarter() && rx == 0 && rz == 0) { UrbanStarterSite.of(this).stamp(chunk); }
+            // Routes come last: tunnels under the avenues, then what buildings declared outside them.
+            if (hasUnderground()) { UrbanRouteStamper.stamp(chunk, district, this); }
+            // A compound's barricades and gate close passages and alley mouths no route uses.
+            if (hasStrongholds()) { UrbanCompoundStamper.stamp(chunk, sites(rx, rz)); }
+            // Wrecks stand in one lane of a local street, clear of every other plan.
+            if (hasRefuges()) { UrbanVehicleStamper.stamp(chunk, vehicles(rx, rz)); }
+            // Growth last of all: its carpet and node lie over the courtyard and square.
+            if (hasEcology()) { UrbanEcologyStamper.stamp(chunk, ecology(rx, rz)); }
+            // The relay mast stands on its roof over everything (layout sixteen).
+            if (hasMissions() && DistrictMap.districtOf(seed, rx, rz) == UrbanDistrict.CIVIC) {
+                RelaySites.Site r = relay();
+                if (r != null && r.rx() == rx && r.rz() == rz) { RelaySites.stamp(chunk, r); }
+            }
+        }
+    }
+
+    // ---- plan queries ------------------------------------------------------
+
+    /**
+     * The plan of a region, built on first request and kept in the bounded cache.
+     *
+     * @throws IllegalStateException for a layout without a city plan
+     * @throws IllegalArgumentException for a region urban ids cannot name
+     */
+    public DistrictPlan regionPlan(int rx, int rz) {
+        if (!hasCityPlan()) {
+            throw new IllegalStateException("layout revision " + layoutRevision + " has no city plan");
+        }
+        long key = UrbanIds.district(rx, rz);
+        // Generators 6 and 7 explicitly inherit layout-2 city fabric, not new hash inputs;
+        // layout nine keeps that lattice and adds its districts.
+        return regionPlans.get(key, ignored -> hasDistricts() ? CityPlanner.planDistricts(seed, rx, rz)
+                : hasStarter() ? CityPlanner.planStarter(seed, rx, rz)
+                : CityPlanner.plan(seed, UrbanRevision.LAYOUT_STREET_NETWORK, rx, rz));
+    }
+
+    public int buildingTemplateRevision() { return buildingTemplateRevision; }
+
+    public int cachedBuildingPlans() { return buildingPlans == null ? 0 : buildingPlans.size(); }
+
+    /** A validated whole-building proposal; generators 4 and 5 continue to have none. */
+    public BuildingPlan buildingAt(int x, int z) {
+        if (buildingPlans == null) { return null; }
+        ParcelPlan parcel = parcelAt(x, z);
+        if (parcel == null) { return null; }
+        // Template five chooses each family from the parcel's own (pure, cached) district plan;
+        // template seven adds the region's routes from its cached catalogue.
+        return buildingPlans.get(UrbanIds.building(parcel.id(), 0), ignored -> hasUnderground()
+                ? BuildingPlanner.planRoutes(seed, parcel, planAt(x, z), routes(StreetNetwork.regionOf(x),
+                        StreetNetwork.regionOf(z))).plan()
+                : BuildingPlanner.plan(seed, buildingTemplateRevision, parcel, planAt(x, z)).plan());
+    }
+
+    /**
+     * The route catalogue of a layout-ten region: its service passages, hidden cellar, fire
+     * escapes and roof connectors. Pure and rebuilt identically after eviction.
+     *
+     * @throws IllegalStateException for a layout without routes
+     */
+    public RouteCatalogue routes(int rx, int rz) {
+        if (!hasUnderground()) { throw new IllegalStateException("layout " + layoutRevision + " has no routes"); }
+        return routeCatalogues.get(UrbanIds.district(rx, rz), ignored -> {
+            DistrictPlan plan = regionPlan(rx, rz);
+            return RouteCatalogue.of(seed, plan, hasStrongholds() ? CompoundClaims.of(seed, plan) : CompoundClaims.NONE);
+        });
+    }
+
+    /**
+     * The planned lock of a compound gate leaf (layout thirteen): keyed, as its guards keep it;
+     * {@link com.veylon.world.FixtureStates#LOCK_NONE} for any other cell. Plans only.
+     */
+    public int compoundLockAt(int x, int y, int z) {
+        CompoundSites.Gate gate = gateAt(x, z);
+        return gate != null && gate.leaf(x, y, z) ? com.veylon.world.FixtureStates.LOCK_KEYED
+                : com.veylon.world.FixtureStates.LOCK_NONE;
+    }
+
+    /** The words on a compound's gate sign at a column, or null where none stands. */
+    public String compoundSignAt(int x, int z) {
+        if (!hasStrongholds() || !CityPlanner.isPlannable(StreetNetwork.regionOf(x), StreetNetwork.regionOf(z))) {
+            return null;
+        }
+        for (CompoundSites.Compound c : sites(StreetNetwork.regionOf(x), StreetNetwork.regionOf(z)).compounds()) {
+            if (c.sign().x() == x && c.sign().z() == z) { return c.signText(); }
+        }
+        return null;
+    }
+
+    private CompoundSites.Gate gateAt(int x, int z) {
+        if (!hasStrongholds() || !CityPlanner.isPlannable(StreetNetwork.regionOf(x), StreetNetwork.regionOf(z))) {
+            return null;
+        }
+        for (CompoundSites.Compound c : sites(StreetNetwork.regionOf(x), StreetNetwork.regionOf(z)).compounds()) {
+            if (c.gate().column(x, z)) { return c.gate(); }
+        }
+        return null;
+    }
+
+    /**
+     * The growth sites and wildlife habitats of a layout-eleven region, planned once and cached.
+     * Pure, and rebuilt identically after eviction.
+     *
+     * @throws IllegalStateException for a layout without ecology
+     */
+    public EcologySites ecology(int rx, int rz) {
+        if (!hasEcology()) { throw new IllegalStateException("layout " + layoutRevision + " has no ecology"); }
+        return ecologySites.get(UrbanIds.district(rx, rz), ignored -> EcologySites.of(seed, regionPlan(rx, rz)));
+    }
+
+    /** Ecology plans currently cached, for the runtime bounds snapshot; never above {@value #MAX_REGION_PLANS}. */
+    public int cachedEcologyPlans() {
+        return ecologySites == null ? 0 : ecologySites.size();
+    }
+
+    /**
+     * The survivor camp and hidden refuge of a layout-twelve region, planned once and cached.
+     * Pure, and rebuilt identically after eviction; the people's state lives elsewhere.
+     *
+     * @throws IllegalStateException for a layout without survivor sites
+     */
+    public SurvivorSites sites(int rx, int rz) {
+        if (!hasSurvivors()) { throw new IllegalStateException("layout " + layoutRevision + " has no survivor sites"); }
+        return survivorSites.get(UrbanIds.district(rx, rz), ignored -> SurvivorSites.of(seed, regionPlan(rx, rz), this));
+    }
+
+    /** Site plans currently cached, for the runtime bounds snapshot; never above {@value #MAX_REGION_PLANS}. */
+    public int cachedSitePlans() {
+        return survivorSites == null ? 0 : survivorSites.size();
+    }
+
+    /**
+     * The burnt-out cars of a layout-fourteen region, planned once and cached; {@link VehicleSites#NONE}
+     * in every earlier layout. Pure, and rebuilt identically after eviction.
+     */
+    public VehicleSites vehicles(int rx, int rz) {
+        if (!hasRefuges() || !CityPlanner.isPlannable(rx, rz)) { return VehicleSites.NONE; }
+        return vehicleSites.get(UrbanIds.district(rx, rz), ignored -> VehicleSites.of(seed, regionPlan(rx, rz), sites(rx, rz)));
+    }
+
+    /** The wreck holding a cell, or null: always null before layout fourteen. Plans only. */
+    public VehicleSites.Wreck wreckAt(int x, int y, int z) {
+        return vehicles(StreetNetwork.regionOf(x), StreetNetwork.regionOf(z)).wreckAt(x, y, z);
+    }
+
+    /** Vehicle plans currently cached, for the runtime bounds snapshot; never above {@value #MAX_REGION_PLANS}. */
+    /**
+     * The world's relay mast in a layout-sixteen world, planned on first need and kept: one record,
+     * pure and rebuilt identically in any session; null in every earlier layout (or, on a seed no
+     * test has found, where no civic roof leaves room for it).
+     */
+    public RelaySites.Site relay() {
+        if (!hasMissions()) { return null; }
+        if (!relayPlanned) {
+            relay = RelaySites.plan(seed, this);
+            relayPlanned = true;
+        }
+        return relay;
+    }
+
+    /** Whether a cell is the relay's cabinet or mast. Plans only. */
+    public boolean relayAt(int x, int y, int z) {
+        RelaySites.Site r = relay();
+        return r != null && r.holds(x, y, z);
+    }
+
+    public int cachedVehiclePlans() {
+        return vehicleSites == null ? 0 : vehicleSites.size();
+    }
+
+    /** One transit segment of layout ten, planned once and cached; absent beyond the planned city. */
+    public TransitNetwork.Segment segment(boolean northSouth, int line, int index) {
+        if (!hasUnderground()) { throw new IllegalStateException("layout " + layoutRevision + " has no transit"); }
+        return transitSegments.get(TransitNetwork.key(northSouth, line, index),
+                ignored -> TransitNetwork.plan(seed, northSouth, line, index, this::regionPlan));
+    }
+
+    /** The segment a band position belongs to. */
+    public TransitNetwork.Segment segment(TransitNetwork.Band band) {
+        return segment(band.northSouth(), band.line(), band.index());
+    }
+
+    /**
+     * The transit station whose footprint holds a column, or null: only boundary-avenue columns
+     * of a layout-ten world can have one. Reads plans, never chunks.
+     */
+    public TransitStation stationAt(int x, int z) {
+        if (!hasUnderground()) { return null; }
+        for (boolean northSouth : new boolean[]{true, false}) {
+            TransitNetwork.Band band = TransitNetwork.band(northSouth, x, z);
+            if (band == null || !CityPlanner.isPlannable(StreetNetwork.regionOf(x), StreetNetwork.regionOf(z))) { continue; }
+            TransitNetwork.Segment s = segment(band);
+            if (s.present() && s.station().containsColumn(x, z)) { return s.station(); }
+        }
+        return null;
+    }
+
+    /**
+     * Route catalogues and transit segments currently cached, for the runtime bounds snapshot;
+     * never above {@value #MAX_ROUTE_PLANS}.
+     */
+    public int cachedRoutePlans() {
+        return (routeCatalogues == null ? 0 : routeCatalogues.size()) + (transitSegments == null ? 0 : transitSegments.size());
+    }
+
+    /**
+     * The parcel indices a region's threat budget occupies under encounter catalogues three to six,
+     * planned once and cached (urban milestone 24). The planner is pure in the region's plans, so an
+     * evicted budget comes back identical.
+     */
+    public java.util.List<Integer> threatBudget(int rx, int rz, java.util.function.Supplier<java.util.List<Integer>> planner) {
+        if (threatBudgets == null) { throw new IllegalStateException("layout revision " + layoutRevision + " has no city plan"); }
+        return threatBudgets.get(UrbanIds.district(rx, rz), ignored -> java.util.List.copyOf(planner.get()));
+    }
+
+    /** Threat budgets currently cached, for the runtime bounds snapshot; never above {@value #MAX_REGION_PLANS}. */
+    public int cachedThreatBudgets() {
+        return threatBudgets == null ? 0 : threatBudgets.size();
+    }
+
+    /** Region plans currently cached; never above {@value #MAX_REGION_PLANS}. */
+    public int cachedRegionPlans() {
+        return regionPlans == null ? 0 : regionPlans.size();
+    }
+
+    /** The planned surface of a column; {@link UrbanSurface#DATUM} where nothing is planned. */
+    public UrbanSurface surfaceAt(int x, int z) {
+        DistrictPlan plan = planAt(x, z);
+        return plan == null ? UrbanSurface.DATUM : plan.surfaceAt(x, z);
+    }
+
+    /** The walkable ground slab of a column; feet stand one block above it. */
+    public int groundY(int x, int z) {
+        return UrbanDatum.STREET_Y;
+    }
+
+    /**
+     * The slab y of the storey envelope reserved over a column: the parcel's
+     * planned roof inside a parcel, the ground elsewhere. Layout revision 2
+     * builds nothing to that height yet.
+     */
+    public int plannedRoofY(int x, int z) {
+        ParcelPlan parcel = parcelAt(x, z);
+        return parcel == null ? groundY(x, z) : parcel.plannedRoofY();
+    }
+
+    /**
+     * The plan of a building by its stable id, through its region's parcel; null when the id names
+     * no planned building. Plans only: no chunk is generated.
+     */
+    public BuildingPlan buildingById(long building) {
+        if (!UrbanIds.isValid(building) || UrbanIds.kind(building) != UrbanIds.Kind.BUILDING) { return null; }
+        int rx = UrbanIds.regionX(building), rz = UrbanIds.regionZ(building);
+        if (!hasCityPlan() || !CityPlanner.isPlannable(rx, rz)) { return null; }
+        ParcelPlan parcel = regionPlan(rx, rz).parcel(UrbanIds.parcelIndex(building));
+        if (parcel == null) { return null; }
+        BuildingPlan plan = buildingAt(parcel.x0(), parcel.z0());
+        return plan != null && plan.id() == building ? plan : null;
+    }
+
+    /** The reserved parcel covering a column, or null. */
+    public ParcelPlan parcelAt(int x, int z) {
+        DistrictPlan plan = planAt(x, z);
+        return plan == null ? null : plan.parcelAt(x, z);
+    }
+
+    /** The district identity of a column's region, or null where nothing is planned. */
+    public UrbanDistrict districtAt(int x, int z) {
+        DistrictPlan plan = planAt(x, z);
+        return plan == null ? null : plan.district;
+    }
+
+    /**
+     * {x, z} of the column a new player stands on: in front of the starter
+     * refuge's courtyard door, or the fixed placeholder column of layout 1.
+     */
+    public int[] spawnColumn() {
+        if (!hasCityPlan()) {
+            return new int[]{PLACEHOLDER_SPAWN_X, PLACEHOLDER_SPAWN_Z};
+        }
+        return regionPlan(0, 0).spawnAnchor();
+    }
+
+    private DistrictPlan planAt(int x, int z) {
+        if (!hasCityPlan()) {
+            return null;
+        }
+        int rx = StreetNetwork.regionOf(x);
+        int rz = StreetNetwork.regionOf(z);
+        return CityPlanner.isPlannable(rx, rz) ? regionPlan(rx, rz) : null;
+    }
+}

@@ -8,6 +8,7 @@ import com.veylon.entity.FragmentAnatomy;
 import com.veylon.util.Vec3i;
 import com.veylon.world.BlockType;
 import com.veylon.world.Chunk;
+import com.veylon.world.World;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
@@ -53,7 +54,8 @@ class SpeciesDismemberQaSceneTest {
                     family + " comes apart into its own pieces, once");
         }
         assertTrue(game.entities.creatures.isEmpty() && game.entities.npcs.isEmpty(), "nobody is left standing");
-        assertEquals(5, game.entities.carcasses.size(), "one harvest record per animal that leaves a carcass");
+        assertEquals(java.util.Arrays.stream(CreatureType.values()).filter(CreatureType::leavesCarcass).count(),
+                game.entities.carcasses.size(), "one harvest record per animal that leaves a carcass");
         for (Carcass c : game.entities.carcasses) {
             assertTrue(c.fragmented(), c.type + "'s record is tied to its torso and never drawn as a whole body");
         }
@@ -101,7 +103,7 @@ class SpeciesDismemberQaSceneTest {
     /** A flat stone clearing: the ground the harness levels before it stages a scene. */
     private static Game arena() {
         Game game = new Game();
-        game.newWorld(20260926L, true);
+        game.newWorld(20260926L, true, World.GEN_CAVE_IDENTITIES);
         for (int cx = 18; cx <= 21; cx++) {
             for (int cz = 18; cz <= 21; cz++) {
                 Chunk c = game.world.getOrCreateChunk(cx, cz);

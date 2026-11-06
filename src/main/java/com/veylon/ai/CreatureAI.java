@@ -55,6 +55,10 @@ public final class CreatureAI {
         if (FirePanic.update(g, c, dt)) {
             return;
         }
+        if (c.home != null && c.hasTarget && !c.type.territorial()) {
+            // City wildlife (milestone 15) never leaves its habitat, whoever set its target.
+            leash(c);
+        }
 
         switch (c.type) {
             case BIRD -> updateBird(g, c, dt);
@@ -63,6 +67,7 @@ public final class CreatureAI {
             case STALKER -> updateStalker(g, c, dt);
             case WOLF -> updatePredatorCommon(g, c, dt);
             case DEER -> updateDeer(g, c, dt);
+            case VEILMAW -> VeilmawAI.update(g, c, dt);
         }
     }
 
@@ -578,7 +583,15 @@ public final class CreatureAI {
             // Startled: fly up and away.
             float fx = c.pos.x + (c.pos.x - g.player.pos.x);
             float fz = c.pos.z + (c.pos.z - g.player.pos.z);
-            Steering.flyToward(c, fx, c.pos.y + 6, fz, c.type.speed * 1.5f);
+            if (c.home != null) {
+                // A city flock scatters inside its own sky, not off across the city.
+                c.target.set(fx, c.pos.y + 6, fz);
+                c.hasTarget = true;
+                leash(c);
+                Steering.flyToward(c, c.target.x, c.target.y, c.target.z, c.type.speed * 1.5f);
+            } else {
+                Steering.flyToward(c, fx, c.pos.y + 6, fz, c.type.speed * 1.5f);
+            }
             g.audio.playBirdFlap(c.pos.x, c.pos.y, c.pos.z);
             return;
         }
@@ -587,11 +600,15 @@ public final class CreatureAI {
             int x = (int) (c.pos.x + g.entities.nextCreatureAiInt(31) - 15);
             int z = (int) (c.pos.z + g.entities.nextCreatureAiInt(31) - 15);
             float groundY = 40;
-            if (g.world.getChunk(Math.floorDiv(x, 16), Math.floorDiv(z, 16)) != null) {
+            if (c.home != null) {
+                // In a city the column top is a roof or a crown: a flock keeps to its own band.
+                groundY = c.home.floorY() - 5;
+            } else if (g.world.getChunk(Math.floorDiv(x, 16), Math.floorDiv(z, 16)) != null) {
                 groundY = g.world.surfaceHeight(x, z);
             }
             c.target.set(x, groundY + 5 + g.entities.nextCreatureAiFloat() * 8, z);
             c.hasTarget = true;
+            leash(c);
             if (!g.time.isNight() && g.entities.nextCreatureAiFloat() < 0.25f) {
                 g.audio.playChirp(c.pos.x, c.pos.y, c.pos.z);
             }
@@ -617,6 +634,22 @@ public final class CreatureAI {
         c.target.set(c.pos.x + dx / len * 12, c.pos.y, c.pos.z + dz / len * 12);
         c.hasTarget = true;
         c.fear = 1f;
+        leash(c);
+    }
+
+    /**
+     * Keeps a city animal's target inside its habitat (urban milestone 15): a park, a courtyard
+     * lawn, a roof or the air over a canal, and for a bird its height band. Wildlife of the
+     * legacy spawner has no habitat and is left alone.
+     */
+    private static void leash(Creature c) {
+        if (c.home == null) {
+            return;
+        }
+        c.home.clamp(c.target);
+        if (c.type.flying) {
+            c.target.y = c.home.clampY(c.target.y);
+        }
     }
 
     private static void pickNearbyPoint(Game g, Creature c, int radius) {
@@ -625,5 +658,6 @@ public final class CreatureAI {
                 c.pos.y,
                 c.pos.z + g.entities.nextCreatureAiInt(radius * 2 + 1) - radius);
         c.hasTarget = true;
+        leash(c);
     }
 }

@@ -2,6 +2,7 @@ package com.veylon.save;
 
 import com.veylon.Game;
 import com.veylon.entity.GameMode;
+import com.veylon.world.World;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -96,7 +97,7 @@ class CreativeControlsSectionTest {
 
     private static Game creativeGame() {
         Game game = new Game();
-        game.newWorld(20260910, true, GameMode.CREATIVE);
+        game.newWorld(20260910, true, World.GEN_CAVE_IDENTITIES, GameMode.CREATIVE);
         return game;
     }
 

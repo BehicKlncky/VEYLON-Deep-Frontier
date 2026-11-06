@@ -147,8 +147,8 @@ class SaveMigrationTest {
     void v3RoundTripPreservesSettlementsFactionsAndGenerator(@TempDir Path dir) {
         Path save = dir.resolve("v3.sav");
         Game g = new Game();
-        g.newWorld(SEED, true);
-        assertEquals(World.CURRENT_GENERATOR, g.world.generatorVersion);
+        g.newWorld(SEED, true, World.GEN_CAVE_IDENTITIES);
+        assertEquals(World.GEN_CAVE_IDENTITIES, g.world.generatorVersion);
 
         // Force-plan a hostile settlement and mutate capture/resident state.
         Settlement hostile = null;
@@ -210,7 +210,7 @@ class SaveMigrationTest {
 
         Game g2 = new Game();
         assertTrue(SaveSystem.load(g2, save));
-        assertEquals(World.CURRENT_GENERATOR, g2.world.generatorVersion,
+        assertEquals(World.GEN_CAVE_IDENTITIES, g2.world.generatorVersion,
                 "generator version survives");
         Settlement restored = g2.world.settlements.get(hostileId);
         assertNotNull(restored, "settlement must be re-registered on load");
@@ -304,7 +304,7 @@ class SaveMigrationTest {
             throws IOException {
         Path save = dir.resolve("corrupt-id.sav");
         Game original = new Game();
-        original.newWorld(SEED, true);
+        original.newWorld(SEED, true, World.GEN_CAVE_IDENTITIES);
         var npc = original.entities.spawnNpc(original.world, "CorruptMe", 8, 40, 8);
         npc.archetype = NpcArchetype.POWDERMAN;
         assertTrue(SaveSystem.save(original, save));
@@ -328,7 +328,7 @@ class SaveMigrationTest {
             throws IOException {
         Path save = dir.resolve("corrupt-faction.sav");
         Game original = new Game();
-        original.newWorld(SEED, true);
+        original.newWorld(SEED, true, World.GEN_CAVE_IDENTITIES);
         original.world.factionReputation.put(
                 com.veylon.settlement.HumanFaction.HEADHUNTERS, -12f);
         assertTrue(SaveSystem.save(original, save));

@@ -9,6 +9,7 @@ import com.veylon.save.SaveSystem;
 import com.veylon.util.Vec3i;
 import com.veylon.world.BlockType;
 import com.veylon.world.Raycaster;
+import com.veylon.world.World;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -76,7 +77,7 @@ class CreativePaletteWorldTest {
         assertTrue(SaveSystem.save(game, save), "R24: a world holding palette items must save");
 
         Game reloaded = new Game();
-        reloaded.newWorld(4422, true);
+        reloaded.newWorld(4422, true, World.GEN_CAVE_IDENTITIES);
         assertTrue(SaveSystem.load(reloaded, save), "R24: and must load again");
         assertEquals(GameMode.CREATIVE, reloaded.gameMode());
         x = 304;

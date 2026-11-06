@@ -79,7 +79,9 @@ public final class ProceduralTextures {
             case "bell_bronze" -> bellBronze(p);
             case "cage_bars" -> cageBars(p);
             default -> {
-                return null;
+                if (!UrbanTextures.paint(tileId, variant, p)) {
+                    return null;
+                }
             }
         }
         return p.pixels;

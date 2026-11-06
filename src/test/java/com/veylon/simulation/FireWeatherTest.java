@@ -5,6 +5,7 @@ import com.veylon.simulation.WeatherSystem.Weather;
 import com.veylon.util.Vec3i;
 import com.veylon.world.BlockType;
 import com.veylon.world.Chunk;
+import com.veylon.world.World;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -39,7 +40,7 @@ class FireWeatherTest {
     @BeforeEach
     void setUp() {
         g = new Game();
-        g.newWorld(777L, true);
+        g.newWorld(777L, true, World.GEN_CAVE_IDENTITIES);
         // Flatten a private arena far from spawn structures at y=40.
         for (int cx = 18; cx <= 21; cx++) {
             for (int cz = 18; cz <= 21; cz++) {

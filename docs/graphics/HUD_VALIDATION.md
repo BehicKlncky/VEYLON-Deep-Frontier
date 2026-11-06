@@ -116,3 +116,116 @@ renderer policy. At 75%, text is naturally smaller. Long HUD lines use a visible
 ellipsis. The native captures exercise a representative sprain; the maximum
 affliction count is covered by geometry tests. These captures verify HUD
 presentation rather than a new performance benchmark or full gameplay smoke.
+
+## Urban milestone 21 — city map, place lines and prompts (2026-10-30)
+
+Package 21 of the urban roadmap adds, in generator-19 cities only, a city map
+screen (ground plan, entered buildings, found sites, objectives and rumours) with
+a journal and a sketch of the storey underfoot, and two place lines in the field
+panel (district; building and floor). Two changes reach every world: the
+interaction box is 580 logical pixels wide instead of 440, and the storage
+screen shows its owner in a warning or own-property colour, a search progress
+bar and wear and freshness rails on its slots. The type scale, palette, panel
+skin and the other modules' geometry are unchanged. `HudLayoutTest` still checks
+every module, the wider prompt included, inside the margins and apart at 1280×720
+and 1920×1080, at 0.75, 1 and 1.5 scale, in both modes and with 0, 1, 7 and 8
+afflictions; `CityMapLayoutTest` checks the map screen's panels at 1280×720,
+1707×960, 1920×1080, 2560×1440 and 1280×1024 logical, and that journal text wraps
+within its panel in the bundled semibold face.
+
+### Reproduce
+
+```bash
+export VEYLON_GENERATOR=urban-dev VEYLON_SEED=20260731 VEYLON_SCENE=urban_onboarding
+export VEYLON_GAME_MODE=survival VEYLON_RESOLUTION=1280x720 VEYLON_UI_SCALE=1
+export VEYLON_CAPTURE_TAG=m21-onboarding-survival-720-2
+./gradlew.bat run -PveylonDataDir=build/qa/m21-onboarding-survival-720-2 --console=plain
+```
+
+The tour writes 14 labelled captures into the QA directory's `screenshots/` and
+closes itself (see `docs/DEVELOPING.md`). The other runs change the mode,
+resolution and scale; the new-world and pause screens use `VEYLON_FRONTEND`
+(`newworld-save`, `pause`, `pause-creative`) with `VEYLON_SHOT=3`, with and
+without `VEYLON_GENERATOR=urban-dev`. Every QA directory was new.
+
+### Validation record
+
+All runs on 2026-10-30, NVIDIA GeForce RTX 3060 Ti, driver 610.88, OpenGL 3.3.0,
+windowed. Each onboarding run printed `[urban-onboarding] pass=true` with 14
+captures, every one `glErrors=0 khrErrors=0`, and a shutdown summary of
+`glGetError=0` with 17 KHR messages and 0 KHR errors (the usual MEDIUM
+pixel-transfer notes). Each screen run wrote one capture at 3 s with the same
+error-free summary.
+
+| Run (`build/qa/<tag>/screenshots/`) | Mode | Framebuffer | Requested → effective scale |
+| --- | --- | --- | --- |
+| `m21-onboarding-survival-720-2` | Survival | 1280×720 | 1 → 1 |
+| `m21-onboarding-creative-720-2` | Creative | 1280×720 | 1 → 1 |
+| `m21-onboarding-survival-720-scale075-2` | Survival | 1280×720 | 0.75 → 0.75 |
+| `m21-onboarding-survival-1080-2` | Survival | 1920×1080 | 1 → 1 |
+| `m21-onboarding-survival-1080-scale150-2` | Survival | 1920×1080 | 1.5 → 1.5 |
+| `m21-onboarding-creative-1080-scale075-2` | Creative | 1920×1080 | 0.75 → 0.75 |
+| `m21-newworld-city`, `m21-newworld-wilderness` | — | 1280×720 | 1 → 1 |
+| `m21-pause-city`, `m21-pause-city-creative`, `m21-pause-wilderness` | Survival, Creative, Survival | 1280×720 | 1 → 1 |
+
+Each tour covers day (10:00), night (23:00) and fog: captures `11-night-hud`,
+`12-night-map` and `13-fog-hud`. The captures inspected and what they show are
+listed in `docs/urban-survival/VALIDATION.md` (milestone 21). In them no module
+overlapped another, no text left its panel, the wider interaction box held the
+lock and search lines whole, the event log held the first-session lines whole
+beside their timestamps, and the map's panels kept their layout at 0.75, 1 and
+1.5. The map, storage and conversation screens are opaque UI panels, so night and
+fog change only the world around them. Two faults were found in the captures
+and fixed before the final runs: the map's journal and sketch cards first used
+the slot skin, whose teal corner sat under their cyan headings, and now use the
+HUD's panel skin; flipped edge labels on the map were clipped and are now whole.
+
+Limits: the storage screen's description of the item under the cursor needs the
+mouse, which the scripted tour cannot move, so no capture shows it; requested
+1.5 at 1280×720 is still clamped to 1 by the renderer, so it is not a separate
+run. These captures check presentation; behaviour is covered by the headless
+tests named in the urban validation record.
+
+## Urban milestone 26 — NEW FRONTIER's world choice and the city's death card (2026-11-06)
+
+The abandoned city became the default new world. NEW FRONTIER now shows two world
+tabs above the unchanged mode cards: "THE ABANDONED CITY", preselected, and "THE
+WILDERNESS  (legacy)", switched with `W` or a click. The cards and a note under them
+describe the chosen world; the replace notice names a new city. The tabs stand where
+the title's rule stood, and the rule now parts the world from its mode. A city's death
+card reads "THE CITY CLAIMS YOU / You wake at your refuge, with what you carried."
+
+### Reproduce
+
+```bash
+export VEYLON_SEED=20260731 VEYLON_SHOT=3 VEYLON_FRONTEND=newworld-save
+VEYLON_RESOLUTION=1280x720 VEYLON_CAPTURE_TAG=m26-newworld-720-s1 \
+  ./gradlew.bat run -PveylonDataDir=build/qa/m26-newworld-720-s1
+# likewise 1920x1080 with VEYLON_UI_SCALE=0.75, 1.0 and 1.5; VEYLON_GENERATOR=wilderness
+# for the wilderness preselected; VEYLON_FRONTEND=death for the city's death card
+```
+
+`VEYLON_FRONTEND=route` (then `route-load`) captures the same screens in play: the
+title, both tabs, Creative chosen, loading, the refuge, a search, the map, the death
+card, the wake, the pause menu and its graphics and audio screens (see
+`docs/DEVELOPING.md`, "Default-path acceptance").
+
+### Validation record
+
+| Tag | Screen | Resolution | Scale requested → applied |
+| --- | --- | --- | --- |
+| `m26-newworld-720-s1` | City, replace notice | 1280×720 | 1 → 1 |
+| `m26-newworld-1080-s075` | City, replace notice | 1920×1080 | 0.75 → 0.75 |
+| `m26-newworld-1080-s1` | City, replace notice | 1920×1080 | 1 → 1 |
+| `m26-newworld-1080-s15` | City, replace notice | 1920×1080 | 1.5 → 1.5 |
+| `m26-newworld-wild-720` | Wilderness, its own notice | 1280×720 | 1 → 1 |
+| `m26-death-city-720` | The city's death card over the refuge | 1280×720 | 1 → 1 |
+
+Every capture: 0 `glGetError`, 0 KHR errors. In them the tabs, cards, notes, notice
+and buttons keep their order without overlap, every line stays whole, and the key
+line at the foot names `W`. Two faults were found in the captures and fixed before
+the runs above: the title's rule first ran through the tabs (it now lies between the
+tabs and the cards), and at 0.75 the tabs stood just under the title with a wide gap
+above the cards (they now take the rule's old place at every scale).
+`ui.CityOnboardingScreensTest` holds every new line within 820 units with the game's
+own font. Limit: as in milestone 21, a requested 1.5 at 1280×720 is clamped to 1.

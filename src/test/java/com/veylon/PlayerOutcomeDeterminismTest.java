@@ -8,6 +8,7 @@ import com.veylon.item.ItemType;
 import com.veylon.simulation.EventSystem;
 import com.veylon.util.Vec3i;
 import com.veylon.world.BlockType;
+import com.veylon.world.World;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -86,11 +87,11 @@ class PlayerOutcomeDeterminismTest {
     private static String outcomes(long seed, Long warmupSeed) {
         if (warmupSeed != null) {
             Game warmup = new Game();
-            warmup.newWorld(warmupSeed, true);
+            warmup.newWorld(warmupSeed, true, World.GEN_CAVE_IDENTITIES);
             drive(warmup);
         }
         Game game = new Game();
-        game.newWorld(seed, true);
+        game.newWorld(seed, true, World.GEN_CAVE_IDENTITIES);
         return drive(game);
     }
 

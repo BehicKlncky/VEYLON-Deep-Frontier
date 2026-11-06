@@ -9,6 +9,7 @@ import com.veylon.item.ItemType;
 import com.veylon.save.SaveSystem;
 import com.veylon.util.Vec3i;
 import com.veylon.world.BlockType;
+import com.veylon.world.World;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -376,7 +377,7 @@ class SettlementReputationGameplayTest {
 
     private static Game game(long seed) {
         Game game = new Game();
-        game.newWorld(seed, true);
+        game.newWorld(seed, true, World.GEN_CAVE_IDENTITIES);
         return game;
     }
 

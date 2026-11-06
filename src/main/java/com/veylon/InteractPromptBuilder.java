@@ -14,6 +14,8 @@ import com.veylon.world.RackBatch;
 import com.veylon.world.Raycaster;
 import com.veylon.world.World;
 
+import java.util.Locale;
+
 /**
  * Builds the one-line "[F] ..." hint the HUD shows for whatever the player is
  * currently looking at or standing next to.
@@ -42,6 +44,8 @@ final class InteractPromptBuilder {
     private static final float COLLECTOR_CAPACITY_L = 3.0f;
 
     private final Game game;
+    /** This frame's block line is only the generic "needs a tool" hint, which a salvage line replaces. */
+    private boolean genericToolHint;
 
     InteractPromptBuilder(Game game) {
         this.game = game;
@@ -53,13 +57,75 @@ final class InteractPromptBuilder {
      * <p>Sets it to {@code null} when nothing nearby is interactable.
      */
     void update() {
-        game.interactPrompt = null;
-        if (npcPrompt() || stuckArrowPrompt() || carcassPrompt() || fallingBodyPrompt()
-                || targetBlockPrompt()
-                || trackPrompt()) {
+        genericToolHint = false;
+        // Layout fourteen: what the use button does with a fortification item in hand (milestone 18).
+        game.interactPrompt = Fortification.prompt(game, game.player.selected());
+        if (game.interactPrompt != null) {
+            return;
+        }
+        // Layout sixteen: what the use button does with a part at the relay (milestone 20).
+        game.interactPrompt = game.refuges.comms.rightClickPrompt(game.player.selected());
+        if (game.interactPrompt != null) {
+            return;
+        }
+        // Layout fifteen: what the use button does with fuel, parts or water at a device (milestone 19).
+        game.interactPrompt = game.refuges.utilities.rightClickPrompt(game.player.selected());
+        if (game.interactPrompt != null) {
+            return;
+        }
+        boolean fixture = fixturePrompt();
+        if (!fixture && (npcPrompt() || stuckArrowPrompt() || carcassPrompt() || fallingBodyPrompt())) {
+            return;
+        }
+        boolean block = fixture || targetBlockPrompt();
+        if (salvagePrompt() || block || trackPrompt()) {
             return;
         }
         waterPrompt();
+    }
+
+    /**
+     * Layout fourteen (milestone 18): what taking the aimed piece apart would give, after the door's
+     * or the block's own line. A generic tool hint gives way to it; an F action keeps its line and
+     * the dismantle follows in short, so the HUD's one line still shows what the piece gives. A
+     * piece that a standing break carries away learns that crouching takes it apart.
+     */
+    private boolean salvagePrompt() {
+        if (game.targetHit == null) {
+            return false;
+        }
+        Vec3i pos = new Vec3i(game.targetHit.x(), game.targetHit.y(), game.targetHit.z());
+        BlockType t = game.targetHit.type();
+        String hint = game.blockActions.dismantling.prompt(pos, t);
+        if (hint == null) {
+            return false;
+        }
+        if (game.blockActions.dismantling.applies(pos, t)) {
+            boolean generic = game.interactPrompt == null || genericToolHint;
+            game.interactPrompt = generic ? hint
+                    : game.interactPrompt + "  ·  " + game.blockActions.dismantling.shortPrompt(pos, t);
+        } else if (RefugeSystem.isBed(t)) {
+            // A bed's own line already says what crouching does to it: claim or give up a refuge.
+            return game.interactPrompt != null;
+        } else if (game.interactPrompt != null && com.veylon.world.Fixtures.isContainer(t)
+                && com.veylon.ui.CityMap.applies(game.world)) {
+            // Layout sixteen: a container's line says what searching costs; crouching shows what it yields (urban 21).
+            return true;
+        } else {
+            game.interactPrompt = (game.interactPrompt == null ? "[LMB] Hold to carry it away" : game.interactPrompt)
+                    + "  ·  " + hint;
+        }
+        return true;
+    }
+
+    /** An aimed door or window outranks nearby people, as it does for the F key. */
+    private boolean fixturePrompt() {
+        if (game.targetHit == null) {
+            return false;
+        }
+        game.interactPrompt = FixtureActions.prompt(game,
+                game.targetHit.x(), game.targetHit.y(), game.targetHit.z());
+        return game.interactPrompt != null;
     }
 
     private boolean npcPrompt() {
@@ -93,6 +159,13 @@ final class InteractPromptBuilder {
                 game.player.pos.x, game.player.pos.y, game.player.pos.z, PICKUP_RANGE);
         if (carcass == null) {
             return false;
+        }
+        if (carcass.type.territorial()) {
+            // An alien's remains give membrane sacs, by hand or knife, and nothing to eat.
+            game.interactPrompt = carcass.hideLeft > 0
+                    ? "[F] Cut membrane sacs from the " + carcass.type.displayName + " remains"
+                    : carcass.type.displayName + " remains (nothing left to take)";
+            return true;
         }
         game.interactPrompt = "[F] Harvest " + carcass.type.displayName + " carcass"
                 + (carcass.rotten() ? " (rotting!)" : "")
@@ -144,13 +217,19 @@ final class InteractPromptBuilder {
                         + (int) (float) world.campfireFuel.getOrDefault(position, 0f)
                         + "s fuel)";
             }
-            case CRATE -> {
+            case CRATE, SHELF, CABINET, LOCKER -> {
                 var stores = world.settlementAt(targetX, targetZ);
-                game.interactPrompt = stores != null && !stores.cleared && !stores.occupied
+                boolean crate = game.targetHit.type() == BlockType.CRATE;
+                // Layout sixteen: what the container is, whose, and what searching it costs (urban 21).
+                String city = game.crates.containerPrompt(new Vec3i(targetX, targetY, targetZ));
+                game.interactPrompt = city != null ? city : stores != null && !stores.cleared && !stores.occupied
                         ? "[F] Open " + (stores.hostile() ? "enemy" : "restricted")
                         + " stores (taking supplies has consequences)"
-                        : "[F] Open crate";
+                        : crate ? "[F] Open crate"
+                        : "[F] Search " + game.targetHit.type().displayName.toLowerCase(Locale.ROOT);
             }
+            case BROKEN_DOOR -> game.interactPrompt = "Broken doorway";
+            case BROKEN_WINDOW -> game.interactPrompt = "Shattered window: climb through";
             case WORKBENCH -> game.interactPrompt = "[F] Use workbench";
             case FURNACE -> game.interactPrompt = "[F] Use furnace (crafting)";
             case ANVIL -> game.interactPrompt = "[F] Use anvil (crafting)";
@@ -160,9 +239,11 @@ final class InteractPromptBuilder {
             case DRYING_RACK -> game.interactPrompt = rackPrompt(
                     new Vec3i(targetX, targetY, targetZ));
             case RAIN_COLLECTOR -> {
+                // Layout fifteen: a planned basin is a tap on its building's pipes (milestone 19).
+                String tap = game.refuges.utilities.tapPrompt(new Vec3i(targetX, targetY, targetZ));
                 float liters = world.collectorWater.getOrDefault(
                         new Vec3i(targetX, targetY, targetZ), 0f);
-                game.interactPrompt = "[F] Rain collector: " + String.format("%.1f", liters)
+                game.interactPrompt = tap != null ? tap : "[F] Rain collector: " + String.format("%.1f", liters)
                         + "/" + String.format("%.1f", COLLECTOR_CAPACITY_L) + " L"
                         + (liters >= 1f ? " (fill waterskin)" : "");
             }
@@ -178,7 +259,8 @@ final class InteractPromptBuilder {
                             ? "Hostile bed — clear the area before sleeping"
                             : "Residents' bed — earn local friendship first";
                 } else {
-                    game.interactPrompt = "[F] Sleep (camp bed"
+                    game.interactPrompt = world.isUrban() ? "[F] Rest in this room (check doors and nearby threats)"
+                            : "[F] Sleep (camp bed"
                             + (game.faction.campPrivileges() ? ")" : " - needs Friendly trust)");
                 }
             }
@@ -204,9 +286,35 @@ final class InteractPromptBuilder {
                         ? "Alarm bell — destroy it to silence the garrison"
                         : "[F] Ring the alarm";
             }
-            case CAGE_BARS -> game.interactPrompt =
-                    "Cage bars (mine through to free captives)";
+            case CAGE_BARS -> game.interactPrompt = world.isUrban() ? "Security bars over a window"
+                    : "Cage bars (mine through to free captives)";
+            case SIGN -> game.interactPrompt = signPrompt(targetX, targetZ);
+            case BARRICADE, BARRICADE_METAL -> game.interactPrompt = Fortification.barricadeInfo(game,
+                    new Vec3i(targetX, targetY, targetZ), game.targetHit.type());
+            // Milestone 19: a device's switch and state.
+            case GENERATOR, ELECTRIC_LAMP, WATER_PURIFIER, RADIO -> game.interactPrompt = game.refuges.utilities.devicePrompt(
+                    new Vec3i(targetX, targetY, targetZ));
+            // Milestone 15: the growth teaches its own counters.
+            case GROWTH_NODE -> game.interactPrompt = "Growth node: a torch set beside it burns it out";
+            case VEIL_MEMBRANE -> game.interactPrompt = "Veil membrane: it wakes to footsteps and light";
+            // Milestone 20: the old relay mast on the precinct roof.
+            case RELAY -> game.interactPrompt = game.refuges.comms.relayPrompt();
+            // Milestone 22: a mark people left beside a street door reads its words.
+            case BRICK, PLASTER, CONCRETE -> {
+                var trace = com.veylon.world.urban.UrbanTraces.at(world.urban, targetX, targetY, targetZ,
+                        faceOf(game.targetHit.nx(), game.targetHit.ny(), game.targetHit.nz()));
+                if (trace != null) {
+                    game.interactPrompt = trace.kind().text();
+                }
+            }
             default -> {
+            }
+        }
+        // Layout fourteen: a bed claims a refuge or chooses home (urban milestone 18).
+        if (game.targetHit.type() == BlockType.BEDROLL || game.targetHit.type() == BlockType.CAMP_BED) {
+            String refuge = game.refuges.bedPrompt(new Vec3i(targetX, targetY, targetZ));
+            if (refuge != null) {
+                game.interactPrompt = refuge;
             }
         }
         // Outpost claim prompt overrides the campfire line.
@@ -228,8 +336,10 @@ final class InteractPromptBuilder {
         }
         if (game.targetHit.type().requiresTool
                 && !holdingTool(game.targetHit.type().preferredTool)) {
-            game.interactPrompt = "Requires "
-                    + game.targetHit.type().preferredTool.name().toLowerCase();
+            // The tool in the words the pack shows: a city's pry tool (urban 21); never an enum name.
+            String tool = com.veylon.item.ItemNames.toolNoun(game.targetHit.type().preferredTool, world.isUrban());
+            game.interactPrompt = world.isUrban() ? "Needs a " + tool + " in hand to break" : "Requires " + tool;
+            genericToolHint = true;
             return true;
         }
         return false;
@@ -280,17 +390,35 @@ final class InteractPromptBuilder {
         }
         int fuel = (int) Math.ceil(state.fuelSeconds());
         ItemStack held = game.player.selected();
-        if (held != null && held.type == ItemType.CHARCOAL
+        if (held != null && (held.type == ItemType.CHARCOAL || game.world.isUrban() && held.type == ItemType.PLANK)
                 && state.fuelSeconds() < World.LANTERN_MAX_FUEL) {
-            return "[F] Refuel lantern with charcoal (" + fuel + "/"
+            return "[F] Refuel lantern with " + (held.type == ItemType.PLANK ? "recovered wood" : "charcoal") + " (" + fuel + "/"
                     + (int) World.LANTERN_MAX_FUEL + "s)";
         }
         if (fuel <= 0) {
-            return "[F] Lantern UNLIT — hold charcoal to refuel";
+            return game.world.isUrban() ? "[F] Lantern UNLIT - hold recovered planks to refuel"
+                    : "[F] Lantern UNLIT — hold charcoal to refuel";
         }
         return state.lit()
                 ? "[F] Extinguish lantern — LIT, " + fuel + "s fuel"
                 : "[F] Light lantern — UNLIT, " + fuel + "s fuel";
+    }
+
+    /** The mesher's face index (0 up, 1 down, 2 north, 3 south, 4 west, 5 east) of a hit's normal. */
+    static int faceOf(int nx, int ny, int nz) {
+        if (ny != 0) { return ny > 0 ? 0 : 1; }
+        if (nz != 0) { return nz < 0 ? 2 : 3; }
+        return nx < 0 ? 4 : 5;
+    }
+
+    /** A frontage sign reads its building's plan; it never loads a chunk or rolls anything. */
+    private String signPrompt(int x, int z) {
+        World world = game.world;
+        var plan = world.urban == null ? null : world.urban.buildingAt(x, z);
+        String text = plan == null ? null : com.veylon.world.urban.CivicCatalogue.signText(world.seed, plan);
+        // Layout thirteen: a compound's gate sign stands over its gate post, outside every parcel.
+        if (plan == null && world.urban != null) { text = world.urban.compoundSignAt(x, z); }
+        return text == null ? "A weathered sign; the paint is unreadable" : "Sign: \"" + text + "\"";
     }
 
     private String beaconPrompt() {

@@ -4,7 +4,7 @@ plugins {
 }
 
 group = 'com.veylon'
-version = '0.8.1'
+version = '0.9.0'
 
 def osName = System.getProperty('os.name').toLowerCase(java.util.Locale.ROOT)
 def osArch = System.getProperty('os.arch').toLowerCase(java.util.Locale.ROOT)
@@ -100,9 +100,24 @@ tasks.withType(Javadoc).configureEach {
     options.addBooleanOption('Xdoclint:all,-missing', true)
 }
 
-tasks.withType(Test).configureEach {
+tasks.withType(Test).configureEach { Test task ->
     useJUnitPlatform()
     systemProperty 'veylon.version', project.version.toString()
+    // Every test JVM gets its own data directory under build/, so nothing a
+    // test saves, settings included, can reach the player's save slot
+    // (docs/urban-survival D-23; pinned by SaveSlotIsolationTest).
+    systemProperty 'veylon.dataDir',
+            layout.buildDirectory.dir("test-data/${task.name}").get().asFile.absolutePath
+}
+
+// Native QA isolation: `-PveylonDataDir=build/qa/<name>` gives a game launched
+// with `run` its own settings, saves and captures. Development worlds
+// (VEYLON_GENERATOR) refuse to start without it.
+tasks.named('run', JavaExec) {
+    def qaDataDir = providers.gradleProperty('veylonDataDir')
+    if (qaDataDir.present) {
+        systemProperty 'veylon.dataDir', file(qaDataDir.get()).absolutePath
+    }
 }
 
 // Wall-clock budgets are calibrated for one reference machine and therefore
@@ -121,7 +136,7 @@ tasks.named('check') {
 }
 
 tasks.register('performanceTest', Test) {
-    dependsOn 'rainPerformanceTest'
+    dependsOn 'rainPerformanceTest', 'cityPerformanceTest'
     group = 'verification'
     description = 'Runs the hardware-calibrated simulation and save/load benchmarks.'
     testClassesDirs = sourceSets.test.output.classesDirs
@@ -129,7 +144,7 @@ tasks.register('performanceTest', Test) {
     outputs.upToDateWhen { false }
     useJUnitPlatform {
         includeTags 'performance'
-        excludeTags 'rain-performance'
+        excludeTags 'rain-performance', 'city-performance'
     }
     // The measured figures are the point of this task, so print them rather
     // than making every run pass --info to see whether a budget was close.
@@ -149,6 +164,25 @@ tasks.register('rainPerformanceTest', Test) {
     outputs.upToDateWhen { false }
     useJUnitPlatform {
         includeTags 'rain-performance'
+    }
+    testLogging {
+        showStandardStreams = true
+    }
+    shouldRunAfter tasks.named('test')
+}
+
+// The dense-city profile generates thousands of city chunks. Like rain it runs in a fresh worker
+// so its JIT profiles cannot move the calibrated figures above, and under the launcher's 2 GiB
+// heap so its memory figures read as a player's session would (urban milestone 24).
+tasks.register('cityPerformanceTest', Test) {
+    group = 'verification'
+    description = 'Profiles dense-city streaming, simulation, memory and save growth in isolation.'
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath
+    outputs.upToDateWhen { false }
+    maxHeapSize = '2g'
+    useJUnitPlatform {
+        includeTags 'city-performance'
     }
     testLogging {
         showStandardStreams = true

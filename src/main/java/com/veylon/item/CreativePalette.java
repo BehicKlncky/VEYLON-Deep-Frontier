@@ -57,7 +57,9 @@ public final class CreativePalette {
             ItemType.SALTPETER_ORE_BLOCK,
             ItemType.GLOW_FUNGUS_BLOCK,
             ItemType.STONE_BRICK_BLOCK,
-            ItemType.CAGE_BARS_BLOCK));
+            ItemType.CAGE_BARS_BLOCK,
+            ItemType.RUBBLE_BLOCK,
+            ItemType.DEBRIS_BLOCK));
 
     /** Every block deliberately left without an item form, with its reason. */
     private static final Map<BlockType, String> EXCLUDED;
@@ -97,6 +99,40 @@ public final class CreativePalette {
         excluded.put(BlockType.BEACON_LIT,
                 "endgame state written by the beacon installation; it is unbreakable"
                         + " and placing one would fake a transmitting beacon");
+        String openHalf = "the open state of a door or window: F swings the placed closed form"
+                + " open and World.fixtures records it; pick block gives the closed item";
+        excluded.put(BlockType.WOOD_DOOR_OPEN, openHalf);
+        excluded.put(BlockType.METAL_DOOR_OPEN, openHalf);
+        excluded.put(BlockType.WINDOW_OPEN, openHalf);
+        String brokenHalf = "irreversible remains of a forced door or shattered pane; they exist"
+                + " only as the result of breaking the closed form";
+        excluded.put(BlockType.BROKEN_DOOR, brokenHalf);
+        excluded.put(BlockType.BROKEN_WINDOW, brokenHalf);
+        excluded.put(BlockType.SIGN,
+                "a generated frontage board whose words come from its building's plan; a placed"
+                        + " copy would name nothing");
+        excluded.put(BlockType.CONTAMINATED_GROUND,
+                "a district hazard crust planned with its yard or quarantine block; no item"
+                        + " carries it, and scraping it away yields nothing");
+        excluded.put(BlockType.RAILING,
+                "a generated guard rail on roof edges, bridges and station stairs; no item carries"
+                        + " it yet, and its salvage belongs to fortification (urban package 18)");
+        excluded.put(BlockType.HIDDEN_PANEL,
+                "a generated loose panel whose hidden cellar and discovery come from its building's"
+                        + " plan; a placed copy would hide nothing");
+        excluded.put(BlockType.HIDDEN_PANEL_OPEN, openHalf);
+        excluded.put(BlockType.GROWTH_NODE,
+                "a generated quarantine growth node that anchors one encounter's territory; a placed"
+                        + " copy would anchor nothing, and breaking one yields a membrane sac, not the node");
+        excluded.put(BlockType.VEIL_MEMBRANE,
+                "the generated membrane floor of a growth territory; no item carries it, and scraping"
+                        + " it away yields nothing");
+        excluded.put(BlockType.CAR_WRECK,
+                "a cell of a generated burnt-out car whose engine, cabin and body come from its region's"
+                        + " plan; no item carries it, and what it gives is salvage, not the car");
+        excluded.put(BlockType.RELAY,
+                "the cabinet of the world's one relay mast, planned on a precinct roof; it is unbreakable,"
+                        + " and a placed copy would carry no broadcast and fake the communications objective");
         EXCLUDED = Collections.unmodifiableMap(excluded);
     }
 

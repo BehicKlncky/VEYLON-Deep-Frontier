@@ -10,6 +10,7 @@ import com.veylon.item.ItemType;
 import com.veylon.settlement.NpcArchetype;
 import com.veylon.world.BlockType;
 import com.veylon.world.Chunk;
+import com.veylon.world.World;
 import org.joml.Vector3f;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -30,7 +31,7 @@ class FirearmGameplayWorkflowTest {
     @BeforeEach
     void setUp() {
         game = new Game();
-        game.newWorld(20260716L, true);
+        game.newWorld(20260716L, true, World.GEN_CAVE_IDENTITIES);
         game.player.inventory.clear();
         game.player.hotbarSel = 0;
         flattenArena();
@@ -104,6 +105,16 @@ class FirearmGameplayWorkflowTest {
 
     @Test
     void musketGunshotIsHeardByDistantHostileAiThroughTheGameplayCommand() {
+        // The listener and the whole acoustic lane must exist in the loaded world.
+        for (int cx = 20; cx <= 22; cx++) {
+            Chunk lane = game.world.getOrCreateChunk(cx, 19);
+            for (int lx = 0; lx < Chunk.SX; lx++) {
+                for (int y = 39; y < Chunk.SY; y++) {
+                    lane.set(lx, y, 6, y == 39 ? BlockType.STONE : BlockType.AIR);
+                }
+            }
+            lane.recomputeAllHeights(); lane.rebuildLights();
+        }
         ItemStack musket = equip(ItemType.MUSKET);
         WeaponDefinition definition = WeaponRegistry.of(musket.type);
         game.player.inventory.add(ItemType.MUSKET_BALL, 1);

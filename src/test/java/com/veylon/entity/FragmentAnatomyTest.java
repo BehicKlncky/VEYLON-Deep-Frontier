@@ -60,6 +60,8 @@ class FragmentAnatomyTest {
         EXPECTED.put(BodyFamily.WOLF, quadruped("neck,head,ear_l,ear_r", true));
         EXPECTED.put(BodyFamily.THORNHORN, quadruped("neck,head", true));
         EXPECTED.put(BodyFamily.STALKER, quadruped("neck,head", true));
+        // Urban milestone 15: the hood fan is the head; its veins and the maw ride along.
+        EXPECTED.put(BodyFamily.VEILMAW, quadruped("neck,head", true));
         EXPECTED.put(BodyFamily.HARE, new String[][] {
                 {"torso", "body", "body", "-", "root,body", "head_joint,tail"},
                 {"head", "head_joint", "head", "torso", "head_joint,head,ear_l,ear_r", ""},

@@ -60,6 +60,7 @@ final class PlayerEnvironmentSystem {
     void mediumTick(float dt) {
         updateShelterAndSmoke(dt);
         game.player.tickToxicFogExposure(game);
+        game.player.tickContaminationExposure(game);
         discoverNearbyPois();
     }
 
@@ -74,7 +75,8 @@ final class PlayerEnvironmentSystem {
         player.shelter = ShelterSystem.evaluate(game.world,
                 player.pos.x, player.pos.y, player.pos.z);
         if (!player.abilities.invulnerable() && player.shelter.indoor()
-                && player.nearFireHeat(game) > INDOOR_FIRE_HEAT_THRESHOLD) {
+                && player.nearFireHeat(game) > INDOOR_FIRE_HEAT_THRESHOLD
+                && (game.world.urban == null || !game.world.urban.hasStarter() || roofedFireNearby())) {
             player.smokeExposure += INDOOR_SMOKE_PER_SECOND * dt;
             if (player.smokeExposure > VISIBLE_SMOKE_EXPOSURE) {
                 game.particles.smoke(player.pos.x, player.pos.y + 1.9f, player.pos.z, 0.4f);
@@ -87,6 +89,28 @@ final class PlayerEnvironmentSystem {
             game.particles.smoke(fumarole.x() + 0.5f, fumarole.y() + 0.35f,
                     fumarole.z() + 0.5f, 0.75f);
         }
+    }
+
+    /** Courtyard heat is not indoor smoke. Only a nearby covered fire can accumulate in a room. */
+    private boolean roofedFireNearby() {
+        int px = (int) Math.floor(game.player.pos.x), py = (int) Math.floor(game.player.pos.y);
+        int pz = (int) Math.floor(game.player.pos.z);
+        for (Vec3i fire : game.fire.burningCells()) {
+            if (fire.distSq(game.player.pos.x, game.player.pos.y, game.player.pos.z) < 25
+                    && game.world.isColumnLoaded(fire.x(), fire.z())
+                    && !game.world.isSkyExposed(fire.x(), fire.y() + 1, fire.z())) { return true; }
+        }
+        for (int x = px - 5; x <= px + 5; x++) {
+            for (int z = pz - 5; z <= pz + 5; z++) {
+                if (!game.world.isColumnLoaded(x, z)) { continue; }
+                for (int y = py - 2; y <= py + 2; y++) {
+                    if (game.world.getBlock(x, y, z) == com.veylon.world.BlockType.CAMPFIRE
+                            && game.world.campfireFuel.getOrDefault(new Vec3i(x, y, z), 0f) > 0
+                            && !game.world.isSkyExposed(x, y + 1, z)) { return true; }
+                }
+            }
+        }
+        return false;
     }
 
     private void discoverNearbyPois() {

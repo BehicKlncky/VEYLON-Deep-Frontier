@@ -40,6 +40,11 @@ public class Environment {
     public final Vector3f foliageTint = new Vector3f(1, 1, 1);
     public float wetness;
     public float frost;
+    /**
+     * 1 in a generated city, else 0 (urban milestone 22): the terrain shader then wets and frosts
+     * only what the sky reaches and bounces a little daylight into rooms above the street.
+     */
+    public float city;
 
     // Water palette.
     public final Vector3f waterDeep = new Vector3f(0.05f, 0.16f, 0.28f);
@@ -148,18 +153,33 @@ public class Environment {
         };
 
         // ---- Fog ----
-        fogStart = g.weather.fogStart();
-        fogEnd = g.weather.fogEnd();
+        // A six-district city thickens it by district: canal mist, yard haze, quarantine murk.
+        // Presentation only; perception and weather simulation are unchanged.
+        float visibility = g.player.district == null ? 1f
+                : com.veylon.world.urban.DistrictRules.of(g.player.district).visibility();
+        fogStart = g.weather.fogStart() * visibility;
+        fogEnd = g.weather.fogEnd() * visibility;
         fogColor.set(horizon).mul(0.9f).add(zenith.x * 0.1f, zenith.y * 0.1f, zenith.z * 0.1f);
         fogColor.mul(biomeFog.x, biomeFog.y, biomeFog.z);
 
         // ---- Events ----
         boolean toxic = g.events.toxicFog();
+        // A six-district city's toxic fog sickens only inside the quarantine. Elsewhere it is drawn
+        // as the thin grey haze it is there; the sickly grade, its motes and the choking vignette
+        // mark only the ground where it harms (urban milestone 22).
+        boolean toxicHarm = toxic && g.player.toxicFogHarmfulHere();
         boolean ash = g.events.ashfall();
         gradeTint.set(1, 1, 1);
         saturation = 1.04f;
         contrast = 1.02f;
-        if (toxic) {
+        if (toxic && !toxicHarm) {
+            fogStart = Math.min(fogStart, 30f);
+            fogEnd = Math.min(fogEnd, 95f);
+            desaturate(fogColor, 0.45f);
+            fogColor.mul(0.92f, 0.95f, 0.88f);
+            gradeTint.set(0.97f, 0.99f, 0.94f);
+            saturation = 0.96f;
+        } else if (toxic) {
             fogStart = Math.min(fogStart, 12f);
             fogEnd = Math.min(fogEnd, 40f);
             fogColor.set(fogColor.x * 0.55f, Math.min(1f, fogColor.y * 1.05f + 0.05f), fogColor.z * 0.4f);
@@ -192,6 +212,17 @@ public class Environment {
             foliageTint.mul(1.05f, 0.95f, 0.8f);
         } else if (biome == Biome.MARSH) {
             foliageTint.mul(0.9f, 1.0f, 0.85f);
+        }
+
+        city = g.world.urban != null && g.world.urban.hasGeneratedBuildings() ? 1f : 0f;
+        // A generated city's water stands in flooded streets, canals and basins: murky and
+        // still, not a mountain lake's clear blue (urban milestone 22).
+        if (city > 0) {
+            waterDeep.set(0.06f, 0.10f, 0.08f);
+            waterShallow.set(0.20f, 0.27f, 0.21f);
+        } else {
+            waterDeep.set(0.05f, 0.16f, 0.28f);
+            waterShallow.set(0.16f, 0.42f, 0.45f);
         }
 
         // ---- Wetness / frost (smoothed so transitions read naturally) ----
@@ -229,7 +260,7 @@ public class Environment {
         }
         vigCold = p.bodyTemp < 34.5f ? clamp((34.5f - p.bodyTemp) / 5f, 0f, 0.8f) : 0f;
         vigPoison = (p.has(Affliction.FOOD_POISONING) || p.has(Affliction.SICKNESS)) ? 0.35f : 0f;
-        if (toxic && p.exposedToSky) {
+        if (toxicHarm && p.exposedToSky && !p.shelter.roofed()) {
             vigPoison = Math.max(vigPoison, 0.3f);
         }
         boolean hot = p.bodyTemp > 40f;

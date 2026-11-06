@@ -174,7 +174,9 @@ Lessons applied:
 
 - **R25** In Creative, pause → `[T] World controls`: time presets (Dawn, Noon, Dusk, Midnight;
   forward only), freeze daylight cycle, weather presets with a weather lock, and wildlife
-  spawning on/off. Controls only apply in Creative, are cleared when leaving Creative, and
+  spawning on/off. Urban milestone 09 labels this "natural spawning" and also
+  gates generated infected activation. Existing bodies remain simulated.
+  Controls only apply in Creative, are cleared when leaving Creative, and
   persist in a new section.
 
 **Quality**

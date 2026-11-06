@@ -5,6 +5,9 @@ import com.veylon.settlement.Settlement;
 import com.veylon.settlement.SettlementBuilder;
 import com.veylon.settlement.SettlementPlanner;
 import com.veylon.util.Vec3i;
+import com.veylon.world.urban.BuildingPlan;
+import com.veylon.world.urban.UrbanIndoorQueries;
+import com.veylon.world.urban.UrbanWorldState;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -15,7 +18,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-public class World {
+public class World implements VoxelAccess {
 
     public interface BlockListener {
         void onBlockChanged(int x, int y, int z, BlockType oldType, BlockType newType);
@@ -32,15 +35,114 @@ public class World {
     public static final int GEN_DEEP = 2;
     /** Release 0.3.0 generator with distinct Root/Basalt cave identities. */
     public static final int GEN_CAVE_IDENTITIES = 3;
-    public static final int CURRENT_GENERATOR = GEN_CAVE_IDENTITIES;
+    /**
+     * Urban-survival development generator, layout revision 1: the street datum
+     * alone ({@link com.veylon.world.urban.UrbanPlaceholderTerrain}). Kept so
+     * saved generator-4 worlds keep loading; new urban worlds use
+     * {@link #GEN_URBAN_STREETS}.
+     */
+    public static final int GEN_URBAN = 4;
+    /**
+     * Urban-survival development generator, layout revision 2: districts, the
+     * street network and reserved parcels, without buildings
+     * ({@link com.veylon.world.urban.CityPlanner}). Until the urban rollout only
+     * explicit development and QA paths create it.
+     */
+    public static final int GEN_URBAN_STREETS = 5;
+    /** Layout 3: frozen building plans, with the layout-2 streets still stamped alone. */
+    public static final int GEN_URBAN_PLANS = 6;
+    /** Layout 4: furnished walk-ups and shops, stamped from frozen template revision two. */
+    public static final int GEN_URBAN_APARTMENTS = 7;
+    /** Layout 5: the same furnished buildings with directional, half-height stair treads. */
+    public static final int GEN_URBAN_SHAPED_STAIRS = 8;
+    /** Layout 6: a starter refuge, constrained courtyard neighbours and salvage progression. */
+    public static final int GEN_URBAN_STARTER = 9;
+    /** Layout 7: frozen starter geometry plus persistent, anchored infected encounters. */
+    public static final int GEN_URBAN_ENCOUNTERS = 10;
+    /**
+     * Layout 8: generator 10 plus the commercial and civic catalogue of building template
+     * five (grocers, clinics, schools, offices, security posts, warehouses). The starter
+     * superblock and every walk-up keep generator 10's blocks and ids.
+     */
+    public static final int GEN_URBAN_CIVIC = 11;
+    /**
+     * Layout 9: six districts with their overlays and climates, buildings from the district
+     * catalogue (template six) and encounter catalogue three. Its starter superblock keeps
+     * generator 10's blocks and ids.
+     */
+    public static final int GEN_URBAN_DISTRICTS = 12;
+    /**
+     * Layout 10: generator 12's six-district city exactly, with the transit tunnels and stations
+     * under its boundary avenues and building template seven (basements, service passages, a
+     * hidden cellar per residential region, guarded roofs, bulkheads, fire escapes and roof
+     * connectors). Its starter superblock keeps generator 10's blocks and ids.
+     */
+    public static final int GEN_URBAN_UNDERGROUND = 13;
+    /**
+     * Layout 11 (urban milestone 15): generator 13's city and routes exactly, plus the growth
+     * sites of the quarantine (a node on a membrane carpet in chosen courtyards and fenced
+     * squares) and encounter catalogue five: the Veilmaw, the Breacher and city wildlife.
+     */
+    public static final int GEN_URBAN_ECOLOGY = 14;
+    /**
+     * Layout 12 (urban milestone 16): generator 14's city, routes and ecology exactly, plus each
+     * region's survivor sites: a small camp on the reclaimed ground floor of a held walk-up and
+     * the hidden civilians of the region's sealed cellar. Sites are plan metadata; no block moves.
+     */
+    public static final int GEN_URBAN_SURVIVORS = 15;
+    /**
+     * Layout 13 (urban milestone 17): generator 15's city, routes, ecology and survivor sites,
+     * plus guarded compounds: a civic courtyard block held as a stronghold behind a gated and a
+     * barricaded passage, and a raider yard on an industrial depot row's service alley.
+     */
+    public static final int GEN_URBAN_STRONGHOLDS = 16;
+    /**
+     * Layout 14 (urban milestone 18): generator 16's city, routes, ecology, survivor sites and
+     * compounds exactly, plus the burnt-out cars left in the local streets' lanes, under the
+     * rules of claimed refuges, salvage and fortification.
+     */
+    public static final int GEN_URBAN_REFUGES = 17;
+    /**
+     * Layout 15 (urban milestone 19): generator 17's city exactly, every block, plan and id, under
+     * the rules of refuge utilities as well: taps that hold only the stale water left in their
+     * building's pipes, and generators, work lamps and water purifiers built from salvage.
+     */
+    public static final int GEN_URBAN_UTILITIES = 18;
+    /**
+     * Layout 16 (urban milestone 20): generator 18's city, every block, plan and id, plus the old relay
+     * mast on the roof of one building in the civic precinct nearest the spawn, under the rules of
+     * urban missions and the long-term objective of restoring the city's communications.
+     */
+    public static final int GEN_URBAN_MISSIONS = 19;
+    /**
+     * Layout 17 (urban milestone 23): generator 19's city exactly, every block, plan and id, under the
+     * rules of the survival economy: content revision four's scarcer supplies, salvage and trade that
+     * cannot be turned into more than they are worth, and the first session's encounter pressure.
+     */
+    public static final int GEN_URBAN_ECONOMY = 20;
+    /**
+     * The generator of every ordinary new world: the abandoned city since the urban rollout
+     * (urban milestone 26). Saved worlds keep the generator they were made with.
+     */
+    public static final int DEFAULT_NEW_WORLD_GENERATOR = GEN_URBAN_ECONOMY;
+    /**
+     * The wilderness NEW FRONTIER still offers beside the city, labelled as the legacy world: the
+     * generator every release from 0.3.0 to 0.8.1 gave its new worlds.
+     */
+    public static final int WILDERNESS_NEW_WORLD_GENERATOR = GEN_CAVE_IDENTITIES;
+    /** The highest generator version a save may name; a load rejects anything above it. */
+    public static final int MAX_SUPPORTED_GENERATOR = GEN_URBAN_ECONOMY;
 
     public final long seed;
     /** Persisted in save v3; legacy (v2) saves always load as {@link #GEN_LEGACY}. */
     public final int generatorVersion;
     public final WorldGenerator generator;
-    private final Map<Long, Chunk> chunks = new HashMap<>();
+    /** Urban foundation state; present exactly when the generator is urban. */
+    public final UrbanWorldState urban;
+    private final ChunkMap chunks = new ChunkMap();
+    private final ChunkBlockEdits blockEdits = new ChunkBlockEdits();
     /** Blocks set during gameplay, persisted in saves (value = BlockType ordinal). */
-    public final Map<Vec3i, Byte> changedBlocks = new HashMap<>();
+    public final Map<Vec3i, Byte> changedBlocks = blockEdits;
     /** Decoration blocks that target not-yet-generated chunks. */
     final Map<Long, List<int[]>> pendingGen = new HashMap<>();
     public final Map<Vec3i, Inventory> crateContents = new HashMap<>();
@@ -87,18 +189,79 @@ public class World {
     public static final float LANTERN_MAX_FUEL = 4 * LANTERN_FUEL_PER_CHARCOAL;
     /** Finite lantern state keyed by the placed block position. */
     public final Map<Vec3i, LanternState> lanterns = new HashMap<>();
+    /** Transient bounded traversal routes and the shared population work allowance. */
+    public final com.veylon.ai.NavigationCache navigation = new com.veylon.ai.NavigationCache();
+    /** Door and window state no block id expresses: open, locks and bars (D-48). */
+    public final FixtureStates fixtures = new FixtureStates(navigation::changed);
 
     public BlockListener listener;
     public Vec3i campPos;
 
-    public World(long seed) {
-        this(seed, CURRENT_GENERATOR);
-    }
-
+    /**
+     * @throws IllegalArgumentException for a generator version this build cannot build
+     */
     public World(long seed, int generatorVersion) {
+        if (!isSupportedGenerator(generatorVersion)) {
+            throw new IllegalArgumentException("unsupported world generator version "
+                    + generatorVersion);
+        }
         this.seed = seed;
         this.generatorVersion = generatorVersion;
+        this.urban = isUrbanGenerator(generatorVersion)
+                ? new UrbanWorldState(seed, generatorVersion) : null;
         this.generator = new WorldGenerator(this, seed);
+    }
+
+    // Generator feature gates. Each names its versions explicitly rather than
+    // comparing with >= or <, so a newer generator inherits nothing by accident:
+    // the urban generator gets none of the wilderness features (decision D-02).
+
+    /** True for every generator version this build can build and load. */
+    public static boolean isSupportedGenerator(int version) {
+        return version == GEN_LEGACY || version == GEN_DEEP
+                || version == GEN_CAVE_IDENTITIES || isUrbanGenerator(version);
+    }
+
+    /** Explicit urban layouts, including the frozen datum, street and plan-only versions. */
+    public static boolean isUrbanGenerator(int version) {
+        return version == GEN_URBAN || version == GEN_URBAN_STREETS
+                || version == GEN_URBAN_PLANS || version == GEN_URBAN_APARTMENTS
+                || version == GEN_URBAN_SHAPED_STAIRS || version == GEN_URBAN_STARTER
+                || version == GEN_URBAN_ENCOUNTERS || version == GEN_URBAN_CIVIC
+                || version == GEN_URBAN_DISTRICTS || version == GEN_URBAN_UNDERGROUND
+                || version == GEN_URBAN_ECOLOGY || version == GEN_URBAN_SURVIVORS
+                || version == GEN_URBAN_STRONGHOLDS || version == GEN_URBAN_REFUGES
+                || version == GEN_URBAN_UTILITIES || version == GEN_URBAN_MISSIONS
+                || version == GEN_URBAN_ECONOMY;
+    }
+
+    /** Generators 2 and 3: deep caves, underground POIs, cave mouths and settlements. */
+    public static boolean hasDeepFrontier(int version) {
+        return version == GEN_DEEP || version == GEN_CAVE_IDENTITIES;
+    }
+
+    /** Generator 3: depth-derived cave identities, fumaroles and Gloomstalker depths. */
+    public static boolean hasCaveIdentities(int version) {
+        return version == GEN_CAVE_IDENTITIES;
+    }
+
+    public boolean isUrban() {
+        return urban != null;
+    }
+
+    @Override
+    public int fixtureLockAt(int x, int y, int z) {
+        int saved = fixtures.stateAt(x, y, z);
+        if (saved >= 0) { return FixtureStates.lock(saved); }
+        if (urban != null && urban.hasGeneratedBuildings() && isColumnLoaded(x, z)
+                && Fixtures.isClosedDoor(getBlock(x, y, z))
+                && !changedBlocks.containsKey(new Vec3i(x, y, z))) {
+            BuildingPlan plan = urban.buildingAt(x, z);
+            if (plan != null) { return FixtureStates.lock(plan.fixtureStateAt(fixtures, x, y, z)); }
+            // Layout thirteen: a compound's gate stands in a passage or alley, outside every parcel.
+            if (urban.hasStrongholds()) { return urban.compoundLockAt(x, y, z); }
+        }
+        return FixtureStates.LOCK_NONE;
     }
 
     /**
@@ -106,7 +269,7 @@ public class World {
      * Safe to call from any chunk in any order; registration is idempotent.
      */
     public Settlement settlementForRegion(int rx, int rz) {
-        if (generatorVersion < GEN_DEEP) {
+        if (!hasDeepFrontier(generatorVersion)) {
             return null;
         }
         long key = Settlement.packId(rx, rz);
@@ -143,8 +306,9 @@ public class World {
      * pays for the map once.
      *
      * <p>Every block query in the engine funnels through here, and
-     * {@code chunks} is a {@code Map<Long, Chunk>} — so each one boxed a fresh
-     * {@link Long} before it could even hash. The access pattern is strongly
+     * {@code chunks} was once a {@code Map<Long, Chunk>}, so each one boxed a
+     * fresh {@link Long} before it could even hash ({@link ChunkMap} now looks a
+     * packed key up without boxing). The access pattern is strongly
      * local: plant growth walks a chunk it already holds, the mesher walks one
      * chunk's neighbourhood, fire and water work a cell at a time, and
      * raycasts step through a few metres.
@@ -154,9 +318,9 @@ public class World {
      * the map: per-body queries that hop between the chunks a crowd stands in
      * (body fire contact, 20 times a second for every body) never box.
      *
-     * <p>Neither can go stale. Chunks are only ever added to the map —
-     * unloading frees GPU meshes and leaves the block data in place — and a new
-     * world is a new {@link World}, so there is no invalidation to get wrong.
+     * <p>Neither can go stale: {@link #unloadChunk}, the one way a chunk leaves
+     * the map (urban milestone 24), clears both before it returns, and a new
+     * world is a new {@link World}.
      */
     private int cachedCx = Integer.MIN_VALUE;
     private int cachedCz = Integer.MIN_VALUE;
@@ -166,6 +330,7 @@ public class World {
     private final int[] recentCx = new int[1 << 2 * RECENT_BITS];
     private final int[] recentCz = new int[1 << 2 * RECENT_BITS];
     private final Chunk[] recentChunk = new Chunk[1 << 2 * RECENT_BITS];
+    private long chunkUnloads;
 
     public Chunk getChunk(int cx, int cz) {
         if (cx == cachedCx && cz == cachedCz) {
@@ -204,6 +369,14 @@ public class World {
                     }
                 }
             }
+            if (urban != null && urban.hasGeneratedBuildings()) {
+                // Structure first, irreversible deltas second, reversible state last.
+                blockEdits.applyTo(c);
+            }
+            if (!fixtures.isEmpty()) {
+                // Saved door and window state outlives the generated structure.
+                fixtures.applyToNewChunk(c);
+            }
             c.recomputeAllHeights();
             c.rebuildLights(this);
             c.generated = true;
@@ -212,6 +385,7 @@ public class World {
             markDirty(cx + 1, cz);
             markDirty(cx, cz - 1);
             markDirty(cx, cz + 1);
+            markUrbanCornersDirty(cx, cz);
         }
         return c;
     }
@@ -237,6 +411,18 @@ public class World {
             pendingGen.computeIfAbsent(key(cx, cz), k -> new ArrayList<>())
                     .add(new int[]{lx, y, lz, t.id(), soft ? 1 : 0});
         }
+    }
+
+    /**
+     * True when a column's chunk has been generated. Unlike
+     * {@link #surfaceHeight} this never generates anything, and unlike
+     * {@link #getBlock} it tells an unloaded column apart from open air, so
+     * placement, spawning and movement checks can refuse a column the world
+     * does not hold yet.
+     */
+    public boolean isColumnLoaded(int x, int z) {
+        Chunk c = getChunk(Math.floorDiv(x, 16), Math.floorDiv(z, 16));
+        return c != null && c.generated;
     }
 
     public BlockType getBlock(int x, int y, int z) {
@@ -278,6 +464,7 @@ public class World {
             markDirty(c.cx + 1, c.cz);
             markDirty(c.cx, c.cz - 1);
             markDirty(c.cx, c.cz + 1);
+            markUrbanCornersDirty(c.cx, c.cz);
         }
         batchChunks.clear();
     }
@@ -299,8 +486,17 @@ public class World {
             }
             return;
         }
-        c.set(lx, y, lz, t);
         Vec3i pos = new Vec3i(x, y, z);
+        if (urban != null && !urban.containers.changing(this,pos,old,t)) { return; }
+        c.set(lx, y, lz, t);
+        if (!(Fixtures.isClosedDoor(old) || Fixtures.isOpen(old))
+                || Fixtures.kindOf(old) != Fixtures.kindOf(t)
+                || Fixtures.kindOf(old) == null || !Fixtures.kindOf(old).door
+                // A loose panel is a wall to every route while closed, so either swing changes them.
+                || Fixtures.kindOf(old) == Fixtures.Kind.HIDDEN_PANEL
+                || fixtureLockAt(x, y, z) != FixtureStates.LOCK_NONE) {
+            navigation.changed(x, y, z);
+        }
         if (old == BlockType.POWDER_KEG) {
             kegFuses.remove(pos);
             kegFusePlayerAttribution.remove(pos);
@@ -310,6 +506,24 @@ public class World {
         }
         if (t == BlockType.LANTERN) {
             lanterns.put(pos, new LanternState(0, false));
+        }
+        Fixtures.Kind oldKind = Fixtures.kindOf(old);
+        if (oldKind != null && Fixtures.kindOf(t) != oldKind) {
+            // Forced, shattered, dismantled, burnt or blown out: the fixture is
+            // gone, so its lock, bar and open state go with it.
+            fixtures.remove(x, y, z);
+        }
+        if (urban != null && com.veylon.world.urban.UrbanFortifications.isBarricade(old)) {
+            urban.fortifications.barricadeGone(pos); // taken down, smashed, burnt or blown out
+        }
+        if (urban != null && com.veylon.world.urban.UrbanUtilities.isDevice(old)) {
+            urban.utilities.removed(this, pos); // taken apart, broken or blown out: its circuit loses it
+        }
+        if (Fixtures.isUrbanContainer(old)) {
+            // One owner for the contents: a hand break has already moved them
+            // out; a blast or a fire destroys them with the furniture, so they
+            // can never reappear in whatever is built here next.
+            crateContents.remove(pos);
         }
         if (batching) {
             batchChunks.add(key(cx, cz));
@@ -323,7 +537,9 @@ public class World {
         }
         c.recomputeHeight(lx, lz);
         c.dirty = true;
-        boolean lightChanged = old.light > 0 || t.light > 0;
+        boolean lightChanged = old.light > 0 || t.light > 0
+                || urban != null && urban.hasGeneratedBuildings()
+                && (old.opaque != t.opaque || old == BlockType.WINDOW || t == BlockType.WINDOW);
         if (lightChanged) {
             c.updateLightAt(this, x, y, z);
             // Light spills into neighbor meshes; rebuild them too.
@@ -331,6 +547,7 @@ public class World {
             markDirty(cx + 1, cz);
             markDirty(cx, cz - 1);
             markDirty(cx, cz + 1);
+            markUrbanCornersDirty(cx, cz);
         } else {
             if (lx == 0) markDirty(cx - 1, cz);
             if (lx == 15) markDirty(cx + 1, cz);
@@ -350,6 +567,15 @@ public class World {
         if (c != null) {
             c.dirty = true;
         }
+    }
+
+    private void markUrbanCornersDirty(int cx, int cz) {
+        if (urban == null || !urban.hasGeneratedBuildings()) { return; }
+        // Mesh vertex smoothing samples the diagonally adjacent column too.
+        markDirty(cx - 1, cz - 1);
+        markDirty(cx - 1, cz + 1);
+        markDirty(cx + 1, cz - 1);
+        markDirty(cx + 1, cz + 1);
     }
 
     /** Mutable value object persisted in the versioned v3 extension. */
@@ -387,6 +613,21 @@ public class World {
         return state != null && state.lit && state.fuelSeconds > 0;
     }
 
+    /** Whether a layout-fifteen work lamp at a cell gives light: switched on and fed (urban milestone 19). */
+    public boolean isLampLit(int x, int y, int z) {
+        return urban != null && urban.utilities.lampLit(x, y, z);
+    }
+
+    /**
+     * Whether a light block at a cell is giving light: a lantern only while it burns, a work lamp
+     * only while it is fed, everything else always.
+     */
+    public boolean emitterOn(BlockType t, int x, int y, int z) {
+        if (t == BlockType.LANTERN) { return isLanternLit(x, y, z); }
+        if (t == BlockType.ELECTRIC_LAMP) { return isLampLit(x, y, z); }
+        return true;
+    }
+
     /** Adds fuel without implicitly igniting the lantern. Returns its new fuel level. */
     public float addLanternFuel(Vec3i pos, float seconds) {
         LanternState state = lanternState(pos);
@@ -410,6 +651,30 @@ public class World {
             refreshLightsAt(pos);
         }
         return state.lit == lit;
+    }
+
+    /**
+     * Save loader hook for one door or window cell. A cell in a generated chunk
+     * takes the saved variant at once, or the entry is dropped as stale when the
+     * cell holds no operable fixture any more. A cell whose chunk does not exist
+     * yet keeps the entry until the chunk is generated: stale state never loads
+     * a chunk.
+     *
+     * @return false only for a state byte no save may hold
+     */
+    public boolean restoreFixtureState(Vec3i pos, int state) {
+        if (pos == null || !FixtureStates.isValid(state) || pos.y() < 0 || pos.y() >= Chunk.SY) {
+            return false;
+        }
+        if (!isColumnLoaded(pos.x(), pos.z())) {
+            return fixtures.set(pos.x(), pos.y(), pos.z(), state);
+        }
+        Fixtures.Kind kind = Fixtures.kindOf(getBlock(pos.x(), pos.y(), pos.z()));
+        if (kind == null) {
+            return true;
+        }
+        setBlock(pos.x(), pos.y(), pos.z(), kind.variant(FixtureStates.isOpen(state)), false);
+        return fixtures.set(pos.x(), pos.y(), pos.z(), state);
     }
 
     /** Save loader hook: validates the block and defers the one-time light rebuild. */
@@ -470,6 +735,7 @@ public class World {
         markDirty(cx + 1, cz);
         markDirty(cx, cz - 1);
         markDirty(cx, cz + 1);
+        markUrbanCornersDirty(cx, cz);
     }
 
     /** One bounded pass after loading all position state. */
@@ -511,6 +777,54 @@ public class World {
         return chunks.values();
     }
 
+    /**
+     * Whether a chunk of this world may be dropped and later generated again without losing or
+     * changing anything (urban milestone 24, D-241). A generated city's chunk is pure in the seed,
+     * the layout and the stable plans, takes no decoration from a neighbour and gets every recorded
+     * edit and saved door or window state back as it generates ({@link #getOrCreateChunk}). Legacy
+     * terrain writes trees and structures across chunk borders, and the unbuilt urban layouts do
+     * not replay edits, so those worlds keep every chunk they generate.
+     */
+    public boolean evictsChunks() {
+        return urban != null && urban.hasGeneratedBuildings();
+    }
+
+    /**
+     * Drops one generated chunk (urban milestone 24): its GPU meshes, its block data, both lookup
+     * caches' references to it and every cached route through its columns. The next request for it
+     * generates it again. Only {@link #evictsChunks} worlds drop chunks, and only the caller knows
+     * that nothing near it still needs it: see {@code ChunkRetention}.
+     *
+     * @return false when the chunk is not loaded
+     * @throws IllegalStateException in a world whose chunks do not regenerate exactly
+     */
+    public boolean unloadChunk(int cx, int cz) {
+        if (!evictsChunks()) {
+            throw new IllegalStateException("generator " + generatorVersion + " keeps every chunk it generates");
+        }
+        Chunk c = chunks.remove(key(cx, cz));
+        if (c == null) {
+            return false;
+        }
+        c.deleteMeshes();
+        if (cachedChunk == c) {
+            cachedChunk = null;
+            cachedCx = cachedCz = Integer.MIN_VALUE;
+        }
+        int slot = (cx & RECENT_MASK) | (cz & RECENT_MASK) << RECENT_BITS;
+        if (recentChunk[slot] == c) {
+            recentChunk[slot] = null;
+        }
+        navigation.unloaded(cx * Chunk.SX, cz * Chunk.SZ, cx * Chunk.SX + Chunk.SX - 1, cz * Chunk.SZ + Chunk.SZ - 1);
+        chunkUnloads++;
+        return true;
+    }
+
+    /** Chunks this world has dropped; a cache that holds chunk references flushes when it moves. */
+    public long chunkUnloads() {
+        return chunkUnloads;
+    }
+
     public int loadedCount() {
         return chunks.size();
     }
@@ -535,8 +849,33 @@ public class World {
         return c.height(Math.floorMod(x, 16), Math.floorMod(z, 16));
     }
 
-    /** Sky light 0..1 at a cell using the column heightmap. */
+    /** Urban depth is below the street datum, rather than below a roof. */
+    public float environmentDepth(int x, float y, int z) {
+        if (urban != null && urban.hasGeneratedBuildings()) {
+            return isColumnLoaded(x, z) ? urban.groundY(x, z) - y : 0f;
+        }
+        return surfaceHeight(x, z) - y;
+    }
+
+    /** Weather exposure; generated urban windows also stop overhead rain. */
+    public boolean isSkyExposed(int x, int y, int z) {
+        if (urban != null && urban.hasGeneratedBuildings()) {
+            return UrbanIndoorQueries.isSkyExposed(this, x, y, z);
+        }
+        Chunk chunk = getChunk(Math.floorDiv(x, Chunk.SX), Math.floorDiv(z, Chunk.SZ));
+        return y >= (chunk == null ? 0 : chunk.height(Math.floorMod(x, Chunk.SX), Math.floorMod(z, Chunk.SZ)));
+    }
+
+    /** Infrequent room/floor observation; never generates a missing column. */
+    public UrbanIndoorQueries.Location urbanLocation(int x, int y, int z) {
+        return UrbanIndoorQueries.location(this, x, y, z);
+    }
+
+    /** Sky light 0..1; urban openings admit bounded daylight below roofs. */
     public float skyLight(int x, int y, int z) {
+        if (urban != null && urban.hasGeneratedBuildings()) {
+            return UrbanIndoorQueries.skyLight(this, x, y, z);
+        }
         Chunk c = getChunk(Math.floorDiv(x, 16), Math.floorDiv(z, 16));
         if (c == null) {
             return 1f;
@@ -550,8 +889,14 @@ public class World {
         return Math.max(0.04f, l);
     }
 
-    /** Light contributed by torches/campfires near a cell, 0..1. */
+    /**
+     * Light contributed by torches/campfires near a cell, 0..1. In a generated city a light counts
+     * only where its straight ray reaches the cell without crossing an opaque block, so a lamp lights
+     * its own room and the doorway it faces, never the flat behind the wall (urban milestone 22); the
+     * renderer and every AI that reads light see the same answer. Other worlds keep the open falloff.
+     */
     public float blockLight(int x, int y, int z) {
+        boolean walled = urban != null && urban.hasGeneratedBuildings();
         int ccx = Math.floorDiv(x, 16), ccz = Math.floorDiv(z, 16);
         float best = 0f;
         for (int dx = -1; dx <= 1; dx++) {
@@ -566,7 +911,8 @@ public class World {
                     float range = l[3] * 0.75f;
                     if (dist < range) {
                         float v = (1f - dist / range) * (l[3] / 15f);
-                        if (v > best) {
+                        // The ray is traced only for a light that would brighten the cell.
+                        if (v > best && (!walled || UrbanIndoorQueries.lightReaches(this, l[0], l[1], l[2], x, y, z))) {
                             best = v;
                         }
                     }
@@ -577,6 +923,15 @@ public class World {
     }
 
     public Biome biomeAt(int x, int z) {
+        if (urban != null && urban.hasDistricts()) {
+            // Six-district cities: each district maps to one climate biome (D-08).
+            var district = urban.districtAt(x, z);
+            return district == null ? Biome.MEADOW
+                    : com.veylon.world.urban.DistrictRules.of(district).climate();
+        }
+        // Starter climate of generators 9-11; historical cities keep their noise climate.
+        if (urban != null && urban.hasStarter() && urban.districtAt(x, z)
+                == com.veylon.world.urban.UrbanDistrict.RESIDENTIAL) { return Biome.MEADOW; }
         return generator.biomeAt(x, z);
     }
 
@@ -592,7 +947,7 @@ public class World {
         // common thing in that volume while exposed sulfur underfoot is the
         // rarest. Testing air first paid three chunk lookups per cell to
         // reject; testing the floor first pays one.
-        if (generatorVersion < GEN_CAVE_IDENTITIES
+        if (!hasCaveIdentities(generatorVersion)
                 || getBlock(x, y - 1, z) != BlockType.SULFUR_ORE
                 || getBlock(x, y, z) != BlockType.AIR
                 || getBlock(x, y + 1, z) != BlockType.AIR

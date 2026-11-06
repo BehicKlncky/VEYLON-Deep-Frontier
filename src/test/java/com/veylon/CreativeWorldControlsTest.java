@@ -8,6 +8,7 @@ import com.veylon.simulation.TimeConstants;
 import com.veylon.simulation.TimePreset;
 import com.veylon.simulation.WeatherSystem;
 import com.veylon.ui.WorldControlsScreen;
+import com.veylon.world.World;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -164,7 +165,7 @@ class CreativeWorldControlsTest {
     @Test
     void withEveryControlOffBothModesAdvanceTimeWeatherAndSpawningIdentically() {
         Game survival = new Game();
-        survival.newWorld(20260910L, true, GameMode.SURVIVAL);
+        survival.newWorld(20260910L, true, World.GEN_CAVE_IDENTITIES, GameMode.SURVIVAL);
         Game creative = creativeWorld();
         assertFalse(creative.daylightFrozen() || creative.weatherLocked() || creative.spawningPaused(),
                 "R25: Creative starts with every control off");
@@ -189,7 +190,7 @@ class CreativeWorldControlsTest {
 
     private static Game creativeWorld() {
         Game world = new Game();
-        world.newWorld(20260910L, true, GameMode.CREATIVE);
+        world.newWorld(20260910L, true, World.GEN_CAVE_IDENTITIES, GameMode.CREATIVE);
         return world;
     }
 
@@ -202,7 +203,7 @@ class CreativeWorldControlsTest {
         assertTrue(SaveSystem.save(game, save));
 
         Game loaded = new Game();
-        loaded.newWorld(4422, true);
+        loaded.newWorld(4422, true, World.GEN_CAVE_IDENTITIES);
         assertTrue(SaveSystem.load(loaded, save), "R25: a world with controls loads");
         assertTrue(loaded.daylightFrozen() && loaded.weatherLocked() && loaded.spawningPaused(),
                 "R25: every control survives the round trip");
@@ -227,7 +228,7 @@ class CreativeWorldControlsTest {
     void aNewWorldStartsWithNoControlsWhicheverModeItIs() {
         game.creativeControls.toggleDaylightFreeze();
         game.creativeControls.toggleSpawning();
-        game.newWorld(20260910L, true, GameMode.CREATIVE);
+        game.newWorld(20260910L, true, World.GEN_CAVE_IDENTITIES, GameMode.CREATIVE);
         assertFalse(game.daylightFrozen() || game.weatherLocked() || game.spawningPaused(),
                 "R25: cross-world control state must not survive newWorld");
     }

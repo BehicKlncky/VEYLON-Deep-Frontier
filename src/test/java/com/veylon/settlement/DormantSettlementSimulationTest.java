@@ -2,6 +2,7 @@ package com.veylon.settlement;
 
 import com.veylon.Game;
 import com.veylon.util.Vec3i;
+import com.veylon.world.World;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -241,7 +242,7 @@ class DormantSettlementSimulationTest {
 
     private static Game world() {
         Game g = new Game();
-        g.newWorld(SEED, true);
+        g.newWorld(SEED, true, World.GEN_CAVE_IDENTITIES);
         return g;
     }
 

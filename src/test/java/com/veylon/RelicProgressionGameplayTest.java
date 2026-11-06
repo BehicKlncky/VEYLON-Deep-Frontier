@@ -13,6 +13,7 @@ import com.veylon.settlement.SettlementBuilder;
 import com.veylon.settlement.SettlementType;
 import com.veylon.util.Vec3i;
 import com.veylon.world.BlockType;
+import com.veylon.world.World;
 import org.joml.Vector3f;
 import org.junit.jupiter.api.Test;
 
@@ -33,7 +34,7 @@ class RelicProgressionGameplayTest {
     @Test
     void generatedFortressAutoRifleIsLootedRestoredAtAnvilAndFiredWithScarceAmmo() {
         Game game = new Game();
-        game.newWorld(SEED, true);
+        game.newWorld(SEED, true, World.GEN_CAVE_IDENTITIES);
         game.player.inventory.clear();
         game.player.hotbarSel = 0;
         game.entities.creatures.clear();

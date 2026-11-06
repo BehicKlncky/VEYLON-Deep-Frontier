@@ -21,6 +21,10 @@ public final class NpcAI {
         if (n.dead) {
             return;
         }
+        if (n.infected()) {
+            InfectedAI.update(g, n, dt);
+            return;
+        }
         n.decideTimer -= dt;
         n.attackCooldown -= dt;
         n.hunger = Math.min(100, n.hunger + 0.03f * dt);
@@ -38,6 +42,11 @@ public final class NpcAI {
             return;
         }
 
+        // Survivor camps and hidden refuges (urban milestone 16) keep to their own planned cells.
+        if (UrbanResidentAI.handles(g, n)) {
+            UrbanResidentAI.update(g, n, dt);
+            return;
+        }
         // Settlement residents and traveling war parties use the 0.3.0 brain.
         if (n.settled() || n.warParty) {
             SettledNpcAI.update(g, n, dt);

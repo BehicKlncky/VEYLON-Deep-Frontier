@@ -7,6 +7,7 @@ import com.veylon.settlement.Settlement;
 import com.veylon.settlement.SettlementPlanner;
 import com.veylon.settlement.SettlementType;
 import com.veylon.util.Vec3i;
+import com.veylon.world.World;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -351,7 +352,7 @@ class DeathRagdollTest {
         game.entities.fastTick(game, 0.05f);
         assertEquals(1, game.ragdolls.liveCount(), "precondition: a body is mid-fall");
 
-        game.newWorld(4242L, true);
+        game.newWorld(4242L, true, World.GEN_CAVE_IDENTITIES);
 
         assertEquals(0, game.ragdolls.liveCount(),
                 "a falling body must not survive into the next world");

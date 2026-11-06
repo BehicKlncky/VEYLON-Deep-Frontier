@@ -160,6 +160,22 @@ public final class CraftingSystem {
     private CraftingSystem() {
     }
 
+    public static List<Recipe> recipesFor(com.veylon.world.World world) {
+        if (world.urban != null && world.urban.hasMissions()) {
+            return UrbanCrafting.MISSION_RECIPES;
+        }
+        if (world.urban != null && world.urban.hasUtilities()) {
+            return UrbanCrafting.UTILITY_RECIPES;
+        }
+        if (world.urban != null && world.urban.hasRefuges()) {
+            return UrbanCrafting.REFUGE_RECIPES;
+        }
+        if (world.urban != null && world.urban.hasEcology()) {
+            return UrbanCrafting.ECOLOGY_RECIPES;
+        }
+        return world.urban != null && world.urban.hasStarter() ? UrbanCrafting.RECIPES : RECIPES;
+    }
+
     public static boolean hasIngredients(Inventory inv, Recipe recipe) {
         for (var e : recipe.ingredients.entrySet()) {
             if (!inv.has(e.getKey(), e.getValue())) {
@@ -217,18 +233,18 @@ public final class CraftingSystem {
             blueprints.add(id);
             return id;
         }
+        // Prove the complete transformation before touching real stacks. Refunding after
+        // a partial insertion can remove pre-existing output or lose item condition.
+        Inventory trial = new Inventory(inv.size());
+        for (int i = 0; i < inv.size(); i++) {
+            ItemStack stack = inv.get(i);
+            trial.set(i, stack == null ? null : stack.copy());
+        }
         for (var e : recipe.ingredients.entrySet()) {
-            inv.remove(e.getKey(), e.getValue());
+            trial.remove(e.getKey(), e.getValue());
         }
-        int leftover = inv.add(recipe.result, recipe.resultCount);
-        if (leftover > 0) {
-            // Refund what didn't fit so items are never silently destroyed.
-            for (var e : recipe.ingredients.entrySet()) {
-                inv.add(e.getKey(), e.getValue());
-            }
-            inv.remove(recipe.result, recipe.resultCount - leftover);
-            return null;
-        }
+        if (trial.add(recipe.result, recipe.resultCount) > 0) { return null; }
+        for (int i = 0; i < inv.size(); i++) { inv.set(i, trial.get(i)); }
         return recipe.name;
     }
 }

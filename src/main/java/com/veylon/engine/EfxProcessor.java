@@ -29,7 +29,7 @@ final class EfxProcessor {
             submit();
             if (alGetError() != AL_NO_ERROR) throw new IllegalStateException("reverb allocation rejected");
             enabled = true;
-            System.out.println("[audio] EFX reverb initialized (six interpolated zones).");
+            System.out.println("[audio] EFX reverb initialized (" + AudioEnvironment.Zone.values().length + " interpolated zones).");
         } catch (RuntimeException failure) {
             close();
             System.out.println("[audio] EFX unavailable (" + failure.getMessage() + "); dry playback enabled.");

@@ -12,6 +12,7 @@ import com.veylon.simulation.SimulationScheduler;
 import com.veylon.simulation.WeatherSystem.Weather;
 import com.veylon.world.BlockType;
 import com.veylon.world.Chunk;
+import com.veylon.world.World;
 import org.junit.jupiter.api.Test;
 
 import static com.veylon.entity.CombustionConstants.AFTERBURN_DPS_PLAYER;
@@ -392,7 +393,7 @@ class CombustionIntegrationTest {
      */
     private static Game arena() {
         Game game = new Game();
-        game.newWorld(777L, true);
+        game.newWorld(777L, true, World.GEN_CAVE_IDENTITIES);
         for (int cx = 18; cx <= 21; cx++) {
             for (int cz = 18; cz <= 21; cz++) {
                 Chunk c = game.world.getOrCreateChunk(cx, cz);

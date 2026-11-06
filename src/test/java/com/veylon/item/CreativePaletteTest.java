@@ -52,7 +52,8 @@ class CreativePaletteTest {
 
     @Test
     void everyPaletteItemPlacesExactlyOneFormerlyUnbuildableBlock() {
-        assertEquals(19, CreativePalette.items().size(), "R24: the audited palette size");
+        // R24 audited 19 forms; urban package 04 appended rubble and debris.
+        assertEquals(21, CreativePalette.items().size(), "the audited palette size");
         Set<BlockType> blocks = EnumSet.noneOf(BlockType.class);
         for (ItemType item : CreativePalette.items()) {
             BlockType block = item.places();

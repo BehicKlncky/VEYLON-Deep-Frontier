@@ -4,6 +4,67 @@ All notable user-facing changes to VEYLON: Deep Frontier are recorded here.
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-11-06
+
+### Added
+
+- The abandoned city is the new world: a connected metropolis streamed region by
+  region, with six districts (Reclaimed Residential, Commercial Downtown, Industrial
+  Yards, Flooded Quarter, Civic Precinct and the Quarantine Zone) that differ in
+  architecture, supplies, hazards, creatures and climate. Progress never needs a tree
+  felled or ore mined.
+- Every generated building can be entered: walk-up apartments, corner shops, grocers,
+  clinics, schools, offices, security posts and warehouses, with furnished rooms,
+  stairs, basements, service passages, transit stations under the avenues, fire
+  escapes and rooftop routes. Doors open, lock, bar and break; windows shatter.
+- Searching: cupboards, fridges, wardrobes, lockers and shelves hold what fits the
+  room and the district. A search takes time and makes noise, and what is taken
+  never returns. Survivors' stores are theirs, and taking from them is theft.
+- Threats: the Veilbound, colonists changed by an alien membrane, who hunt by sound
+  and sight; the Veilmaw, which grows out of the quarantine and telegraphs its
+  strike; and the Breacher, which hammers through barricades. Skitterwings,
+  Murkhares and Glowdeer live in parks, courtyards, canals and on roofs.
+- People: small survivor camps that talk, trade and give work; civilians hidden
+  behind loose panels in sealed cellars, heard before they are found; guarded
+  strongholds with gates, rules and responses to theft; and a raider yard.
+- A home: a starter refuge with a bed and a workbench, up to three claimed flats,
+  plank and sheet-metal barricades and door braces, furniture and burnt-out cars
+  taken apart for salvage, taps holding the last water in their pipes, and
+  generators, work lamps and water purifiers built from salvage and fed from intact
+  fuel tanks.
+- A long goal: survivors' missions and the old radio relay, rumoured, repaired from
+  three parts found across the districts and its codes earned or scanned for, then a
+  broadcast from your own radio. The city answers, and survival goes on.
+- A city map and journal (`M`) of the streets walked, the buildings entered, home,
+  the sites found and the objectives, with a sketch of the storey underfoot; the HUD
+  names the district, building and floor, and interaction prompts say what a search
+  or a lock costs.
+- The city's look and sound: walls that stop light, dry interiors, district
+  dressing, door marks, toxic fog drawn where it harms, indoor and underground
+  acoustics, and a district soundscape with the threats' tells.
+- Long journeys stay bounded: a city drops its farthest chunks and regenerates them
+  block for block, and each chunk is meshed once from a finished neighbourhood.
+
+### Changed
+
+- NEW FRONTIER chooses the world as well as the mode. It opens on the city; `W`
+  switches to the wilderness of earlier releases, labelled as the legacy world. Saves
+  reopen the world they were made in, and the replace-save notice names a new city.
+- A city's death card says the survivor wakes at their refuge with what they carried.
+- The release smoke (`VEYLON_SMOKE`) runs in the city; `VEYLON_GENERATOR=wilderness`
+  runs it in the wilderness with its fortress approach.
+
+### Compatibility
+
+- Saves remain binary v3. This release opens every save from 0.2.0 to 0.8.1 in its
+  own world; wilderness saves keep their terrain, settlements and rules, and saving
+  them again adds only optional sections, so 0.8.1 still opens them.
+- A city save names its generator and adds versioned `urban.*` sections. Releases up
+  to 0.8.1 refuse it as an unsupported world generator before touching their live
+  world. A damaged city section fails the whole load and keeps the last good save.
+- The day's temperature curve is inverted in every world (14:00 is the coldest hour);
+  it is unchanged so existing worlds keep their outcomes.
+
 ## [0.8.1] - 2026-09-28
 
 ### Changed

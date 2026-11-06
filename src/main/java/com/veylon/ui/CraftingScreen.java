@@ -41,14 +41,14 @@ public class CraftingScreen {
         }
 
         List<Recipe> recipes = new ArrayList<>();
-        for (Recipe r : CraftingSystem.RECIPES) {
+        for (Recipe r : CraftingSystem.recipesFor(g.world)) {
             if (tab == 0 || r.station == stations[tab - 1]) {
                 recipes.add(r);
             }
         }
         if (recipes.isEmpty()) {
             tab = 0;
-            recipes.addAll(CraftingSystem.RECIPES);
+            recipes.addAll(CraftingSystem.recipesFor(g.world));
         }
 
         float pw = 700, ph = 500;
@@ -140,7 +140,7 @@ public class CraftingScreen {
         dy += 26;
         if (r.result != null) {
             ui.itemIcon(r.result, dx, dy - 3, 24, known ? 1f : 0.4f);
-            ui.textShadow(dx + 30, dy, 1.3f, "Makes: " + r.resultCount + " x " + r.result.displayName,
+            ui.textShadow(dx + 30, dy, 1.3f, "Makes: " + r.resultCount + " x " + com.veylon.item.ItemNames.of(r.result, g.world.isUrban()),
                     0.85f, 0.85f, 0.85f, 1f);
         } else {
             String next = CraftingSystem.nextBlueprint(g.player.blueprints);
@@ -169,7 +169,7 @@ public class CraftingScreen {
             boolean ok = have >= e.getValue();
             ui.itemIcon(e.getKey(), dx, dy - 1, 16);
             ui.textShadow(dx + 21, dy, 1.3f,
-                    e.getKey().displayName + "  " + have + "/" + e.getValue() + (ok ? "" : "  MISSING"),
+                    com.veylon.item.ItemNames.of(e.getKey(), g.world.isUrban()) + "  " + have + "/" + e.getValue() + (ok ? "" : "  MISSING"),
                     ok ? 0.6f : 1f, ok ? 1f : 0.4f, ok ? 0.6f : 0.4f, 1f);
             dy += 19;
         }
@@ -189,21 +189,31 @@ public class CraftingScreen {
         boolean doCraft = (g.input.wasMousePressed(GLFW_MOUSE_BUTTON_LEFT) && btnHover)
                 || g.input.wasKeyPressed(GLFW_KEY_ENTER);
         if (doCraft && canCraft) {
-            String result = CraftingSystem.craft(g.player.inventory, r, nearby, g.player.blueprints);
-            if (result != null) {
-                g.audio.playCraft();
-                if (r.result == null) {
-                    g.log("Blueprint decoded: " + CraftingSystem.blueprintTitle(result)
-                            + "! New recipe available.");
-                } else {
-                    g.log("Crafted " + r.resultCount + " x " + r.result.displayName);
-                }
-            }
+            craft(g, r, nearby);
         }
 
         ui.textCentered(w / 2f, y0 + ph - 24, 1.2f,
                 "[C] close   [W/S] select   [Q/R] station tab   [Enter] craft",
                 0.7f, 0.7f, 0.7f, 1f);
+    }
+
+    /**
+     * The screen's craft command ([Enter] or the button), shared with scripted routes.
+     *
+     * @return the crafted item's name, a decoded blueprint id, or null when nothing was made
+     */
+    public static String craft(Game g, Recipe r, Set<Station> nearby) {
+        String result = CraftingSystem.craft(g.player.inventory, r, nearby, g.player.blueprints);
+        if (result != null) {
+            g.audio.playCraft();
+            if (r.result == null) {
+                g.log("Blueprint decoded: " + CraftingSystem.blueprintTitle(result)
+                        + "! New recipe available.");
+            } else {
+                g.log("Crafted " + r.resultCount + " x " + com.veylon.item.ItemNames.of(r.result, g.world.isUrban()));
+            }
+        }
+        return result;
     }
 
     private void drawTab(UiRenderer ui, float x, float y, String label, boolean active, boolean inRange) {

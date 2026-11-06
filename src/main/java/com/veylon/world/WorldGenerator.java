@@ -87,11 +87,11 @@ public class WorldGenerator {
     }
 
     private boolean deep() {
-        return world.generatorVersion >= World.GEN_DEEP;
+        return World.hasDeepFrontier(world.generatorVersion);
     }
 
     private boolean caveIdentities() {
-        return world.generatorVersion >= World.GEN_CAVE_IDENTITIES;
+        return World.hasCaveIdentities(world.generatorVersion);
     }
 
     /** Derived terrain identity; names are stable but the enum is never serialized. */
@@ -183,6 +183,17 @@ public class WorldGenerator {
     public void generate(Chunk c) {
         int baseX = c.cx * Chunk.SX;
         int baseZ = c.cz * Chunk.SZ;
+        if (World.isUrbanGenerator(world.generatorVersion)) {
+            // Exact dispatch: the urban branch shares no terrain, cave, ore,
+            // decoration, POI or settlement step with generators 1-3 (D-02).
+            // Its layout revision picks the datum or the city plan; soil
+            // moisture still follows the climate biome (D-08): the district's own climate in
+            // six-district cities, the frozen noise climate in earlier urban layouts.
+            Biome climate = world.urban.hasDistricts() ? world.biomeAt(baseX + 8, baseZ + 8)
+                    : biomeAt(baseX + 8, baseZ + 8);
+            world.urban.stamp(c, climate.moisture);
+            return;
+        }
         boolean deep = deep();
         boolean identities = caveIdentities();
 

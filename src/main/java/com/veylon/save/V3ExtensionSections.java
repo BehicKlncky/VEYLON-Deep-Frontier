@@ -79,6 +79,44 @@ final class V3ExtensionSections {
         sections.add(new V3Section(BodiesSection.ID, BodiesSection.write(g)));
         sections.add(new V3Section(FragmentsSection.ID, FragmentsSection.write(g)));
         sections.add(new V3Section(RemainsSection.ID, RemainsSection.write(g)));
+        if (FixtureStatesSection.present(g)) {
+            // Only worlds whose doors or windows hold state carry the section.
+            sections.add(new V3Section(FixtureStatesSection.ID, FixtureStatesSection.write(g)));
+        }
+        if (g.world.isUrban()) {
+            if (com.veylon.entity.UrbanEncounterDirector.manages(g.world)) {
+                sections.add(new V3Section(UrbanPopulationSection.ID, UrbanPopulationSection.write(g)));
+            }
+            // Legacy saves stay byte-identical: the section exists only for urban worlds.
+            sections.add(new V3Section(UrbanMetaSection.ID, UrbanMetaSection.write(g)));
+            if (g.world.urban.hasStarter()) {
+                sections.add(new V3Section(UrbanRefugesSection.ID, UrbanRefugesSection.write(g)));
+            }
+            if (com.veylon.world.urban.UrbanContainers.manages(g.world)) {
+                sections.add(new V3Section(UrbanContainersSection.ID, UrbanContainersSection.write(g)));
+            }
+            if (com.veylon.settlement.UrbanSiteDirector.manages(g.world)) {
+                sections.add(new V3Section(UrbanSitesSection.ID, UrbanSitesSection.write(g)));
+            }
+            if (UrbanCompoundsSection.manages(g)) {
+                sections.add(new V3Section(UrbanCompoundsSection.ID, UrbanCompoundsSection.write(g)));
+            }
+            if (UrbanFortificationsSection.manages(g)) {
+                sections.add(new V3Section(UrbanFortificationsSection.ID, UrbanFortificationsSection.write(g)));
+            }
+            if (UrbanUtilitiesSection.manages(g)) {
+                sections.add(new V3Section(UrbanUtilitiesSection.ID, UrbanUtilitiesSection.write(g)));
+            }
+            if (UrbanMissionsSection.manages(g)) {
+                sections.add(new V3Section(UrbanMissionsSection.ID, UrbanMissionsSection.write(g)));
+            }
+            if (UrbanDiscoverySection.present(g)) {
+                sections.add(new V3Section(UrbanDiscoverySection.ID, UrbanDiscoverySection.write(g)));
+            }
+            if (UrbanVisitsSection.present(g)) {
+                sections.add(new V3Section(UrbanVisitsSection.ID, UrbanVisitsSection.write(g)));
+            }
+        }
         out.writeInt(V3_SECTION_ENVELOPE_MAGIC);
         out.writeInt(sections.size());
         for (V3Section section : sections) {
@@ -193,6 +231,7 @@ final class V3ExtensionSections {
 
     private static V3Section writeReputationActionsSection(Game g) throws IOException {
         List<Settlement> settlements = g.world.settlements.values().stream()
+                .filter(s -> !(s instanceof com.veylon.settlement.UrbanSite))
                 .filter(s -> s.trespassCooldown > 0f || s.restrictedStorageCooldown > 0f)
                 .sorted(Comparator.comparingLong(s -> s.id))
                 .toList();
@@ -276,6 +315,13 @@ final class V3ExtensionSections {
         boolean restoredLanterns = false;
         byte[] fragments = null;
         byte[] remains = null;
+        byte[] containers = null;
+        byte[] population = null;
+        byte[] sites = null;
+        byte[] compounds = null;
+        byte[] fortifications = null;
+        byte[] utilities = null;
+        byte[] urbanMissions = null;
         for (int i = 0; i < sectionCount; i++) {
             String id = in.readUTF();
             if (id.isBlank() || !seen.add(id)) {
@@ -314,10 +360,47 @@ final class V3ExtensionSections {
                 fragments = payload;
             } else if (RemainsSection.ID.equals(id)) {
                 remains = payload;
+            } else if (FixtureStatesSection.ID.equals(id)) {
+                FixtureStatesSection.read(payload, g);
+            } else if (UrbanMetaSection.ID.equals(id)) {
+                UrbanMetaSection.read(payload, g);
+            } else if (UrbanContainersSection.ID.equals(id)) {
+                containers = payload;
+            } else if (UrbanRefugesSection.ID.equals(id)) {
+                UrbanRefugesSection.read(payload, g);
+            } else if (UrbanDiscoverySection.ID.equals(id)) {
+                UrbanDiscoverySection.read(payload, g);
+            } else if (UrbanVisitsSection.ID.equals(id)) {
+                UrbanVisitsSection.read(payload, g);
+            } else if (UrbanSitesSection.ID.equals(id)) {
+                sites = payload;
+            } else if (UrbanCompoundsSection.ID.equals(id)) {
+                compounds = payload;
+            } else if (UrbanFortificationsSection.ID.equals(id)) {
+                fortifications = payload;
+            } else if (UrbanUtilitiesSection.ID.equals(id)) {
+                utilities = payload;
+            } else if (UrbanMissionsSection.ID.equals(id)) {
+                urbanMissions = payload;
+            } else if (UrbanPopulationSection.ID.equals(id)) {
+                population = payload;
             }
             // Unknown stable IDs are intentionally skipped using their bounded length.
         }
         readSettledPieces(fragments, remains, g);
+        UrbanMetaSection.finishLoad(g);
+        if (containers != null) { UrbanContainersSection.read(containers,g); }
+        if (population != null) { UrbanPopulationSection.read(population, g); }
+        // After discovery (a refuge's) and the NPC list (bindings) are in place.
+        if (sites != null) { UrbanSitesSection.read(sites, g); }
+        // What compounds remember names exactly the compounds urban.sites registered.
+        if (compounds != null) { UrbanCompoundsSection.read(compounds, g); }
+        // Braces stand behind doors whose bars world.fixtures restored, wherever it appeared.
+        if (fortifications != null) { UrbanFortificationsSection.read(fortifications, g); }
+        // Taps and devices are checked against the block edits and plans, which are all in by now.
+        if (utilities != null) { UrbanUtilitiesSection.read(utilities, g); }
+        // The objective names sites and the relay by their plans, which need nothing loaded.
+        if (urbanMissions != null) { UrbanMissionsSection.read(urbanMissions, g); }
         if (restoredLanterns) {
             g.world.refreshLoadedLights();
         }

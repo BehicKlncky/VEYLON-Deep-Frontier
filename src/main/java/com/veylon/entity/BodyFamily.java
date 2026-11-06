@@ -18,7 +18,9 @@ public enum BodyFamily {
     BIRD(CreatureType.BIRD),
     HARE(CreatureType.HARE),
     THORNHORN(CreatureType.THORNHORN),
-    STALKER(CreatureType.STALKER);
+    STALKER(CreatureType.STALKER),
+    /** The quarantine's alien organism (urban milestone 15). */
+    VEILMAW(CreatureType.VEILMAW);
 
     /** The species this family draws, or null for the humanoid. */
     public final CreatureType creature;
@@ -35,6 +37,7 @@ public enum BodyFamily {
             case HARE -> HARE;
             case THORNHORN -> THORNHORN;
             case STALKER -> STALKER;
+            case VEILMAW -> VEILMAW;
         };
     }
 

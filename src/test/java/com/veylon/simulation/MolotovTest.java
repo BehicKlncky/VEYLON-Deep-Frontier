@@ -20,6 +20,7 @@ import com.veylon.simulation.WeatherSystem.Weather;
 import com.veylon.util.Vec3i;
 import com.veylon.world.BlockType;
 import com.veylon.world.Chunk;
+import com.veylon.world.World;
 import org.joml.Vector3f;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -513,7 +514,7 @@ class MolotovTest {
     /** {@code CombatSystemsTest}'s isolated arena, dry, with fixed seeds. */
     private static Game arena() {
         Game game = new Game();
-        game.newWorld(777L, true);
+        game.newWorld(777L, true, World.GEN_CAVE_IDENTITIES);
         flatten(game);
         game.player.pos.set(310, FEET, 310);
         game.entities.creatures.clear();

@@ -206,7 +206,7 @@ public class Hud {
         text(ui, x, box.y() + 78, BODY, "Explore. Build. Shape the frontier.", MUTED);
         String[][] rows = {{"MOVEMENT", p.abilities.flying() ? "FLYING" : "GROUNDED"},
                 {"ENVIRONMENT", format("%.1f C", p.envTemp)}, {"SHELTER", p.shelter.label()},
-                {"TERRAIN", p.biome.displayName}};
+                {"TERRAIN", p.terrainLabel()}};
         for (int i = 0; i < rows.length; i++) {
             float y = box.y() + 116 + i * 46;
             rect(ui, x, y, BAR_WIDTH, 1, LINE, 0.65f);
@@ -224,25 +224,39 @@ public class Hud {
         panel(ui, box, "FIELD CONDITIONS", CYAN);
         float x = box.x() + PAD, width = box.width() - PAD * 2;
         fitted(ui, x, box.y() + 32, width, TITLE, g.time.timeString(), TEXT);
+        if (CityMap.applies(g.world)) {
+            // A city trades the separate season line for where the survivor stands (urban 21).
+            fitted(ui, x, box.y() + 56, width, SMALL, g.seasons.current(g.time).displayName + ", "
+                    + g.seasons.daysLeft(g.time) + " days left / " + g.weather.effective().displayName, AMBER);
+            String district = CityMap.districtName(g.world, (int) Math.floor(g.player.pos.x),
+                    (int) Math.floor(g.player.pos.z));
+            fitted(ui, x, box.y() + 77, width, SMALL, district == null ? "Beyond the city plan" : district, TEXT);
+            fitted(ui, x, box.y() + 97, width, SMALL, CityMap.hereLine(g), MUTED);
+            return;
+        }
         fitted(ui, x, box.y() + 56, width, SMALL,
                 g.seasons.current(g.time).displayName + " / " + g.seasons.daysLeft(g.time) + " days left", AMBER);
         fitted(ui, x, box.y() + 77, width, SMALL, "Weather / " + g.weather.effective().displayName, TEXT);
-        fitted(ui, x, box.y() + 97, width, SMALL, "Biome / " + g.player.biome.displayName, MUTED);
+        fitted(ui, x, box.y() + 97, width, SMALL, g.player.locationLine(), MUTED);
     }
 
     private void renderMission(Game g, UiRenderer ui, Rect box) {
         panel(ui, box, "FRONTIER / OPERATIONS", CYAN);
         float x = box.x() + PAD, width = box.width() - PAD * 2;
         fitted(ui, x, box.y() + 33, width, SMALL, "Events / " + g.events.summary(), AMBER);
+        String journal = com.veylon.settlement.UrbanMissionBoard.journalLine(g);
         fitted(ui, x, box.y() + 55, width, SMALL,
-                "Camp / " + g.faction.standing() + " (" + (int) g.faction.trust + ")",
+                journal != null ? journal : g.world.isUrban() ? "Refuge / close doors before resting"
+                        : "Camp / " + g.faction.standing() + " (" + (int) g.faction.trust + ")",
                 g.faction.hostile ? RED_TEXT : TEXT);
         rect(ui, x, box.y() + 79, width, 1, LINE, 0.65f);
-        fitted(ui, x, box.y() + 89, width, BODY,
-                g.faction.quest == null ? "No active request" : g.faction.quest.describe(), TEXT);
+        // Layout sixteen: the communications objective's next step stands in for the legacy request (urban 20).
+        String comms = com.veylon.settlement.UrbanComms.hudLine(g);
+        fitted(ui, x, box.y() + 89, width, BODY, comms != null ? comms
+                : g.faction.quest == null ? "No active request" : g.faction.quest.describe(), TEXT);
         String navigation = QuestObjectiveView.navigationLabel(g);
-        fitted(ui, x, box.y() + 120, width, SMALL,
-                navigation.isEmpty() ? "[M] Map & navigation" : navigation, CYAN);
+        fitted(ui, x, box.y() + 120, width, SMALL, !navigation.isEmpty() ? navigation
+                : CityMap.applies(g.world) ? "[M] Map & journal" : "[M] Map & navigation", CYAN);
     }
 
     private void renderHotbar(Game g, UiRenderer ui, HudLayout layout) {
@@ -275,7 +289,7 @@ public class Hud {
         }
         ItemStack held = g.player.selected();
         if (held != null) {
-            String label = held.type.displayName;
+            String label = com.veylon.item.ItemNames.of(held.type, g.world.isUrban());
             if (held.type.hasDurability()) label += " / " + (int) held.durability + "/"
                     + (int) held.type.maxDurability + " condition";
             else if (held.type.spoils()) label += " / " + (int) (held.freshnessFrac() * 100) + "% fresh";

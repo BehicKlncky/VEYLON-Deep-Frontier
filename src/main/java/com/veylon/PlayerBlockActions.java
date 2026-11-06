@@ -14,6 +14,7 @@ import com.veylon.item.ToolKind;
 import com.veylon.simulation.FireSystem;
 import com.veylon.util.Vec3i;
 import com.veylon.world.BlockType;
+import com.veylon.world.Fixtures;
 import com.veylon.world.RackBatch;
 
 import java.util.Random;
@@ -73,6 +74,10 @@ final class PlayerBlockActions {
     private static final float CREATIVE_BREAK_EPSILON = 0.000001f;
 
     private final Game game;
+    /** Taking pieces apart for materials in a layout-fourteen city (urban milestone 18). */
+    final Dismantling dismantling;
+    /** Whether the last held frame was taking a piece apart; a change restarts the work. */
+    private boolean wasDismantling;
     /** Break-outcome rolls; reseeded per world by {@code Game.reseedSimulation}. */
     private final Random rng = new Random();
     /**
@@ -83,6 +88,7 @@ final class PlayerBlockActions {
 
     PlayerBlockActions(Game game) {
         this.game = game;
+        this.dismantling = new Dismantling(game);
     }
 
     void setRandomSeed(long seed) {
@@ -104,6 +110,18 @@ final class PlayerBlockActions {
             return; // indestructible
         }
         Vec3i pos = new Vec3i(game.targetHit.x(), game.targetHit.y(), game.targetHit.z());
+        boolean dismantle = dismantling.applies(pos, t);
+        if (dismantle != wasDismantling) {
+            // Crouching down or standing up changes the job: the work starts again.
+            wasDismantling = dismantle;
+            dismantling.reset();
+            game.miningProgress = 0;
+            game.miningTarget = null;
+        }
+        if (dismantle) {
+            dismantling.work(dt, pos, t);
+            return;
+        }
         if (!pos.equals(game.miningTarget)) {
             game.miningTarget = pos;
             game.miningProgress = 0;
@@ -173,6 +191,16 @@ final class PlayerBlockActions {
         creativeBreakRemaining = 0;
         game.miningProgress = 0;
         game.miningTarget = null;
+        wasDismantling = false;
+        dismantling.reset();
+    }
+
+    /**
+     * Takes apart the piece at a cell for its materials (urban milestone 18): the command a held,
+     * finished dismantle ends in, and the one gameplay tests drive.
+     */
+    boolean completePlayerDismantle(Vec3i pos) {
+        return dismantling.complete(pos);
     }
 
     float creativeBreakRemaining() { return creativeBreakRemaining; }
@@ -180,7 +208,17 @@ final class PlayerBlockActions {
     /** R21: prefer an existing hotbar stack, then an empty slot, then the selected slot. */
     boolean pickBlock() {
         if (!game.player.abilities.instantBuild() || game.targetHit == null) return false;
-        ItemType item = BlockItemForms.of(game.targetHit.type());
+        // An open or broken door or window picks the item that places its closed form.
+        BlockType picked = game.targetHit.type();
+        Fixtures.Kind kind = Fixtures.kindOf(picked);
+        if (kind != null) {
+            picked = kind.closed;
+        } else if (picked == BlockType.BROKEN_DOOR) {
+            picked = BlockType.WOOD_DOOR;
+        } else if (picked == BlockType.BROKEN_WINDOW) {
+            picked = BlockType.WINDOW;
+        }
+        ItemType item = BlockItemForms.of(picked);
         if (item == null) {
             game.log("This block has no item form.");
             return false;
@@ -217,28 +255,77 @@ final class PlayerBlockActions {
                 && (held == null || held.type.tool != type.preferredTool))) {
             return false;
         }
+        com.veylon.world.urban.UrbanContainers.Entry container = null;
+        if (com.veylon.world.urban.UrbanContainers.manages(game.world) && Fixtures.isContainer(type)) {
+            container = game.world.urban.containers.touch(game.world,pos);
+            if (container == null) {
+                game.log("This container cannot be changed: the world's storage record is full.");
+                return false;
+            }
+        }
+        // Urban blocks never lose what they hold or give: refuse instead (D-51).
+        if (!FixtureActions.mayBreak(game, pos, type, held)) {
+            return false;
+        }
+        // Layout fourteen: a door braced behind takes blows on its brace before it can be forced.
+        if (Fixtures.isClosedDoor(type) && Fortification.braceTakesPlayerBlow(game, pos)) {
+            game.combat.consumeDurability(held, BREAK_DURABILITY_COST);
+            return true;
+        }
+        if (container != null) {
+            game.crates.onContainerSalvaged(container);
+            game.world.urban.containers.moved(container);
+        }
         breakBlock(pos, type, held);
         return true;
     }
 
     private void breakBlock(Vec3i pos, BlockType t, ItemStack held) {
+        boolean creative = game.player.abilities.instantBuild();
         int brokenCrateContents = spillContainerContents(pos, t);
-        if (!game.player.abilities.instantBuild()) awardDrops(t, held);
+        if (!creative) awardDrops(pos, t, held);
 
-        game.world.setBlock(pos.x(), pos.y(), pos.z(), BlockType.AIR, true);
-        game.audio.playBlockBreak(pos.x() + 0.5f, pos.y() + 0.5f, pos.z() + 0.5f);
-        game.particles.blockDust(t, pos.x() + 0.5f, pos.y() + 0.5f, pos.z() + 0.5f,
-                BREAK_DUST_PARTICLES);
-        if (!game.player.abilities.instantBuild()) game.combat.consumeDurability(held, BREAK_DURABILITY_COST);
+        // A Survival break forces a closed door or shatters a closed pane; a door
+        // is one object over its whole opening.
+        BlockType remains = FixtureActions.remainsOf(t, creative);
+        if (FixtureActions.breaksWholeOpening(t)) {
+            FixtureActions.replaceOpening(game.world, pos, t, remains);
+        } else {
+            game.world.setBlock(pos.x(), pos.y(), pos.z(), remains, true);
+        }
+        boolean forcedDoor = remains == BlockType.BROKEN_DOOR;
+        boolean shattered = remains == BlockType.BROKEN_WINDOW;
+        float cx = pos.x() + 0.5f, cy = pos.y() + 0.5f, cz = pos.z() + 0.5f;
+        if (forcedDoor) {
+            game.audio.playDoorForced(cx, cy, cz);
+        } else if (shattered) {
+            game.audio.playGlassBreak(cx, cy, cz);
+        } else {
+            game.audio.playBlockBreak(cx, cy, cz);
+        }
+        game.particles.blockDust(t, cx, cy, cz, BREAK_DUST_PARTICLES);
+        if (!creative) game.combat.consumeDurability(held, BREAK_DURABILITY_COST);
+        if (shattered && FixtureActions.bareHanded(held)) {
+            // Punching out a pane cuts; the damage gate spares a Creative body.
+            game.player.hurtPhysical(game, FixtureActions.BARE_HAND_GLASS_DAMAGE, true);
+            game.log("The glass cuts your hand.");
+        }
         if (game.player.isPerceivableByAi()) {
             game.player.noise = Math.min(1f, game.player.noise + BREAK_NOISE_SELF);
         }
 
         boolean structure = isBuiltStructure(t);
-        game.noise.emit(game, pos.x() + 0.5f, pos.y() + 0.5f, pos.z() + 0.5f,
-                structure ? STRUCTURE_NOISE_RADIUS : TERRAIN_NOISE_RADIUS,
-                structure ? STRUCTURE_NOISE_STRENGTH : TERRAIN_NOISE_STRENGTH,
-                structure ? "structure-break" : "mining-break", true, game.player);
+        if (forcedDoor || shattered) {
+            game.noise.emit(game, cx, cy, cz,
+                    forcedDoor ? FixtureActions.FORCED_NOISE_RADIUS : FixtureActions.GLASS_NOISE_RADIUS,
+                    forcedDoor ? FixtureActions.FORCED_NOISE : FixtureActions.GLASS_NOISE,
+                    forcedDoor ? "door-forced" : "glass-break", true, game.player);
+        } else {
+            game.noise.emit(game, cx, cy, cz,
+                    structure ? STRUCTURE_NOISE_RADIUS : TERRAIN_NOISE_RADIUS,
+                    structure ? STRUCTURE_NOISE_STRENGTH : TERRAIN_NOISE_STRENGTH,
+                    structure ? "structure-break" : "mining-break", true, game.player);
+        }
 
         applyVandalismConsequences(pos, t, brokenCrateContents);
         if (t == BlockType.POWDER_KEG) {
@@ -254,7 +341,7 @@ final class PlayerBlockActions {
      */
     private int spillContainerContents(Vec3i pos, BlockType t) {
         int brokenCrateContents = 0;
-        if (t == BlockType.CRATE) {
+        if (Fixtures.isContainer(t)) {
             Inventory crate = game.world.crateContents.remove(pos);
             if (crate != null) {
                 for (int i = 0; i < crate.size(); i++) {
@@ -287,7 +374,17 @@ final class PlayerBlockActions {
         return brokenCrateContents;
     }
 
-    private void awardDrops(BlockType t, ItemStack held) {
+    private void awardDrops(Vec3i pos, BlockType t, ItemStack held) {
+        if (FixtureActions.isUrbanBlock(t)) {
+            // Salvage: at most the one item that places the block; mayBreak has
+            // already checked that it fits.
+            boolean toolOk = !t.requiresTool || (held != null && held.type.tool == t.preferredTool);
+            ItemStack salvage = toolOk ? FixtureActions.salvageOf(game.world, pos, t) : null;
+            if (salvage != null) {
+                game.player.inventory.addStack(salvage);
+            }
+            return;
+        }
         if (t.drop != null) {
             boolean dropOk = !t.requiresTool || (held != null && held.type.tool == t.preferredTool);
             if (t == BlockType.LEAVES) {
@@ -307,11 +404,13 @@ final class PlayerBlockActions {
         return t == BlockType.WALL || t == BlockType.STONE_BRICK
                 || t == BlockType.GATE || t == BlockType.CRATE || t == BlockType.CAMPFIRE
                 || t == BlockType.CAMP_BED || t == BlockType.PLANK || t == BlockType.LOG
-                || t == BlockType.WORKBENCH || t == BlockType.FURNACE || t == BlockType.ANVIL;
+                || t == BlockType.WORKBENCH || t == BlockType.FURNACE || t == BlockType.ANVIL
+                || FixtureActions.isUrbanBlock(t) && t != BlockType.DEBRIS && t != BlockType.RUBBLE;
     }
 
     /** Camp trust and settlement reputation both react to destroyed property. */
     private void applyVandalismConsequences(Vec3i pos, BlockType t, int brokenCrateContents) {
+        if (com.veylon.world.urban.UrbanContainers.manages(game.world) && Fixtures.isContainer(t)) { return; }
         if (game.world.campPos != null && !game.faction.hostile
                 && isCampProperty(t)
                 && pos.distSq(game.world.campPos.x(), game.world.campPos.y(),
@@ -327,7 +426,7 @@ final class PlayerBlockActions {
         if (t == BlockType.ALARM_BELL && bs.hostile()) {
             game.log("The alarm bell clatters down — the garrison can't ring it now.");
             game.settlementManager.onAlarmSabotaged(game, bs);
-        } else if (t == BlockType.CRATE) {
+        } else if (Fixtures.isContainer(t)) {
             game.settlementManager.onContainerBroken(game, bs, brokenCrateContents);
         } else {
             game.settlementManager.onStructureDestroyed(game, bs, t);
@@ -351,21 +450,48 @@ final class PlayerBlockActions {
         if (place == null || !game.world.getBlock(px, py, pz).isReplaceable()) {
             return false;
         }
+        if (place == BlockType.STAIRS) {
+            double yaw = Math.toRadians(game.camera.yaw);
+            place = com.veylon.world.StairGeometry.ascending(
+                    Math.sin(yaw), -Math.cos(yaw));
+        }
         // Don't place inside the player or an entity, nor a flame into anyone who can burn.
         if (place.solid && wouldCollide(px, py, pz) || flameWouldTouch(place, px, py, pz)) {
+            return false;
+        }
+        // A door is placed whole: it needs a free, unoccupied cell above too.
+        boolean door = Fixtures.isClosedDoor(place);
+        if (door && (!FixtureActions.doorFits(game.world, px, py, pz) || wouldCollide(px, py + 1, pz))) {
+            return false;
+        }
+        // Layout fifteen: a device goes on a building's wiring, one generator to a building (urban 19).
+        String wiring = game.refuges.utilities.placementRefusal(new Vec3i(px, py, pz), place);
+        if (wiring != null) {
+            game.log(wiring + ".");
             return false;
         }
         game.world.setBlock(px, py, pz, place, true);
         if (game.world.getBlock(px, py, pz) != place) {
             return false; // the world rejected it (protected region, chunk edge)
         }
+        if (door) {
+            game.world.setBlock(px, py + 1, pz, place, true);
+        }
         Vec3i pos = new Vec3i(px, py, pz);
+        if (Fixtures.isUrbanContainer(place) && !com.veylon.world.urban.UrbanContainers.manages(game.world)) {
+            game.world.crateContents.put(pos, new Inventory(CRATE_SLOTS));
+        }
         switch (place) {
             case CAMPFIRE -> game.world.campfireFuel.put(pos, CAMPFIRE_INITIAL_FUEL);
-            case CRATE -> game.world.crateContents.put(pos, new Inventory(CRATE_SLOTS));
+            case CRATE -> {
+                if (!com.veylon.world.urban.UrbanContainers.manages(game.world)) {
+                    game.world.crateContents.put(pos, new Inventory(CRATE_SLOTS));
+                }
+            }
             case RAIN_COLLECTOR -> game.world.collectorWater.put(pos, 0f);
             case LANTERN -> game.log(
                     "Lantern placed empty. Hold charcoal and press [F] to refuel it.");
+            case GENERATOR, ELECTRIC_LAMP, WATER_PURIFIER, RADIO -> game.refuges.utilities.placed(pos, place);
             case BEACON -> {
                 game.world.beaconPos = pos;
                 game.world.beaconStage = 0;

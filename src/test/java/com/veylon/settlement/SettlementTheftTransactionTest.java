@@ -6,6 +6,7 @@ import com.veylon.item.ItemStack;
 import com.veylon.item.ItemType;
 import com.veylon.util.Vec3i;
 import com.veylon.world.BlockType;
+import com.veylon.world.World;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -21,7 +22,7 @@ class SettlementTheftTransactionTest {
     @BeforeEach
     void setUp() {
         game = new Game();
-        game.newWorld(424242L, true);
+        game.newWorld(424242L, true, World.GEN_CAVE_IDENTITIES);
         settlement = findNeutralSettlement(game);
         assertNotNull(settlement);
         cratePosition = settlement.center;

@@ -1,0 +1,32 @@
+container urban:fixture:0,0:40:0:1:4:2 SEARCHED progress=0.0 owner=ABANDONED holds [-,-,FIBERx5/-1.0/-1.0/0,-,-,-,-,-,-,-,-,-]
+container urban:fixture:0,0:40:0:1:5:2 SEARCHING progress=0.6000001 owner=ABANDONED holds [BANDAGEx1/-1.0/-1.0/0,ANTISEPTICx1/-1.0/-1.0/0,-,-,-,-,-,-,-,-,-,-]
+container urban:fixture:0,0:40:0:1:6:2 DESTROYED progress=0.0 owner=ABANDONED holds nothing
+cell 65, 45, 66 CABINET state=-1
+cell 65, 45, 70 CABINET state=-1
+cell 65, 45, 75 AIR state=-1
+cell 74, 41, 65 WOOD_DOOR_OPEN state=1
+cell 74, 41, 69 WOOD_DOOR state=4
+cell 64, 46, 65 BROKEN_WINDOW state=-1
+cell 66, 45, 80 AIR state=-1
+cell 75, 41, 64 BARRICADE state=-1
+cell 66, 49, 65 GENERATOR state=-1
+cell 66, 49, 66 ELECTRIC_LAMP state=-1
+claim urban:floor:0,0:44:0:0 bed=65, 41, 83 at minute 480.0
+claim urban:floor:0,0:40:0:1 bed=66, 45, 65 at minute 487.4400001108657
+home urban:floor:0,0:40:0:1
+barricade 35.0 brace 70.0 damaged=1 braces=1
+taps drawn=2 tapped=1 devices=2
+device 66, 49, 65 GENERATOR on=true fuel=296.25 condition=99.8
+device 66, 49, 66 LAMP on=true fuel=0.0 condition=100.0
+encounter urban:encounter:-3,-3:42:0:0:6:0 VEILBOUND dead=true health=0.0 body=false
+encounter urban:encounter:-3,-1:70:0:0:0:0 VEILMAW dead=true health=0.0 body=false
+site urban:building:0,0:53:0 CAMP trust=10.0000 fear=0.0000 discovered=true cleared=false rewarded=false clock=3492.3200 people=AAA
+site urban:building:0,0:3:0 REFUGE trust=8.0000 fear=0.0000 discovered=true cleared=false rewarded=false clock=3492.3200 people=AAA
+site urban:building:0,-2:40:0 RAIDERS trust=-100.0000 fear=100.0000 discovered=false cleared=true rewarded=true clock=-1.0000 people=DDDD
+site urban:building:1,2:112:0 STRONGHOLD trust=25.0000 fear=0.0000 discovered=true cleared=false rewarded=false clock=3480.0800 people=AAAAAAAAA
+hidden room found=true of 1
+comms rumoured=true found=false parts=0 codes=0 complete=false
+mission CLINIC_SUPPLIES ACTIVE progress=0.0 rewarded=false target=urban:building:1,0:33:0 accepted=492.32000018358406
+mission HIDDEN_AID COMPLETED progress=3.0 rewarded=true target=urban:building:0,0:3:0 accepted=492.32000018358406
+mission LANDMARK ACTIVE progress=0.0 rewarded=false target=urban:building:1,2:49:0 accepted=492.32000018358406
+pack [IRON_PICKAXEx1/300.0/-1.0/0,-,WATERSKIN_EMPTYx1/-1.0/-1.0/0,-,TORCHx1/-1.0/-1.0/0,-,RAIN_CLOAKx1/75.27733/-1.0/0,WATERSKIN_DIRTYx2/-1.0/-1.0/0,DRIED_MEATx12/-1.0/6980.0/0,WATERSKIN_CLEANx4/-1.0/-1.0/0,WATERSKIN_CLEANx3/-1.0/-1.0/0,-,-,-,-,-,-,-,-,-,-,-,-,-,-,-,-,-,-,-,-,-,-,-,-,-]

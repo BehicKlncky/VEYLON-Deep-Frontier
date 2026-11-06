@@ -70,10 +70,108 @@ public enum BlockType {
     GATE_OPEN("Gate (open)", Shape.RACK, false, false, true, 2.6f, ToolKind.AXE, false, null, 0, 0, 0f, 0.44f, 0.34f, 0.22f),
     STONE_BRICK("Stone Brick", Shape.CUBE, true, true, false, 7.5f, ToolKind.PICKAXE, false, ItemType.STONE, 1, 0, 0f, 0.44f, 0.44f, 0.48f),
     ALARM_BELL("Alarm Bell", Shape.TORCH, false, false, false, 1.4f, ToolKind.NONE, false, ItemType.SCRAP, 1, 0, 0f, 0.75f, 0.60f, 0.25f),
-    CAGE_BARS("Cage Bars", Shape.CUBE, true, true, false, 5.0f, ToolKind.PICKAXE, false, ItemType.SCRAP, 1, 0, 0f, 0.36f, 0.38f, 0.42f);
+    CAGE_BARS("Cage Bars", Shape.CUBE, true, true, false, 5.0f, ToolKind.PICKAXE, false, ItemType.SCRAP, 1, 0, 0f, 0.36f, 0.38f, 0.42f),
 
+    // ---- Urban materials and fixtures (urban package 04; append-only, budget <= 24) ----
+    // Doors and windows are closed/open/broken id pairs (Fixtures); lock and bar
+    // state lives in World.fixtures. A broken door or window, the open halves and
+    // the fixture items are handled by Fixtures and FixtureActions, so their
+    // BlockType drop is null.
+    ASPHALT("Asphalt", Shape.CUBE, true, true, false, 4.5f, ToolKind.PICKAXE, false, ItemType.ASPHALT, 1, 0, 0f, 0.20f, 0.20f, 0.22f),
+    PAVING("Paving Slabs", Shape.CUBE, true, true, false, 4.0f, ToolKind.PICKAXE, false, ItemType.PAVING, 1, 0, 0f, 0.58f, 0.57f, 0.55f),
+    CONCRETE("Concrete", Shape.CUBE, true, true, false, 7.0f, ToolKind.PICKAXE, false, ItemType.CONCRETE, 1, 0, 0f, 0.62f, 0.62f, 0.60f),
+    BRICK("Brick", Shape.CUBE, true, true, false, 6.0f, ToolKind.PICKAXE, false, ItemType.BRICK, 1, 0, 0f, 0.55f, 0.30f, 0.24f),
+    PLASTER("Plaster Wall", Shape.CUBE, true, true, false, 1.5f, ToolKind.PICKAXE, false, ItemType.PLASTER, 1, 0, 0f, 0.80f, 0.77f, 0.70f),
+    SHEET_METAL("Sheet Metal", Shape.CUBE, true, true, false, 8.0f, ToolKind.PICKAXE, true, ItemType.SHEET_METAL, 1, 0, 0f, 0.45f, 0.48f, 0.50f),
+    RUBBLE("Rubble", Shape.CUBE, true, true, false, 1.2f, ToolKind.PICKAXE, false, ItemType.GRAVEL, 1, 0, 0f, 0.50f, 0.48f, 0.45f),
+    WOOD_DOOR("Wooden Door", Shape.PANE, true, true, true, 3.0f, ToolKind.AXE, false, null, 0, 0, 0f, 0.52f, 0.38f, 0.24f),
+    WOOD_DOOR_OPEN("Wooden Door (open)", Shape.LEAF, false, false, true, 3.0f, ToolKind.AXE, false, null, 0, 0, 0f, 0.52f, 0.38f, 0.24f),
+    METAL_DOOR("Metal Door", Shape.PANE, true, true, false, 9.0f, ToolKind.PICKAXE, true, null, 0, 0, 0f, 0.38f, 0.42f, 0.44f),
+    METAL_DOOR_OPEN("Metal Door (open)", Shape.LEAF, false, false, false, 9.0f, ToolKind.PICKAXE, true, null, 0, 0, 0f, 0.38f, 0.42f, 0.44f),
+    BROKEN_DOOR("Broken Doorway", Shape.PANE, false, false, true, 0.6f, ToolKind.AXE, false, null, 0, 0, 0f, 0.36f, 0.28f, 0.20f),
+    WINDOW("Window", Shape.CUBE, true, false, false, 0.4f, ToolKind.NONE, false, null, 0, 0, 0f, 0.62f, 0.72f, 0.78f),
+    WINDOW_OPEN("Window (open)", Shape.LEAF, false, false, false, 0.4f, ToolKind.NONE, false, null, 0, 0, 0f, 0.62f, 0.72f, 0.78f),
+    BROKEN_WINDOW("Shattered Window", Shape.PANE, false, false, false, 0.3f, ToolKind.NONE, false, null, 0, 0, 0f, 0.45f, 0.48f, 0.50f),
+    STAIRS("Concrete Stairs", Shape.CUBE, true, true, false, 6.0f, ToolKind.PICKAXE, false, ItemType.STAIRS, 1, 0, 0f, 0.60f, 0.60f, 0.58f),
+    SHELF("Shelving Unit", Shape.CUBE, true, true, true, 2.0f, ToolKind.AXE, false, ItemType.SHELF, 1, 0, 0f, 0.55f, 0.44f, 0.30f),
+    CABINET("Cabinet", Shape.CUBE, true, true, true, 2.0f, ToolKind.AXE, false, ItemType.CABINET, 1, 0, 0f, 0.62f, 0.52f, 0.38f),
+    LOCKER("Metal Locker", Shape.CUBE, true, true, false, 4.0f, ToolKind.PICKAXE, false, ItemType.LOCKER, 1, 0, 0f, 0.40f, 0.48f, 0.46f),
+    TABLE("Table", Shape.TABLE, true, false, true, 1.5f, ToolKind.AXE, false, ItemType.TABLE, 1, 0, 0f, 0.58f, 0.44f, 0.28f),
+    DEBRIS("Debris", Shape.PANEL, false, false, false, 0.15f, ToolKind.NONE, false, null, 0, 0, 0f, 0.48f, 0.46f, 0.42f),
+
+    // Append-only byte ids: the direction names the ascending (high) end.
+    STAIRS_NORTH("Concrete Stairs", Shape.STAIRS, true, false, false, 6.0f, ToolKind.PICKAXE, false, ItemType.STAIRS, 1, 0, 0f, 0.60f, 0.60f, 0.58f),
+    STAIRS_SOUTH("Concrete Stairs", Shape.STAIRS, true, false, false, 6.0f, ToolKind.PICKAXE, false, ItemType.STAIRS, 1, 0, 0f, 0.60f, 0.60f, 0.58f),
+    STAIRS_WEST("Concrete Stairs", Shape.STAIRS, true, false, false, 6.0f, ToolKind.PICKAXE, false, ItemType.STAIRS, 1, 0, 0f, 0.60f, 0.60f, 0.58f),
+    STAIRS_EAST("Concrete Stairs", Shape.STAIRS, true, false, false, 6.0f, ToolKind.PICKAXE, false, ItemType.STAIRS, 1, 0, 0f, 0.60f, 0.60f, 0.58f),
+
+    // Milestone 12: a painted frontage board set into the facade above an entrance. Its words
+    // come from the building plan, so breaking it salvages nothing and no item places one.
+    SIGN("Painted Sign", Shape.CUBE, true, true, true, 1.5f, ToolKind.AXE, false, null, 0, 0, 0f, 0.66f, 0.58f, 0.40f),
+
+    // Milestone 13: spilled chemicals and quarantine runoff crusted over the ground. Standing on
+    // it risks sickness in Survival; scraping it away by hand leaves a shallow pit and nothing else.
+    CONTAMINATED_GROUND("Contaminated Ground", Shape.CUBE, true, true, false, 1.2f, ToolKind.NONE, false, null, 0, 0, 0f, 0.36f, 0.42f, 0.20f),
+
+    // Milestone 14: a see-through steel guard rail. On a parapet, a bridge or around a stair
+    // opening it makes a second course that nobody steps over, without hiding the view.
+    RAILING("Guard Rail", Shape.CUBE, true, false, false, 4.0f, ToolKind.PICKAXE, false, null, 0, 0, 0f, 0.36f, 0.38f, 0.40f),
+    // A loose plaster panel over a cellar doorway. Closed it is named and built like the wall
+    // around it; working it with F slides it aside like a door (Fixtures.Kind.HIDDEN_PANEL).
+    HIDDEN_PANEL("Plaster Wall", Shape.CUBE, true, true, false, 1.5f, ToolKind.PICKAXE, false, null, 0, 0, 0f, 0.78f, 0.75f, 0.68f),
+    HIDDEN_PANEL_OPEN("Loose Panel (open)", Shape.LEAF, false, false, false, 1.5f, ToolKind.PICKAXE, false, null, 0, 0, 0f, 0.78f, 0.75f, 0.68f),
+
+    // Milestone 15: the quarantine's alien growth. A node anchors one Veilmaw's territory; its
+    // glow is in the texture, not the light simulation, so it never reads as a lamp. A flame
+    // beside it sets it alight, breaking it gives one membrane sac, and either way its organism
+    // withers. The membrane carpet round it is the territory floor: it burns, and scraping it
+    // away by hand leaves nothing.
+    GROWTH_NODE("Growth Node", Shape.CUBE, true, true, true, 2.5f, ToolKind.AXE, false, ItemType.MEMBRANE_SAC, 1, 0, 0f, 0.46f, 0.38f, 0.54f),
+    VEIL_MEMBRANE("Veil Membrane", Shape.CUBE, true, true, true, 0.9f, ToolKind.NONE, false, null, 0, 0, 0f, 0.29f, 0.26f, 0.33f),
+
+    // Milestone 18: one cell of a burnt-out car left in a street lane, a static salvage prop. What
+    // part of the car a cell is comes from its region's plan (VehicleSites); nothing carries one,
+    // and only a pry tool works its metal.
+    CAR_WRECK("Wrecked Car", Shape.CUBE, true, true, false, 8.0f, ToolKind.PICKAXE, true, null, 0, 0, 0f, 0.36f, 0.30f, 0.26f),
+    // Milestone 18 fortification: boards or sheet metal fixed across an opening, a thin panel in
+    // the wall plane over a solid cell. Their strength is in UrbanFortifications, and holding the
+    // attack button on one takes it down, returning most of what it cost (SalvageTable).
+    BARRICADE("Plank Barricade", Shape.PANE, true, true, true, 2.5f, ToolKind.AXE, false, null, 0, 0, 0f, 0.56f, 0.42f, 0.26f),
+    BARRICADE_METAL("Sheet-Metal Barricade", Shape.PANE, true, true, false, 6.0f, ToolKind.PICKAXE, false, null, 0, 0, 0f, 0.44f, 0.47f, 0.48f),
+
+    // Milestone 19 refuge utilities: a small petrol generator rebuilt from salvage and the work lamp
+    // it lights. Their fuel, wear and switches are in UrbanUtilities; nothing carries one away whole,
+    // so taking one apart (SalvageTable) is how it comes down. A lamp's light is registered in its
+    // chunk only while it is switched on and fed, like a lantern's while it burns.
+    GENERATOR("Generator", Shape.CUBE, true, true, false, 3.0f, ToolKind.PICKAXE, false, null, 0, 0, 0f, 0.55f, 0.24f, 0.18f),
+    ELECTRIC_LAMP("Work Lamp", Shape.TORCH, false, false, false, 0.4f, ToolKind.NONE, false, null, 0, 14, 0f, 0.86f, 0.84f, 0.70f),
+    // A pump and filter unit built from salvage: on a generator's wiring it draws its building's stale
+    // water and treats it. Its tanks and filter are in UrbanUtilities, like a generator's fuel.
+    WATER_PURIFIER("Water Purifier", Shape.CUBE, true, true, false, 2.5f, ToolKind.PICKAXE, false, null, 0, 0, 0f, 0.55f, 0.60f, 0.64f),
+
+    // Urban milestone 20: the cabinet of the old relay mast on one precinct roof (RelaySites), which
+    // the communications objective repairs. It cannot be broken or blasted; what has been fitted into
+    // it is kept by the missions ledger, never as a block state.
+    RELAY("Relay Mast", Shape.CUBE, true, true, false, -1f, ToolKind.NONE, false, null, 0, 0, 0f, 0.40f, 0.45f, 0.48f),
+    // A radio workstation built round a transmitter module: on a generator's wiring in a refuge it carries
+    // a broadcast through the repaired relay. Its switch is in UrbanUtilities, like a lamp's; taking it
+    // apart (SalvageTable) gives the module back.
+    RADIO("Radio Workstation", Shape.CUBE, true, true, false, 2.5f, ToolKind.PICKAXE, false, null, 0, 0, 0f, 0.34f, 0.38f, 0.33f);
+
+    /**
+     * How a block is meshed. Not persisted: only {@link BlockType} ordinals are
+     * saved, so shapes may be appended or reordered freely.
+     */
     public enum Shape {
-        NONE, CUBE, CROSS, LIQUID, TORCH, CAMPFIRE, PANEL, RACK, BASIN
+        NONE, CUBE, CROSS, LIQUID, TORCH, CAMPFIRE, PANEL, RACK, BASIN,
+        /** An open door or casement: a thin leaf along one jamb ({@code FixtureGeometry}). */
+        LEAF,
+        /** A thin panel in the wall plane: closed/broken doors and shattered windows. */
+        PANE,
+        /** A table top on four legs over a full-cell collider. */
+        TABLE,
+        /** Two half-height treads, with matching collision and targeting. */
+        STAIRS
     }
 
     public final String displayName;
@@ -131,7 +229,7 @@ public enum BlockType {
 
     /** Blocks the player can place another block into. */
     public boolean isReplaceable() {
-        return this == AIR || this == WATER || this == TALL_GRASS;
+        return this == AIR || this == WATER || this == TALL_GRASS || this == DEBRIS;
     }
 
     /** Blocks that can be targeted by the mining raycast. */

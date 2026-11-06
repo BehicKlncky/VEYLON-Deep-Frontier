@@ -473,6 +473,69 @@ public final class IconAtlas {
                 c.circle(7, 22, 4, 0xFFC5A66D);
                 c.line(9, 19, 9, 26, 1, 0xFF4A392A);
             }
+            // Milestone 19 utilities read by their silhouette too.
+            case GENERATOR -> {
+                c.clear();
+                c.rect(5, 9, 27, 27, 0xFF1C1D20);
+                c.rect(7, 11, 25, 16, 0xFF8A3426);
+                c.circle(16, 12, 2, 0xFF262628);
+                c.rect(8, 18, 20, 25, 0xFF4A4C4E);
+                for (int y = 19; y <= 24; y += 2) { c.line(8, y, 20, y, 1, 0xFF2E3032); }
+                c.circle(23, 21, 3, 0xFF2A2A2C);
+                c.circle(23, 21, 1, 0xFFB0A890);
+            }
+            case WATER_PURIFIER -> {
+                c.clear();
+                c.rect(8, 6, 24, 29, 0xFF5A6064);
+                c.rect(9, 7, 23, 28, 0xFF8A9094);
+                c.rect(11, 12, 13, 25, 0xFF2A3034);
+                c.rect(11, 18, 13, 25, 0xFF4A7A9A);
+                c.rect(16, 10, 21, 15, 0xFF3A4044);
+                c.circle(19, 12, 1, 0xFF9AC8E0);
+                c.line(12, 6, 12, 3, 2, 0xFF50585C);
+                c.line(20, 6, 20, 3, 2, 0xFF50585C);
+            }
+            case WORK_LAMP -> {
+                c.clear();
+                c.rect(11, 25, 21, 28, 0xFF3A3D42);
+                c.line(16, 25, 16, 16, 2, 0xFF56606A);
+                c.circle(16, 11, 7, 0xFFE8D27A);
+                c.circle(16, 11, 4, 0xFFFFF2B8);
+                c.line(9, 5, 23, 5, 2, 0xFF3A3D42);
+            }
+            // Urban fixtures read by their silhouette, not as a cube of their texture.
+            case WOOD_DOOR -> {
+                c.clear();
+                c.rect(9, 2, 23, 29, 0xFF4E3824);
+                c.rect(10, 3, 22, 28, 0xFF7A5A3C);
+                c.rect(12, 5, 20, 13, 0xFF664A30);
+                c.rect(12, 16, 20, 26, 0xFF664A30);
+                c.circle(19, 15, 1, 0xFFD8D0B8);
+            }
+            case METAL_DOOR -> {
+                c.clear();
+                c.rect(9, 2, 23, 29, 0xFF3A3D42);
+                c.rect(10, 3, 22, 28, 0xFF56606A);
+                c.rect(13, 5, 19, 11, 0xFF2A3A44);
+                c.line(11, 16, 21, 16, 1, 0xFF9AA2A8);
+                c.rect(10, 24, 22, 28, 0xFF6E767C);
+            }
+            case WINDOW -> {
+                c.clear();
+                c.rect(6, 5, 26, 27, 0xFFBFB8A8);
+                c.rect(8, 7, 24, 25, 0xFF4A6070);
+                c.line(9, 20, 15, 9, 1, 0xFFB8CCD8);
+                c.line(14, 23, 22, 10, 1, 0xFF9FB6C4);
+                c.line(8, 16, 24, 16, 1, 0xFFBFB8A8);
+            }
+            case STAIRS -> {
+                c.clear();
+                c.polygon(new int[]{4, 4, 12, 12, 20, 20, 28, 28},
+                        new int[]{28, 22, 22, 15, 15, 8, 8, 28}, 0xFF8A8A86);
+                c.line(4, 22, 12, 22, 1, 0xFFC8742E);
+                c.line(12, 15, 20, 15, 1, 0xFFC8742E);
+                c.line(20, 8, 28, 8, 1, 0xFFC8742E);
+            }
             default -> {
                 // The real material projection is already the distinguishing mark.
             }
@@ -723,6 +786,86 @@ public final class IconAtlas {
                 c.line(10, 11, 20, 10, 1, 0xFFB9E7FF);
                 c.line(11, 15, 22, 20, 1, 0xFFB9E7FF);
                 c.rect(12, 17, 16, 22, 0xFFB9E7FF);
+            }
+            case DOOR_BRACE -> {
+                // A stout beam with an iron strap and two nail heads at each end.
+                c.polygon(new int[]{4, 8, 28, 24}, new int[]{25, 29, 7, 3}, shade(base, 0.5f));
+                c.polygon(new int[]{6, 8, 26, 24}, new int[]{25, 27, 7, 5}, base);
+                c.line(13, 20, 18, 15, 3, 0xFF5A5E62);
+                c.circle(8, 25, 1, 0xFFC8C4B8);
+                c.circle(24, 7, 1, 0xFFC8C4B8);
+            }
+            case FUEL_CAN -> {
+                // A red jerrycan with its handle and spout.
+                c.rect(8, 9, 24, 29, 0xFF5A1A12);
+                c.rect(9, 10, 23, 28, 0xFFA8382A);
+                c.line(9, 19, 23, 19, 1, 0xFF7A2418);
+                c.rect(11, 5, 19, 9, 0xFF5A1A12);
+                c.line(20, 7, 25, 3, 2, 0xFF7A7A72);
+            }
+            // Milestone 20: the relay's parts read by their shapes.
+            case TRANSMITTER_MODULE -> {
+                // A green circuit board in a steel bracket, with chips, a crystal can and a connector.
+                c.rect(4, 8, 28, 26, 0xFF3A3E42);
+                c.rect(6, 10, 26, 24, base);
+                c.rect(9, 13, 15, 18, 0xFF1C1E20);
+                c.rect(18, 13, 23, 16, 0xFF1C1E20);
+                c.circle(20, 21, 2, 0xFFB8B8B0);
+                for (int x = 8; x <= 24; x += 4) { c.line(x, 24, x, 28, 1, 0xFFC8A040); }
+                c.line(9, 20, 16, 20, 1, 0xFFC8A040);
+            }
+            case POWER_CELL -> {
+                // Two squat cells side by side, amber sleeves, their terminals on top.
+                for (int x : new int[]{6, 17}) {
+                    c.rect(x, 9, x + 9, 28, shade(base, 0.55f));
+                    c.rect(x + 1, 10, x + 8, 27, base);
+                    c.rect(x + 3, 6, x + 6, 9, 0xFF8A8C88);
+                    c.line(x + 1, 15, x + 8, 15, 1, 0xFF2A2A2A);
+                }
+            }
+            case ANTENNA_CABLE -> {
+                // A coil of black coax, two turns with a gap between, and a brass plug on its free end.
+                for (int y = -10; y <= 10; y++) {
+                    for (int x = -10; x <= 10; x++) {
+                        int d = x * x + y * y;
+                        if (d <= 100 && d > 56) { c.set(14 + x, 17 + y, 0xFF1A1A1C); }
+                        else if (d <= 36 && d > 12) { c.set(14 + x, 17 + y, 0xFF2E2E30); }
+                    }
+                }
+                c.line(22, 22, 28, 28, 2, 0xFF1A1A1C);
+                c.rect(26, 26, 30, 30, 0xFFC8A040);
+            }
+            case RADIO -> {
+                // An olive set with a green dial, a speaker grille, knobs and a whip aerial.
+                c.rect(4, 12, 28, 28, shade(base, 0.55f));
+                c.rect(5, 13, 27, 27, base);
+                c.rect(7, 15, 25, 18, 0xFF3A5A3A);
+                for (int y = 20; y <= 26; y += 2) { c.line(7, y, 14, y, 1, shade(base, 0.45f)); }
+                c.circle(19, 23, 2, 0xFF24261F);
+                c.circle(24, 23, 2, 0xFF24261F);
+                c.line(24, 12, 29, 3, 1, 0xFF8A8C80);
+            }
+            case SPARE_PARTS -> {
+                // A toothed gear beside a coiled spring and a twist of copper wire.
+                for (int i = 0; i < 8; i++) {
+                    double a = i * Math.PI / 4;
+                    c.line(12, 14, 12 + (int) Math.round(Math.cos(a) * 9), 14 + (int) Math.round(Math.sin(a) * 9),
+                            3, shade(base, 0.6f));
+                }
+                c.circle(12, 14, 7, base);
+                c.circle(12, 14, 3, shade(base, 0.35f));
+                for (int y = 18; y <= 28; y += 3) { c.line(20, y, 28, y + 1, 2, shade(base, 1.3f)); }
+                c.line(4, 28, 14, 25, 1, 0xFFB87333);
+            }
+            case MEMBRANE_SAC -> {
+                // A violet sac with pale yellow-green veins and one bright pore.
+                c.circle(16, 18, 11, shade(base, 0.45f));
+                c.circle(15, 17, 9, base);
+                c.circle(19, 12, 3, shade(base, 1.35f));
+                c.line(9, 20, 16, 15, 1, 0xFFCFE88A);
+                c.line(16, 15, 23, 22, 1, 0xFFCFE88A);
+                c.line(16, 15, 15, 26, 1, 0xFFB8D27A);
+                c.circle(16, 15, 2, 0xFFE4F6A0);
             }
             case SCRAP -> {
                 c.polygon(new int[]{5, 10, 16, 19, 28, 25, 15, 9},

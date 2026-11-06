@@ -40,6 +40,8 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Long-running release QA for every persistent or high-churn bounded collection. */
@@ -82,7 +84,7 @@ class RuntimeBoundsTest {
     @Test
     void highChurnRuntimeCollectionsHitTheirCapsThenExpireWithoutGrowth() {
         Game game = new Game();
-        game.newWorld(20260716L, true);
+        game.newWorld(20260716L, true, World.GEN_CAVE_IDENTITIES);
         game.entities.creatures.clear();
         game.entities.npcs.clear();
         game.noise.reset();
@@ -326,9 +328,358 @@ class RuntimeBoundsTest {
     }
 
     @Test
+    void streamingAcrossManyUrbanRegionsKeepsThePlanCacheAndQueuesBounded() {
+        Game game = new Game();
+        game.newWorld(20260716L, true, World.GEN_URBAN_STREETS, com.veylon.entity.GameMode.SURVIVAL);
+        // A diagonal walk through thirty regions, streaming chunks as a player would.
+        for (int region = 0; region < 30; region++) {
+            int x = region * 256 + 120;
+            int z = -region * 256 + 40;
+            game.world.ensureChunks(x, z, 1, 100);
+            RuntimeBudgetSnapshot snapshot = RuntimeBudgetSnapshot.capture(game);
+            assertTrue(snapshot.withinHardLimits(), snapshot.occupancySummary());
+            assertTrue(snapshot.urbanRegionPlans() <= com.veylon.world.urban.UrbanWorldState.MAX_REGION_PLANS);
+            assertEquals(0, snapshot.pendingGenerationChunks(), "urban slices never queue edits");
+        }
+        assertEquals(com.veylon.world.urban.UrbanWorldState.MAX_REGION_PLANS,
+                RuntimeBudgetSnapshot.capture(game).urbanRegionPlans(), "the cache filled and stayed at its cap");
+        assertTrue(RuntimeBudgetSnapshot.hardLimitSummary().contains("urbanPlans="));
+        assertTrue(RuntimeBudgetSnapshot.capture(game).occupancySummary().contains("urbanPlans=16"));
+        assertTrue(game.entities.creatures.isEmpty(), "no surface wildlife spawned on the way");
+    }
+
+    @Test
+    void buildingPlanCacheEvictsAndRebuildsIdenticallyWithoutGeneratingChunksOrState() {
+        Game game = new Game();
+        game.newWorld(20260731, true, World.GEN_URBAN_PLANS, com.veylon.entity.GameMode.SURVIVAL);
+        var firstParcel = game.world.urban.regionPlan(0, 0).refuge();
+        var first = game.world.urban.buildingAt(firstParcel.x0(), firstParcel.z0());
+        int chunks = game.world.loadedCount();
+        int plans = 0;
+        for (int region = 0; plans <= com.veylon.world.urban.UrbanWorldState.MAX_BUILDING_PLANS; region++) {
+            var district = game.world.urban.regionPlan(region, -region);
+            for (var parcel : district.parcels()) {
+                game.world.urban.buildingAt(parcel.x0(), parcel.z0());
+                plans++;
+            }
+            assertTrue(RuntimeBudgetSnapshot.capture(game).withinHardLimits());
+        }
+        assertEquals(com.veylon.world.urban.UrbanWorldState.MAX_BUILDING_PLANS,
+                RuntimeBudgetSnapshot.capture(game).urbanBuildingPlans());
+        assertEquals(first, game.world.urban.buildingAt(firstParcel.x1(), firstParcel.z1()));
+        assertEquals(chunks, game.world.loadedCount());
+        assertTrue(game.world.changedBlocks.isEmpty());
+        assertTrue(game.world.crateContents.isEmpty());
+        assertEquals(0, game.world.fixtures.size());
+    }
+
+    @Test
+    void routeCataloguesAndTransitSegmentsStopAtTheirCaps() {
+        Game game = new Game();
+        game.newWorld(20260731, true, World.GEN_URBAN_UNDERGROUND, com.veylon.entity.GameMode.SURVIVAL);
+        var urban = game.world.urban;
+        int chunks = game.world.loadedCount();
+        // Pure queries along one candidate avenue and across a row of regions: more segments and
+        // catalogues than either cache holds, and no chunk generated on the way.
+        for (int i = 0; i < com.veylon.world.urban.UrbanWorldState.MAX_TRANSIT_SEGMENTS + 8; i++) {
+            urban.segment(true, 0, i);
+            if (i < com.veylon.world.urban.UrbanWorldState.MAX_REGION_PLANS + 8) { urban.routes(i, 0); }
+            RuntimeBudgetSnapshot snapshot = RuntimeBudgetSnapshot.capture(game);
+            assertTrue(snapshot.withinHardLimits(), snapshot.occupancySummary());
+        }
+        int cap = com.veylon.world.urban.UrbanWorldState.MAX_ROUTE_PLANS;
+        assertEquals(cap, RuntimeBudgetSnapshot.capture(game).urbanRoutePlans(), "both caches filled and stayed at their caps");
+        assertTrue(RuntimeBudgetSnapshot.hardLimitSummary().contains("routePlans=" + cap));
+        assertTrue(RuntimeBudgetSnapshot.capture(game).occupancySummary().contains("routePlans=" + cap));
+        assertEquals(chunks, game.world.loadedCount());
+        assertTrue(game.world.changedBlocks.isEmpty());
+    }
+
+    @Test
+    void survivorSitePlansStopAtTheirCap() {
+        // Layout thirteen's compounds live in the same site plans, and their claims in the route catalogues.
+        for (int generator : new int[]{World.GEN_URBAN_SURVIVORS, World.GEN_URBAN_STRONGHOLDS}) {
+            Game game = new Game();
+            game.newWorld(20260731, true, generator, com.veylon.entity.GameMode.SURVIVAL);
+            var urban = game.world.urban;
+            int chunks = game.world.loadedCount();
+            // Pure site plans across more regions than the cache holds, generating nothing.
+            for (int i = 0; i < com.veylon.world.urban.UrbanWorldState.MAX_REGION_PLANS + 8; i++) {
+                urban.sites(i, -i);
+                RuntimeBudgetSnapshot snapshot = RuntimeBudgetSnapshot.capture(game);
+                assertTrue(snapshot.withinHardLimits(), snapshot.occupancySummary());
+            }
+            assertEquals(com.veylon.world.urban.UrbanWorldState.MAX_REGION_PLANS,
+                    RuntimeBudgetSnapshot.capture(game).urbanSitePlans());
+            assertEquals(chunks, game.world.loadedCount(), "planning compounds generates no chunk");
+            assertTrue(RuntimeBudgetSnapshot.hardLimitSummary().contains(
+                    "sitePlans=" + com.veylon.world.urban.UrbanWorldState.MAX_REGION_PLANS));
+        }
+    }
+
+    @Test
+    void vehiclePlansStopAtTheirCap() {
+        Game game = new Game();
+        game.newWorld(20260731, true, World.GEN_URBAN_REFUGES, com.veylon.entity.GameMode.SURVIVAL);
+        var urban = game.world.urban;
+        int chunks = game.world.loadedCount();
+        int cap = com.veylon.world.urban.UrbanWorldState.MAX_REGION_PLANS;
+        // Pure wreck plans across more regions than the cache holds, generating nothing.
+        for (int i = 0; i < cap + 8; i++) {
+            urban.vehicles(i, -i);
+            RuntimeBudgetSnapshot snapshot = RuntimeBudgetSnapshot.capture(game);
+            assertTrue(snapshot.withinHardLimits(), snapshot.occupancySummary());
+        }
+        assertEquals(cap, RuntimeBudgetSnapshot.capture(game).urbanVehiclePlans());
+        assertEquals(chunks, game.world.loadedCount(), "planning wrecks generates no chunk");
+        assertTrue(RuntimeBudgetSnapshot.hardLimitSummary().contains("vehiclePlans=" + cap));
+        assertTrue(RuntimeBudgetSnapshot.capture(game).occupancySummary().contains("vehiclePlans=" + cap));
+    }
+
+    @Test
+    void threatBudgetsStopAtTheirCapAndRebuildIdentically() {
+        Game game = new Game();
+        game.newWorld(20260731, true, World.GEN_URBAN_ECONOMY, com.veylon.entity.GameMode.SURVIVAL);
+        var urban = game.world.urban;
+        int chunks = game.world.loadedCount();
+        int cap = com.veylon.world.urban.UrbanWorldState.MAX_REGION_PLANS;
+        java.util.List<java.util.List<com.veylon.world.urban.EncounterAnchors.Anchor>> first = new ArrayList<>();
+        // Every parcel's anchors across more regions than the budget cache holds: pure, generating nothing.
+        for (int i = 0; i < cap + 8; i++) {
+            for (var parcel : urban.regionPlan(i, 1 - i).parcels()) {
+                var anchors = com.veylon.world.urban.EncounterAnchors.forParcel(game.world, parcel);
+                if (i == 0) { first.add(anchors); }
+            }
+            RuntimeBudgetSnapshot snapshot = RuntimeBudgetSnapshot.capture(game);
+            assertTrue(snapshot.withinHardLimits(), snapshot.occupancySummary());
+        }
+        assertEquals(cap, RuntimeBudgetSnapshot.capture(game).urbanThreatBudgets());
+        World fresh = new World(20260731, World.GEN_URBAN_ECONOMY);
+        var parcels = urban.regionPlan(0, 1).parcels();
+        for (int p = 0; p < parcels.size(); p++) {
+            assertEquals(first.get(p), com.veylon.world.urban.EncounterAnchors.forParcel(game.world, parcels.get(p)),
+                    "an evicted budget comes back identical, parcel " + p);
+            assertEquals(first.get(p), com.veylon.world.urban.EncounterAnchors.forParcel(fresh, parcels.get(p)),
+                    "a cached budget answers as a fresh world does, parcel " + p);
+        }
+        assertEquals(chunks, game.world.loadedCount(), "planning budgets generates no chunk");
+        assertTrue(RuntimeBudgetSnapshot.hardLimitSummary().contains("threatBudgets=" + cap));
+        assertTrue(RuntimeBudgetSnapshot.capture(game).occupancySummary().contains("threatBudgets=" + cap));
+    }
+
+    @Test
+    void fortificationLedgersStopAtTheirCaps() {
+        Game game = new Game();
+        game.newWorld(20260731, true, World.GEN_URBAN_REFUGES, com.veylon.entity.GameMode.SURVIVAL);
+        var f = game.world.urban.fortifications;
+        int damaged = com.veylon.world.urban.UrbanFortifications.MAX_DAMAGED;
+        // Far from anything generated: the ledger never loads a chunk to remember a cell.
+        for (int i = 0; i < damaged; i++) {
+            assertTrue(f.damage(BlockType.BARRICADE, new com.veylon.util.Vec3i(100_000 + i, 50, 0), 1f) > 0);
+        }
+        assertEquals(0f, f.damage(BlockType.BARRICADE, new com.veylon.util.Vec3i(-100_000, 50, 0), 1f),
+                "a cell the full ledger cannot remember gives way at once rather than growing it");
+        assertEquals(damaged, f.damagedCount());
+        int braces = com.veylon.world.urban.UrbanFortifications.MAX_BRACES;
+        for (int i = 0; i <= braces; i++) {
+            for (int y = 50; y <= 51; y++) {
+                assertTrue(game.world.fixtures.set(200_000 + 2 * i, y, 0, com.veylon.world.FixtureStates.LOCK_BARRED));
+            }
+            boolean set = f.setBrace(game.world, new com.veylon.util.Vec3i(200_000 + 2 * i, 50, 0), 10f);
+            assertEquals(i < braces, set, "brace " + i);
+        }
+        RuntimeBudgetSnapshot full = RuntimeBudgetSnapshot.capture(game);
+        assertEquals(damaged, full.damagedBarricades());
+        assertEquals(braces, full.doorBraces());
+        assertTrue(full.withinHardLimits(), full.occupancySummary());
+        assertTrue(RuntimeBudgetSnapshot.hardLimitSummary().contains("damagedBarricades=" + damaged));
+        assertTrue(RuntimeBudgetSnapshot.hardLimitSummary().contains("braces=" + braces));
+        // A brace whose door is no longer barred makes room again.
+        for (int y = 50; y <= 51; y++) { game.world.fixtures.remove(200_000, y, 0); }
+        assertTrue(f.setBrace(game.world, new com.veylon.util.Vec3i(200_000 + 2 * braces, 50, 0), 10f));
+        assertEquals(braces, f.braceCount());
+    }
+
+    @Test
+    void refugeClaimsStopAtThree() {
+        Game game = new Game();
+        game.newWorld(20260731, true, World.GEN_URBAN_REFUGES, com.veylon.entity.GameMode.SURVIVAL);
+        var refuges = game.world.urban.refuges;
+        assertEquals(1, refuges.size(), "the starter refuge is the first claim");
+        var neighbour = com.veylon.RefugeWorldArena.neighbour(game);
+        refuges.add(com.veylon.world.urban.UrbanIds.floor(neighbour.id(), 1), null, 0);
+        refuges.add(com.veylon.world.urban.UrbanIds.floor(neighbour.id(), 2), null, 0);
+        assertTrue(refuges.full());
+        assertThrows(IllegalStateException.class,
+                () -> refuges.add(com.veylon.world.urban.UrbanIds.floor(neighbour.id(), 0), null, 0));
+        RuntimeBudgetSnapshot snapshot = RuntimeBudgetSnapshot.capture(game);
+        assertEquals(com.veylon.world.urban.UrbanRefuges.MAX_CLAIMS, snapshot.refugeClaims());
+        assertTrue(snapshot.withinHardLimits(), snapshot.occupancySummary());
+        assertTrue(RuntimeBudgetSnapshot.hardLimitSummary().contains("refuges=" + com.veylon.world.urban.UrbanRefuges.MAX_CLAIMS));
+    }
+
+    @Test
+    void theTapLedgerStopsAtItsCapAndAFullOneRunsNoNewBuildingsTaps() {
+        com.veylon.Game game = com.veylon.UtilityWorldArena.session(com.veylon.entity.GameMode.SURVIVAL);
+        var u = game.world.urban.utilities;
+        int cap = com.veylon.world.urban.UrbanUtilities.MAX_TAPPED;
+        java.util.Map<Long, Integer> rows = new java.util.HashMap<>();
+        for (int i = 0; i < cap; i++) { rows.put(farBuilding(i), 1); }
+        u.restore(game.world, rows, java.util.List.of());
+        var neighbour = com.veylon.RefugeWorldArena.neighbour(game);
+        var tap = com.veylon.UtilityWorldArena.basins(neighbour).getFirst();
+        game.player.inventory.clear();
+        com.veylon.UtilityWorldArena.giveEmptySkins(game, 1);
+        com.veylon.SurvivorWorldArena.standAt(game, tap.target());
+        com.veylon.SurvivorWorldArena.pressF(game, tap.position());
+        assertEquals(1, game.player.inventory.count(com.veylon.item.ItemType.WATERSKIN_EMPTY),
+                "a building the full ledger cannot remember gives no water rather than growing it");
+        assertEquals(0, u.drawn(neighbour.id()));
+        RuntimeBudgetSnapshot full = RuntimeBudgetSnapshot.capture(game);
+        assertEquals(cap, full.tappedBuildings());
+        assertTrue(full.withinHardLimits(), full.occupancySummary());
+        assertTrue(RuntimeBudgetSnapshot.hardLimitSummary().contains("tapped=" + cap));
+        assertThrows(IllegalArgumentException.class, () -> {
+            rows.put(farBuilding(cap), 1);
+            u.restore(game.world, rows, java.util.List.of());
+        });
+    }
+
+    @Test
+    void theMissionJournalHoldsFourInHandAndTheRecordsStopAtTheirCap() {
+        com.veylon.Game game = com.veylon.SurvivorWorldArena.session(com.veylon.SurvivorWorldArena.SEED,
+                com.veylon.entity.GameMode.SURVIVAL, com.veylon.world.World.GEN_URBAN_MISSIONS,
+                new com.veylon.engine.AudioManager());
+        var ledger = game.world.urban.missions;
+        var kind = com.veylon.world.urban.UrbanMissions.Kind.CLINIC_SUPPLIES;
+        for (int i = 0; i < com.veylon.world.urban.UrbanMissions.MAX_ACTIVE; i++) {
+            ledger.accept(kind, farBuilding(i), farBuilding(10_000), 0);
+        }
+        assertFalse(ledger.canAccept(), "four in hand");
+        assertThrows(IllegalStateException.class, () -> ledger.accept(kind, farBuilding(99), farBuilding(10_000), 0));
+        int cap = com.veylon.world.urban.UrbanMissions.MAX_RECORDS;
+        for (int i = 4; i < cap; i++) {
+            for (var m : ledger.missions()) {
+                if (m.active()) { m.status = com.veylon.world.urban.UrbanMissions.Status.COMPLETED; }
+            }
+            ledger.accept(kind, farBuilding(i), farBuilding(10_000), 0);
+        }
+        for (var m : ledger.missions()) { m.status = com.veylon.world.urban.UrbanMissions.Status.FAILED; }
+        assertEquals(cap, ledger.missions().size());
+        assertFalse(ledger.canAccept(), "a full ledger takes no more missions, whoever offers");
+        assertThrows(IllegalStateException.class, () -> ledger.accept(kind, farBuilding(cap), farBuilding(10_000), 0));
+        RuntimeBudgetSnapshot full = RuntimeBudgetSnapshot.capture(game);
+        assertEquals(cap, full.missionRecords());
+        assertTrue(full.withinHardLimits(), full.occupancySummary());
+        assertTrue(RuntimeBudgetSnapshot.hardLimitSummary().contains("urbanMissions=" + cap));
+    }
+
+    @Test
+    void theDeviceLedgerStopsAtItsCapAndAFullOneTakesNoNewDevice() {
+        com.veylon.Game game = com.veylon.UtilityWorldArena.session(com.veylon.entity.GameMode.SURVIVAL);
+        var u = game.world.urban.utilities;
+        int cap = com.veylon.world.urban.UrbanUtilities.MAX_DEVICES;
+        var neighbour = com.veylon.RefugeWorldArena.neighbour(game);
+        java.util.List<com.veylon.world.urban.UrbanUtilities.Device> devices = new java.util.ArrayList<>();
+        for (int i = 0; i < cap; i++) {
+            devices.add(new com.veylon.world.urban.UrbanUtilities.Device(com.veylon.world.urban.UrbanUtilities.Kind.LAMP,
+                    new com.veylon.util.Vec3i(200_000 + i, 50, 0), neighbour.id()));
+        }
+        u.restore(game.world, java.util.Map.of(), devices);
+        var room = com.veylon.RefugeWorldArena.piece(neighbour, 1, BlockType.CAMP_BED).target();
+        com.veylon.SurvivorWorldArena.standAt(game, room);
+        assertEquals("Too many devices are wired up already (" + cap + ")",
+                u.placementRefusal(game.world, room.offset(0, 1, 0), BlockType.ELECTRIC_LAMP));
+        assertNull(u.add(game.world, room.offset(0, 1, 0), BlockType.ELECTRIC_LAMP), "a full ledger takes no device");
+        RuntimeBudgetSnapshot full = RuntimeBudgetSnapshot.capture(game);
+        assertEquals(cap, full.utilityDevices());
+        assertTrue(full.withinHardLimits(), full.occupancySummary());
+        assertTrue(RuntimeBudgetSnapshot.hardLimitSummary().contains("devices=" + cap));
+        devices.add(new com.veylon.world.urban.UrbanUtilities.Device(com.veylon.world.urban.UrbanUtilities.Kind.LAMP,
+                new com.veylon.util.Vec3i(300_000, 50, 0), neighbour.id()));
+        assertThrows(IllegalArgumentException.class, () -> u.restore(game.world, java.util.Map.of(), devices));
+    }
+
+    /** A building id in a far region, distinct for every index; no plan is ever built for it. */
+    private static long farBuilding(int i) {
+        long district = com.veylon.world.urban.UrbanIds.district(10_000 + i / 100, 10_000);
+        return com.veylon.world.urban.UrbanIds.building(com.veylon.world.urban.UrbanIds.parcel(district, i % 100), 0);
+    }
+
+    @Test
+    void survivorSiteRecordsStopAtTheirCap() {
+        Game game = com.veylon.SurvivorWorldArena.session(com.veylon.SurvivorWorldArena.SEED,
+                com.veylon.entity.GameMode.SURVIVAL);
+        var camp = com.veylon.SurvivorWorldArena.nearest(game, com.veylon.world.urban.SurvivorSites.Kind.CAMP);
+        var refuge = com.veylon.SurvivorWorldArena.nearest(game, com.veylon.world.urban.SurvivorSites.Kind.REFUGE);
+        // Stand-in records fill the registry to its cap; the next real site is refused, not added.
+        for (int i = 0; i < com.veylon.settlement.UrbanSiteDirector.MAX_SITES; i++) {
+            game.world.settlements.put(-1L - i, new com.veylon.settlement.UrbanSite(camp));
+        }
+        assertNull(game.settlementManager.urbanSites.register(game, refuge));
+        RuntimeBudgetSnapshot full = RuntimeBudgetSnapshot.capture(game);
+        assertEquals(com.veylon.settlement.UrbanSiteDirector.MAX_SITES, full.urbanSiteRecords());
+        assertTrue(full.withinHardLimits(), full.occupancySummary());
+        game.world.settlements.put(1L, new com.veylon.settlement.UrbanSite(camp));
+        assertFalse(RuntimeBudgetSnapshot.capture(game).withinHardLimits(), "a record past the cap is reported");
+        assertTrue(RuntimeBudgetSnapshot.hardLimitSummary().contains("sites=" + com.veylon.settlement.UrbanSiteDirector.MAX_SITES));
+    }
+
+    @Test
+    void ecologyPlansAndCityCreaturesStopAtTheirCaps() {
+        Game game = new Game();
+        game.newWorld(20260731, true, World.GEN_URBAN_ECOLOGY, com.veylon.entity.GameMode.SURVIVAL);
+        var urban = game.world.urban;
+        int chunks = game.world.loadedCount();
+        // Pure ecology queries across more regions than the cache holds, generating nothing.
+        for (int i = 0; i < com.veylon.world.urban.UrbanWorldState.MAX_REGION_PLANS + 8; i++) {
+            urban.ecology(i, -i);
+            RuntimeBudgetSnapshot snapshot = RuntimeBudgetSnapshot.capture(game);
+            assertTrue(snapshot.withinHardLimits(), snapshot.occupancySummary());
+        }
+        assertEquals(com.veylon.world.urban.UrbanWorldState.MAX_REGION_PLANS,
+                RuntimeBudgetSnapshot.capture(game).urbanEcologyPlans());
+        assertEquals(chunks, game.world.loadedCount());
+        String limits = RuntimeBudgetSnapshot.hardLimitSummary();
+        assertTrue(limits.contains("aliens=" + com.veylon.entity.UrbanEncounterDirector.MAX_ACTIVE_ALIENS));
+        assertTrue(limits.contains("wildlife=" + com.veylon.entity.UrbanEncounterDirector.MAX_ACTIVE_WILDLIFE));
+        // Staged bodies past a cap are reported against it.
+        for (int i = 0; i <= com.veylon.entity.UrbanEncounterDirector.MAX_ACTIVE_ALIENS; i++) {
+            var c = game.entities.spawnCreature(game.world, Creature.CreatureType.VEILMAW, i * 3f, 41, 0);
+            c.encounterId = -1 - i;
+        }
+        RuntimeBudgetSnapshot over = RuntimeBudgetSnapshot.capture(game);
+        assertEquals(com.veylon.entity.UrbanEncounterDirector.MAX_ACTIVE_ALIENS + 1, over.activeAliens());
+        assertFalse(over.withinHardLimits(), "the snapshot sees a breached alien cap");
+    }
+
+    @Test
+    void residentsOpeningManyDoorsKeepTheirSwingShutTimersBounded() {
+        Game game = new Game();
+        game.newWorld(20260716L, true, World.GEN_URBAN_STREETS, com.veylon.entity.GameMode.SURVIVAL);
+        game.world.ensureChunks(10, 7, 1, 100);
+        int doors = 0;
+        for (int x = 0; x < 20; x++) {
+            for (int z = 0; z < 15; z++) {
+                game.world.setBlock(x, 41, z, com.veylon.world.BlockType.WOOD_DOOR, true);
+                game.world.setBlock(x, 42, z, com.veylon.world.BlockType.WOOD_DOOR, true);
+                assertTrue(com.veylon.FixtureActions.residentOpens(game, x, 41, z));
+                doors++;
+            }
+        }
+        assertEquals(300, doors);
+        RuntimeBudgetSnapshot snapshot = RuntimeBudgetSnapshot.capture(game);
+        assertTrue(snapshot.withinHardLimits(), snapshot.occupancySummary());
+        assertEquals(com.veylon.world.FixtureStates.MAX_TRANSIT, snapshot.residentDoors(),
+                "past the cap doors still open, but no further timers are kept");
+        assertEquals(600, snapshot.fixtureStates());
+        assertTrue(RuntimeBudgetSnapshot.hardLimitSummary().contains("residentDoors="));
+    }
+
+    @Test
     void repeatedPathQueriesStayBudgetedAndNeverLoadChunks() {
         Game game = new Game();
-        game.newWorld(-1234567L, true);
+        game.newWorld(-1234567L, true, World.GEN_CAVE_IDENTITIES);
         int loaded = game.world.loadedCount();
         int sx = (int) Math.floor(game.player.pos.x);
         int sy = (int) Math.floor(game.player.pos.y);
@@ -358,7 +709,7 @@ class RuntimeBoundsTest {
     }
 
     private static World generate(long seed, List<int[]> chunks) {
-        World world = new World(seed, World.CURRENT_GENERATOR);
+        World world = new World(seed, World.GEN_CAVE_IDENTITIES);
         for (int[] chunk : chunks) {
             world.getOrCreateChunk(chunk[0], chunk[1]);
         }
@@ -568,7 +919,7 @@ class RuntimeBoundsTest {
      */
     private static Game flatArena(long seed) {
         Game game = new Game();
-        game.newWorld(seed, true);
+        game.newWorld(seed, true, World.GEN_CAVE_IDENTITIES);
         for (int cx = 18; cx <= 21; cx++) {
             for (int cz = 18; cz <= 21; cz++) {
                 Chunk c = game.world.getOrCreateChunk(cx, cz);
