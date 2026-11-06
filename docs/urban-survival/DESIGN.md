@@ -31,6 +31,8 @@ The owner's requirements below are **mandatory**. A package may not drop, weaken
 | R9 | All lore, architecture, factions, creatures, text, visuals and audio are original. The Last of Us and Project Zomboid are atmosphere references only: no names, mechanics signatures, text, art or sound are copied. | every package; 22, 26 |
 | R10 | Historical worlds keep their original rules and layouts. The default new world stays legacy until 26 passes. | 02, 25, 26 |
 
+**R10 after 0.9.0 (owner decision, 2026-11-06).** For releases after 0.9.0, only the current version's saves must open; older saves and the development generators 4–19 lose their compatibility guarantee, and generators 1, 2 and 4–19 are scheduled for removal. The policy and its consequences are in `docs/ARCHITECTURE.md`, "Save compatibility policy". R10 describes what 0.9.0 shipped.
+
 These engineering contracts from the pack apply to every package:
 - Main-thread simulation, world access, meshing, rendering and audio, with bounded work.
 - Persistence of irreversible facts from the package that introduces them.

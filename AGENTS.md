@@ -37,7 +37,7 @@ The shared graph at `graphify-out/` indexes code structure only. Documents, hist
 ## Invariants
 
 - Keep simulation, world access, meshing, rendering and audio submission on the main thread. Budget expensive work across frames; do not introduce background access to this state.
-- Persisted enum ordinals are append-only. Preserve existing save layouts and generator behavior for old worlds; use the save compatibility skill for changes that affect them.
+- Saves: only saves written by the current version must open (owner policy, 2026-11-06; see "Save compatibility policy" in `docs/ARCHITECTURE.md`). Do not add or extend migration paths, frozen generators or old-save fixtures. Keep saves strict and deterministic within a version, prefer appending to persisted enums, and use the save compatibility skill when saved state or world generation changes.
 - Seed new simulation/AI random streams from the world seed in `WorldBootstrap` with distinct salts. Presentation randomness must not alter simulation results.
 - `World.getBlock` returns `AIR` for unloaded chunks: check loaded columns before using it to decide movement or placement safety.
 - Route player damage through the existing damage/affliction entry points so Creative invulnerability remains effective. Check both Creative and Survival when changing their shared behavior.

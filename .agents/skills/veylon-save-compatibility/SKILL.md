@@ -5,6 +5,8 @@ description: Preserve VEYLON save compatibility when changing serialized state, 
 
 # VEYLON save compatibility
 
+> **Owner policy, 2026-11-06:** only saves written by the current version must open (see "Save compatibility policy" in `docs/ARCHITECTURE.md`). Where this skill asks you to preserve legacy saves, migration, historical fixtures or frozen generator output, the policy wins. The 0.9.1 save-epoch work rewrites this skill.
+
 All paths below are relative to the repository root. Start with the save/load section of `docs/ARCHITECTURE.md`, then the relevant code in `src/main/java/com/veylon/save/`. Read only the contributor rules in `docs/DEVELOPING.md` that apply to the changed state.
 
 ## Design the change

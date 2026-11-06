@@ -255,6 +255,46 @@ QA staging ────┘                       (independent of record)
 
 ### Save / load
 
+#### Save compatibility policy (owner decision, 2026-11-06)
+
+**Rule.** A build must open the saves written by its own version. That is the
+only save-compatibility promise VEYLON makes.
+
+- Saves written by earlier releases (0.2.0 to 0.9.0), and worlds of the
+  unreleased development generators 4–19, are unsupported. A build may refuse
+  them. No migration path, historical fixture or compatibility test is kept for
+  them.
+- A refused save is never modified or deleted. The player is told that it was
+  written by another version and can start a new world.
+- Within a version every existing guarantee stays: strict, bounded reading; a
+  corrupt or refused save fails the whole load before the live world or the last
+  good save is touched; atomic replacement; deterministic regeneration from the
+  seed plus the saved deltas.
+- "Current version" means the save epoch of the running build. A release that
+  changes nothing save-relevant may keep the epoch, so its saves keep loading;
+  that is allowed, not promised.
+
+**What this means for contributors.**
+
+- Do not add migration paths, legacy readers, frozen generator versions,
+  content/layout revisions or downgrade promises to keep old saves loading.
+- World generation, loot, layouts and persisted data may change between
+  versions. A change that would make an earlier save load into a different world
+  or state must make that save unloadable instead: the save header's epoch
+  changes and the build refuses saves of any other epoch.
+- Prefer appending to persisted enums; reorder or remove constants only together
+  with an epoch change.
+- Old-save code is removed, not extended. The 0.9.1 roadmap replaces the v2
+  migration and the historical-save tests with the epoch check; the 0.9.2 roadmap
+  retires generators 1, 2 and 4–19, leaving the city (20) and the wilderness (3).
+
+**Status.** Decided, not yet implemented. Until the 0.9.1 save-epoch work lands,
+the code still behaves as the rest of this section describes (v2 migration,
+frozen generators, historical fixtures). That machinery is scheduled for
+removal: do not extend it.
+
+#### How saving works
+
 `SaveSystem.save(Game)` walks the live object graph and writes binary v3;
 `load` reconstructs it. Load **goes through `newWorld` first**, so a load always
 inherits the full reset above rather than merging into a live world
