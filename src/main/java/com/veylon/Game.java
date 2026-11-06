@@ -406,16 +406,9 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
     // World setup
     // ------------------------------------------------------------------
 
-    public void newWorld(long seed, boolean fresh) {
-        newWorld(seed, fresh, World.DEFAULT_NEW_WORLD_GENERATOR);
-    }
-
+    /** A Survival world of the named generator; every caller names the world it builds. */
     public void newWorld(long seed, boolean fresh, int generatorVersion) {
         newWorld(seed, fresh, generatorVersion, GameMode.SURVIVAL);
-    }
-
-    public void newWorld(long seed, boolean fresh, GameMode mode) {
-        newWorld(seed, fresh, World.DEFAULT_NEW_WORLD_GENERATOR, mode);
     }
 
     /**

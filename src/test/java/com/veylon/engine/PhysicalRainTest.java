@@ -8,7 +8,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class PhysicalRainTest {
     static World arena() {
-        World w = new World(711);
+        World w = new World(711, World.GEN_CAVE_IDENTITIES);
         for (int cx = -2; cx <= 1; cx++) for (int cz = -2; cz <= 1; cz++) {
             Chunk c = w.getOrCreateChunk(cx, cz);
             for (int x = 0; x < 16; x++) for (int z = 0; z < 16; z++) {

@@ -159,7 +159,7 @@ class GameLoopIntegrationTest {
     @Test
     void newWorldClearsSimulationQueuesAndPlayerActionState() {
         Game game = new Game();
-        game.newWorld(4242L, true);
+        game.newWorld(4242L, true, World.GEN_CAVE_IDENTITIES);
 
         // Dirty every category of cross-world state the reset is meant to clear.
         game.entities.encounters.restored = true;
@@ -215,7 +215,7 @@ class GameLoopIntegrationTest {
         game.targetHit = new com.veylon.world.Raycaster.Hit(fx, fy, fz, 0, 1, 0, 1, BlockType.LOG);
         game.mine(0.01f);
         assertTrue(game.blockActions.creativeBreakRemaining() > 0, "precondition: Creative break timer is active");
-        game.newWorld(4242L, true);
+        game.newWorld(4242L, true, World.GEN_CAVE_IDENTITIES);
         assertEquals(0, game.blockActions.creativeBreakRemaining(), "R19: Creative break timing resets with the world");
         assertFalse(game.entities.encounters.restored);
         assertEquals(0, game.entities.encounters.lastSpawns);
@@ -313,7 +313,7 @@ class GameLoopIntegrationTest {
     @Test
     void meleeCooldownDoesNotCarryIntoTheNextWorld() {
         Game game = new Game();
-        game.newWorld(7717L, true);
+        game.newWorld(7717L, true, World.GEN_CAVE_IDENTITIES);
 
         // Land a swing so the melee cooldown is genuinely running, and confirm
         // it is: a second immediate swing must be refused.
@@ -322,7 +322,7 @@ class GameLoopIntegrationTest {
         assertFalse(game.performPlayerAttack(wolfInReach(game)),
                 "precondition: the melee cooldown blocks an immediate second swing");
 
-        game.newWorld(7717L, true);
+        game.newWorld(7717L, true, World.GEN_CAVE_IDENTITIES);
 
         assertTrue(game.performPlayerAttack(wolfInReach(game)),
                 "the first swing in a new world must not be eaten by the previous world's cooldown");
@@ -340,9 +340,9 @@ class GameLoopIntegrationTest {
     @Test
     void twoWorldsFromTheSameSeedAgreeOnSpawnAndTerrain() {
         Game first = new Game();
-        first.newWorld(31337L, true);
+        first.newWorld(31337L, true, World.GEN_CAVE_IDENTITIES);
         Game second = new Game();
-        second.newWorld(31337L, true);
+        second.newWorld(31337L, true, World.GEN_CAVE_IDENTITIES);
 
         assertEquals(first.player.pos.x, second.player.pos.x, 1e-4f);
         assertEquals(first.player.pos.y, second.player.pos.y, 1e-4f);
@@ -363,7 +363,7 @@ class GameLoopIntegrationTest {
     @Test
     void aSaveLoadCycleThroughTheRealGameLoopKeepsNeedsInventoryAndWorldEdits() {
         Game game = new Game();
-        game.newWorld(90210L, true);
+        game.newWorld(90210L, true, World.GEN_CAVE_IDENTITIES);
 
         // Make the world and the player distinguishable from a fresh start.
         int bx = (int) game.player.pos.x + 2;
@@ -416,7 +416,7 @@ class GameLoopIntegrationTest {
     @Test
     void loadingOverALiveWorldReplacesItRatherThanMerging() {
         Game game = new Game();
-        game.newWorld(555L, true);
+        game.newWorld(555L, true, World.GEN_CAVE_IDENTITIES);
         int markX = (int) game.player.pos.x + 4;
         int markZ = (int) game.player.pos.z + 4;
         int markY = game.world.surfaceHeight(markX, markZ) + 1;
@@ -431,7 +431,7 @@ class GameLoopIntegrationTest {
         assertTrue(SaveSystem.save(game, savePath));
 
         // A second, different world in the same Game instance, then load back.
-        game.newWorld(556L, true);
+        game.newWorld(556L, true, World.GEN_CAVE_IDENTITIES);
         assertNotNull(game.world);
         game.entities.spawnCreature(game.world, com.veylon.entity.Creature.CreatureType.WOLF,
                 game.player.pos.x + 3, game.player.pos.y, game.player.pos.z);

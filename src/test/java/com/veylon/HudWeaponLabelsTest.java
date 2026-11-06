@@ -5,6 +5,7 @@ import com.veylon.entity.GameMode;
 import com.veylon.item.ItemStack;
 import com.veylon.item.ItemType;
 import com.veylon.ui.Hud;
+import com.veylon.world.World;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 
@@ -15,7 +16,7 @@ class HudWeaponLabelsTest {
     @EnumSource(GameMode.class)
     void exactWeaponLabelsAndEmptyMagazineHintsRemainStable(GameMode mode) {
         Game g = new Game();
-        g.newWorld(20260918L, true, mode);
+        g.newWorld(20260918L, true, World.GEN_CAVE_IDENTITIES, mode);
         g.player.inventory.clear();
         boolean creative = mode == GameMode.CREATIVE;
         assertEquals(creative ? "Selected Arrow [R]   unlimited arrows"

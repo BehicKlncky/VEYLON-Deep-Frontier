@@ -2,6 +2,7 @@ package com.veylon;
 
 import com.veylon.ai.VeilmawAI;
 import com.veylon.entity.Creature;
+import com.veylon.world.World;
 import com.veylon.world.urban.Habitat;
 import com.veylon.simulation.SimulationScheduler;
 import com.veylon.simulation.WeatherSystem.Weather;
@@ -28,7 +29,7 @@ final class EcologyArena {
 
     static Game create(long seed) {
         Game g = new Game();
-        g.newWorld(seed, true);
+        g.newWorld(seed, true, World.GEN_CAVE_IDENTITIES);
         for (int cx = 17; cx <= 21; cx++) {
             for (int cz = 17; cz <= 21; cz++) {
                 Chunk c = g.world.getOrCreateChunk(cx, cz);

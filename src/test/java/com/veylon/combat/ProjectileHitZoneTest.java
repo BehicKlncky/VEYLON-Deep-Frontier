@@ -8,6 +8,7 @@ import com.veylon.item.ItemType;
 import com.veylon.settlement.NpcArchetype;
 import com.veylon.world.BlockType;
 import com.veylon.world.Chunk;
+import com.veylon.world.World;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -453,7 +454,7 @@ class ProjectileHitZoneTest {
     /** {@code CombatSystemsTest}'s isolated arena: four chunks of stone up to y=39. */
     private static Game arena() {
         Game game = new Game();
-        game.newWorld(777L, true);
+        game.newWorld(777L, true, World.GEN_CAVE_IDENTITIES);
         for (int cx = 18; cx <= 21; cx++) {
             for (int cz = 18; cz <= 21; cz++) {
                 Chunk c = game.world.getOrCreateChunk(cx, cz);

@@ -304,7 +304,7 @@ class SaveMigrationTest {
             throws IOException {
         Path save = dir.resolve("corrupt-id.sav");
         Game original = new Game();
-        original.newWorld(SEED, true);
+        original.newWorld(SEED, true, World.GEN_CAVE_IDENTITIES);
         var npc = original.entities.spawnNpc(original.world, "CorruptMe", 8, 40, 8);
         npc.archetype = NpcArchetype.POWDERMAN;
         assertTrue(SaveSystem.save(original, save));
@@ -328,7 +328,7 @@ class SaveMigrationTest {
             throws IOException {
         Path save = dir.resolve("corrupt-faction.sav");
         Game original = new Game();
-        original.newWorld(SEED, true);
+        original.newWorld(SEED, true, World.GEN_CAVE_IDENTITIES);
         original.world.factionReputation.put(
                 com.veylon.settlement.HumanFaction.HEADHUNTERS, -12f);
         assertTrue(SaveSystem.save(original, save));

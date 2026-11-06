@@ -189,10 +189,6 @@ public class World implements VoxelAccess {
     public BlockListener listener;
     public Vec3i campPos;
 
-    public World(long seed) {
-        this(seed, DEFAULT_NEW_WORLD_GENERATOR);
-    }
-
     /**
      * @throws IllegalArgumentException for a generator version this build cannot build
      */

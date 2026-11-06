@@ -124,7 +124,7 @@ class UrbanStarterProgressionTest {
         }
         creative.player.hurtPhysical(creative, 1000, true);
         assertFalse(creative.player.dead); assertTrue(creative.player.abilities.invulnerable());
-        assertSame(CraftingSystem.RECIPES, CraftingSystem.recipesFor(new World(7)));
+        assertSame(CraftingSystem.RECIPES, CraftingSystem.recipesFor(new World(7, World.GEN_CAVE_IDENTITIES)));
         assertSame(CraftingSystem.RECIPES, CraftingSystem.recipesFor(new World(7, World.GEN_URBAN_SHAPED_STAIRS)));
         assertSame(UrbanCrafting.RECIPES, CraftingSystem.recipesFor(survival.world));
         for (Recipe recipe : UrbanCrafting.RECIPES) {

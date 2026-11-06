@@ -11,6 +11,7 @@ import com.veylon.settlement.SettlementType;
 import com.veylon.ui.NpcScreen;
 import com.veylon.util.Vec3i;
 import com.veylon.world.Poi;
+import com.veylon.world.World;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -161,7 +162,7 @@ class FactionQuestTest {
     void coreQuestFieldsRemainSaveCompatible(@TempDir Path dir) {
         for (Quest.Type type : Quest.Type.values()) {
             Game g = new Game();
-            g.newWorld(7070L, true);
+            g.newWorld(7070L, true, World.GEN_CAVE_IDENTITIES);
             Quest q = new Quest(type, ItemType.MEDICINE, 3, 432.5f,
                     17, ItemType.BANDAGE, 2, "Persistent giver");
             q.progress = 1;
@@ -261,7 +262,7 @@ class FactionQuestTest {
 
     private static Scenario scenario(long seed) {
         Game g = new Game();
-        g.newWorld(seed, true);
+        g.newWorld(seed, true, World.GEN_CAVE_IDENTITIES);
         g.world.settlements.clear();
 
         Settlement home = settlement(100, 0, 0, SettlementType.VILLAGE,

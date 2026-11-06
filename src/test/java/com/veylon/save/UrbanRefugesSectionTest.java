@@ -21,7 +21,7 @@ class UrbanRefugesSectionTest {
         var site = com.veylon.world.urban.UrbanStarterSite.of(g.world.urban);
         g.world.collectorWater.put(site.collector(), 0f); g.world.campfireFuel.put(site.fire(), 0f);
         Path save = directory.resolve("refuge.sav");
-        assertTrue(SaveSystem.save(g, save)); g.newWorld(42, true);
+        assertTrue(SaveSystem.save(g, save)); g.newWorld(42, true, World.GEN_CAVE_IDENTITIES);
         assertTrue(SaveSystem.load(g, save));
         assertEquals(anchor, g.world.urban.refugeAnchor);
         assertEquals(0f, g.world.collectorWater.get(site.collector()));

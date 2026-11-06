@@ -37,14 +37,14 @@ class WorldSeedDeterminismTest {
     @Test
     void everySimulationRandomIsSeededByNewWorld() throws Exception {
         Game a = new Game();
-        a.newWorld(12345L, true);
+        a.newWorld(12345L, true, World.GEN_CAVE_IDENTITIES);
         Game b = new Game();
-        b.newWorld(12345L, true);
+        b.newWorld(12345L, true, World.GEN_CAVE_IDENTITIES);
 
         // Burn a different world through the second instance's generators, then
         // rebuild the original seed. Anything still unseeded will have diverged.
-        b.newWorld(999L, true);
-        b.newWorld(12345L, true);
+        b.newWorld(999L, true, World.GEN_CAVE_IDENTITIES);
+        b.newWorld(12345L, true, World.GEN_CAVE_IDENTITIES);
 
         List<String> diverged = new ArrayList<>();
         for (Field f : simulationRandomFields(a)) {
@@ -141,7 +141,7 @@ class WorldSeedDeterminismTest {
      * randomness feeds into.
      */
     private static String simulate(long seed, Long warmupSeed) {
-        return simulate(seed, warmupSeed, World.DEFAULT_NEW_WORLD_GENERATOR);
+        return simulate(seed, warmupSeed, World.GEN_CAVE_IDENTITIES);
     }
 
     /** As above, building the measured world with {@code generator}; the warm-up is legacy. */

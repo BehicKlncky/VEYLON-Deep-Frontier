@@ -4,6 +4,7 @@ import com.veylon.entity.GameMode;
 import com.veylon.item.ItemStack;
 import com.veylon.item.ItemType;
 import com.veylon.ui.CreativeCatalogScreen;
+import com.veylon.world.World;
 import org.junit.jupiter.api.Test;
 
 import java.util.function.IntPredicate;
@@ -174,7 +175,7 @@ class CreativeCatalogRoutingTest {
 
     private static Game playing(GameMode mode) {
         Game game = new Game();
-        game.newWorld(20260910L, true, mode);
+        game.newWorld(20260910L, true, World.GEN_CAVE_IDENTITIES, mode);
         game.appState = Game.AppState.PLAYING;
         return game;
     }

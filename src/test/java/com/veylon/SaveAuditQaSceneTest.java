@@ -1,6 +1,7 @@
 package com.veylon;
 
 import com.veylon.save.SaveSystem;
+import com.veylon.world.World;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
@@ -53,7 +54,7 @@ class SaveAuditQaSceneTest {
     void theTourRefusesAnEmptySlot() throws Exception {
         Files.deleteIfExists(SaveSystem.SAVE_PATH);
         Game game = new Game();
-        game.newWorld(7, true);
+        game.newWorld(7, true, World.GEN_CAVE_IDENTITIES);
         assertThrows(IllegalStateException.class, () -> new UrbanQaScenes(game).stage("save_audit"));
     }
 
@@ -61,7 +62,7 @@ class SaveAuditQaSceneTest {
         Files.createDirectories(SaveSystem.SAVE_PATH.getParent());
         Files.write(SaveSystem.SAVE_PATH, save);
         Game game = new Game();
-        game.newWorld(4_242L, true);
+        game.newWorld(4_242L, true, World.GEN_CAVE_IDENTITIES);
         game.appState = Game.AppState.PLAYING;
         UrbanQaScenes scenes = new UrbanQaScenes(game);
         HotkeyRouter router = new HotkeyRouter(game);

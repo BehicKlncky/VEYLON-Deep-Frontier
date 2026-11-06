@@ -4,6 +4,7 @@ import com.veylon.Game;
 import com.veylon.entity.Npc;
 import com.veylon.save.SaveSystem;
 import com.veylon.util.Vec3i;
+import com.veylon.world.World;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -176,7 +177,7 @@ class NpcBudgetTest {
 
     private static Game game(long seed) {
         Game g = new Game();
-        g.newWorld(seed, true);
+        g.newWorld(seed, true, World.GEN_CAVE_IDENTITIES);
         g.entities.npcs.clear();
         return g;
     }

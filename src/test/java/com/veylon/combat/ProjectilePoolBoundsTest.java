@@ -4,6 +4,7 @@ import com.veylon.Game;
 import com.veylon.item.ItemType;
 import com.veylon.world.BlockType;
 import com.veylon.world.Chunk;
+import com.veylon.world.World;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -27,7 +28,7 @@ class ProjectilePoolBoundsTest {
     @BeforeEach
     void setUp() {
         g = new Game();
-        g.newWorld(4242L, true);
+        g.newWorld(4242L, true, World.GEN_CAVE_IDENTITIES);
         // Flat stone arena at y=40 so shots have a predictable backstop.
         for (int cx = 18; cx <= 21; cx++) {
             for (int cz = 18; cz <= 21; cz++) {

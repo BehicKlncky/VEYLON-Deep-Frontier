@@ -84,7 +84,7 @@ class RuntimeBoundsTest {
     @Test
     void highChurnRuntimeCollectionsHitTheirCapsThenExpireWithoutGrowth() {
         Game game = new Game();
-        game.newWorld(20260716L, true);
+        game.newWorld(20260716L, true, World.GEN_CAVE_IDENTITIES);
         game.entities.creatures.clear();
         game.entities.npcs.clear();
         game.noise.reset();
@@ -679,7 +679,7 @@ class RuntimeBoundsTest {
     @Test
     void repeatedPathQueriesStayBudgetedAndNeverLoadChunks() {
         Game game = new Game();
-        game.newWorld(-1234567L, true);
+        game.newWorld(-1234567L, true, World.GEN_CAVE_IDENTITIES);
         int loaded = game.world.loadedCount();
         int sx = (int) Math.floor(game.player.pos.x);
         int sy = (int) Math.floor(game.player.pos.y);
@@ -919,7 +919,7 @@ class RuntimeBoundsTest {
      */
     private static Game flatArena(long seed) {
         Game game = new Game();
-        game.newWorld(seed, true);
+        game.newWorld(seed, true, World.GEN_CAVE_IDENTITIES);
         for (int cx = 18; cx <= 21; cx++) {
             for (int cz = 18; cz <= 21; cz++) {
                 Chunk c = game.world.getOrCreateChunk(cx, cz);

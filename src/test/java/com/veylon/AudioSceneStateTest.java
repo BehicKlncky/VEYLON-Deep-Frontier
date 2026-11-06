@@ -15,7 +15,7 @@ import static org.junit.jupiter.api.Assertions.*;
 class AudioSceneStateTest {
     @Test void acousticQueriesDoNotGenerateChunksOrPlanSettlements() {
         Game game = new Game();
-        game.world = new World(42);
+        game.world = new World(42, World.GEN_CAVE_IDENTITIES);
         game.player = new Player(game.world);
         game.player.pos.set(-4000, 80, -4000);
         game.player.biome = Biome.PINE_FOREST;
@@ -28,7 +28,7 @@ class AudioSceneStateTest {
 
     @Test void ruinedStoneFloorAndUndergroundDepthSelectDifferentSpaces() {
         Game game = new Game();
-        game.world = new World(42);
+        game.world = new World(42, World.GEN_CAVE_IDENTITIES);
         game.player = new Player(game.world);
         game.player.pos.set(1, 90, 1);
         game.world.getOrCreateChunk(0, 0);
@@ -38,7 +38,7 @@ class AudioSceneStateTest {
     }
 
     @Test void musicReadsDayDepthBeaconAndThreatWithoutGeneratingWorldState() {
-        var game = new Game(); game.world = new World(42); game.player = new Player(game.world);
+        var game = new Game(); game.world = new World(42, World.GEN_CAVE_IDENTITIES); game.player = new Player(game.world);
         game.player.pos.set(10, 80, 10);
         assertEquals(MusicMood.CALM, AudioSceneState.music(game, 0));
         game.time.totalMinutes = 23 * 60;
@@ -56,7 +56,7 @@ class AudioSceneStateTest {
     }
 
     @Test void combatTargetsAreThreatsButDeadAndAbstractNpcsAreIgnored() {
-        var game = new Game(); game.world = new World(42); game.player = new Player(game.world);
+        var game = new Game(); game.world = new World(42, World.GEN_CAVE_IDENTITIES); game.player = new Player(game.world);
         var npc = new Npc(game.world, "audio observer"); npc.pos.set(game.player.pos).add(30, 0, 0); npc.combatTarget = game.player;
         game.entities.npcs.add(npc);
         assertEquals(MusicMood.THREAT, AudioSceneState.music(game, 0));

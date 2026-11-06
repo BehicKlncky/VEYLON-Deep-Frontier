@@ -134,7 +134,7 @@ class HistoricalV3SaveCompatibilityTest {
         Files.write(save, fixture);
         for (int cycle = 0; cycle < 2; cycle++) {
             Game g = new Game();
-            g.newWorld(91_340L, true);
+            g.newWorld(91_340L, true, World.GEN_CAVE_IDENTITIES);
             World live = g.world;
             assertTrue(SaveSystem.load(g, save), f.label() + " cycle " + cycle + " loads over a live world");
             assertNotSame(live, g.world);

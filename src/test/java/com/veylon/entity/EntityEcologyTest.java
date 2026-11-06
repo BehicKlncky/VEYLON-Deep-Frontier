@@ -208,7 +208,7 @@ class EntityEcologyTest {
     @Test
     void generatedRootCaveDenSpawnsItsWolfUnderground() {
         Game game = new Game();
-        game.newWorld(20260716L, true);
+        game.newWorld(20260716L, true, World.GEN_CAVE_IDENTITIES);
         Poi den = null;
         for (int radius = 0; radius <= 8 && den == null; radius++) {
             for (int cx = -radius; cx <= radius && den == null; cx++) {
@@ -256,7 +256,7 @@ class EntityEcologyTest {
 
     private static Game darkCavern(long seed, int radius) {
         Game g = new Game();
-        g.newWorld(seed, true);
+        g.newWorld(seed, true, World.GEN_CAVE_IDENTITIES);
         g.entities.creatures.clear();
         g.world.pois.clear();
         loadChunks(g, CAVERN.x() - radius, CAVERN.x() + radius,

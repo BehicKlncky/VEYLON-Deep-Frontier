@@ -6,6 +6,7 @@ import com.veylon.save.SaveSystem;
 import com.veylon.util.AppPaths;
 import com.veylon.util.Vec3i;
 import com.veylon.world.BlockType;
+import com.veylon.world.World;
 import org.junit.jupiter.api.Test;
 
 import java.nio.file.Path;
@@ -38,7 +39,7 @@ class BeaconEndgameIntegrationTest {
     @Test
     void theThreeStageRepairEnforcesEveryCostAndEndsTheGame() {
         Game game = new Game();
-        game.newWorld(SEED, true);
+        game.newWorld(SEED, true, World.GEN_CAVE_IDENTITIES);
         Vec3i beacon = placeBeaconFrame(game);
 
         assertEquals(BlockType.BEACON, blockAt(game, beacon),
@@ -99,7 +100,7 @@ class BeaconEndgameIntegrationTest {
     @Test
     void aHalfRepairedBeaconSurvivesASaveLoadCycleAndCanStillBeFinished() {
         Game game = new Game();
-        game.newWorld(SEED, true);
+        game.newWorld(SEED, true, World.GEN_CAVE_IDENTITIES);
         Vec3i beacon = placeBeaconFrame(game);
 
         game.player.inventory.clear();

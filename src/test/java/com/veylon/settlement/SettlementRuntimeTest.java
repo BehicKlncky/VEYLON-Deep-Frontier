@@ -5,6 +5,7 @@ import com.veylon.ai.SettledNpcAI;
 import com.veylon.entity.Npc;
 import com.veylon.item.ItemType;
 import com.veylon.util.Vec3i;
+import com.veylon.world.World;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -25,7 +26,7 @@ class SettlementRuntimeTest {
     @BeforeEach
     void setUp() {
         g = new Game();
-        g.newWorld(424242L, true);
+        g.newWorld(424242L, true, World.GEN_CAVE_IDENTITIES);
     }
 
     private Settlement findSettlement(Settlement.Alignment alignment) {

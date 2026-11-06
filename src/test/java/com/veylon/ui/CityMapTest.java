@@ -173,7 +173,7 @@ class CityMapTest {
         Game older = SurvivorWorldArena.session(SEED, GameMode.SURVIVAL, World.GEN_URBAN_UTILITIES, new AudioManager());
         assertFalse(CityMap.applies(older.world), "a generator-18 city keeps the map it had");
         Game legacy = new Game();
-        legacy.newWorld(SEED, true, World.DEFAULT_NEW_WORLD_GENERATOR, GameMode.SURVIVAL);
+        legacy.newWorld(SEED, true, World.GEN_CAVE_IDENTITIES, GameMode.SURVIVAL);
         assertFalse(CityMap.applies(legacy.world));
         for (Game.UiMode mode : new Game.UiMode[]{Game.UiMode.MAP, Game.UiMode.CRATE, Game.UiMode.NPC,
                 Game.UiMode.INVENTORY, Game.UiMode.CRAFTING}) {

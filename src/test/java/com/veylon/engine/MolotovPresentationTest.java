@@ -5,6 +5,7 @@ import com.veylon.HeadlessGames;
 import com.veylon.combat.WeaponRegistry;
 import com.veylon.world.BlockType;
 import com.veylon.world.Chunk;
+import com.veylon.world.World;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -180,7 +181,7 @@ class MolotovPresentationTest {
     void aMolotovImpactNeverShakesTheCameraOrPlaysAnExplosion() {
         SoundProbe sounds = new SoundProbe();
         Game g = HeadlessGames.withAudio(sounds);
-        g.newWorld(777L, true);
+        g.newWorld(777L, true, World.GEN_CAVE_IDENTITIES);
         flatten(g);
         g.player.pos.set(310, 40.1f, 310);
         g.entities.creatures.clear();
@@ -226,7 +227,7 @@ class MolotovPresentationTest {
     @Test
     void aBottleInFlightTrailsItsBurningRagAndAScrapBombDoesNot() {
         Game g = new Game();
-        g.newWorld(777L, true);
+        g.newWorld(777L, true, World.GEN_CAVE_IDENTITIES);
         flatten(g);
         g.player.pos.set(310, 40.1f, 310);
         g.entities.creatures.clear();

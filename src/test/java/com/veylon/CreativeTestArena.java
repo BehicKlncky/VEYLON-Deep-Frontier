@@ -4,6 +4,7 @@ import com.veylon.engine.AudioManager;
 import com.veylon.entity.GameMode;
 import com.veylon.world.BlockType;
 import com.veylon.world.Chunk;
+import com.veylon.world.World;
 
 /** Shared deterministic arena, separated from generated camp and settlement mechanics. */
 final class CreativeTestArena {
@@ -13,7 +14,7 @@ final class CreativeTestArena {
 
     static Game create(GameMode mode, AudioManager audio) {
         Game game = new Game(audio);
-        game.newWorld(20260910L, true, mode);
+        game.newWorld(20260910L, true, World.GEN_CAVE_IDENTITIES, mode);
         game.entities.creatures.clear();
         game.entities.npcs.clear();
         game.entities.carcasses.clear();

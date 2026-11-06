@@ -65,7 +65,7 @@ class UrbanInteractionPromptsTest {
         assertEquals(ItemNames.PRY_TOOL, ItemNames.of(repair.result, true), "the recipe makes what it says");
 
         Game legacy = new Game();
-        legacy.newWorld(SurvivorWorldArena.SEED, true, World.DEFAULT_NEW_WORLD_GENERATOR, GameMode.SURVIVAL);
+        legacy.newWorld(SurvivorWorldArena.SEED, true, World.GEN_CAVE_IDENTITIES, GameMode.SURVIVAL);
         Vec3i ore = new Vec3i((int) legacy.player.pos.x + 2, (int) legacy.player.pos.y, (int) legacy.player.pos.z);
         legacy.world.setBlock(ore.x(), ore.y(), ore.z(), BlockType.IRON_ORE, true);
         legacy.player.inventory.clear();

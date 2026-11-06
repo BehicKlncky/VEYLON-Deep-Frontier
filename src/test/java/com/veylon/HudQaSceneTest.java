@@ -3,6 +3,7 @@ package com.veylon;
 import com.veylon.entity.GameMode;
 import com.veylon.item.ItemType;
 import com.veylon.ui.QuestObjectiveView;
+import com.veylon.world.World;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -11,7 +12,7 @@ class HudQaSceneTest {
     @Test
     void survivalFixtureStagesRepeatableNeedsEquipmentAndNavigation() {
         Game g = new Game();
-        g.newWorld(20260918L, true);
+        g.newWorld(20260918L, true, World.GEN_CAVE_IDENTITIES);
         HudQaScene scene = new HudQaScene(g);
         scene.stage();
         assertTrue(g.simPaused);
@@ -42,7 +43,7 @@ class HudQaSceneTest {
     @Test
     void creativeFixtureKeepsEnvironmentAndFlightWithoutMedicalPressure() {
         Game g = new Game();
-        g.newWorld(20260918L, true, GameMode.CREATIVE);
+        g.newWorld(20260918L, true, World.GEN_CAVE_IDENTITIES, GameMode.CREATIVE);
         new HudQaScene(g).stage();
         assertTrue(g.player.abilities.flying());
         assertTrue(g.player.afflictions.isEmpty());

@@ -24,7 +24,7 @@ class CaveToolsGameplayIntegrationTest {
     @Test
     void craftedLadderClimbsWithoutBlockingAndCraftedMarkerRemainsReadableAtNightAfterLoad() {
         Game game = new Game();
-        game.newWorld(-1234567L, true);
+        game.newWorld(-1234567L, true, World.GEN_CAVE_IDENTITIES);
         flatten(game, -20, -20);
         game.player.inventory.clear();
         game.player.pos.set(-310.5f, 40.1f, -310.5f);

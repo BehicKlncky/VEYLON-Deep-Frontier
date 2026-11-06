@@ -3,6 +3,7 @@ package com.veylon.entity;
 import com.veylon.Game;
 import com.veylon.world.BlockType;
 import com.veylon.world.Chunk;
+import com.veylon.world.World;
 
 /**
  * A private flat arena far from the generated camp, so a body falls onto known
@@ -23,7 +24,7 @@ final class RagdollTestArena {
 
     static Game create(long seed) {
         Game game = new Game();
-        game.newWorld(seed, true);
+        game.newWorld(seed, true, World.GEN_CAVE_IDENTITIES);
         flatten(game, 18, 21, 18, 21);
         game.player.pos.set(CENTER_X, GROUND + 0.1f, CENTER_Z);
         game.player.vel.zero();

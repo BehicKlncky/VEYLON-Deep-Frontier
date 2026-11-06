@@ -134,7 +134,7 @@ class UrbanIntegratedSaveTest {
         SurvivorWorldArena.run(other, 4f);
         other.closeScreens();
         Game legacy = new Game();
-        legacy.newWorld(4_242L, true);
+        legacy.newWorld(4_242L, true, World.GEN_CAVE_IDENTITIES);
         legacy.player.inventory.add(ItemType.IRON_INGOT, 3);
 
         for (Game live : List.of(same, other, legacy)) {

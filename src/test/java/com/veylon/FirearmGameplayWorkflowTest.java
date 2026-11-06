@@ -10,6 +10,7 @@ import com.veylon.item.ItemType;
 import com.veylon.settlement.NpcArchetype;
 import com.veylon.world.BlockType;
 import com.veylon.world.Chunk;
+import com.veylon.world.World;
 import org.joml.Vector3f;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -30,7 +31,7 @@ class FirearmGameplayWorkflowTest {
     @BeforeEach
     void setUp() {
         game = new Game();
-        game.newWorld(20260716L, true);
+        game.newWorld(20260716L, true, World.GEN_CAVE_IDENTITIES);
         game.player.inventory.clear();
         game.player.hotbarSel = 0;
         flattenArena();

@@ -2,6 +2,7 @@ package com.veylon.simulation;
 
 import com.veylon.Game;
 import com.veylon.entity.Npc;
+import com.veylon.world.World;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
@@ -408,7 +409,7 @@ class EventRollLadderTest {
 
     private static Game world() {
         Game g = new Game();
-        g.newWorld(4242L, true);
+        g.newWorld(4242L, true, World.GEN_CAVE_IDENTITIES);
         return g;
     }
 }

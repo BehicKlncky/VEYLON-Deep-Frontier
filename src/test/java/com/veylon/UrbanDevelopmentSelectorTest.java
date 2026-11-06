@@ -141,7 +141,7 @@ class UrbanDevelopmentSelectorTest {
     @Test
     void anUnsupportedGeneratorIsRefusedBeforeTheLiveWorldIsTouched() {
         Game game = new Game();
-        game.newWorld(SEED, true);
+        game.newWorld(SEED, true, World.GEN_CAVE_IDENTITIES);
         World live = game.world;
         assertThrows(IllegalArgumentException.class,
                 () -> game.newWorld(SEED, true, World.MAX_SUPPORTED_GENERATOR + 1, GameMode.SURVIVAL));

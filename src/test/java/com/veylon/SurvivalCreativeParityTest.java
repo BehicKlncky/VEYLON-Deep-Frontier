@@ -14,6 +14,7 @@ import com.veylon.util.Vec3i;
 import com.veylon.world.BlockType;
 import com.veylon.world.Chunk;
 import com.veylon.world.Raycaster;
+import com.veylon.world.World;
 import org.joml.Vector3f;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -31,7 +32,7 @@ class SurvivalCreativeParityTest {
     @BeforeEach
     void setUp() {
         game = new Game();
-        game.newWorld(20260910L, true);
+        game.newWorld(20260910L, true, World.GEN_CAVE_IDENTITIES);
         game.entities.creatures.clear();
         game.entities.npcs.clear();
         game.player.inventory.clear();

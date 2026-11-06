@@ -9,6 +9,7 @@ import com.veylon.settlement.NpcArchetype;
 import com.veylon.simulation.WeatherSystem.Weather;
 import com.veylon.world.BlockType;
 import com.veylon.world.Chunk;
+import com.veylon.world.World;
 
 /**
  * A flat stone arena for body-fire presentation tests: x and z 288..351, the
@@ -34,7 +35,7 @@ public final class BodyFireArena {
     }
 
     private static Game arena(Game game) {
-        game.newWorld(777L, true);
+        game.newWorld(777L, true, World.GEN_CAVE_IDENTITIES);
         for (int cx = 18; cx <= 21; cx++) {
             for (int cz = 18; cz <= 21; cz++) {
                 Chunk c = game.world.getOrCreateChunk(cx, cz);

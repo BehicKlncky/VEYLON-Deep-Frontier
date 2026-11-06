@@ -8,6 +8,7 @@ import com.veylon.ui.GameModeScreen;
 import com.veylon.ui.NewFrontierScreen;
 import com.veylon.ui.PauseMenu;
 import com.veylon.ui.TitleScreen;
+import com.veylon.world.World;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -199,7 +200,7 @@ class ModeSelectionRoutingTest {
 
     private static Game playing(GameMode mode) {
         Game game = new Game();
-        game.newWorld(20260910L, true, mode);
+        game.newWorld(20260910L, true, World.GEN_CAVE_IDENTITIES, mode);
         game.appState = Game.AppState.PLAYING;
         return game;
     }

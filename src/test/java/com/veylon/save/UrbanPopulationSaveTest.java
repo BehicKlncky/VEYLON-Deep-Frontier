@@ -125,7 +125,7 @@ class UrbanPopulationSaveTest {
 
     @Test void oldWorldsRemainEncounterFreeAndAbsenceOfNewStateIsNotAnUpgrade() throws Exception {
         Game g = new Game(); Path save = directory.resolve("old.sav");
-        for (int generator : new int[]{World.DEFAULT_NEW_WORLD_GENERATOR, World.GEN_URBAN_STARTER}) {
+        for (int generator : new int[]{World.GEN_CAVE_IDENTITIES, World.GEN_URBAN_STARTER}) {
             g.newWorld(7, true, generator, GameMode.SURVIVAL);
             assertTrue(SaveSystem.save(g, save)); assertTrue(SaveSystem.load(g, save));
             assertEquals(generator, g.world.generatorVersion);

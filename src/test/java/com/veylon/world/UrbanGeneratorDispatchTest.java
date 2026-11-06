@@ -90,7 +90,6 @@ class UrbanGeneratorDispatchTest {
         for (int version : new int[]{0, -3, World.MAX_SUPPORTED_GENERATOR + 1, 99}) {
             assertThrows(IllegalArgumentException.class, () -> new World(1L, version));
         }
-        assertEquals(World.DEFAULT_NEW_WORLD_GENERATOR, new World(1L).generatorVersion);
     }
 
     @Test

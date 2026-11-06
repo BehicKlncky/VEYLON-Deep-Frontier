@@ -27,6 +27,7 @@ import com.veylon.simulation.WeatherSystem.Weather;
 import com.veylon.util.Vec3i;
 import com.veylon.world.BlockType;
 import com.veylon.world.Chunk;
+import com.veylon.world.World;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -650,7 +651,7 @@ class CombustionLifecycleTest {
         g.fastTick(DT);
         assertEquals(1, g.burnResidues.trackedCount(), "precondition: a body burning on the ground");
         g.activeNpc = g.entities.spawnNpc(g.world, "Speaker", 300.5f, FEET, 300.5f);
-        g.newWorld(777L, true);
+        g.newWorld(777L, true, World.GEN_CAVE_IDENTITIES);
         assertEquals(0, g.burnResidues.trackedCount(), "a new world keeps no remains' fire");
         assertEquals(0, g.burnResidues.totalCaptured);
         assertEquals(0, g.combustion.burningBodies(g));
@@ -981,7 +982,7 @@ class CombustionLifecycleTest {
      */
     private static Game arena() {
         Game game = new Game();
-        game.newWorld(777L, true);
+        game.newWorld(777L, true, World.GEN_CAVE_IDENTITIES);
         for (int cx = 18; cx <= 21; cx++) {
             for (int cz = 18; cz <= 21; cz++) {
                 Chunk c = game.world.getOrCreateChunk(cx, cz);

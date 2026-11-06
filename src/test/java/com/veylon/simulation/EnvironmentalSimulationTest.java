@@ -131,7 +131,7 @@ class EnvironmentalSimulationTest {
 
     private static Game game(long seed) {
         Game game = new Game();
-        game.newWorld(seed, true);
+        game.newWorld(seed, true, World.GEN_CAVE_IDENTITIES);
         game.entities.creatures.clear();
         game.entities.npcs.clear();
         return game;

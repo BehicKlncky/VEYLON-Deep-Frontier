@@ -7,6 +7,7 @@ import com.veylon.item.ItemType;
 import com.veylon.ui.Hud;
 import com.veylon.world.BlockType;
 import com.veylon.world.Chunk;
+import com.veylon.world.World;
 import org.joml.Vector3f;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -25,7 +26,7 @@ class BowGameplayWorkflowTest {
     @BeforeEach
     void setUp() {
         g = new Game();
-        g.newWorld(20260716L, true);
+        g.newWorld(20260716L, true, World.GEN_CAVE_IDENTITIES);
         g.player.inventory.clear();
         g.player.hotbarSel = 0;
         bow = new ItemStack(ItemType.PRIMITIVE_BOW, 1);

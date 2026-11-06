@@ -18,6 +18,7 @@ import com.veylon.item.ItemType;
 import com.veylon.settlement.NpcArchetype;
 import com.veylon.world.BlockType;
 import com.veylon.world.Chunk;
+import com.veylon.world.World;
 import org.joml.Matrix4f;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -583,7 +584,7 @@ class RemainsSectionTest {
 
     private static Game arena(long seed) {
         Game game = new Game();
-        game.newWorld(seed, true);
+        game.newWorld(seed, true, World.GEN_CAVE_IDENTITIES);
         for (int cx = 17; cx <= 21; cx++) {
             for (int cz = 17; cz <= 21; cz++) {
                 Chunk c = game.world.getOrCreateChunk(cx, cz);

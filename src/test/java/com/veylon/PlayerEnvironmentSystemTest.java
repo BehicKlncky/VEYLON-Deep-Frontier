@@ -172,7 +172,7 @@ class PlayerEnvironmentSystemTest {
 
     private static Game worldAt(long seed) {
         Game game = new Game();
-        game.newWorld(seed, true);
+        game.newWorld(seed, true, World.GEN_CAVE_IDENTITIES);
         return game;
     }
 

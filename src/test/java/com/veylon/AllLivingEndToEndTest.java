@@ -32,6 +32,7 @@ import com.veylon.simulation.WeatherSystem.Weather;
 import com.veylon.util.Vec3i;
 import com.veylon.world.BlockType;
 import com.veylon.world.Chunk;
+import com.veylon.world.World;
 import org.joml.Vector3f;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -755,7 +756,7 @@ class AllLivingEndToEndTest {
         assertEquals(bare.entities.nextPanicFloat(), full.entities.nextPanicFloat(), 0f, "the panic stream in step");
 
         // A new world keeps nothing of it.
-        full.newWorld(778L, true);
+        full.newWorld(778L, true, World.GEN_CAVE_IDENTITIES);
         assertEquals(0, full.fragments.liveCount() + full.fragments.settledCount());
         assertEquals(0, full.ragdolls.liveCount());
         assertEquals(0, full.burnResidues.trackedCount());
@@ -1076,7 +1077,7 @@ class AllLivingEndToEndTest {
     /** The flat stone arena, being played: clear noon, nobody about, the player at (310, 40, 310). */
     static Game arena(GameMode mode) {
         Game g = new Game();
-        g.newWorld(777L, true, mode);
+        g.newWorld(777L, true, World.GEN_CAVE_IDENTITIES, mode);
         for (int cx = 18; cx <= 21; cx++) {
             for (int cz = 18; cz <= 21; cz++) {
                 Chunk c = g.world.getOrCreateChunk(cx, cz);

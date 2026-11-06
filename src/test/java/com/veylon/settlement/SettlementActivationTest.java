@@ -5,6 +5,7 @@ import com.veylon.ai.Pathfinder;
 import com.veylon.ai.SettledNpcAI;
 import com.veylon.entity.Npc;
 import com.veylon.util.Vec3i;
+import com.veylon.world.World;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -24,7 +25,7 @@ class SettlementActivationTest {
     @Test
     void residentsActivateRunAiAndDeactivateCleanly() {
         Game g = new Game();
-        g.newWorld(20260716L, true);
+        g.newWorld(20260716L, true, World.GEN_CAVE_IDENTITIES);
 
         // Find any settlement, generate its chunks, and stand the player there.
         Settlement s = null;
@@ -84,7 +85,7 @@ class SettlementActivationTest {
     @Test
     void activeResidentsEatWorkTradeAndUseFiniteMedicineStocks() {
         Game g = new Game();
-        g.newWorld(31337L, true);
+        g.newWorld(31337L, true, World.GEN_CAVE_IDENTITIES);
         int x = 240, z = 240;
         g.world.ensureChunks(x, z, 2, 10_000);
         int y = g.world.surfaceHeight(x, z) + 1;
@@ -154,7 +155,7 @@ class SettlementActivationTest {
     @Test
     void dormantSicknessCanKillAndPopulationNeverExceedsCapacity() {
         Game g = new Game();
-        g.newWorld(616161L, true);
+        g.newWorld(616161L, true, World.GEN_CAVE_IDENTITIES);
         Settlement s = new Settlement(Settlement.packId(30, 30), 30, 30,
                 SettlementType.CAMP, new Vec3i(900, 40, 900), HumanFaction.FRONTIER,
                 Settlement.Alignment.FRIENDLY);
@@ -189,7 +190,7 @@ class SettlementActivationTest {
     @Test
     void hostileGarrisonEngagesTheNearbyPlayerWithoutCrashing() {
         Game g = new Game();
-        g.newWorld(918273L, true);
+        g.newWorld(918273L, true, World.GEN_CAVE_IDENTITIES);
         Settlement hostile = null;
         outer:
         for (int rx = -8; rx <= 8; rx++) {
@@ -239,7 +240,7 @@ class SettlementActivationTest {
     @Test
     void actualEntityDeathsAndSiegeObjectivesClearAFortInStages(@TempDir Path dir) {
         Game g = new Game();
-        g.newWorld(515151L, true);
+        g.newWorld(515151L, true, World.GEN_CAVE_IDENTITIES);
         Settlement fort = null;
         outer:
         for (int rx = -10; rx <= 10; rx++) {

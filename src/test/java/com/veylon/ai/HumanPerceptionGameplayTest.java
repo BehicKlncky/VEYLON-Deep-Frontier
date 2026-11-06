@@ -10,6 +10,7 @@ import com.veylon.settlement.SettlementType;
 import com.veylon.util.Vec3i;
 import com.veylon.world.BlockType;
 import com.veylon.world.Chunk;
+import com.veylon.world.World;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -29,7 +30,7 @@ class HumanPerceptionGameplayTest {
     @BeforeEach
     void setUp() {
         game = new Game();
-        game.newWorld(20260716L, true);
+        game.newWorld(20260716L, true, World.GEN_CAVE_IDENTITIES);
         game.entities.npcs.clear();
         game.entities.creatures.clear();
         game.noise.reset();

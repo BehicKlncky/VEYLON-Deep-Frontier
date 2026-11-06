@@ -3,6 +3,7 @@ package com.veylon.combat;
 import com.veylon.Game;
 import com.veylon.item.ItemStack;
 import com.veylon.item.ItemType;
+import com.veylon.world.World;
 import org.joml.Vector3f;
 import org.junit.jupiter.api.Test;
 
@@ -101,7 +102,7 @@ class BowDrawScalingTest {
 
     private static Game readyToShoot(long seed) {
         Game game = new Game();
-        game.newWorld(seed, true);
+        game.newWorld(seed, true, World.GEN_CAVE_IDENTITIES);
         // Well above the terrain, so arrows do not bury themselves in a hill
         // between the shot and the assertion.
         game.player.pos.y += 40;

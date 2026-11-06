@@ -7,6 +7,7 @@ import com.veylon.item.ItemType;
 import com.veylon.util.Vec3i;
 import com.veylon.world.BlockType;
 import com.veylon.world.Chunk;
+import com.veylon.world.World;
 import org.joml.Vector3f;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -26,7 +27,7 @@ class ActiveExplosivePersistenceTest {
     void gameplayThrownBombsAndPlacedKegKeepIndependentFusesAcrossSaveLoad(
             @TempDir Path directory) {
         Game game = new Game();
-        game.newWorld(20260716L, true);
+        game.newWorld(20260716L, true, World.GEN_CAVE_IDENTITIES);
         flattenArena(game);
         game.entities.creatures.clear();
         game.entities.npcs.clear();

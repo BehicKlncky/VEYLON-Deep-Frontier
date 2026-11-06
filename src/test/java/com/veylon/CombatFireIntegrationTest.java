@@ -22,6 +22,7 @@ import com.veylon.simulation.WeatherSystem.Weather;
 import com.veylon.util.Vec3i;
 import com.veylon.world.BlockType;
 import com.veylon.world.Chunk;
+import com.veylon.world.World;
 import org.joml.Vector3f;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -643,7 +644,7 @@ class CombatFireIntegrationTest {
      */
     private static Game arena(GameMode mode) {
         Game game = new Game();
-        game.newWorld(777L, true, mode);
+        game.newWorld(777L, true, World.GEN_CAVE_IDENTITIES, mode);
         for (int cx = 18; cx <= 21; cx++) {
             for (int cz = 18; cz <= 21; cz++) {
                 Chunk c = game.world.getOrCreateChunk(cx, cz);

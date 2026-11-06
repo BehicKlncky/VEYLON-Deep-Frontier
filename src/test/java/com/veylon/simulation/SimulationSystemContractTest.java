@@ -2,6 +2,7 @@ package com.veylon.simulation;
 
 import com.veylon.Game;
 import com.veylon.world.BlockType;
+import com.veylon.world.World;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -63,7 +64,7 @@ class SimulationSystemContractTest {
     @Test
     void aNewWorldClearsEveryPerWorldSystemState() {
         Game game = new Game();
-        game.newWorld(31_415L, true);
+        game.newWorld(31_415L, true, World.GEN_CAVE_IDENTITIES);
 
         // Dirty one piece of state on each system, through its own API where
         // there is one.
@@ -159,7 +160,7 @@ class SimulationSystemContractTest {
         assertTrue(game.burnResidues.trackedCount() > 0 && game.burnResidues.totalCaptured > 0,
                 "precondition: remains are burning");
 
-        game.newWorld(31_415L, true);
+        game.newWorld(31_415L, true, World.GEN_CAVE_IDENTITIES);
 
         assertEquals(8 * 60, game.time.totalMinutes, 1e-6,
                 "a new world starts at day 1, 08:00");
@@ -242,7 +243,7 @@ class SimulationSystemContractTest {
         // Nothing about reset() may depend on knowing the concrete type: a future
         // registry that holds List<SimulationSystem> has to be able to do this.
         Game game = new Game();
-        game.newWorld(2_718L, true);
+        game.newWorld(2_718L, true, World.GEN_CAVE_IDENTITIES);
         game.time.advance(5_000);
         game.weather.current = WeatherSystem.Weather.RAIN;
         game.combustion.totalIgnitions = 3;

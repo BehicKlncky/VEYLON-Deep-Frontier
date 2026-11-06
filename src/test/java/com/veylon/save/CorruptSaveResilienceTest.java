@@ -180,7 +180,7 @@ class CorruptSaveResilienceTest {
     @Test
     void failedSaveKeepsTheLastCompleteFile(@TempDir Path dir) throws IOException {
         Game game = new Game();
-        game.newWorld(40_111L, true);
+        game.newWorld(40_111L, true, World.GEN_CAVE_IDENTITIES);
         Path save = dir.resolve("atomic.dat");
         assertTrue(SaveSystem.save(game, save));
         byte[] complete = Files.readAllBytes(save);
@@ -206,7 +206,7 @@ class CorruptSaveResilienceTest {
         Files.write(truncated, Arrays.copyOf(complete, complete.length - 1));
 
         Game target = new Game();
-        target.newWorld(91_337L, true);
+        target.newWorld(91_337L, true, World.GEN_CAVE_IDENTITIES);
         World liveWorld = target.world;
         var livePlayer = target.player;
         float liveHealth = target.player.health;
@@ -224,7 +224,7 @@ class CorruptSaveResilienceTest {
     @Test
     void aSnapshotNoLoadWouldAcceptIsNeverPublished(@TempDir Path dir) throws IOException {
         Game game = new Game();
-        game.newWorld(40_114L, true);
+        game.newWorld(40_114L, true, World.GEN_CAVE_IDENTITIES);
         Path save = dir.resolve("limit.dat");
         assertTrue(SaveSystem.save(game, save));
         byte[] complete = Files.readAllBytes(save);
@@ -255,7 +255,7 @@ class CorruptSaveResilienceTest {
             channel.write(java.nio.ByteBuffer.wrap(new byte[1]), 128L * 1024 * 1024);
         }
         Game target = new Game();
-        target.newWorld(91_339L, true);
+        target.newWorld(91_339L, true, World.GEN_CAVE_IDENTITIES);
         World liveWorld = target.world;
         assertFalse(SaveSystem.load(target, huge));
         assertSame(liveWorld, target.world, "refused before any world is replaced");
@@ -270,7 +270,7 @@ class CorruptSaveResilienceTest {
     @Test
     void aReplacementThatCannotHappenLeavesTheSlotAndNoTemporaryFile(@TempDir Path dir) throws IOException {
         Game game = new Game();
-        game.newWorld(40_116L, true);
+        game.newWorld(40_116L, true, World.GEN_CAVE_IDENTITIES);
         Path slot = dir.resolve("veylon.sav");
         Files.createDirectory(slot);
         Path inside = Files.write(slot.resolve("keep.txt"), new byte[]{1, 2, 3});
@@ -291,7 +291,7 @@ class CorruptSaveResilienceTest {
         // magic + save version + seed = 16 bytes before generatorVersion.
         Path futureGenerator = corrupt(dir, save, 16, World.MAX_SUPPORTED_GENERATOR + 1);
         Game target = new Game();
-        target.newWorld(91_338L, true);
+        target.newWorld(91_338L, true, World.GEN_CAVE_IDENTITIES);
         World liveWorld = target.world;
 
         assertFalse(SaveSystem.load(target, futureGenerator));
@@ -310,7 +310,7 @@ class CorruptSaveResilienceTest {
      */
     private static Path fixture(Path dir, long seed) {
         Game game = new Game();
-        game.newWorld(seed, true);
+        game.newWorld(seed, true, World.GEN_CAVE_IDENTITIES);
         game.player.inventory.add(ItemType.IRON_INGOT, 3);
 
         game.world.changedBlocks.clear();

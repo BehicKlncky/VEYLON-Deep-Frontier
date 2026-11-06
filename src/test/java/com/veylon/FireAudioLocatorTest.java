@@ -10,7 +10,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class FireAudioLocatorTest {
     @Test void nearestFueledCampfireWinsAndExtinguishedFireIsSilent() {
-        World world = new World(42);
+        World world = new World(42, World.GEN_CAVE_IDENTITIES);
         world.getOrCreateChunk(0, 0);
         Vec3i near = new Vec3i(4, 90, 4), far = new Vec3i(7, 90, 4);
         for (Vec3i fire : List.of(near, far)) {
@@ -26,7 +26,7 @@ class FireAudioLocatorTest {
     }
 
     @Test void burningCellsWorkAcrossNegativeCoordinatesWithoutGeneratingChunks() {
-        World world = new World(42);
+        World world = new World(42, World.GEN_CAVE_IDENTITIES);
         int chunks = world.loadedCount();
         Vector3f out = new Vector3f();
         assertTrue(FireAudioLocator.nearest(world, List.of(new Vec3i(-2, 40, -2)), -0.2f, 40, -0.2f, out));
