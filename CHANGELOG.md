@@ -4,6 +4,23 @@ All notable user-facing changes to VEYLON: Deep Frontier are recorded here.
 
 ## [Unreleased]
 
+### Added
+
+- The abandoned city is the new world: a streamed metropolis of six districts whose
+  every building can be entered and searched, infected and alien threats, survivor
+  camps, hidden civilians, guarded strongholds and a raider yard, claimable refuges with
+  barricades, salvage and small utilities, survivor missions and the old radio relay to
+  restore. Progress never needs a tree felled or ore mined.
+
+### Changed
+
+- NEW FRONTIER chooses the world as well as the mode. It opens on the city; `W` switches
+  to the wilderness of earlier releases, labelled as the legacy world. Saves reopen the
+  world they were made in, and the replace-save notice names a new city.
+- A city's death card says the survivor wakes at their refuge with what they carried.
+- Releases up to 0.8.1 cannot open a city save; they refuse it without touching their
+  live world.
+
 ## [0.8.1] - 2026-09-28
 
 ### Changed

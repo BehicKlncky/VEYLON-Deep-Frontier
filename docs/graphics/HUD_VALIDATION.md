@@ -185,3 +185,47 @@ mouse, which the scripted tour cannot move, so no capture shows it; requested
 1.5 at 1280×720 is still clamped to 1 by the renderer, so it is not a separate
 run. These captures check presentation; behaviour is covered by the headless
 tests named in the urban validation record.
+
+## Urban milestone 26 — NEW FRONTIER's world choice and the city's death card (2026-11-06)
+
+The abandoned city became the default new world. NEW FRONTIER now shows two world
+tabs above the unchanged mode cards: "THE ABANDONED CITY", preselected, and "THE
+WILDERNESS  (legacy)", switched with `W` or a click. The cards and a note under them
+describe the chosen world; the replace notice names a new city. The tabs stand where
+the title's rule stood, and the rule now parts the world from its mode. A city's death
+card reads "THE CITY CLAIMS YOU / You wake at your refuge, with what you carried."
+
+### Reproduce
+
+```bash
+export VEYLON_SEED=20260731 VEYLON_SHOT=3 VEYLON_FRONTEND=newworld-save
+VEYLON_RESOLUTION=1280x720 VEYLON_CAPTURE_TAG=m26-newworld-720-s1 \
+  ./gradlew.bat run -PveylonDataDir=build/qa/m26-newworld-720-s1
+# likewise 1920x1080 with VEYLON_UI_SCALE=0.75, 1.0 and 1.5; VEYLON_GENERATOR=wilderness
+# for the wilderness preselected; VEYLON_FRONTEND=death for the city's death card
+```
+
+`VEYLON_FRONTEND=route` (then `route-load`) captures the same screens in play: the
+title, both tabs, Creative chosen, loading, the refuge, a search, the map, the death
+card, the wake, the pause menu and its graphics and audio screens (see
+`docs/DEVELOPING.md`, "Default-path acceptance").
+
+### Validation record
+
+| Tag | Screen | Resolution | Scale requested → applied |
+| --- | --- | --- | --- |
+| `m26-newworld-720-s1` | City, replace notice | 1280×720 | 1 → 1 |
+| `m26-newworld-1080-s075` | City, replace notice | 1920×1080 | 0.75 → 0.75 |
+| `m26-newworld-1080-s1` | City, replace notice | 1920×1080 | 1 → 1 |
+| `m26-newworld-1080-s15` | City, replace notice | 1920×1080 | 1.5 → 1.5 |
+| `m26-newworld-wild-720` | Wilderness, its own notice | 1280×720 | 1 → 1 |
+| `m26-death-city-720` | The city's death card over the refuge | 1280×720 | 1 → 1 |
+
+Every capture: 0 `glGetError`, 0 KHR errors. In them the tabs, cards, notes, notice
+and buttons keep their order without overlap, every line stays whole, and the key
+line at the foot names `W`. Two faults were found in the captures and fixed before
+the runs above: the title's rule first ran through the tabs (it now lies between the
+tabs and the cards), and at 0.75 the tabs stood just under the title with a wide gap
+above the cards (they now take the rule's old place at every scale).
+`ui.CityOnboardingScreensTest` holds every new line within 820 units with the game's
+own font. Limit: as in milestone 21, a requested 1.5 at 1280×720 is clamped to 1.

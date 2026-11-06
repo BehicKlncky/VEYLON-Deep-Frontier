@@ -107,10 +107,14 @@ notifications), not for reaching sideways into an unrelated subsystem.
 5. `sessionSeed = qa.configuredSeed()` — honours `VEYLON_SEED`, else random.
 6. Branch on environment:
    - **Automated** (`VEYLON_SMOKE` / `VEYLON_SCENE` / `VEYLON_SHOT` set):
-     `newWorld(seed, true)`, then `qa.applyBenchmarkScene(scene)`, then straight
-     into `PLAYING` with the cursor captured.
+     `newWorld(seed, true, generator, mode)` with the session's world (the city
+     unless `VEYLON_GENERATOR` says otherwise; a wilderness scene keeps the
+     wilderness), then `qa.applyBenchmarkScene(scene)`, then straight into
+     `PLAYING` with the cursor captured.
    - **Normal**: `appState = TITLE`; the world is not created until the player
-     picks New Game or Load.
+     picks New Game or Load. NEW FRONTIER chooses the world (the abandoned city,
+     or the wilderness labelled as the legacy world) and the mode.
+     `VEYLON_FRONTEND=route` drives this path natively from the title.
 7. Enter the main loop until `window.shouldClose()`.
 8. On exit: `renderer.delete()`, `ui.delete()`, `audio.shutdown()`,
    `window.destroy()`. A smoke run throws if any release gate failed.
@@ -119,9 +123,11 @@ notifications), not for reaching sideways into an unrelated subsystem.
 
 `newWorld(seed, fresh, generatorVersion, mode)` is the single path that produces a
 playable world, used by New Game, by save loading and by the QA harness. The
-rules live in `WorldBootstrap`; `Game.newWorld` and its shorter overloads are the
-entry points every caller still uses. Ordinary new worlds take
-`World.DEFAULT_NEW_WORLD_GENERATOR`; a load passes the version its save recorded.
+rules live in `WorldBootstrap`; `Game.newWorld` is the entry point every caller
+uses, always naming the generator it builds. Ordinary new worlds take
+`World.DEFAULT_NEW_WORLD_GENERATOR`, the abandoned city since urban package 26; the
+wilderness NEW FRONTIER also offers is `World.WILDERNESS_NEW_WORLD_GENERATOR`
+(generator 3); a load passes the version its save recorded.
 An unsupported version is refused before anything is reset. It **resets before it
 constructs**, in this order:
 
@@ -277,9 +283,10 @@ adds guarded strongholds and raider yards (layout 13, template 7, catalogue 5), 
 adds burnt-out cars to the local streets and the refuge, salvage and fortification
 rules (layout 14, template 7, catalogue 5), and 18 adds refuge utilities (layout 15), 19
 the relay mast and missions (layout 16), and 20 is the city of 19 under the survival
-economy's content revision 4 and encounter catalogue 6 (layout 17). The development
-selector creates 20. New worlds use
-`World.DEFAULT_NEW_WORLD_GENERATOR` (3, until the urban rollout); a load accepts any
+economy's content revision 4 and encounter catalogue 6 (layout 17). New worlds use
+`World.DEFAULT_NEW_WORLD_GENERATOR`, generator 20 since the urban rollout (package
+26; generator 3 before it), or the wilderness's generator 3 when NEW FRONTIER's
+legacy choice is taken; the development selector creates 20 too. A load accepts any
 supported version and rejects the rest, including anything above
 `MAX_SUPPORTED_GENERATOR`, before it replaces the live world. Feature gates name
 their versions (`hasDeepFrontier`, `hasCaveIdentities`, `isUrbanGenerator`) instead

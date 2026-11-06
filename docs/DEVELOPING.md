@@ -43,11 +43,11 @@ runs. All are inert when unset. Everything below is handled by `QaHarness`;
 |---|---|
 | `VEYLON_SEED` | Fixed world seed (a non-numeric value is hashed) |
 | `VEYLON_GAME_MODE=survival\|creative` | Initial mode for automated world runs only; absent means Survival. Invalid values fail explicitly. Ignored for normal title sessions and frontend-only captures. |
-| `VEYLON_GENERATOR=urban-dev` | Development selector: NEW FRONTIER and automated worlds use the newest urban generator (`UrbanRevision.DEVELOPMENT_GENERATOR`, now `World.GEN_URBAN_ECONOMY`: generator 20, layout 17 / template 7 / content 4, encounter catalogue 6; the mission, onboarding, utility and refuge tours were checked to pass on it headlessly, and every tour's headless test keeps the generator it was written for). Absent keeps the ordinary default. Any other value fails, and so does `urban-dev` without an isolated data directory (see below). |
-| `VEYLON_SMOKE=<seconds>` | Release smoke gate: save/load, fire, storm, a fortress approach, then a pass/fail report. Throws on failure |
-| `VEYLON_SCENE=<name>` | Stage a deterministic benchmark scene (`day`, `pinefog`, `nightfire`, `ruin`, `toxic`, `ao_shadow`, `phase4`, `ashwolf`, `silhouette30`, `vfx_blood`, `vfx_mining`, `vfx_beacon`, `death_ragdoll_showcase`, `death_ragdoll_sequence`, `dismember_showcase`, `dismember_wall`, `dismember_bomb` (a real scrap bomb thrown into a group of six, one outside the lethal radius; it goes off at 2.4 s), `dismember_species`, `dismember_species_wall` and `dismember_species_close` (every species, a guard and the player's remains blown apart at 1 s; open meadow, a step and a wall, and a close view of the small bodies), `molotov_ground`, `molotov_tree` and `molotov_rain` (a real fire bomb thrown at 0.5 s onto a dry clearing at dusk, beside a round tree that catches, or with rain from 3 s that puts the pool out; shots `0.7,1.2,3,7,11`, `1,4,10,20` and `2,3.5,5`), the burning-body scenes `body_fire_row`, `body_fire_row_night`, `body_fire_close`, `body_fire_out`, `body_fire_blast`, `body_fire_panic`, `body_fire_bird`, `body_fire_rain`, `body_fire_ragdoll` and `body_fire_player` (see "Burning bodies QA" below), `movement`, `inventory`, `ui_cycle`, `held_*`, `creative_flight` with `VEYLON_GAME_MODE=creative`, which flies east at Shift speed and prints a `[flight]` streaming report at 29 s, and the urban scenes `urban_streets`, `urban_intersection`, `urban_seam_walk`, `urban_fixtures`, `urban_fixtures_night`, `urban_apartments`, `urban_apartments_night`, `urban_apartments_lit_night`, `urban_apartments_manual`, `urban_apartments_manual_night`, `urban_loot`, the playable-slice route `urban_slice`, the catalogue walk `urban_catalogue`, the district tour `urban_districts`, the route tour `urban_underground`, the ecology tour `urban_ecology`, the survivor tour `urban_survivors`, the stronghold tour `urban_strongholds`, the refuge tour `urban_refuge`, the utility tour `urban_utilities`, the mission tour `urban_missions`, the onboarding tour `urban_onboarding`, the atmosphere tour `urban_atmosphere` and the performance tour `urban_performance` with `VEYLON_GENERATOR=urban-dev` (see "Urban planning QA" below), and the save audit `save_audit` on any save placed in an isolated slot (see the same table)) |
+| `VEYLON_GENERATOR=wilderness\|urban-dev` | This session's new world, which NEW FRONTIER opens on, staged `VEYLON_FRONTEND` worlds use and automated worlds build. Absent is the ordinary default, the abandoned city (`World.DEFAULT_NEW_WORLD_GENERATOR`, generator 20: layout 17 / template 7 / content 4, encounter catalogue 6). `wilderness` is the legacy world NEW FRONTIER also offers (`World.WILDERNESS_NEW_WORLD_GENERATOR`, generator 3). `urban-dev` is the newest urban layout (`UrbanRevision.DEVELOPMENT_GENERATOR`, today the default city itself) and needs an isolated data directory (see below). Any other value fails. Every tour's headless test keeps the generator it was written for. |
+| `VEYLON_SMOKE=<seconds>` | Release smoke gate on this session's world (the city unless `VEYLON_GENERATOR=wilderness`): a world edit and an equip, an isolated save and load, fire and storm, then a pass/fail report; in the wilderness also a generated-fortress approach. Throws on failure |
+| `VEYLON_SCENE=<name>` | Stage a deterministic benchmark scene (`day`, `pinefog`, `nightfire`, `ruin`, `toxic`, `ao_shadow`, `phase4`, `ashwolf`, `silhouette30`, `vfx_blood`, `vfx_mining`, `vfx_beacon`, `death_ragdoll_showcase`, `death_ragdoll_sequence`, `dismember_showcase`, `dismember_wall`, `dismember_bomb` (a real scrap bomb thrown into a group of six, one outside the lethal radius; it goes off at 2.4 s), `dismember_species`, `dismember_species_wall` and `dismember_species_close` (every species, a guard and the player's remains blown apart at 1 s; open meadow, a step and a wall, and a close view of the small bodies), `molotov_ground`, `molotov_tree` and `molotov_rain` (a real fire bomb thrown at 0.5 s onto a dry clearing at dusk, beside a round tree that catches, or with rain from 3 s that puts the pool out; shots `0.7,1.2,3,7,11`, `1,4,10,20` and `2,3.5,5`), the burning-body scenes `body_fire_row`, `body_fire_row_night`, `body_fire_close`, `body_fire_out`, `body_fire_blast`, `body_fire_panic`, `body_fire_bird`, `body_fire_rain`, `body_fire_ragdoll` and `body_fire_player` (see "Burning bodies QA" below), `movement`, `inventory`, `ui_cycle`, `held_*`, `creative_flight` with `VEYLON_GAME_MODE=creative`, which flies east at Shift speed and prints a `[flight]` streaming report at 29 s, and the urban scenes `urban_streets`, `urban_intersection`, `urban_seam_walk`, `urban_fixtures`, `urban_fixtures_night`, `urban_apartments`, `urban_apartments_night`, `urban_apartments_lit_night`, `urban_apartments_manual`, `urban_apartments_manual_night`, `urban_loot`, the playable-slice route `urban_slice`, the catalogue walk `urban_catalogue`, the district tour `urban_districts`, the route tour `urban_underground`, the ecology tour `urban_ecology`, the survivor tour `urban_survivors`, the stronghold tour `urban_strongholds`, the refuge tour `urban_refuge`, the utility tour `urban_utilities`, the mission tour `urban_missions`, the onboarding tour `urban_onboarding`, the atmosphere tour `urban_atmosphere` and the performance tour `urban_performance` on the default city (see "Urban planning QA" below), and the save audit `save_audit` on any save placed in an isolated slot (see the same table)). A city scene (`urban_*`) and `save_audit` play this session's world and refuse to start without an isolated data directory; every other scene was made for the wilderness and builds it unless `VEYLON_GENERATOR` names a world |
 | `VEYLON_SHOT="5,10"` | Capture screenshots at those elapsed seconds |
-| `VEYLON_FRONTEND=<name>` | Pin a front-end screen (`options`, `audio`, `loading`, `death`, `victory`, `glyphs`, `newworld`). `newworld-save` shows the replace-save notice without writing a save. `pause` and `gamemode` stage a Survival world with the pause menu or the mode confirmation open; `pause-creative`, `gamemode-creative` and `victory-creative` stage a Creative world; `catalog`, `catalog-tools`, `catalog-search` (query "iron") and `catalog-inventory` open the Creative catalog; `worldcontrols` and `worldcontrols-held` open the Creative world controls, the second with dusk, a frozen clock, a locked storm and paused spawning already applied |
+| `VEYLON_FRONTEND=<name>` | Pin a front-end screen (`options`, `audio`, `loading`, `death`, `victory`, `glyphs`, `newworld`). `newworld-save` shows the replace-save notice without writing a save. `route` and then `route-load` play the default new-world path natively from the title over two launches (see "Default-path acceptance" below). Staged worlds are this session's world, the city unless `VEYLON_GENERATOR=wilderness`. `pause` and `gamemode` stage a Survival world with the pause menu or the mode confirmation open; `pause-creative`, `gamemode-creative` and `victory-creative` stage a Creative world; `catalog`, `catalog-tools`, `catalog-search` (query "iron") and `catalog-inventory` open the Creative catalog; `worldcontrols` and `worldcontrols-held` open the Creative world controls, the second with dusk, a frozen clock, a locked storm and paused spawning already applied |
 | `VEYLON_RESOLUTION=1920x1080` | Framebuffer override |
 | `VEYLON_UI_SCALE`, `VEYLON_VSYNC`, `VEYLON_FULLSCREEN`, `VEYLON_SHADOWS` | Settings overrides |
 | `VEYLON_AUDIO_QA=1` | Add three positional audio reports per second to the smoke, without gameplay effects |
@@ -72,18 +72,56 @@ from the real save slot:
   `build.gradle` for every `Test` task and checked by `SaveSlotIsolationTest`.
 - For a native QA session pass `-PveylonDataDir=build/qa/<name>` to `run`. The
   game then reads and writes only there, including F5 saves.
-- `VEYLON_GENERATOR=urban-dev` refuses to start unless the data directory is
-  set and differs from the player's own (`AppPaths.isolatedFromPlayerData`).
+- `VEYLON_GENERATOR=urban-dev`, every city scene (`urban_*`), `save_audit` and the
+  `route`/`route-load` frontend route refuse to start unless the data directory
+  is set and differs from the player's own (`AppPaths.isolatedFromPlayerData`):
+  each of them can press F5 into the slot.
 
 ```powershell
-$env:VEYLON_GENERATOR='urban-dev'; $env:VEYLON_SEED='20260731'
+$env:VEYLON_SEED='20260731'
 .\gradlew.bat run -PveylonDataDir=build/qa/urban
 ```
 
+#### Default-path acceptance (urban package 26)
+
+Since package 26 the abandoned city is the ordinary new world. NEW FRONTIER opens
+on it, with the wilderness one key away (`W`) and labelled as the legacy world;
+Survival and Creative are chosen as before (`S`/`C`). The native default-path route
+plays it from the title with ordinary keys over two launches that share one
+isolated directory, as a player quits and comes back:
+
+```powershell
+$env:VEYLON_SEED='20260731'; $env:VEYLON_CAPTURE_TAG='route-survival'
+$env:VEYLON_FRONTEND='route'
+.\gradlew.bat run -PveylonDataDir=build/qa/route-survival
+$env:VEYLON_FRONTEND='route-load'; $env:VEYLON_CAPTURE_TAG='route-survival-load'
+.\gradlew.bat run -PveylonDataDir=build/qa/route-survival
+```
+
+The first launch captures the title, NEW FRONTIER on the city and on the
+wilderness, the loading card and the refuge; searches a ground-floor cupboard of
+the refuge with the use button from an empty hand (its pose staged beside it) and
+takes one stack through the screen's transfer command; walks, opens the map and
+presses F5. In Survival it then dies through the player damage gate, captures the
+city's death card, wakes at the refuge with what it carried and loads the save over
+the live world with F9; with `VEYLON_GAME_MODE=creative` it chooses Creative with
+`C` and flies instead. Then the pause menu, graphics and audio screens, and `Q`. The
+second launch loads from the title with `L` and must hold exactly what the first
+saved (`SaveAuditQaScene.durable`), then visits the pause screens and quits. Each
+launch prints `[frontend-route] ... pass=true` with the keys it pressed; the route
+has no headless twin because its screens draw only with GL, and
+`DefaultCityAcceptanceTest` drives the same controller through its seams.
+
+The release smoke runs on the city by default; the wilderness smoke, with its
+fortress approach, needs `VEYLON_GENERATOR=wilderness`. Wilderness benchmark and
+capture scenes keep the wilderness without a selector.
+
 #### Urban planning QA
 
-The urban scenes need the street network (`VEYLON_GENERATOR=urban-dev`) and an
-isolated data directory; on any other world they print a notice and do nothing.
+The urban scenes play the default city (`VEYLON_GENERATOR=urban-dev` is the same
+world today and the commands below that set it still work) and need an isolated
+data directory; on a world without the planning they need, they print a notice and
+do nothing.
 Each prints `[urban-qa] plan ...` diagnostics for the four regions that meet at
 the origin (overlaps, parcel rules, routes and seams, all expected to be 0) and
 the spawn column.

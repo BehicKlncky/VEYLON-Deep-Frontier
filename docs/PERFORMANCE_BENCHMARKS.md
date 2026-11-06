@@ -469,3 +469,23 @@ The release smoke (`VEYLON_SMOKE=30`, seed 20260910, a legacy world, 1280 ×
 720, VSync off) on `0dd758c` passes: 1,495 FPS, p99 0.88 ms, max 16.2 ms,
 fortress approach 1,580 FPS, save and load, every hard limit, 0 GL and KHR
 errors; a legacy world dropped no chunk (`chunks={retained=600,unloaded=0}`).
+
+## Default urban rollout (urban milestone 26, 2026-11-06)
+
+The abandoned city is now the default new world, so the release smoke runs in the
+city unless `VEYLON_GENERATOR=wilderness` is set. Measured on the second machine
+(AMD Ryzen 5 5600X, NVIDIA GeForce RTX 3060 Ti, OpenGL 3.3.0 NVIDIA 621.01), 1280 ×
+720, VSync off, seed 20260910, each with its own isolated data directory and no
+concurrent build work, on `011cdc3`'s code with the NEW FRONTIER layout fix:
+
+| Smoke | Average FPS | p95 / p99 / max ms | Notes |
+| --- | --- | --- | --- |
+| City, Survival (the default) | 1,036.9 | 1.07 / 1.11 / 9.44 | 225 chunks loaded, 362 meshes built, none dropped; 4 residents and 2 infected awake; no fortress approach (none exists in a city) |
+| City, Creative | 1,057.0 | 1.07 / 1.11 / 9.04 | 240 chunks after the flight leg |
+| Wilderness, Survival | 1,491.3 | 0.83 / 0.89 / 16.33 | fortress approach 1,574.5 FPS (p99 0.89 ms) toward the fortress 2,218 blocks away; 600 chunks |
+
+Every run: save and load, every hard limit, 139 of 139 item icons, 0 `glGetError`
+and 0 KHR errors. The wilderness figures match package 24's run on `0dd758c`
+(1,495 FPS, fortress 1,580). The city smoke streams no long approach, so a city's
+streaming cost is still measured by `VEYLON_SCENE=urban_performance` (above); the
+reference machine has not run either.
