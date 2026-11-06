@@ -4270,9 +4270,9 @@ reviewer subagents ran.
 
 ### Limits and next gate
 
-- **Human acceptance (D-80):** the consolidated playtest and listening pass, package
-  23's extended play and the pack's manual acceptance scenario on the default path.
-  Package 26 stays PARTIAL until they run.
+- **Human acceptance (D-80):** closed on 2026-11-06 by the owner's report that they
+  had playtested, with their request to release v0.9.0 (D-259). The report gave no
+  seed, day count, findings or listening devices; none are recorded.
 - The reference machine has run neither package 24's figures nor these smokes.
 - The city's release smoke has no long approach (D-255).
 - P-15, the planning hitches (D-247), save time growth (D-246, D-250) and the

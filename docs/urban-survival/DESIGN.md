@@ -786,7 +786,7 @@ No mandatory requirement was found unmet, so the default was switched (D-253). H
 
 ### 19.4 What stays open
 
-- **Human acceptance (D-80):** the consolidated human playtest and listening pass, package 23's extended play and this package's manual acceptance scenario. Until they run, the rollout is in place on the feature branch but the package is not complete. The switch is its own commit and can be reverted alone.
+- **Human acceptance (D-80)** was closed on 2026-11-06 by the owner's report of their playtest and their request to release (D-259); the report gave no further detail. Package 26 is complete and ships as v0.9.0.
 - **The reference machine** has not run package 24's figures or this package's smokes.
 - **The release smoke** approaches a generated fortress only in the wilderness; in the city it exercises save, load, fire and storm, and the city's streaming is measured by `urban_performance` (D-255).
 - **P-15** (the inverted day's temperature curve), the first-touch planning hitches (D-247), save time growth (D-246, D-250) and the writer's untested 128 MiB check (D-249) are unchanged.
