@@ -279,7 +279,7 @@ The **always** set runs for every code package, together with the portable build
 | 23 | 08 and 20 tests | Resource, prerequisite and transaction tests; a multi-day production integration | Fresh extended play with day count, revision, seed, gear and choices |
 | 24 | `qa.RuntimeBoundsTest` and allocation tests | Bounds, allocation and state; eviction and revisit order if eviction is chosen. **24:** `ChunkRetentionTest`, `ChunkStreamingScheduleTest`, `ChunkMesherFingerprintTest`, `world.ChunkMapTest`, `entity.ChunkUnloadCachesTest`, `ai.NavigationCacheUnloadTest`, `UrbanPerformanceQaSceneTest` and `RuntimeBoundsTest`'s threat budgets | `.\gradlew.bat performanceTest --console=plain` (opt-in, calibrated host) plus native city measurements |
 | 25 | `save.*`, fingerprints, quest, settlement and parity tests | Integrated urban fixture across orders and revisits; corruption and atomic replacement. **25:** `UrbanIntegratedSaveTest`, `save.UrbanSaveCorruptionTest`, `save.CorruptSaveResilienceTest`, `save.HistoricalV3SaveCompatibilityTest`, `save.UrbanEarlierRevisionSaveTest`, `world.urban.RoofOpeningFallbackTest` and `SaveAuditQaSceneTest` | A genuine legacy world and the integrated urban state, from isolated saves. **25:** `VEYLON_SCENE=save_audit` on the integrated city and on the v0.3.0 and v0.8.1 Survival and Creative saves |
-| 26 | Everything relevant | Rollout path tests | Default-path smoke and the manual acceptance scenario from the pack README |
+| 26 | Everything relevant | Rollout path tests. **26:** `DefaultCityAcceptanceTest`, `UrbanDevelopmentSelectorTest`, `ModeSelectionRoutingTest`, `ui.CityOnboardingScreensTest`, `UrbanFirstSessionHintsTest`, `world.UrbanGeneratorDispatchTest`, with every generator-20 route test, which the first of them proves runs the default path's world | Default-path smoke and the manual acceptance scenario from the pack README. **26:** `VEYLON_FRONTEND=route` then `route-load` in both modes, the smoke in the city and the wilderness, `urban_missions` on the default world, NEW FRONTIER and the death card at 720p and 1080p; the manual scenario and the human pass of D-80 pending |
 
 Test names in the table are relative to `com.veylon.`. Run them with `.\gradlew.bat test --tests "com.veylon.<name>" --console=plain`.
 
@@ -4160,3 +4160,120 @@ butchers first.
   hitches (D-247) and the reference machine's rerun are unchanged.
 - Next gate: package 26 (default urban rollout and final acceptance), after the
   consolidated human pass.
+
+## Milestone 26 — default urban rollout and final acceptance (2026-11-06)
+
+### Scope and baseline
+
+- Branch `feature/urban-survival` at `a3f32e1` (the 25 records), clean tree. Read the
+  revised base, the prompt, `AGENTS.md`, `docs/COMMIT_WORKFLOW.md` and these records.
+  The consolidated human playtest (D-80) has not run; this package went ahead on the
+  owner's instruction to execute 26 and leaves every human-only gate pending.
+- Changed: the default new world (generator 20) with the wilderness offered as the
+  labelled legacy world (D-253, D-254), scripted sessions after the switch (D-255),
+  the city's death card (D-256), a native default-path route (D-257), a default-path
+  acceptance test, and the current documents. No generator, plan, template, content,
+  catalogue, block, item, icon, ordinal or save-section change.
+- Host, the second machine: AMD Ryzen 5 5600X, Windows 11 Pro 10.0.26200, NVIDIA
+  GeForce RTX 3060 Ti, OpenGL 3.3.0 NVIDIA 621.01 with KHR_debug, the repository-local
+  Temurin 25.0.4.1+1; windowed natives with isolated data directories.
+
+### The requirement audit
+
+DESIGN §19.1 checks R1–R10 against the production game on generator 20 and names
+the tests and natives that show each. None was found unmet, so the default was
+switched. The human judgement of the same requirements (D-80) is still pending.
+
+### Headless evidence
+
+- `DefaultCityAcceptanceTest` (5 tests): NEW FRONTIER's defaults build generator 20 in
+  Survival whose 5 × 5 chunks around the spawn, refuge bed and building, kit and
+  first log equal `SurvivorWorldArena.session(20260731, SURVIVAL, 20)` exactly, the
+  world every generator-20 route test plays (`UrbanEconomyRouteTest`'s objective and
+  four further days with no wild block touched, `UrbanIntegratedSaveTest`,
+  `UrbanSliceRouteTest` on 20, the economy tests); package 25's integrated city built
+  on the default path, saved, the title reached and loaded fact for fact
+  (`IntegratedCityFixture.describe` and `SaveAuditQaScene.durable` both equal), a new
+  city started over it inherits nothing and the slot still loads; death through the
+  damage gate wakes the survivor in the refuge at 55 health with what they carried;
+  Esc, O, V and G route from the pause menu; Creative on the default city flies,
+  places without spending, breaks without a drop and sets noon, a storm, frozen
+  daylight and the weather lock.
+- `ModeSelectionRoutingTest` (now with both worlds' Creative/Survival twins and the
+  `W` key), `UrbanDevelopmentSelectorTest` (the `wilderness` selector, scene worlds and
+  their isolation, the default through NEW FRONTIER and the wilderness one key away),
+  `ui.CityOnboardingScreensTest` (every new line measured with the game's font, the
+  death card's text), `UrbanFirstSessionHintsTest`, `world.UrbanGeneratorDispatchTest`.
+- Before the switch, 91 test classes were retargeted to name generator 3 and the
+  implicit-default conveniences removed (`2bc1b60`), its build unchanged at 2,355 tests.
+
+### Native evidence
+
+All from the main checkout on the package's final code, each in a new isolated
+directory under `build/qa/`, seed 20260731 unless named, 1280 × 720 unless named:
+
+| Run | Result |
+| --- | --- |
+| `m26-route-survival-final` (`VEYLON_FRONTEND=route`, then `route-load`) | Both launches `pass=true`, generator 20: NEW FRONTIER opened on the city, W showed the wilderness and returned; the refuge's bathroom cabinet at (70, 41, 82) searched with RMB from an empty slot 9 and a bandage taken; walk, map, F5; death through the damage gate, the city's card, Enter woke the survivor in the refuge with the same pack; F9 over the live world restored what F5 wrote; pause, graphics, audio, Q. The second launch loaded with L from the title and held exactly what the first saved. 14 + 6 captures, 0 GL and KHR errors |
+| `m26-route-creative-final` (`VEYLON_GAME_MODE=creative`) | Both launches `pass=true`: Creative chosen with C, the same search and F5, a double-tapped Space flying, F9, pause screens, Q; the second launch's load equal. 0 GL and KHR errors |
+| `m26-missions-default-survival` (`VEYLON_SCENE=urban_missions`, no selector) | `pass=true generator=20`, 15 captures, 117 s: the camp's rumour and three missions, the hidden civilians behind their loose panel (`HIDDEN_AID` ready), the Wardens made friends, their codes and module, the power cells and the antenna cable, the relay repaired, the generator and radio built and switched on, on the air, "THE CITY ANSWERS", the camp again, F5 and F9 with the same objective and missions. 0 GL and KHR errors |
+| `m26-ecology-default-survival` (`VEYLON_SCENE=urban_ecology`, no selector) | `pass=true generator=20`, 16 captures, 71 s: the quarantine's growth, the Veilmaw's ripple telegraph and lunge, the node set alight and the Veilmaw withered, its membrane sacs cut, F5 and F9, the burnt site revisited, a night lure to a torch, park hares bolting, the roof flock, the Breacher blind to a crouch. 0 GL and KHR errors |
+| `m26-smoke-city`, `m26-smoke-city-creative`, `m26-smoke-wilderness` (`VEYLON_SMOKE=30`, VSync off, seed 20260910) | All pass: 1,036.9, 1,057.0 and 1,491.3 FPS, the wilderness's fortress approach 1,574.5 FPS; figures in `docs/PERFORMANCE_BENCHMARKS.md` |
+| `m26-newworld-720-s1`, `-1080-s075`, `-1080-s1`, `-1080-s15`, `m26-newworld-wild-720`, `m26-death-city-720` (`VEYLON_FRONTEND`) | NEW FRONTIER with its tabs and the replace notice at 1280 × 720 and at 1920 × 1080 with scales 0.75, 1 and 1.5; the wilderness preselected with its own notice; the city's death card. 0 GL and KHR errors; `docs/graphics/HUD_VALIDATION.md` |
+
+The tours stage what they always staged and say so in their evidence lines (poses
+between legs, the clock, a kit in the mission tour); the route stages only the pose
+beside the cupboard and takes the stack through the screen's transfer command,
+because a native tour cannot move the cursor. Every capture was checked by eye. The
+captures found two layout faults, fixed before the final runs: the title's rule ran
+through the new tabs, and at scale 0.75 the tabs sat under the title far above the
+cards. Two earlier route pairs on intermediate code also passed (`m26-route-survival`,
+`m26-route-creative`). Seen but not changed, as they predate this package and appear
+in every world: an end card (death, the city's answer) draws over the HUD's target
+label, and the death card's vitals read −900 health.
+
+Reused, because nothing they show changed for generator 20 since they ran: package
+23's native economy tour (2.5 days, `build/qa/m23-economy-survival-2`, `-creative-2`),
+package 24's `urban_performance` and package 25's save audits of the integrated city
+and the release saves.
+
+### Commands and portable builds
+
+Every code commit was validated by the full portable build (`.\gradlew.bat build
+--console=plain`) on its exact tree in a detached worktree (`build/m12-check`,
+`m13-check`, `m14-check`, `m21-check`), the trees assembled by laying each commit's
+file versions over its parent and recording `git write-tree`, then committed with
+`git read-tree <tree>` and `git commit -F`:
+
+| Commit | Tree | Tests | Classes | Build |
+| --- | --- | --- | --- | --- |
+| `2bc1b60` | `bcda911` | 2,355 | 304 | BUILD SUCCESSFUL in 17m 53s (alone) |
+| `c2d1824` | `2216169` | 2,356 | 304 | BUILD SUCCESSFUL in 22m 9s |
+| `0a3bc94` | `c304f84` | 2,360 | 304 | BUILD SUCCESSFUL in 22m 15s |
+| `0f4cb7f` | `dbc118a` | 2,360 | 304 | BUILD SUCCESSFUL in 22m 2s |
+| `011cdc3` | `7f7a9d7` | 2,365 | 305 | BUILD SUCCESSFUL in 22m 15s |
+| `43f04fa` | `da15edb` | 2,365 | 305 | BUILD SUCCESSFUL in 17m 49s (alone) |
+
+The four middle builds ran in parallel; each skipped one test, the existing Windows
+skip, and none failed.
+
+Focused runs while iterating (`.\gradlew.bat test --tests ... --console=plain`, the
+classes read back from `build/test-results`): `UrbanDevelopmentSelectorTest`,
+`ModeSelectionRoutingTest`, `ui.CityOnboardingScreensTest`,
+`UrbanFirstSessionHintsTest` and `world.UrbanGeneratorDispatchTest` (30 tests),
+`DefaultCityAcceptanceTest` and `SaveAuditQaSceneTest` (8 tests), all passing.
+
+`graphify update . --no-cluster` on the final code (`43f04fa`): 12,208 nodes and 51,515 edges, with the usual extractor warnings for `build.gradle` and `settings.gradle`.
+
+These records: relative links and anchors checked, `git diff --check` clean. No
+reviewer subagents ran.
+
+### Limits and next gate
+
+- **Human acceptance (D-80):** the consolidated playtest and listening pass, package
+  23's extended play and the pack's manual acceptance scenario on the default path.
+  Package 26 stays PARTIAL until they run.
+- The reference machine has run neither package 24's figures nor these smokes.
+- The city's release smoke has no long approach (D-255).
+- P-15, the planning hitches (D-247), save time growth (D-246, D-250) and the
+  writer's untested 128 MiB check (D-249) are unchanged.

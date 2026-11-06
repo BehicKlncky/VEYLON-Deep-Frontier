@@ -740,3 +740,53 @@ One economy city (generator 20, seed 20260731, Survival) carries every kind of i
 - The writer's 128 MiB check has no test (D-249).
 - Save and load time still grow with the places a save names (D-246, D-250), and first-touch planning hitches remain (D-247).
 - The reference machine has not run package 24's figures.
+
+## 19. The default urban rollout and final acceptance (package 26)
+
+Package 26 made the abandoned city the ordinary new world and gathered the final evidence. Decisions D-253 to D-258; the evidence is in VALIDATION, milestone 26. Nothing was merged, pushed, tagged or released, and no real save was touched: every native run used its own data directory.
+
+### 19.1 The owner's requirements against the production game
+
+| Id | Requirement | Production behaviour on the default world (generator 20) | Evidence |
+| --- | --- | --- | --- |
+| R1 | The city covers the playable world | An unbounded streamed city planned region by region; parks, canals, courtyards and squares are its fabric; no wilderness POI, ore, cave or legacy settlement is generated | 03 and 13 plan tests, `UrbanGeneratorDispatchTest`, `WorldGeneratorFingerprintTest`; 24's long journeys |
+| R2 | Enter, scavenge, avoid or confront, return | The refuge, contextual containers, infected and alien encounters, the return home and sleep | `UrbanSliceRouteTest` (10–20), `UrbanEconomyRouteTest`, `DefaultCityAcceptanceTest`; the native route |
+| R3 | No trees or ore for progression | Survival needs, the first upgrade and the relay come from containers, salvage, people and repairs | `UrbanEconomyRouteTest` (the objective and four more days, no wild block touched), `UrbanMissionRouteTest`, `UrbanStarterProgressionTest` |
+| R4 | Every generated building explorable | Every parcel's plan proves entrance, rooms, stairs, containers and exits before stamping; the last two unplannable parcels were planned by 25 | `AccessibilityValidator` sweeps, `UrbanEconomyAuditTest` (no parcel skipped), `RoofOpeningFallbackTest` |
+| R5 | Small survivor camps | Held walk-up ground floors with residents, needs, trade, rumours and missions | `UrbanSurvivor*` tests; 16's natives |
+| R6 | Guarded strongholds | Gated civic courtyards with guards, rules, theft responses and a raider yard | `UrbanStronghold*` tests; 17's natives |
+| R7 | Civilians hidden in basements | Sealed cellars behind loose panels, found by sound and search | `UrbanSurvivor*`, the integrated fixture; 16's natives |
+| R8 | Distinct districts and creatures | Six districts (Reclaimed Residential, Commercial Downtown, Industrial Yards, Flooded Quarter, Civic Precinct, Quarantine Zone); the Veilbound, the Veilmaw and the Breacher; Skitterwings, Murkhares and Glowdeer | 13 and 15 tests; their natives |
+| R9 | Original content | Working names, generated art and sound; no reference game's names, text, art or sound | Packages 09–22's reviews; P-01 still holds the names as working names |
+| R10 | Historical worlds keep their rules; the default switches at 26 | Saved generators load their own world; the wilderness stays on NEW FRONTIER as the labelled legacy world | `HistoricalV3SaveCompatibilityTest`, `HistoricalV020SaveCompatibilityTest`, `UrbanEarlierRevisionSaveTest`, the fingerprints; this package |
+
+No mandatory requirement was found unmet, so the default was switched (D-253). Human judgement of the same requirements (D-80) has still not been given.
+
+### 19.2 The rollout
+
+- **The default.** `World.DEFAULT_NEW_WORLD_GENERATOR` is generator 20 (layout 17, template 7, content 4, encounter catalogue 6). `World.WILDERNESS_NEW_WORLD_GENERATOR` names generator 3, the world every release from 0.3.0 to 0.8.1 created. A save always loads the generator it recorded (D-253).
+- **NEW FRONTIER** opens on the city and Survival; `W` or a click shows the wilderness, labelled "(legacy)", with its own card text and note; `S`/`C` choose the mode as before. Every opening returns to the session's world and Survival. A new city's replace notice says "Saving this new city will replace your current save." (P-05); the loading card says "Mapping the abandoned city..." (D-254).
+- **The death card** in a city says the survivor wakes at their refuge with what they carried, as the respawn always did (D-256).
+- **QA.** `VEYLON_GENERATOR` accepts `wilderness` (and `urban-dev`, the newest layout, today the default itself). A city scene or the save audit refuses to run without an isolated data directory, as `urban-dev` made it before; a wilderness scene keeps the wilderness unless a selector names a world; the smoke plays the session's world (D-255). `VEYLON_FRONTEND=route`/`route-load` plays the default path natively over two launches (D-257).
+- **Tests** name the generator they build: the implicit-default conveniences are gone and 91 test classes name generator 3 (D-253).
+
+### 19.3 The final acceptance scenario and where it is shown
+
+| Step of the pack's scenario | Headless, on the default path or its proven twin | Native |
+| --- | --- | --- |
+| A new Survival world in the city | `DefaultCityAcceptanceTest` (NEW FRONTIER's defaults build generator 20 at the refuge, identical block for block to every route test's city) | the route's NEW FRONTIER, loading and refuge captures |
+| A furnished apartment and another district; food, water, medicine, tools | The integrated fixture built on the default path; `UrbanEconomyRouteTest` (clinic, warehouse, office, security post) | the route's cupboard search; 23's economy tour (reused) |
+| Infected and an alien district encounter | The fixture's dead infected and Veilmaw | 15's ecology tour, 23's economy tour (reused) |
+| A camp, a stronghold, hidden civilians | The fixture: camp missions, hidden aid, the yard taken and the stronghold grateful | `urban_missions` on the default world (this package) |
+| A refuge, a utility, a city mission | The fixture's claimed home, taps and generator-run lamp, and its hidden-aid mission | `urban_missions` (this package) |
+| Save, load and revisit | The fixture saved, the title reached and loaded fact for fact; `UrbanIntegratedSaveTest`'s revisits on the same world | the route's two launches; 25's save audit of the integrated city (reused) |
+| Continued survival without trees or ore | `UrbanEconomyRouteTest`: four days after the city answers | 23's economy tour, 2.5 days (reused) |
+| Legacy saves and Creative | Genuine release saves; `DefaultCityAcceptanceTest`'s Creative city; the Creative twins of every tour | the Creative route pair; 25's release-save audits (reused) |
+| The default selection | `UrbanGeneratorDispatchTest`, `UrbanDevelopmentSelectorTest`, `ModeSelectionRoutingTest` | the route's `check the default world is the city` |
+
+### 19.4 What stays open
+
+- **Human acceptance (D-80):** the consolidated human playtest and listening pass, package 23's extended play and this package's manual acceptance scenario. Until they run, the rollout is in place on the feature branch but the package is not complete. The switch is its own commit and can be reverted alone.
+- **The reference machine** has not run package 24's figures or this package's smokes.
+- **The release smoke** approaches a generated fortress only in the wilderness; in the city it exercises save, load, fire and storm, and the city's streaming is measured by `urban_performance` (D-255).
+- **P-15** (the inverted day's temperature curve), the first-touch planning hitches (D-247), save time growth (D-246, D-250) and the writer's untested 128 MiB check (D-249) are unchanged.
