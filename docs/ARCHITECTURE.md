@@ -275,52 +275,106 @@ habitats (layout 11, template 7) with encounter catalogue 5, and 15 adds the
 survivor camps and hidden refuges (layout 12, template 7, catalogue 5), and 16
 adds guarded strongholds and raider yards (layout 13, template 7, catalogue 5), and 17
 adds burnt-out cars to the local streets and the refuge, salvage and fortification
-rules (layout 14, template 7, catalogue 5). The development selector creates 17. New
-worlds use
+rules (layout 14, template 7, catalogue 5), and 18 adds refuge utilities (layout 15), 19
+the relay mast and missions (layout 16), and 20 is the city of 19 under the survival
+economy's content revision 4 and encounter catalogue 6 (layout 17). The development
+selector creates 20. New worlds use
 `World.DEFAULT_NEW_WORLD_GENERATOR` (3, until the urban rollout); a load accepts any
 supported version and rejects the rest, including anything above
 `MAX_SUPPORTED_GENERATOR`, before it replaces the live world. Feature gates name
 their versions (`hasDeepFrontier`, `hasCaveIdentities`, `isUrbanGenerator`) instead
 of comparing with `>=`, so a new generator inherits nothing by accident, and
-`WorldGeneratorFingerprintTest` pins versions 1–19 absolutely. `ShapedStairGenerationTest`
+`WorldGeneratorFingerprintTest` pins versions 1–20 absolutely. `ShapedStairGenerationTest`
 checks version 8 against frozen version 7 outside stair cells and across chunk orders.
+Under building template 7 (generators 13–20) a building whose every attempt failed on a
+roof opening that faces its own stair house is planned once more without that opening
+(urban D-248); nothing that planned before reaches that step, and the two repaired
+parcels are pinned by `RoofOpeningFallbackTest`.
 
 An urban world's layout revision follows from its generator, so it is known
 before bootstrap generates a chunk; a geometry change means a new generator
 version, never a change under an old one (`UrbanRevision`). Its content revision
 (the rolled loot, encounter and trade tables) is saved in `urban.meta`, which
-only urban worlds write. It is optional for older layouts and required for
-generators 9–19. Until that section, or its
-absent default, has been read, a loading world's content revision cannot be read
-at all. Fresh worlds use content revision 3; revisions 1 and 2 remain supported.
-Revision 1 is the absent-metadata default. The tables and their hash inputs are frozen
-under each revision. Generators 9–19 require content 3. Encounter catalogues are
-additive and versioned separately in `urban.population` (1 for generator 10, 2 for
-11, 3 for 12, 4 for 13, 5 for 14–19, which write codec 2); they do not reroll
-content-3 loot or add encounters to older generators. Generators 13–19 also write
-`urban.discovery` v1 (a count capped at 4,096,
-then ascending observed site ids, each checked against the plan); absence means
-nothing found. Generators 15–19 also require `urban.sites` v1, their survivor
-sites and people, generators 16–19 `urban.compounds` v1, what their compounds
-remember, generators 17–19 `urban.refuges` v2, their claimed refuges, and
-`urban.fortifications` v1, their damaged barricades and braces, generators 18 and 19
-`urban.utilities` v1, their taps' ledger and devices, and generator 19
-`urban.missions` v1, what its survivor learned and did toward the city's
-communications. Generator 19 also writes `urban.visits` v1 (package 21): the districts its
-survivor walked and the buildings they entered, as ascending stable ids capped at
-1,024 and 4,096; it is optional, absence (a package-20 save) means nothing visited, and
-an older build skips it as unknown. Compatibility directions:
+only urban worlds write. Until that section, or its absent default, has been
+read, a loading world's content revision cannot be read at all. Revision 1 is the
+absent-metadata default and is honoured only by the layouts before the starter
+neighbourhood; generators 9–19 require content 3 and generator 20 requires
+content 4, and no other layout accepts 4. The tables and their hash inputs are
+frozen under each revision. Encounter catalogues are additive and versioned in
+`urban.population` (1 for generator 10, 2 for 11, 3 for 12, 4 for 13, 5 for
+14–19 and 6 for 20; catalogues 5 and 6 write codec 2); they do not reroll loot or
+add encounters to older generators.
 
-- this build, a legacy save: unchanged, and no urban state is created;
-- this build, an urban save: the same geometry through its generator, the content
-  revision from `urban.meta` (absence means revision 1 only for older layouts);
-- an older build, a newer urban save: refused when its generator or content
-  revision is unsupported, before the live world is touched; optional unknown
-  sections alone do not make downgrading safe;
-- an `urban.meta` in a non-urban world, a newer section version, a layout
-  revision that does not match the generator, an unsupported content revision or
-  trailing bytes: the whole load fails.
+City state lives in stable-id sections of the v3 envelope, each with its own
+version, bounded counts and an explicit meaning when absent. The writer of every
+city section reads its own bytes back with the load's checks before the save is
+published. Sections are read in any order: those that cross-check others are
+held until every section is in (urban package 25 loads them shuffled).
 
+| Section | Version | Written by | When absent | Bounds |
+| --- | --- | --- | --- | --- |
+| `world.fixtures` | 1 | any world whose doors or windows hold state | as generated, unlocked | 32,768 cells, exact length |
+| `urban.meta` | 1 | generators 4–20 | content revision 1, which generators 9–20 refuse | fixed 12 bytes |
+| `urban.refuges` | 1 (9–16), 2 (17–20) | generators 9–20 | load fails | one starter anchor, 3 claims |
+| `urban.containers` | 1 | generators 7–20 | content 1 adopts the core inventories; else the load fails | 32,768 rows of 36 bytes, exact length |
+| `urban.population` | codec 1 (10–13), 2 (14–20) | generators 10–20 | load fails | 32,768 rows |
+| `urban.discovery` | 1 | generators 13–20 | nothing found | 4,096 ascending ids |
+| `urban.sites` | 1 | generators 15–20 | load fails | 1,024 sites |
+| `urban.compounds` | 1 | generators 16–20 | load fails | exactly the registered compounds |
+| `urban.fortifications` | 1 | generators 17–20 | load fails | 2,048 cells, 256 braces |
+| `urban.utilities` | 1 | generators 18–20 | load fails | 1,024 tapped buildings, 64 devices |
+| `urban.missions` | 1 | generators 19–20 | load fails | 256 records, 4 in hand |
+| `urban.visits` | 1 | generators 19–20 | nothing walked or entered (a package-20 save) | 1,024 + 4,096 ascending ids |
+
+An absent default holds only while nothing else contradicts it: a refuge whose
+people were met needs its discovery, and a brace needs its barred door, so
+removing `urban.discovery` or `world.fixtures` from such a save fails it too.
+
+The corruption policy is explicit and covered section by section on an
+integrated city save (`UrbanSaveCorruptionTest`): a required section missing, any
+section repeated, a version this world does not read, a payload cut short or
+followed by stray bytes, a count past its cap or not matching its length, an
+invalid id, kind, code or ordinal, a non-finite or out-of-range number, a
+contradiction between sections and a file over 128 MiB each fail the whole load.
+A section id this build does not know is skipped by its length and is not
+written again. A load over a live world is first proved on a throwaway `Game`,
+so a refused load changes nothing in the session and never touches the file.
+
+Saves are published from a sibling temporary file only after the whole payload
+is written, flushed and checked. Besides each section's own read-back, the core
+writer refuses any count its reader bounds (4,000,000 block edits, 100,000
+general entries, 32,768 city crates, the inventory size) and any file over the
+128 MiB a load reads, since publishing either would replace the last good save
+with one nothing can open. A failed save, including a failed final replacement,
+keeps the previous file byte for byte and leaves no temporary file
+(`CorruptSaveResilienceTest`). The writers' read-back re-plans the places their
+rows name when the bounded plan caches have dropped them (urban D-246); it is
+kept as the guard on the last good save (urban D-250).
+
+A city's facts survive complete round trips (`UrbanIntegratedSaveTest`): its
+extension sections are written again byte for byte after a load. The core's
+block edits and crates iterate in hash order, which a load may change; their
+contents are equal and no reader depends on their order.
+
+Compatibility directions, each with genuine evidence:
+
+- this build, a legacy save: unchanged rules and terrain, and no city state is
+  created. Saves written by the archived v0.2.0, v0.3.0 and v0.8.1 writers load
+  with their settlements, quests, beacon progress, progression and Creative
+  controls; fresh chunks match the releases' own generators byte for byte; saved
+  again they gain only the optional sections later releases introduced
+  (`HistoricalV020SaveCompatibilityTest`, `HistoricalV3SaveCompatibilityTest`);
+- this build, an earlier urban revision: the same city through its frozen
+  generator and its content revision from `urban.meta`. Saves written by the
+  package-06 build (generator 7, content 1) and the package-20 build (generator 19,
+  before `urban.visits`) load fact for fact (`UrbanContainersSectionTest`,
+  `UrbanEarlierRevisionSaveTest`);
+- a release build (0.8.1 or older), any urban save: refused as an unsupported
+  generator before the live world is touched;
+- an older development build, a newer urban save: refused when the generator,
+  the content revision or a known section's version is newer than it reads; an
+  optional section it does not know is skipped and lost when it saves again. A
+  newer generator makes downgrading unsafe, so no downgrade is promised.
 Urban ids (`world.urban.UrbanIds`) are packed from plan coordinates, never from
 visit or list order. `urban.containers` validates generated fixture ids against
 their immutable reservation and survivor owner building. An invalid, wrong-kind
