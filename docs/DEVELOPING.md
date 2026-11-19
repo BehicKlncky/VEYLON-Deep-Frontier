@@ -13,12 +13,12 @@ Setup requirements (JDK 25, OpenGL 3.3, the proxy workaround) are in
 
 ```bash
 ./gradlew run            # play the game
-./gradlew test           # 886 deterministic tests, headless, ~4 min
+./gradlew test           # the deterministic headless suite, in parallel workers
 ./gradlew performanceTest # 5 wall-clock benchmarks + the per-system tick
                           # profile; reference PC only
 ./gradlew cityPerformanceTest # the dense-city profile alone (performanceTest
                           # runs it first, in its own worker)
-./gradlew build          # compile + test
+./gradlew build          # compile + test + Javadoc/doclint
 ./gradlew fatJar         # self-contained JAR in build/libs/
 ```
 
@@ -31,6 +31,32 @@ On Windows use `.\gradlew.bat`. Tests need no display or GPU — they construct
 ./gradlew test --tests "com.veylon.GameLoopIntegrationTest"
 ./gradlew test --tests "*.newWorldClears*"
 ```
+
+### Test workers, isolation and CI
+
+- `test` splits the classes between parallel worker JVMs with a 1 GiB heap
+  each. The default is two thirds of the logical processors, eight on a
+  12-thread host, measured in 0.9.1 milestone 02. `-PveylonTestForks=N` sets
+  the number; `1` runs every class in one JVM, for example to rule out an
+  interaction between classes.
+- Each worker has its own data directory, `build/test-data/<task>/worker-<id>`,
+  where `<id>` is Gradle's `org.gradle.test.worker`. `WorkerDataDirectory` sets
+  it before any test runs, so no two workers share a save slot or a settings
+  file; `SaveSlotIsolationTest` pins it. The task's directory is emptied when
+  the task starts.
+- Do not rely on another class having run first or on files it wrote: classes
+  are dealt to the workers, so their order and company change between runs.
+- `@TempDir` directories are deleted with bounded, logged retries before
+  JUnit's own cleanup runs (`TempDirCleanup`, 0.9.1 defect B02). On Windows an
+  antivirus can briefly put a copy of a file a test deletes beside it. A retry
+  prints `[temp-dir cleanup]` to the test's standard error. JUnit still fails a
+  test whose directory cannot be deleted.
+- The calibrated `performanceTest`, `rainPerformanceTest` and
+  `cityPerformanceTest` stay in one worker each.
+- `.github/workflows/verify.yml` runs `build` on Windows x64 for every push and
+  pull request. It runs on macOS arm64 for pull requests to `main`, once a week
+  and on demand. It uploads the test reports when a run fails. Release packages
+  still come from `release-build.yml`.
 
 ### QA and capture runs
 
@@ -69,7 +95,9 @@ working directory — the checkout itself when you run from Gradle. Keep QA away
 from the real save slot:
 
 - Tests always run with `-Dveylon.dataDir=build/test-data/<task>`, set by
-  `build.gradle` for every `Test` task and checked by `SaveSlotIsolationTest`.
+  `build.gradle` for every `Test` task, and each worker JVM moves to its own
+  `worker-<id>` directory inside it (see "Test workers, isolation and CI"
+  above). `SaveSlotIsolationTest` checks both.
 - For a native QA session pass `-PveylonDataDir=build/qa/<name>` to `run`. The
   game then reads and writes only there, including F5 saves.
 - `VEYLON_GENERATOR=urban-dev`, every city scene (`urban_*`), `save_audit` and the
