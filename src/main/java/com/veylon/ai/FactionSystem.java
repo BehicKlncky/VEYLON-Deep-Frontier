@@ -427,20 +427,11 @@ public class FactionSystem {
                 "captive-rescued:" + quest.targetCaptiveId, 1);
     }
 
-    /** Compatibility overload intentionally cannot guess which historical captive was targeted. */
-    public void onCaptiveRescued(Game g) {
-        // Context is mandatory; old unbound quests never attach to an unrelated rescue.
-    }
-
     public void onSettlementCleared(Game g, Settlement settlement) {
         if (matchesSettlement(Quest.Type.CLEAR_HOSTILE, settlement)) {
             progress(g, Quest.Type.CLEAR_HOSTILE,
                     "settlement-cleared:" + stableSettlementId(settlement.id), 1);
         }
-    }
-
-    public void onSettlementCleared(Game g) {
-        // Context is mandatory.
     }
 
     /** Binds a pending defense/patrol objective when its concrete mission dispatches. */

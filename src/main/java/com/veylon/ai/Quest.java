@@ -50,7 +50,10 @@ public class Quest {
         COMPLETED,
         FAILED,
         EXPIRED,
-        /** A v2/pre-target-v3 quest that cannot safely be attached to a new target. */
+        /**
+         * A quest never bound to a target, as the HUD's QA scene stages one: it cannot progress, and
+         * its giver withdraws it without reward. The name is what saves store.
+         */
         LEGACY_UNBOUND;
 
         public static Status byName(String name) {
@@ -97,9 +100,9 @@ public class Quest {
     public final Set<String> creditedEvents = new LinkedHashSet<>();
 
     /**
-     * Compatibility constructor. Callers loading a core-only historical quest
-     * intentionally get {@link Status#LEGACY_UNBOUND}; a target extension or a
-     * newly-created offer must explicitly bind it before gameplay can progress.
+     * A quest's core fields, {@link Status#LEGACY_UNBOUND} until it is bound: a
+     * new offer binds it ({@link #bind}), and a load restores its target and
+     * status from the save's {@code quest.target-state} section.
      */
     public Quest(Type type, ItemType item, int required, float timeLeft,
                  int trustReward, ItemType rewardItem, int rewardCount, String giverName) {
