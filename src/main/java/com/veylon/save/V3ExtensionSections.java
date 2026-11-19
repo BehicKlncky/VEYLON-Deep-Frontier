@@ -77,7 +77,6 @@ final class V3ExtensionSections {
         sections.add(new V3Section(GameModeSection.ID, GameModeSection.write(g)));
         sections.add(new V3Section(CreativeControlsSection.ID, CreativeControlsSection.write(g)));
         sections.add(new V3Section(BodiesSection.ID, BodiesSection.write(g)));
-        sections.add(new V3Section(FragmentsSection.ID, FragmentsSection.write(g)));
         sections.add(new V3Section(RemainsSection.ID, RemainsSection.write(g)));
         if (FixtureStatesSection.present(g)) {
             // Only worlds whose doors or windows hold state carry the section.
@@ -313,7 +312,6 @@ final class V3ExtensionSections {
         }
         Set<String> seen = new HashSet<>();
         boolean restoredLanterns = false;
-        byte[] fragments = null;
         byte[] remains = null;
         byte[] containers = null;
         byte[] population = null;
@@ -356,8 +354,6 @@ final class V3ExtensionSections {
                 CreativeControlsSection.read(payload, g);
             } else if (BodiesSection.ID.equals(id)) {
                 BodiesSection.read(payload, g);
-            } else if (FragmentsSection.ID.equals(id)) {
-                fragments = payload;
             } else if (RemainsSection.ID.equals(id)) {
                 remains = payload;
             } else if (FixtureStatesSection.ID.equals(id)) {
@@ -387,7 +383,8 @@ final class V3ExtensionSections {
             }
             // Unknown stable IDs are intentionally skipped using their bounded length.
         }
-        readSettledPieces(fragments, remains, g);
+        // The pieces' harvest links name carcasses of the core body, read before any section.
+        if (remains != null) { RemainsSection.read(remains, g); }
         UrbanMetaSection.finishLoad(g);
         if (containers != null) { UrbanContainersSection.read(containers,g); }
         if (population != null) { UrbanPopulationSection.read(population, g); }
@@ -404,28 +401,6 @@ final class V3ExtensionSections {
         if (restoredLanterns) {
             g.world.refreshLoadedLights();
         }
-    }
-
-    /**
-     * Restores the settled pieces once every section is in hand, so the result
-     * does not depend on the order sections appear in: {@code world.remains}
-     * when the save has it, otherwise the people in {@code world.fragments}
-     * version 1. Version 1 is validated either way, so a damaged one still
-     * fails the load. The carcasses the remains tie back to come from the v3
-     * body, which is read before any section.
-     */
-    private static void readSettledPieces(byte[] fragments, byte[] remains, Game g)
-            throws IOException {
-        if (remains == null) {
-            if (fragments != null) {
-                FragmentsSection.read(fragments, g);
-            }
-            return;
-        }
-        if (fragments != null) {
-            FragmentsSection.parse(fragments);
-        }
-        RemainsSection.read(remains, g);
     }
 
     private static void readActiveExplosivesSection(byte[] payload, Game g) throws IOException {

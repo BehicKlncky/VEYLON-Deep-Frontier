@@ -22,7 +22,7 @@ import java.util.Locale;
  * it.
  *
  * <p>A piece placed with the rest pose — every human piece today, and every
- * piece read from a {@code world.fragments} version 1 record — has
+ * piece of a pose {@code world.remains} records as its family's rest pose — has
  * {@code poseRotation} the identity and {@code poseCentre} its rest centre, so
  * the rule above is the one this class always had: a rest-pose model point
  * {@code p} is drawn at {@code pos + orientation × (p − restCentre)}.
@@ -32,7 +32,7 @@ public class BodyFragment {
     /**
      * The ten pieces of a person (assumption A6), in the order of
      * {@link FragmentAnatomy#humanoid()}'s pieces: the ordinal is the piece id
-     * {@code world.fragments} version 1 stores, so append only.
+     * {@code world.remains} stores for a person's piece, so append only.
      *
      * <p>Every number is the humanoid table's, which repeats
      * {@code NpcModels.build()}: pivots summed down the part tree, arm and leg
@@ -73,7 +73,7 @@ public class BodyFragment {
             definition = FragmentAnatomy.humanoid().piece(ordinal());
             if (!definition.name.equals(name().toLowerCase(Locale.ROOT))) {
                 throw new IllegalStateException("legacy piece " + name() + " maps to humanoid piece "
-                        + definition.name + "; world.fragments v1 ids would change");
+                        + definition.name + "; saved people's piece ids would change");
             }
             rootPart = definition.rootPart;
             boxPart = definition.boxPart;
@@ -101,7 +101,7 @@ public class BodyFragment {
     /** What this piece is, in its body family's table. */
     public final FragmentPiece definition;
     /**
-     * The legacy human identity, the {@code world.fragments} version 1 id;
+     * The human identity, the piece id {@code world.remains} stores for a person;
      * null for a piece of any other body.
      */
     public final Piece piece;
@@ -173,7 +173,7 @@ public class BodyFragment {
     /** Last measured settle energy, for tests and the debug overlay. */
     public float energy;
 
-    /** A human piece in the standing rest pose, as {@code world.fragments} version 1 restores it. */
+    /** A human piece in the standing rest pose. */
     public BodyFragment(Piece piece) {
         this(piece.definition, piece.definition.anatomy.restPose());
     }

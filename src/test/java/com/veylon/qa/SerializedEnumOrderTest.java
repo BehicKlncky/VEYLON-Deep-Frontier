@@ -103,13 +103,13 @@ class SerializedEnumOrderTest {
             "RECOVER_STOLEN_SUPPLIES", "CAPTURE_FORT", "DEFEND_OUTPOST",
             "EXPLORE_SETTLEMENT_CAVE");
 
-    /** {@code world.bodies} and {@code world.fragments} store the archetype as ordinal + 1. */
+    /** {@code world.bodies} and {@code world.remains} store the archetype as ordinal + 1. */
     private static final List<String> NPC_ARCHETYPE_ORDER = List.of(
             "VILLAGER", "GUARD", "MEDIC", "TRADER", "FARMER", "SMITH", "ARCHER",
             "SCAVENGER", "TRACKER", "SCOUT", "HUNTER", "BRUTE", "POWDERMAN", "LEADER",
             "CAPTIVE", "VEILBOUND", "BREACHER");
 
-    /** {@code world.fragments} stores the piece id as its ordinal. */
+    /** A person's piece id in {@code world.remains} is its {@code BodyFragment.Piece} ordinal. */
     private static final List<String> BODY_FRAGMENT_PIECE_ORDER = List.of(
             "TORSO", "HEAD", "UPPER_ARM_L", "UPPER_ARM_R", "FOREARM_L", "FOREARM_R",
             "THIGH_L", "THIGH_R", "SHIN_L", "SHIN_R");
@@ -181,10 +181,10 @@ class SerializedEnumOrderTest {
     }
 
     @Test
-    void bodyFragmentPieceNamesAndOrderMatchTheFragmentSectionSnapshot() {
+    void bodyFragmentPieceNamesAndOrderMatchTheRemainsSectionSnapshot() {
         assertEquals(BODY_FRAGMENT_PIECE_ORDER,
                 Arrays.stream(BodyFragment.Piece.values()).map(BodyFragment.Piece::name).toList(),
-                "the fragment section persists BodyFragment.Piece.ordinal(); append only");
+                "a person's piece in world.remains is restored by BodyFragment.Piece.ordinal(); append only");
     }
 
     @Test
@@ -207,6 +207,6 @@ class SerializedEnumOrderTest {
         List<String> humanoid = FRAGMENT_PIECE_ORDER.get(BodyFamily.HUMANOID).stream()
                 .map(name -> name.toUpperCase(Locale.ROOT)).toList();
         assertEquals(BODY_FRAGMENT_PIECE_ORDER, humanoid,
-                "a person's piece id in world.remains is its world.fragments version 1 ordinal");
+                "a person's piece id in world.remains is its BodyFragment.Piece ordinal");
     }
 }

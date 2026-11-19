@@ -647,7 +647,7 @@ public final class FragmentAnatomy {
 
     /**
      * {@code NpcModels.build()}. Piece order is {@link BodyFragment.Piece}'s,
-     * the ids {@code world.fragments} version 1 stores.
+     * the ids {@code world.remains} stores for a person.
      */
     private static FragmentAnatomy humanoidTable() {
         float hipY = 0.86f;

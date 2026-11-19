@@ -30,7 +30,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HexFormat;
 import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -52,10 +51,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * {@code world.remains}: each piece comes back as its own species' piece, in
  * the pose its body died in, where and how it lay, with its look and its rot
  * clock; an animal's one harvest record comes back on its torso, never twice
- * and never as a second whole body; a save without the section loads as
- * v0.8.0 would, and a literal v0.8.0 section still loads; a body this build
- * does not know is skipped, never read as a person; and anything malformed
- * fails the whole load and leaves the live world alone.
+ * and never as a second whole body; a body this build does not know is
+ * skipped, never read as a person; and anything malformed fails the whole
+ * load and leaves the live world alone. It is the only record of the settled
+ * pieces: 0.9.1 stopped writing {@code world.fragments} beside it.
  */
 class RemainsSectionTest {
 
@@ -64,24 +63,6 @@ class RemainsSectionTest {
     private static final float Z = 310.5f;
     /** A powder keg's power; the strongest blast the game makes. */
     private static final float KEG = 3.8f;
-
-    /**
-     * A {@code world.fragments} version 1 payload exactly as v0.8.0 wrote it,
-     * composed by hand from the format, not by any writer: a guard's head and
-     * the player's right shin.
-     */
-    private static final String V080_FRAGMENTS = String.join("",
-            "00000001", "00000002",
-            // HEAD (1) at (310.5, 40.25, 312), turned (0.5, 0.5, -0.5, 0.5), 200 s left,
-            // GUARD (ordinal 1, stored + 1), not raider/trader/sick, camp 1.
-            "00000001", "439B4000", "42210000", "439C0000",
-            "3F000000", "3F000000", "BF000000", "3F000000", "43480000",
-            "00000002", "00", "00", "00", "00000001",
-            // SHIN_R (9) at (308.75, 40.0625, 309.5), turned (-0.5, 0.5, 0.5, 0.5),
-            // a full 420 s, no archetype, the neutral camp -2.
-            "00000009", "439A6000", "42204000", "439AC000",
-            "BF000000", "3F000000", "3F000000", "3F000000", "43D20000",
-            "00000000", "00", "00", "00", "FFFFFFFE");
 
     @TempDir
     Path directory;
@@ -146,66 +127,6 @@ class RemainsSectionTest {
 
         assertArrayEquals(RemainsSection.write(original), RemainsSection.write(loaded),
                 "saving the loaded world again writes the same remains, so repeated loads cannot drift");
-    }
-
-    @Test
-    void aSaveWithoutTheRemainsSectionLoadsAsV080Would() throws IOException {
-        Game original = mixedWorld(8080L);
-        List<BodyFragment> people = original.fragments.settled.stream()
-                .filter(f -> f.piece != null).toList();
-        assertEquals(20, people.size(), "precondition: a person and the player's remains");
-        List<Carcass> recordsBefore = List.copyOf(original.entities.carcasses);
-
-        Path save = directory.resolve("v080.sav");
-        assertTrue(SaveSystem.save(original, save));
-        Files.write(save, CreativeSaveSections.replace(Files.readAllBytes(save), RemainsSection.ID, null));
-        Game loaded = new Game();
-        assertTrue(SaveSystem.load(loaded, save), "a save without world.remains still loads");
-
-        List<BodyFragment> after = loaded.fragments.settled;
-        assertEquals(people.size(), after.size(), "the people come back from version 1; no animal piece does");
-        FragmentPose rest = FragmentAnatomy.humanoid().restPose();
-        for (int i = 0; i < people.size(); i++) {
-            BodyFragment was = people.get(i);
-            BodyFragment is = after.get(i);
-            assertSame(was.piece, is.piece, "piece " + i);
-            assertEquals(was.pos.x, is.pos.x, 0f);
-            assertEquals(was.pos.y, is.pos.y, 0f);
-            assertEquals(was.pos.z, is.pos.z, 0f);
-            assertEquals(was.orientation.w, is.orientation.w, 1e-6f);
-            assertEquals(was.decay, is.decay, 0f);
-            assertEquals(was.appearance.campIndex, is.appearance.campIndex);
-            assertSame(rest, is.pose, "version 1 never carried a pose");
-        }
-        assertEquals(recordsBefore.size(), loaded.entities.carcasses.size(),
-                "each animal still leaves exactly one record");
-        for (int i = 0; i < recordsBefore.size(); i++) {
-            Carcass is = loaded.entities.carcasses.get(i);
-            assertFalse(is.fragmented(), is.type + " falls back to one whole carcass, not none and not two");
-            assertEquals(recordsBefore.get(i).meatLeft, is.meatLeft, is.type + ": same meat");
-            assertEquals(recordsBefore.get(i).hideLeft, is.hideLeft, is.type + ": same hide");
-        }
-    }
-
-    @Test
-    void aLiteralVersion1SectionStillLoadsAndIsStillWrittenByteForByte() throws IOException {
-        byte[] literal = HexFormat.of().parseHex(V080_FRAGMENTS);
-        assertEquals(102, literal.length, "precondition: two 47-byte records after version and count");
-
-        Game direct = new Game();
-        FragmentsSection.read(literal, direct);
-        assertV080Pieces(direct.fragments.settled);
-        assertArrayEquals(literal, FragmentsSection.write(direct),
-                "people are still written to version 1 exactly as v0.8.0 wrote them");
-
-        Game empty = arena(1201L);
-        Path save = directory.resolve("literal-v1.sav");
-        assertTrue(SaveSystem.save(empty, save));
-        byte[] bytes = CreativeSaveSections.replace(Files.readAllBytes(save), FragmentsSection.ID, literal);
-        Files.write(save, CreativeSaveSections.replace(bytes, RemainsSection.ID, null));
-        Game loaded = new Game();
-        assertTrue(SaveSystem.load(loaded, save), "a v0.8.0 fragment section loads through the whole reader");
-        assertV080Pieces(loaded.fragments.settled);
     }
 
     @Test
@@ -672,29 +593,6 @@ class RemainsSectionTest {
         Map<FragmentPose, FragmentPose> inverse = new IdentityHashMap<>();
         map.forEach((k, v) -> inverse.put(v, k));
         return inverse;
-    }
-
-    private static void assertV080Pieces(List<BodyFragment> pieces) {
-        assertEquals(2, pieces.size());
-        BodyFragment head = pieces.get(0);
-        assertSame(BodyFragment.Piece.HEAD, head.piece, "version 1 id 1 is the person's head");
-        assertSame(BodyFamily.HUMANOID, head.definition.family);
-        assertSame(FragmentAnatomy.humanoid().restPose(), head.pose);
-        assertEquals(310.5f, head.pos.x, 0f);
-        assertEquals(40.25f, head.pos.y, 0f);
-        assertEquals(312f, head.pos.z, 0f);
-        assertEquals(-0.5f, head.orientation.z, 0f);
-        assertEquals(200f, head.decay, 0f);
-        assertSame(NpcArchetype.GUARD, head.appearance.archetype);
-        assertEquals(1, head.appearance.campIndex);
-        BodyFragment shin = pieces.get(1);
-        assertSame(BodyFragment.Piece.SHIN_R, shin.piece, "version 1 id 9 is the right shin");
-        assertEquals(308.75f, shin.pos.x, 0f);
-        assertEquals(40.0625f, shin.pos.y, 0f);
-        assertEquals(-0.5f, shin.orientation.x, 0f);
-        assertEquals(RagdollConstants.CORPSE_DECAY, shin.decay, 0f);
-        assertNull(shin.appearance.archetype);
-        assertEquals(NpcAppearance.NEUTRAL_CAMP_INDEX, shin.appearance.campIndex, "the player's campless look");
     }
 
     // ------------------------------------------------------------------

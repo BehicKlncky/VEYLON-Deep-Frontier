@@ -30,24 +30,16 @@ import static com.veylon.save.BodiesSection.writeAppearance;
 import static com.veylon.save.SaveSystem.readCount;
 
 /**
- * Optional v3 state: the remains of every body blown apart — a person's, an
- * animal's or the player's — lying where they came to rest, in the pose each
- * body died in, with the harvest record an animal's torso carries.
+ * The remains of every body blown apart — a person's, an animal's or the
+ * player's — lying where they came to rest, in the pose each body died in,
+ * with the harvest record an animal's torso carries.
  *
- * <p>This is the authoritative record of the settled pieces. It holds every one
- * of them, people included, in the order {@code BodyFragmentSystem.settled}
+ * <p>This is the only record of the settled pieces. It holds every one of
+ * them, people included, in the order {@code BodyFragmentSystem.settled}
  * holds them, so after a load the settled cap evicts the piece it would have
- * evicted before the save. {@link FragmentsSection} version 1 is still written
- * beside it, unchanged, for builds that do not know this section: when both
- * are present this one is restored and that one only validated.
- *
- * <p>It is a new stable ID rather than version 2 of {@code world.fragments}
- * because the version 1 reader refuses any other version of its section and
- * with it the whole save, while every reader skips an ID it does not know by
- * its length. A v0.8.0 build therefore opens a newer save with its people,
- * their pieces in the standing rest pose, and without the animals' pieces;
- * an animal's harvest record, which lives in the frozen v3 body, then loads
- * as an ordinary whole carcass: one body, the same meat and hide.
+ * evicted before the save. Until 0.9.1 the people were also written to
+ * {@code world.fragments} version 1 for builds that did not know this
+ * section; no build of this epoch reads that section.
  *
  * <p>Layout, all numeric (see {@link BodiesSection} for why):
  * <pre>
@@ -62,8 +54,8 @@ import static com.veylon.save.SaveSystem.readCount;
  * </pre>
  * A piece's identity is (family, piece id), both append only
  * ({@link BodyFamily}, each family's {@link FragmentAnatomy} piece list); a
- * person's piece id is its {@code world.fragments} version 1 ordinal. The
- * pieces of one body share one pose, stored once.
+ * person's piece id is its {@link BodyFragment.Piece} ordinal. The pieces of
+ * one body share one pose, stored once.
  *
  * <p><b>Policy for what this build cannot read.</b> Every count, index and
  * number is bounds checked, and anything malformed — a count over its cap, an
@@ -80,10 +72,11 @@ import static com.veylon.save.SaveSystem.readCount;
  * keeps its pieces in the family's rest pose, as version 1 people load.
  * Nothing unknown is ever read as a person's piece.
  *
- * <p>On write, a piece the reader would refuse is left out, as in version 1,
- * and a pose it would refuse is written as the family's rest pose: the piece
- * keeps its place, not its articulation. Pieces in flight are never written;
- * {@code SaveSystem.save} settles them first.
+ * <p>On write, a piece the reader would refuse is left out, so one bad piece
+ * of debris can cost that piece, never the save, and a pose it would refuse
+ * is written as the family's rest pose: the piece keeps its place, not its
+ * articulation. Pieces in flight are never written; {@code SaveSystem.save}
+ * settles them first.
  */
 final class RemainsSection {
 
@@ -91,6 +84,10 @@ final class RemainsSection {
     static final int VERSION = 1;
     /** The most pieces the world can hold at rest. */
     static final int MAX_PIECES = BodyFragmentConstants.MAX_SETTLED_FRAGMENTS;
+    /** A unit quaternion's components lie in [-1, 1]; the rest is headroom for float drift. */
+    private static final float MAX_QUATERNION_COMPONENT = 2f;
+    /** Below this squared length a quaternion has no direction worth normalising. */
+    private static final float MIN_QUATERNION_LENGTH_SQUARED = 1e-6f;
     /** At most one pose per piece. */
     static final int MAX_POSES = MAX_PIECES;
     /** Every harvest record rides on an anchored torso. */
@@ -129,7 +126,7 @@ final class RemainsSection {
         }
         List<BodyFragment> kept = new ArrayList<>(settled.size());
         for (BodyFragment f : settled) {
-            if (FragmentsSection.placementReadable(f)) {
+            if (placementReadable(f)) {
                 kept.add(f);
             }
         }
@@ -364,10 +361,10 @@ final class RemainsSection {
             float x = readFinite(in, "remains x", -MAX_HORIZONTAL, MAX_HORIZONTAL);
             float y = readFinite(in, "remains y", -MAX_VERTICAL, MAX_VERTICAL);
             float z = readFinite(in, "remains z", -MAX_HORIZONTAL, MAX_HORIZONTAL);
-            float qx = FragmentsSection.readQuaternion(in, "x");
-            float qy = FragmentsSection.readQuaternion(in, "y");
-            float qz = FragmentsSection.readQuaternion(in, "z");
-            float qw = FragmentsSection.readQuaternion(in, "w");
+            float qx = readQuaternion(in, "x");
+            float qy = readQuaternion(in, "y");
+            float qz = readQuaternion(in, "z");
+            float qw = readQuaternion(in, "w");
             float length = qx * qx + qy * qy + qz * qz + qw * qw;
             if (Math.abs(length - 1f) > QUATERNION_TOLERANCE) {
                 throw new IOException("remains orientation is not a unit quaternion: " + length);
@@ -435,6 +432,24 @@ final class RemainsSection {
     // ------------------------------------------------------------------
     // Shared bounds
     // ------------------------------------------------------------------
+
+    private static float readQuaternion(DataInputStream in, String axis) throws IOException {
+        return readFinite(in, "remains orientation " + axis,
+                -MAX_QUATERNION_COMPONENT, MAX_QUATERNION_COMPONENT);
+    }
+
+    /** Whether a piece's position, orientation and rot clock are within what the reader accepts. */
+    private static boolean placementReadable(BodyFragment f) {
+        float qx = f.orientation.x, qy = f.orientation.y, qz = f.orientation.z;
+        float qw = f.orientation.w;
+        return withinPose(f.pos.x, MAX_HORIZONTAL) && withinPose(f.pos.y, MAX_VERTICAL)
+                && withinPose(f.pos.z, MAX_HORIZONTAL)
+                && withinPose(qx, MAX_QUATERNION_COMPONENT) && withinPose(qy, MAX_QUATERNION_COMPONENT)
+                && withinPose(qz, MAX_QUATERNION_COMPONENT) && withinPose(qw, MAX_QUATERNION_COMPONENT)
+                && qx * qx + qy * qy + qz * qz + qw * qw >= MIN_QUATERNION_LENGTH_SQUARED
+                && Float.isFinite(f.decay) && f.decay >= 0f
+                && f.decay <= RagdollConstants.CORPSE_DECAY;
+    }
 
     private static boolean withinPose(float value, float max) {
         return Float.isFinite(value) && value >= -max && value <= max;

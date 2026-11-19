@@ -46,7 +46,7 @@ final class BodiesSection {
     /** Far above the corpse despawn radius could ever sustain. */
     private static final int MAX_CORPSES = 4096;
     private static final float MAX_ANGLE = 40f;
-    /** Position bounds; {@link FragmentsSection} holds its pieces to the same ones. */
+    /** Position bounds; {@link RemainsSection} holds its pieces to the same ones. */
     static final float MAX_HORIZONTAL = 100_000_000f;
     static final float MAX_VERTICAL = 10_000f;
 
@@ -115,7 +115,7 @@ final class BodiesSection {
 
     /**
      * The look of the person a body came from. Shared with
-     * {@link FragmentsSection}, so a piece of a person is recorded exactly as
+     * {@link RemainsSection}, so a piece of a person is recorded exactly as
      * the whole corpse is.
      */
     static void writeAppearance(DataOutputStream out, NpcAppearance appearance)
@@ -212,7 +212,7 @@ final class BodiesSection {
      * A NaN here would load, and then no comparison against it would ever be
      * true again — the same failure the player-scalar guard exists for. The
      * bounded equivalents in SaveSystem and V3ExtensionSections are private;
-     * {@link FragmentsSection} reads through this one.
+     * {@link RemainsSection} reads through this one.
      */
     static float readFinite(DataInputStream in, String label, float min, float max)
             throws IOException {

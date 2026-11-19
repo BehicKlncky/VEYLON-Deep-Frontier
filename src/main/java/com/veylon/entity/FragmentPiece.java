@@ -9,8 +9,8 @@ import java.util.List;
  * <p>Built once by {@link FragmentAnatomy} and never changed. The {@link #id}
  * is the piece's stable identity inside its {@link BodyFamily}: its index in
  * {@link FragmentAnatomy#pieces}, append only. Humanoid ids are the ordinals of
- * {@link BodyFragment.Piece}, which is what {@code world.fragments} version 1
- * stores.
+ * {@link BodyFragment.Piece}, which is what {@code world.remains} stores for a
+ * person.
  *
  * <p>Every position is rest-pose model space: the model standing with no
  * animation, feet at the origin, facing -Z. The collision box is the box of

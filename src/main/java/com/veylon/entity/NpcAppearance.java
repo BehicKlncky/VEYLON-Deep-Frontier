@@ -17,8 +17,8 @@ public final class NpcAppearance {
      * no person's index is, so the look wears no camp badge; its vest,
      * {@code floorMod(-2, 4) = 2}, is the gatherer's plain brown one, which is
      * also the vest of every archetype without one of its own. Saves store
-     * the index as it is, so the look survives {@code world.fragments}
-     * version 1 unchanged.
+     * the index as it is, so the look survives a save and load
+     * unchanged.
      */
     public static final int NEUTRAL_CAMP_INDEX = -2;
 

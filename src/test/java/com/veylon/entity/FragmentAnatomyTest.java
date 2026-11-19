@@ -386,7 +386,7 @@ class FragmentAnatomyTest {
         }
         FragmentAnatomy deer = FragmentAnatomy.of(CreatureType.DEER);
         assertNull(new BodyFragment(deer.piece(0), deer.restPose()).piece,
-                "no animal piece can be mistaken for a world.fragments v1 id");
+                "no animal piece can be mistaken for a person's piece");
     }
 
     // ------------------------------------------------------------------
