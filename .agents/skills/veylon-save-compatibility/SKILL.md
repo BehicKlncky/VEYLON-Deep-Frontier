@@ -1,43 +1,56 @@
 ---
 name: veylon-save-compatibility
-description: Preserve VEYLON save compatibility when changing serialized state, enum ordinals, save/load code or seeded world generation.
+description: Keep VEYLON saves strict within one save epoch, and raise the epoch when a change would load a save into another world or state. Use when changing serialized state, enum tables, save/load code or seeded world generation.
 ---
 
-# VEYLON save compatibility
+# VEYLON saves and the save epoch
 
-> **Owner policy, 2026-11-06:** only saves written by the current version must open (see "Save compatibility policy" in `docs/ARCHITECTURE.md`). Where this skill asks you to preserve legacy saves, migration, historical fixtures or frozen generator output, the policy wins. The 0.9.1 save-epoch work rewrites this skill.
+All paths below are relative to the repository root. The rule is the owner's save policy: a build opens only saves of its own save epoch ("Save compatibility policy" and "The save epoch" in `docs/ARCHITECTURE.md`; decisions D-01 and D-16 to D-19 in `docs/roadmap/v0.9.1/DESIGN.md`). Read those, then the code in `src/main/java/com/veylon/save/`. Read only the contributor rules in `docs/DEVELOPING.md` that apply, starting with "Saves and the save epoch".
 
-All paths below are relative to the repository root. Start with the save/load section of `docs/ARCHITECTURE.md`, then the relevant code in `src/main/java/com/veylon/save/`. Read only the contributor rules in `docs/DEVELOPING.md` that apply to the changed state.
+## What the policy rules out
+
+- No migration path, legacy reader, absence default for a section every save holds, frozen generator version, content or layout revision kept for old saves, downgrade promise or historical save fixture. Do not add one, and remove one you find.
+- A refusal test builds a foreign or older header in code (`src/test/java/com/veylon/save/ForeignSaves.java`); it never loads a stored file of an earlier build.
 
 ## Design the change
 
-- Inspect `SaveSystem.java` and `V3ExtensionSections.java` before changing serialization. The current writer uses binary v3 and loads v2; preserve the frozen base layout and existing legacy migration behavior.
-- Persisted enums are append-only. Check `SerializedEnumOrderTest` before editing block, item, biome, affliction, settlement or entity-state enums.
-- Decide whether each new field is persistent or transient and how it resets on new world, load and, for NPCs, dormancy/reactivation. Do not persist temporary state just because a field exists.
-- Extend through the existing section mechanism with a stable ID, bounded payload and explicit absent-section defaults. Inspect the current reader's handling of unknown IDs and unsupported versions rather than assuming they are equivalent.
-- Existing compatibility distinction: older readers can skip a new optional ID such as `world.fragments`; readers that know `world.bodies` but reject its newer version can reject the entire save. Document both old-save loading and older-build reading behavior when relevant.
-- Terrain and settlement structure are regenerated from seed/version plus deltas. Preserve legacy generation and planning order-independence; intentional new terrain behavior must follow the existing generator-version mechanism.
-- Retain input validation: bounded counts via `readCount`, validated ordinals, finite/bounded numeric values and explicit rejection of malformed sections.
-- Retain durable publication through a sibling temporary file, flush and atomic replacement. A failed save must preserve the previous file; do not replace this with a direct overwrite.
+- The header (`SaveHeader`) is magic, format, epoch, seed and generator. Every format keeps magic, format and epoch at the same offsets. `SaveSystem.open` refuses another format or epoch before it builds anything; keep that order.
+- Within one epoch the reader accepts exactly what the writer writes: one version per section (per generator where the city's differ), every always-written section present (`V3ExtensionSections.ALWAYS_WRITTEN`), an unknown section id refused, ordinals and stable ids validated. A section written only when it holds something means exactly "nothing" when absent.
+- Decide whether each new field is persistent or transient and how it resets on new world, on load and, for NPCs, on dormancy and reactivation. Do not persist temporary state just because a field exists.
+- New state goes into a stable-id, length-prefixed section with an int version and bounded counts (`readCount`), not into the core body.
+- Persisted enums: append rather than reorder, so ordinals stay stable while an epoch is developed. `SerializedEnumOrderTest` pins the orders.
+- Terrain and settlement and city structure are regenerated from seed and generator plus deltas. Only generators 3 (wilderness) and 20 (city) may change on purpose; re-record their pins in `WorldGeneratorFingerprintTest`. Generators 1, 2 and 4–19 stay as they are until 0.9.2 retires them. Keep generation and planning order-independent and seeded.
+- Keep durable publication: sibling temporary file, flush, atomic replacement, the writer's refusal of any count or size its reader would refuse. A failed save keeps the previous file; never write the destination directly.
+
+## The epoch guard
+
+`SaveEpochGuardTest` digests the layout (a sample save of each world kind), the stored enum tables and both world kinds' generation, as five recorded inputs.
+
+- It fails while the current epoch is unreleased: check that the change was meant to alter saves, then paste the values it prints into `RECORDED`.
+- It fails while `RELEASED` names the current epoch: raise `SaveHeader.EPOCH` by one and record the new epoch's inputs. Never edit or remove a `RELEASED` entry; a release adds its epoch with the digest the passing test prints.
+- An appended enum constant counts as a change: a build of the same epoch must read every save of that epoch.
 
 ## Verify the affected behavior
 
-Use the existing fixtures and production save/load path. Select tests according to the change:
+Use the production save and load path and fixed seeds. Select tests according to the change:
 
-| Change | Relevant existing coverage |
+| Change | Relevant coverage |
 | --- | --- |
-| Base reader/writer or migration | `SaveMigrationTest`, `HistoricalV020SaveCompatibilityTest`, `CorruptSaveResilienceTest` |
-| Extension state | Relevant section tests: `BodiesSectionTest`, `FragmentsSectionTest`, `GameModeSectionTest`, `CreativeControlsSectionTest` |
+| Header, refusal, messages | `SaveEpochRefusalTest`, `SaveRefusalRoutingTest` |
+| Core body or extension tail | `CoreSaveRoundTripTest`, `CorruptSaveResilienceTest` |
+| A section | its section test, such as `BodiesSectionTest`, `RemainsSectionTest`, `GameModeSectionTest` or `CreativeControlsSectionTest` |
+| City sections | `UrbanIntegratedSaveTest`, `UrbanSaveCorruptionTest` |
 | Ordinals | `SerializedEnumOrderTest` |
-| Terrain or RNG | `WorldGeneratorFingerprintTest`, `WorldSeedDeterminismTest` |
-| Session reset/load over a live world | `GameLoopIntegrationTest` |
+| Terrain, plans or RNG | `WorldGeneratorFingerprintTest`, `WorldSeedDeterminismTest` |
+| Anything above | `SaveEpochGuardTest` |
+| Session reset or load over a live world | `GameLoopIntegrationTest` |
 
-For save-package coverage on Windows:
+For the save package on Windows:
 
 ```powershell
 .\gradlew.bat test --tests "com.veylon.save.*" --console=plain
 ```
 
-Use `./gradlew` on macOS. Run other relevant classes with their actual package-qualified names, then the portable build for code changes. Add meaningful round-trip, missing-section/default or corruption coverage where the change creates a new case; never regenerate authentic historical fixtures merely to make tests pass.
+Use `./gradlew` on macOS. Run other relevant classes with their package-qualified names, then the portable build for code changes. Add round-trip, refusal and corruption cases where the change creates a new one.
 
-Document the compatibility result and persistent/transient decision in the existing architecture/development docs when they change. In the handoff distinguish verified old-save loading, newer-save downgrade behavior and any untested direction.
+Document the persistent or transient decision and any new section in `docs/ARCHITECTURE.md` and `docs/DEVELOPING.md` when they change. In the handoff say whether the guard's inputs moved, whether they were re-recorded, and whether the epoch rose.
