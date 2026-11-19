@@ -72,7 +72,7 @@ class UrbanFortificationsSectionTest {
         Path file = directory.resolve("missing.sav");
         assertTrue(SaveSystem.save(fx.game(), file));
         byte[] bytes = Files.readAllBytes(file);
-        // Renaming the section makes it an unknown id, which the reader skips: the same as an absent one.
+        // Renaming the section leaves it missing, and its new id unknown: either fails the load.
         byte[] id = UrbanFortificationsSection.ID.getBytes(StandardCharsets.UTF_8);
         int at = indexOf(bytes, id);
         assertTrue(at > 0);

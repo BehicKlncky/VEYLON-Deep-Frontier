@@ -245,27 +245,4 @@ public final class UrbanContainers {
         nextPlayerId=next;
         sectionRestored=true;
     }
-
-    /** Missing old section: preserve core inventories, and retire edited generated reservations, never refill them. */
-    public void adoptLegacy(World world) {
-        for (Vec3i position : world.crateContents.keySet().toArray(Vec3i[]::new)) {
-            world.getOrCreateChunk(Math.floorDiv(position.x(),16),Math.floorDiv(position.z(),16));
-            BlockType live = world.getBlock(position.x(),position.y(),position.z());
-            if (!Fixtures.isContainer(live)) { world.crateContents.remove(position); continue; }
-            if (entries.size() >= MAX_ENTRIES) { throw new IllegalArgumentException("too many legacy container inventories"); }
-            Planned plan = planned(world,position);
-            if (plan != null && plan.fixture.block() == live) { put(generated(world,plan,State.SEARCHED)); }
-            else { player(position,live); }
-        }
-        for (var edit : world.changedBlocks.entrySet()) {
-            Vec3i position=edit.getKey();
-            if (at(position) != null || position.y() < UrbanDatum.slabY(-1) || position.y() > UrbanDatum.slabY(5)) { continue; }
-            Planned plan=planned(world,position);
-            if (plan != null && !entries.containsKey(plan.fixture.id())) {
-                if (entries.size() >= MAX_ENTRIES) { throw new IllegalArgumentException("too many legacy container edits"); }
-                put(generated(world,plan,State.DESTROYED));
-            }
-        }
-        prepareSave(world);
-    }
 }

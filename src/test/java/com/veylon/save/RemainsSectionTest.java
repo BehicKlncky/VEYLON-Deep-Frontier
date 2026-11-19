@@ -11,7 +11,6 @@ import com.veylon.entity.Creature.CreatureType;
 import com.veylon.entity.FragmentAnatomy;
 import com.veylon.entity.FragmentPose;
 import com.veylon.entity.Npc;
-import com.veylon.entity.NpcAppearance;
 import com.veylon.entity.RagdollConstants;
 import com.veylon.gfx.model.FragmentModels;
 import com.veylon.item.ItemType;
@@ -41,7 +40,6 @@ import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -51,10 +49,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * {@code world.remains}: each piece comes back as its own species' piece, in
  * the pose its body died in, where and how it lay, with its look and its rot
  * clock; an animal's one harvest record comes back on its torso, never twice
- * and never as a second whole body; a body this build does not know is
- * skipped, never read as a person; and anything malformed fails the whole
- * load and leaves the live world alone. It is the only record of the settled
- * pieces: 0.9.1 stopped writing {@code world.fragments} beside it.
+ * and never as a second whole body; and anything malformed, or that only
+ * another build could have written, such as a body this build does not know,
+ * fails the whole load and leaves the live world alone. It is the only record
+ * of the settled pieces: 0.9.1 stopped writing {@code world.fragments} beside it.
  */
 class RemainsSectionTest {
 
@@ -257,45 +255,6 @@ class RemainsSectionTest {
     // ------------------------------------------------------------------
 
     @Test
-    void aBodyThisBuildDoesNotKnowIsSkippedAndNeverReadAsAPerson() throws IOException {
-        Spec spec = new Spec();
-        spec.pose(BodyFamily.values().length, 0);                       // 0: a family from a newer build
-        spec.pose(BodyFamily.DEER.ordinal(), 3);                         // 1: a deer table of another size
-        spec.pose(BodyFamily.DEER.ordinal(), 0);                         // 2: the deer at rest
-        spec.pose(BodyFamily.HUMANOID.ordinal(), 0);                     // 3: a person at rest
-        spec.pose(BodyFamily.WOLF.ordinal(), FragmentAnatomy.of(CreatureType.WOLF).jointCount()); // 4
-        spec.poses.get(4).values[0] = 0.4f;                              //    a wolf that died turning
-        spec.piece(0, 0);                                                // 0 skipped: unknown family
-        spec.piece(1, 0);                                                // 1 a deer torso, pose unknown
-        spec.piece(2, FragmentAnatomy.of(CreatureType.DEER).pieces.size()); // 2 skipped: unknown piece
-        spec.piece(2, 1);                                                // 3 a deer's head
-        spec.piece(3, 1);                                                // 4 a person's head
-        spec.piece(4, FragmentAnatomy.of(CreatureType.WOLF).pieces.size() + 3); // 5 skipped: unknown piece
-        spec.link(0, 0, 2, ItemType.ARROW.ordinal() + 1);                // on the skipped torso
-        spec.link(1, 3, 1, ItemType.IRON_ARROW.ordinal() + 1);           // on the other table's torso
-        spec.link(5, 1, 0, 0);                                           // on the skipped wolf piece
-
-        Game game = withCarcasses(new Game());
-        RemainsSection.read(spec.bytes(), game);
-        List<BodyFragment> read = game.fragments.settled;
-        assertEquals(3, read.size(), "only the pieces this build knows are laid down");
-        FragmentAnatomy deerTable = FragmentAnatomy.of(CreatureType.DEER);
-        assertSame(deerTable.piece(0), read.get(0).definition, "a deer torso posed by another table");
-        assertSame(deerTable.restPose(), read.get(0).pose, "lies where it lay, in the deer's rest pose");
-        assertSame(deerTable.piece(1), read.get(1).definition, "a deer's piece 1 is the deer's head");
-        assertNull(read.get(1).piece, "and never the person's piece with the same id");
-        assertSame(BodyFragment.Piece.HEAD, read.get(2).piece);
-
-        List<Carcass> records = game.entities.carcasses;
-        assertFalse(records.get(0).fragmented(), "a record whose torso was skipped stays one whole carcass");
-        assertEquals(2, records.get(0).stuckArrows, "and keeps its arrows");
-        assertSame(ItemType.ARROW, records.get(0).stuckArrowType);
-        assertSame(read.get(0), records.get(3).remains, "a known torso still carries its record");
-        assertEquals(1, records.get(3).stuckArrows);
-        assertFalse(records.get(1).fragmented(), "the wolf's record stays whole too");
-    }
-
-    @Test
     void malformedRemainsFailTheWholeLoadAndLeaveTheLiveWorldAlone() throws IOException {
         Game accepting = withCarcasses(new Game());
         RemainsSection.read(valid().bytes(), accepting);
@@ -309,9 +268,15 @@ class RemainsSectionTest {
         corruptions.put("a negative pose count", s -> s.poseCount = -1);
         corruptions.put("one pose over the cap", s -> s.poseCount = RemainsSection.MAX_POSES + 1);
         corruptions.put("a negative family ordinal", s -> s.poses.get(0).family = -1);
+        // Only another build could write these three; none of its pieces is ever guessed at.
+        corruptions.put("a body family this build does not know",
+                s -> s.poses.get(0).family = BodyFamily.values().length);
+        corruptions.put("a person's joint table of another size",
+                s -> s.poses.get(1).resize(FragmentAnatomy.humanoid().jointCount() + 1));
+        corruptions.put("a piece id past its family's list",
+                s -> s.pieces.get(1).id = FragmentAnatomy.of(CreatureType.DEER).pieces.size());
         corruptions.put("a negative joint count", s -> s.poses.get(1).resize(-1));
-        corruptions.put("more joints than any pose may list",
-                s -> s.poses.get(1).resize(RemainsSection.MAX_POSE_JOINTS + 1));
+        corruptions.put("a few joints", s -> s.poses.get(1).resize(3));
         corruptions.put("a NaN pose angle", s -> s.poses.get(1).values[0] = Float.NaN);
         corruptions.put("an angle past the bound", s -> s.poses.get(1).values[1] = 41f);
         corruptions.put("an offset past the bound", s -> s.poses.get(1).values[4] = -4.5f);

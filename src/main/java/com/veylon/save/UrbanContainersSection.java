@@ -118,7 +118,6 @@ final class UrbanContainersSection {
         Inventory inventory=entry.state.retired() ? null : game.world.crateContents.get(entry.position);
         if (declared!=(inventory!=null) || entry.state.retired() && declared
                 || entry.state==UrbanContainers.State.EMPTY && inventory!=null
-                && (game.world.urban.contentRevision()!=1 || !inventory.isEmpty())
                 || entry.state==UrbanContainers.State.SEARCHED && inventory==null) {
             throw new IOException("container inventory reference mismatch");
         }
@@ -143,9 +142,8 @@ final class UrbanContainersSection {
     }
 
     static void finishLoad(Game game) throws IOException {
-        if (!UrbanContainers.manages(game.world) || game.world.urban.containers.sectionRestored()) { return; }
-        if (game.world.urban.contentRevision()!=1) { throw new IOException("missing required "+ID); }
-        try { game.world.urban.containers.adoptLegacy(game.world); }
-        catch (IllegalArgumentException invalid) { throw new IOException("invalid legacy container state",invalid); }
+        if (UrbanContainers.manages(game.world) && !game.world.urban.containers.sectionRestored()) {
+            throw new IOException("missing required "+ID);
+        }
     }
 }

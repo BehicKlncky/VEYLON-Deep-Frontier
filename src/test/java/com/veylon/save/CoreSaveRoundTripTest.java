@@ -5,7 +5,6 @@ import com.veylon.settlement.NpcArchetype;
 import com.veylon.settlement.Settlement;
 import com.veylon.util.Vec3i;
 import com.veylon.world.BlockType;
-import com.veylon.world.Chunk;
 import com.veylon.world.World;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -144,46 +143,27 @@ class CoreSaveRoundTripTest {
     }
 
     @Test
-    void preExtensionV3StillLoadsWithSafeDefaults(@TempDir Path dir) throws IOException {
-        Path save = dir.resolve("old-v3.sav");
+    void aSaveCutBeforeItsExtensionTailIsRefused(@TempDir Path dir) throws IOException {
+        Path save = dir.resolve("cut.sav");
         Game original = new Game();
-        original.newWorld(SEED, true, World.GEN_DEEP);
-        Vec3i oldFuse = new Vec3i(40, 44, 40);
-        original.world.getOrCreateChunk(
-                Math.floorDiv(oldFuse.x(), 16), Math.floorDiv(oldFuse.z(), 16));
-        original.world.setBlock(oldFuse.x(), oldFuse.y(), oldFuse.z(),
-                BlockType.POWDER_KEG, true);
-        assertTrue(original.explosions.tryArmKeg(original, oldFuse, 3.5f, true));
+        original.newWorld(SEED, true, World.GEN_CAVE_IDENTITIES);
+        Vec3i fuse = new Vec3i(40, 44, 40);
+        original.world.getOrCreateChunk(Math.floorDiv(fuse.x(), 16), Math.floorDiv(fuse.z(), 16));
+        original.world.setBlock(fuse.x(), fuse.y(), fuse.z(), BlockType.POWDER_KEG, true);
+        assertTrue(original.explosions.tryArmKeg(original, fuse, 3.5f, true));
         assertTrue(SaveSystem.save(original, save));
 
         byte[] bytes = Files.readAllBytes(save);
         int extension = lastIndexOf(bytes, new byte[]{0x57, 0x33, 0x45, 0x58});
-        assertTrue(extension > 0, "test fixture contains the optional v3 extension");
+        assertTrue(extension > 0, "the save has its extension tail");
         Files.write(save, Arrays.copyOf(bytes, extension));
+        assertFalse(SaveSystem.load(new Game(), save),
+                "every save of this build ends with the tail; one cut before it is damaged");
 
-        Game loaded = new Game();
-        assertTrue(SaveSystem.load(loaded, save), "an original v3 EOF remains valid");
-        assertEquals(World.GEN_DEEP, loaded.world.generatorVersion,
-                "pre-identity v3 worlds retain generator id 2");
-        assertTrue(loaded.world.gateTimers.isEmpty());
-        assertTrue(loaded.world.settlements.values().stream().noneMatch(s -> s.rumored));
-        assertEquals(3.5f, loaded.world.kegFuses.get(oldFuse), 0.001f);
-        assertFalse(loaded.world.kegFusePlayerAttribution
-                        .getOrDefault(oldFuse, false),
-                "an old v3 timer with no attribution tail defaults safely to non-player");
-
-        World expectedGeneratorTwo = new World(SEED, World.GEN_DEEP);
-        Chunk expected = expectedGeneratorTwo.getOrCreateChunk(-12, -9);
-        Chunk actual = loaded.world.getOrCreateChunk(-12, -9);
-        for (int lx = 0; lx < Chunk.SX; lx++) {
-            for (int lz = 0; lz < Chunk.SZ; lz++) {
-                for (int y = 0; y < Chunk.SY; y++) {
-                    assertEquals(expected.get(lx, y, lz), actual.get(lx, y, lz),
-                            "old v3 unexplored terrain changed at "
-                                    + lx + "," + y + "," + lz);
-                }
-            }
-        }
+        byte[] versionOne = bytes.clone();
+        versionOne[extension + 7] = 1;
+        Files.write(save, versionOne);
+        assertFalse(SaveSystem.load(new Game(), save), "the tail's version 1 is no longer read");
     }
 
     @Test

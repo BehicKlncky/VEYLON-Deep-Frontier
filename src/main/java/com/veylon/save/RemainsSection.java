@@ -8,7 +8,6 @@ import com.veylon.entity.Carcass;
 import com.veylon.entity.FragmentAnatomy;
 import com.veylon.entity.FragmentPiece;
 import com.veylon.entity.FragmentPose;
-import com.veylon.entity.NpcAppearance;
 import com.veylon.entity.RagdollConstants;
 import com.veylon.item.ItemType;
 
@@ -63,14 +62,11 @@ import static com.veylon.save.SaveSystem.readCount;
  * is not of unit length, a pose that would draw a piece at an implausible
  * scale, two links to one torso or one record, a record on a limb, on a body
  * that leaves no carcass or on another species, trailing bytes — fails the
- * whole load, which leaves the live world untouched. A body this build does
- * not know — a family ordinal past {@link BodyFamily}, or a piece id past the
- * family's list — is <em>skipped</em>: its records are fixed in size, so they
- * are read, checked and dropped, and a link to such a piece leaves its
- * carcass a whole one, arrows included. A known family whose pose lists
- * another joint count than this build's table — a table from another build —
- * keeps its pieces in the family's rest pose, as version 1 people load.
- * Nothing unknown is ever read as a person's piece.
+ * whole load, which leaves the live world untouched. So does anything only
+ * another build could have written (0.9.1 D-18): a family ordinal past
+ * {@link BodyFamily}, a piece id past the family's list, or a pose whose joint
+ * count is neither zero nor the family's. Nothing unknown is ever read as a
+ * person's piece.
  *
  * <p>On write, a piece the reader would refuse is left out, so one bad piece
  * of debris can cost that piece, never the save, and a pose it would refuse
@@ -92,11 +88,6 @@ final class RemainsSection {
     static final int MAX_POSES = MAX_PIECES;
     /** Every harvest record rides on an anchored torso. */
     static final int MAX_LINKS = BodyFragmentConstants.MAX_ANCHORED_REMAINS;
-    /**
-     * Joints a pose entry may list: headroom over {@link FragmentAnatomy#MAX_JOINTS},
-     * so a newer build's pose for a body this one does not know can be skipped.
-     */
-    static final int MAX_POSE_JOINTS = 64;
     /** Radians; the animation's joints stay within a turn. */
     static final float MAX_POSE_ANGLE = 40f;
     /** Metres; the largest pose offset the animation sets is 0.62. */
@@ -108,7 +99,6 @@ final class RemainsSection {
     /** Far more arrows than one animal's health lets lodge in it. */
     static final int MAX_STUCK_ARROWS = 1024;
 
-    private static final int STRIDE = 7;
     private static final BodyFamily[] FAMILIES = BodyFamily.values();
     private static final ItemType[] ITEMS = ItemType.values();
 
@@ -265,7 +255,7 @@ final class RemainsSection {
         List<Link> links;
         try (DataInputStream in = new DataInputStream(new ByteArrayInputStream(payload))) {
             int version = in.readInt();
-            if (version < 1 || version > VERSION) {
+            if (version != VERSION) {
                 throw new IOException("unsupported remains section version " + version);
             }
             FragmentPose[] poses = readPoses(in);
@@ -280,12 +270,9 @@ final class RemainsSection {
         for (Link link : links) {
             link.record.stuckArrows = link.arrows;
             link.record.stuckArrowType = link.arrowType;
-            harvest[link.piece] = pieces[link.piece] == null ? null : link.record;
+            harvest[link.piece] = link.record;
         }
         for (int i = 0; i < pieces.length; i++) {
-            if (pieces[i] == null) {
-                continue;
-            }
             if (harvest[i] != null) {
                 game.fragments.restoreSettled(pieces[i], harvest[i]);
             } else {
@@ -294,58 +281,46 @@ final class RemainsSection {
         }
     }
 
-    /** @return one pose per entry; null for a body family this build does not know */
+    /** @return one pose per entry */
     private static FragmentPose[] readPoses(DataInputStream in) throws IOException {
         int count = readCount(in, "remains poses", MAX_POSES);
         FragmentPose[] poses = new FragmentPose[count];
         for (int p = 0; p < count; p++) {
             int family = in.readInt();
-            if (family < 0) {
+            if (family < 0 || family >= FAMILIES.length) {
                 throw new IOException("invalid remains body family ordinal: " + family);
             }
-            int joints = in.readInt();
-            if (joints < 0 || joints > MAX_POSE_JOINTS) {
-                throw new IOException("invalid remains pose joint count: " + joints);
-            }
-            float[] values = new float[joints * STRIDE];
-            for (int j = 0; j < joints; j++) {
-                int o = j * STRIDE;
-                for (int k = 0; k < 3; k++) {
-                    values[o + k] = readFinite(in, "pose angle", -MAX_POSE_ANGLE, MAX_POSE_ANGLE);
-                }
-                for (int k = 3; k < 6; k++) {
-                    values[o + k] = readFinite(in, "pose offset", -MAX_POSE_OFFSET, MAX_POSE_OFFSET);
-                }
-                values[o + 6] = readFinite(in, "pose scale", MIN_POSE_SCALE, MAX_POSE_SCALE);
-            }
-            if (family >= FAMILIES.length) {
-                continue; // a body a newer build knows; its pieces are skipped
-            }
             FragmentAnatomy anatomy = FAMILIES[family].anatomy();
+            int joints = in.readInt();
             if (joints == 0) {
                 poses[p] = anatomy.restPose();
-            } else if (joints == anatomy.jointCount()) {
-                FragmentPose.Recorder recorder = new FragmentPose.Recorder(anatomy);
-                for (int j = 0; j < joints; j++) {
-                    int o = j * STRIDE;
-                    recorder.set(j, values[o], values[o + 1], values[o + 2],
-                            values[o + 3], values[o + 4], values[o + 5], values[o + 6]);
-                }
-                FragmentPose pose = recorder.snapshot();
-                if (!piecesToScale(pose)) {
-                    throw new IOException("a " + anatomy.family + " pose draws a piece out of scale");
-                }
-                poses[p] = pose;
-            } else {
-                // A joint table from another build: the pieces and where they
-                // lie are known, how their joints were turned is not.
-                poses[p] = anatomy.restPose();
+                continue;
             }
+            if (joints != anatomy.jointCount()) {
+                throw new IOException("a " + anatomy.family + " pose lists " + joints
+                        + " joints; the family has " + anatomy.jointCount());
+            }
+            FragmentPose.Recorder recorder = new FragmentPose.Recorder(anatomy);
+            for (int j = 0; j < joints; j++) {
+                float rotX = readFinite(in, "pose angle", -MAX_POSE_ANGLE, MAX_POSE_ANGLE);
+                float rotY = readFinite(in, "pose angle", -MAX_POSE_ANGLE, MAX_POSE_ANGLE);
+                float rotZ = readFinite(in, "pose angle", -MAX_POSE_ANGLE, MAX_POSE_ANGLE);
+                float poseX = readFinite(in, "pose offset", -MAX_POSE_OFFSET, MAX_POSE_OFFSET);
+                float poseY = readFinite(in, "pose offset", -MAX_POSE_OFFSET, MAX_POSE_OFFSET);
+                float poseZ = readFinite(in, "pose offset", -MAX_POSE_OFFSET, MAX_POSE_OFFSET);
+                float scale = readFinite(in, "pose scale", MIN_POSE_SCALE, MAX_POSE_SCALE);
+                recorder.set(j, rotX, rotY, rotZ, poseX, poseY, poseZ, scale);
+            }
+            FragmentPose pose = recorder.snapshot();
+            if (!piecesToScale(pose)) {
+                throw new IOException("a " + anatomy.family + " pose draws a piece out of scale");
+            }
+            poses[p] = pose;
         }
         return poses;
     }
 
-    /** @return one piece per record; null where the record's body or piece is unknown here */
+    /** @return one piece per record */
     private static BodyFragment[] readPieces(DataInputStream in, FragmentPose[] poses) throws IOException {
         int count = readCount(in, "remains pieces", MAX_PIECES);
         BodyFragment[] pieces = new BodyFragment[count];
@@ -354,9 +329,10 @@ final class RemainsSection {
             if (poseIndex < 0 || poseIndex >= poses.length) {
                 throw new IOException("remains piece refers to missing pose " + poseIndex);
             }
+            FragmentPose pose = poses[poseIndex];
             int id = in.readInt();
-            if (id < 0) {
-                throw new IOException("invalid remains piece id: " + id);
+            if (id < 0 || id >= pose.anatomy.pieces.size()) {
+                throw new IOException("invalid " + pose.anatomy.family + " piece id: " + id);
             }
             float x = readFinite(in, "remains x", -MAX_HORIZONTAL, MAX_HORIZONTAL);
             float y = readFinite(in, "remains y", -MAX_VERTICAL, MAX_VERTICAL);
@@ -370,19 +346,13 @@ final class RemainsSection {
                 throw new IOException("remains orientation is not a unit quaternion: " + length);
             }
             float decay = readFinite(in, "remains decay", 0f, RagdollConstants.CORPSE_DECAY);
-            BodyFragment scratch = null;
-            FragmentPose pose = poses[poseIndex];
-            if (pose != null && id < pose.anatomy.pieces.size()) {
-                FragmentPiece definition = pose.anatomy.piece(id);
-                scratch = new BodyFragment(definition, pose);
-                scratch.pos.set(x, y, z);
-                scratch.orientation.set(qx, qy, qz, qw).normalize();
-                scratch.decay = decay;
-            }
-            // Read even for a skipped piece: the record's size does not depend on its body.
-            readAppearance(in, scratch != null ? scratch.appearance
-                    : new NpcAppearance(), "remains");
-            pieces[i] = scratch;
+            FragmentPiece definition = pose.anatomy.piece(id);
+            BodyFragment piece = new BodyFragment(definition, pose);
+            piece.pos.set(x, y, z);
+            piece.orientation.set(qx, qy, qz, qw).normalize();
+            piece.decay = decay;
+            readAppearance(in, piece.appearance, "remains");
+            pieces[i] = piece;
         }
         return pieces;
     }
@@ -420,7 +390,7 @@ final class RemainsSection {
                 throw new IOException("a " + record.type + " leaves no carcass to harvest");
             }
             BodyFragment f = pieces[piece];
-            if (f != null && (f.definition.parent != -1 || f.definition.family.creature != record.type)) {
+            if (f.definition.parent != -1 || f.definition.family.creature != record.type) {
                 throw new IOException("the " + f.definition + " piece cannot carry a " + record.type
                         + " carcass");
             }

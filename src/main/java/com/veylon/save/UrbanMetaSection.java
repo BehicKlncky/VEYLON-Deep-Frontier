@@ -11,22 +11,19 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 
 /**
- * Optional v3 section {@code urban.meta}: the revisions an urban world was
- * created under (urban-survival decision D-04).
+ * The section {@code urban.meta}: the revisions an urban world was created
+ * under (urban-survival decision D-04). Every city writes it and a city save
+ * without it is refused; a wilderness world never writes it.
  *
  * <p>Version 1 holds the layout revision and the content revision as two ints.
- * Only urban worlds write it, so a legacy world's save is unchanged and older
- * builds read it exactly as before. An older build never reaches this section
- * in an urban save: it rejects the generator version first, before replacing
- * the live world.
  *
  * <p>Reading it validates rather than trusts. The layout revision must be the
- * one the save's generator builds — the generator, read from the base before
+ * one the save's generator builds — the generator, read from the header before
  * any chunk generates, is what actually selected the geometry — and the
- * content revision must be one this build supports. Any mismatch, a section in
- * a non-urban world, another section version or trailing bytes fails the whole
- * load. An urban save without the section takes
- * {@link UrbanRevision#ABSENT_CONTENT} once every section has been read.
+ * content revision must be the one a new world of that generator records
+ * ({@link UrbanRevision#contentFor}), the only one this build writes for it.
+ * Any mismatch, a section in a non-urban world, another section version or
+ * trailing bytes fails the whole load.
  */
 final class UrbanMetaSection {
     static final String ID = "urban.meta";
@@ -70,6 +67,12 @@ final class UrbanMetaSection {
                         + " does not match generator " + game.world.generatorVersion
                         + ", which builds layout revision " + urban.layoutRevision());
             }
+            int written = UrbanRevision.contentFor(game.world.generatorVersion);
+            if (contentRevision != written) {
+                throw new IOException("urban content revision " + contentRevision + " under generator "
+                        + game.world.generatorVersion + ", whose worlds this build writes with "
+                        + written);
+            }
             try {
                 urban.resolveContentRevision(contentRevision);
             } catch (IllegalArgumentException | IllegalStateException invalid) {
@@ -78,11 +81,11 @@ final class UrbanMetaSection {
         }
     }
 
-    /** Gives an urban world without the section its documented default. */
-    static void finishLoad(Game game) {
+    /** Refuses an urban save without the section. */
+    static void finishLoad(Game game) throws IOException {
         UrbanWorldState urban = game.world.urban;
         if (urban != null && !urban.contentRevisionResolved()) {
-            urban.resolveContentRevision(UrbanRevision.ABSENT_CONTENT);
+            throw new IOException("missing required " + ID);
         }
     }
 }

@@ -151,12 +151,6 @@ public final class UrbanRevision {
     public static final int CURRENT_CONTENT = ECONOMY_CONTENT;
     /** Oldest content revision this build still loads. */
     public static final int MIN_SUPPORTED_CONTENT = 1;
-    /**
-     * Content revision of an urban save that carries no {@code urban.meta}
-     * section. Every build that can create an urban world writes the section, so
-     * this is a defined default for damaged or hand-made files, not a migration.
-     */
-    public static final int ABSENT_CONTENT = 1;
 
     /** The urban generator the development selector creates: the newest layout. */
     public static final int DEVELOPMENT_GENERATOR = World.GEN_URBAN_ECONOMY;

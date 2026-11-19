@@ -75,7 +75,7 @@ class UrbanVisitsSectionTest {
         Path absent = directory.resolve("absent.sav");
         Files.write(absent, CreativeSaveSections.replace(Files.readAllBytes(file), UrbanVisitsSection.ID, null));
         Game none = new Game();
-        assertTrue(SaveSystem.load(none, absent), "a package-20 save of the same city still loads");
+        assertTrue(SaveSystem.load(none, absent), "a city where nothing was walked or entered writes no section");
         assertEquals(0, none.world.urban.visits.districtCount() + none.world.urban.visits.buildingCount());
     }
 

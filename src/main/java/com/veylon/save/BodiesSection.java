@@ -17,27 +17,22 @@ import java.io.IOException;
 import static com.veylon.save.SaveSystem.readCount;
 
 /**
- * Optional v3 state: how every body in the world is lying.
+ * The section {@code world.bodies}, version 2: how every body in the world is
+ * lying. Every save writes it.
  *
  * <p>Two things go in here. First, one {@link BodyPose} per {@link Carcass},
- * positional and in the order the v3 body wrote them — the same index-aligned
+ * positional and in the order the core body wrote them — the same index-aligned
  * side-car the party-state section uses, and the reason a count mismatch is a
  * hard failure rather than something to patch up. Second, the human corpses,
- * which have no representation in the base v3 layout at all.
- *
- * <p>An absent section is exactly what every save written before this feature
- * means: carcasses keep the fixed keeled-over pose their constructor assigns
- * and the world holds no human corpses. Nothing here changes the frozen v3
- * body, so the byte walk in {@code CorruptSaveResilienceTest} is untouched.
+ * which have no representation in the core body at all.
  *
  * <p><b>In-flight ragdolls are deliberately not persisted.</b> Like bow draw
  * and reload progress they are transient. A save settles every falling body
  * first, so a save taken mid-fall produces a settled corpse rather than losing
  * one; loading clears the list through the {@code newWorld} reset path.
  *
- * <p>The record is entirely numeric. A stray UTF field here would move the
- * byte anchors the migration tests locate fixtures with, so the archetype
- * travels as a bounds-checked ordinal instead of its stable string id.
+ * <p>The record is entirely numeric: the archetype travels as a bounds-checked
+ * ordinal instead of its stable string id.
  */
 final class BodiesSection {
 
@@ -80,7 +75,7 @@ final class BodiesSection {
     static void read(byte[] payload, Game game) throws IOException {
         try (DataInputStream in = new DataInputStream(new ByteArrayInputStream(payload))) {
             int version = in.readInt();
-            if (version < 1 || version > VERSION) {
+            if (version != VERSION) {
                 throw new IOException("unsupported bodies section version " + version);
             }
             int poses = readCount(in, "carcass poses");
@@ -89,7 +84,7 @@ final class BodiesSection {
                         + " for " + game.entities.carcasses.size() + " carcasses");
             }
             for (Carcass carcass : game.entities.carcasses) {
-                readPose(in, carcass.pose, version, BodySkeleton.of(carcass.type));
+                readPose(in, carcass.pose, BodySkeleton.of(carcass.type));
             }
 
             int count = readCount(in, "human corpses");
@@ -104,7 +99,7 @@ final class BodiesSection {
                         readFinite(in, "corpse z", -MAX_HORIZONTAL, MAX_HORIZONTAL));
                 corpse.decay = readFinite(in, "corpse decay", 0f, MAX_VERTICAL);
                 readAppearance(in, corpse.appearance, "corpse");
-                readPose(in, corpse.pose, version, BodySkeleton.humanoid());
+                readPose(in, corpse.pose, BodySkeleton.humanoid());
                 game.entities.corpses.add(corpse);
             }
             if (in.available() != 0) {
@@ -157,8 +152,8 @@ final class BodiesSection {
         }
     }
 
-    private static void readPose(DataInputStream in, BodyPose pose, int version,
-                                 BodySkeleton skeleton) throws IOException {
+    private static void readPose(DataInputStream in, BodyPose pose, BodySkeleton skeleton)
+            throws IOException {
         pose.yaw = readFinite(in, "pose yaw", -MAX_ANGLE, MAX_ANGLE);
         pose.pitch = readFinite(in, "pose pitch", -MAX_ANGLE, MAX_ANGLE);
         pose.roll = readFinite(in, "pose roll", -MAX_ANGLE, MAX_ANGLE);
@@ -166,46 +161,15 @@ final class BodiesSection {
         pose.pivotY = readFinite(in, "pose pivot", -4f, 4f);
         pose.solved = in.readBoolean();
         int bones = in.readInt();
-        if (bones < 0 || bones > (version == 1 ? 6 : skeleton.boneCount)) {
+        if (bones < 0 || bones > skeleton.boneCount) {
             throw new IOException("invalid pose bone count: " + bones);
         }
         pose.boneCount = bones;
         for (int b = 0; b < bones; b++) {
-            int target = version == 1 ? legacyBone(skeleton, b) : b;
-            float x = readFinite(in, "bone rotX", -MAX_ANGLE, MAX_ANGLE);
-            float y = version == 1 ? 0 : readFinite(in, "bone rotY", -MAX_ANGLE, MAX_ANGLE);
-            float z = readFinite(in, "bone rotZ", -MAX_ANGLE, MAX_ANGLE);
-            if (target >= 0) {
-                pose.boneRotX[target] = x;
-                pose.boneRotY[target] = y;
-                pose.boneRotZ[target] = z;
-            }
+            pose.boneRotX[b] = readFinite(in, "bone rotX", -MAX_ANGLE, MAX_ANGLE);
+            pose.boneRotY[b] = readFinite(in, "bone rotY", -MAX_ANGLE, MAX_ANGLE);
+            pose.boneRotZ[b] = readFinite(in, "bone rotZ", -MAX_ANGLE, MAX_ANGLE);
         }
-        if (version == 1 && pose.solved) pose.boneCount = skeleton.boneCount;
-    }
-
-    /** Version 1 stored flat bones in a different order, never child rotations. */
-    private static int legacyBone(BodySkeleton skeleton, int old) {
-        String name;
-        if (skeleton == BodySkeleton.humanoid()) {
-            name = switch (old) {
-                case 0 -> "head"; case 1 -> "arm_l"; case 2 -> "arm_r";
-                case 3 -> "leg_l"; case 4 -> "leg_r"; default -> "";
-            };
-        } else if (skeleton == BodySkeleton.of(com.veylon.entity.Creature.CreatureType.BIRD)) {
-            name = old == 0 ? "head" : old == 1 ? "tail" : "";
-        } else {
-            name = switch (old) {
-                case 0 -> "leg_fl"; case 1 -> "leg_fr"; case 2 -> "leg_bl"; case 3 -> "leg_br";
-                case 4 -> skeleton == BodySkeleton.of(com.veylon.entity.Creature.CreatureType.HARE)
-                        ? "head" : "neck";
-                case 5 -> "tail"; default -> "";
-            };
-        }
-        for (int b = 0; b < skeleton.boneCount; b++) {
-            if (skeleton.part[b].equals(name)) return b;
-        }
-        return -1;
     }
 
     /**

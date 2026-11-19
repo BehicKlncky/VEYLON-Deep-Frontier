@@ -496,11 +496,8 @@ public final class SaveSystem {
             int nAfflictions = readCount(in, "affliction");
             Affliction[] afflictionTypes = Affliction.values();
             for (int i = 0; i < nAfflictions; i++) {
-                int ord = in.readInt();
-                float secs = in.readFloat();
-                if (ord >= 0 && ord < afflictionTypes.length) {
-                    p.afflictions.put(afflictionTypes[ord], secs);
-                }
+                Affliction affliction = afflictionTypes[readOrdinal(in, "affliction", afflictionTypes.length)];
+                p.afflictions.put(affliction, in.readFloat());
             }
 
             p.blueprints.clear();
@@ -558,14 +555,10 @@ public final class SaveSystem {
             ItemType[] itemTypes = ItemType.values();
             for (int i = 0; i < nRacks; i++) {
                 Vec3i pos = readVec(in);
-                int ord = in.readInt();
-                int count = in.readInt();
-                float progress = in.readFloat();
-                if (ord >= 0 && ord < itemTypes.length) {
-                    RackBatch batch = new RackBatch(itemTypes[ord], count);
-                    batch.progress = progress;
-                    g.world.rackBatches.put(pos, batch);
-                }
+                ItemType input = itemTypes[readOrdinal(in, "drying rack input", itemTypes.length)];
+                RackBatch batch = new RackBatch(input, in.readInt());
+                batch.progress = in.readFloat();
+                g.world.rackBatches.put(pos, batch);
             }
 
             // Rain collectors.
@@ -710,23 +703,17 @@ public final class SaveSystem {
             g.world.kegFusePlayerAttribution.clear();
             readSettlements(in, g);
             readFactionState(in, g);
-            int nKegs = readCount(in, "powder-keg fuse");
+            // The writer refuses more lit kegs than the explosion system holds, so a load does too.
+            int nKegs = readCount(in, "powder-keg fuse", ExplosionSystem.MAX_ACTIVE_FUSES);
             for (int i = 0; i < nKegs; i++) {
                 Vec3i keg = readVec(in);
                 float fuse = in.readFloat();
                 if (!Float.isFinite(fuse)) {
                     throw new IOException("invalid powder-keg fuse time");
                 }
-                // Pre-limit v3 saves remain readable: consume every entry,
-                // retain a bounded prefix, and let non-positive legacy
-                // timers resolve on the next simulation tick.
-                if (g.world.kegFuses.size() < ExplosionSystem.MAX_ACTIVE_FUSES) {
-                    g.world.kegFuses.put(keg, fuse);
-                }
+                g.world.kegFuses.put(keg, fuse);
             }
-            if (in.available() > 0) {
-                readV3Extension(in, g);
-            }
+            readV3Extension(in, g);
             UrbanMetaSection.finishLoad(g);
             UrbanContainersSection.finishLoad(g);
             UrbanRefugesSection.finishLoad(g);
@@ -890,9 +877,8 @@ public final class SaveSystem {
     }
 
     /**
-     * Optional versioned v3 tail. Keeping this after every original v3 field
-     * preserves byte-for-byte readability of older v3 saves: EOF simply means
-     * the newly introduced runtime state uses safe defaults.
+     * The extension tail every save ends with: gate timers, the settlements' and NPCs' extended
+     * state, then the stable-id sections ({@link V3ExtensionSections}). A load requires it whole.
      */
     private static void writeV3Extension(DataOutputStream out, Game g, List<Npc> npcs)
             throws IOException {
@@ -942,14 +928,14 @@ public final class SaveSystem {
 
     private static void readV3Extension(DataInputStream in, Game g) throws IOException {
         if (in.available() < 8) {
-            throw new IOException("truncated v3 extension");
+            throw new IOException("missing or truncated extension tail");
         }
         if (in.readInt() != V3_EXTENSION_MAGIC) {
-            throw new IOException("unknown trailing v3 save data");
+            throw new IOException("unknown data where the extension tail begins");
         }
         int extensionVersion = in.readInt();
-        if (extensionVersion < 1 || extensionVersion > V3_EXTENSION_VERSION) {
-            throw new IOException("unsupported v3 extension version " + extensionVersion);
+        if (extensionVersion != V3_EXTENSION_VERSION) {
+            throw new IOException("unsupported extension tail version " + extensionVersion);
         }
 
         g.world.gateTimers.clear();
@@ -1001,11 +987,9 @@ public final class SaveSystem {
             npc.partyMissionTimer = in.readFloat();
             npc.partyContact = in.readBoolean();
         }
-        if (extensionVersion >= 2) {
-            V3ExtensionSections.read(in, g);
-        }
+        V3ExtensionSections.read(in, g);
         if (in.available() != 0) {
-            throw new IOException("unexpected bytes after v3 extension");
+            throw new IOException("unexpected bytes after the extension tail");
         }
     }
 

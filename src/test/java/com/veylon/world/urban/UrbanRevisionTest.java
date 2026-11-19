@@ -70,7 +70,6 @@ class UrbanRevisionTest {
     void contentRevisionsOutsideTheSupportedRangeAreRefusedWithAReason() {
         UrbanRevision.requireSupportedContent(UrbanRevision.CURRENT_CONTENT);
         UrbanRevision.requireSupportedContent(UrbanRevision.MIN_SUPPORTED_CONTENT);
-        UrbanRevision.requireSupportedContent(UrbanRevision.ABSENT_CONTENT);
 
         IllegalArgumentException newer = assertThrows(IllegalArgumentException.class,
                 () -> UrbanRevision.requireSupportedContent(UrbanRevision.CURRENT_CONTENT + 1));
@@ -121,7 +120,7 @@ class UrbanRevisionTest {
         UrbanWorldState economy = new UrbanWorldState(1L, World.GEN_URBAN_ECONOMY);
         assertTrue(economy.hasEconomy() && economy.hasMissions() && economy.hasUtilities(),
                 "layout seventeen keeps every rule of the layouts before it");
-        for (int other : new int[]{UrbanRevision.ABSENT_CONTENT, 2, UrbanRevision.STARTER_CONTENT}) {
+        for (int other : new int[]{1, 2, UrbanRevision.STARTER_CONTENT}) {
             IllegalArgumentException refused = assertThrows(IllegalArgumentException.class,
                     () -> economy.resolveContentRevision(other));
             assertTrue(refused.getMessage().contains("requires urban content revision"), refused.getMessage());

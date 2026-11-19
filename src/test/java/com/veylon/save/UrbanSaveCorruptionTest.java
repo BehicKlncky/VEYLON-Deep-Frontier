@@ -31,8 +31,9 @@ import static org.junit.jupiter.api.Assertions.*;
  * except {@code urban.visits}, whose absence means nothing walked or entered. A failed load changes
  * nothing in the live world and never touches the last good save; a flipped byte never escapes the
  * load as an exception, and whatever a load accepts can be saved again. A section this build does
- * not know is skipped and dropped by the next save. A snapshot that cannot be written whole never
- * replaces the last save and leaves no temporary file behind.
+ * not know fails the load too, since only another build could have written it (0.9.1 D-18). A
+ * snapshot that cannot be written whole never replaces the last save and leaves no temporary file
+ * behind.
  */
 class UrbanSaveCorruptionTest {
     @TempDir Path directory;
@@ -146,19 +147,13 @@ class UrbanSaveCorruptionTest {
     }
 
     @Test
-    void aSectionThisBuildDoesNotKnowIsSkippedAndDroppedByTheNextSave() throws Exception {
+    void aSectionThisBuildDoesNotKnowFailsTheWholeLoad() throws Exception {
         SaveEnvelope.Parsed parsed = SaveEnvelope.parse(saved);
-        List<SaveEnvelope.Section> newer = new ArrayList<>(parsed.sections());
-        newer.add(2, new SaveEnvelope.Section("urban.future-ledger", new byte[]{0, 0, 0, 9, 1, 2, 3}));
-        Game g = new Game();
-        assertTrue(SaveSystem.load(g, write(SaveEnvelope.rebuild(saved, parsed, newer))), "an unknown id is skipped");
-        assertEquals(described, IntegratedCityFixture.describe(g, facts));
-        Path again = directory.resolve("again.sav");
-        assertTrue(SaveSystem.save(g, again));
-        SaveEnvelope.Parsed resaved = SaveEnvelope.parse(Files.readAllBytes(again));
-        assertEquals(parsed.ids(), resaved.ids(), "its state is lost on the next save, as documented");
-        for (String id : parsed.ids()) {
-            assertArrayEquals(parsed.section(id).payload(), resaved.section(id).payload(), id);
+        Live live = live();
+        for (String id : List.of("urban.future-ledger", "world.fragments", "urban.meta.v2")) {
+            List<SaveEnvelope.Section> other = new ArrayList<>(parsed.sections());
+            other.add(2, new SaveEnvelope.Section(id, new byte[]{0, 0, 0, 1, 1, 2, 3}));
+            live.assertRefuses(SaveEnvelope.rebuild(saved, parsed, other), "an unknown " + id);
         }
     }
 

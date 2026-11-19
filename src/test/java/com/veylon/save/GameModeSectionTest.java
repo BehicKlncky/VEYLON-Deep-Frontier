@@ -44,7 +44,7 @@ class GameModeSectionTest {
     }
 
     @Test
-    void absentSectionLoadsAnOldV3WorldAsUnmarkedSurvival() throws Exception {
+    void aSaveWithoutTheSectionIsRefusedAndKeepsTheLiveMode() throws Exception {
         Game original = new Game();
         original.newWorld(20260910, true, World.GEN_CAVE_IDENTITIES);
         Path save = directory.resolve("without-mode.sav");
@@ -52,10 +52,9 @@ class GameModeSectionTest {
         Files.write(save, CreativeSaveSections.replace(Files.readAllBytes(save), GameModeSection.ID, null));
         original.switchGameMode(GameMode.CREATIVE);
         original.player.abilities.setFlying(true);
-        assertTrue(SaveSystem.load(original, save), "R1: optional-section absence must remain loadable");
-        assertEquals(GameMode.SURVIVAL, original.gameMode());
-        assertFalse(original.creativeMarked(), "R1: old saves cannot inherit the live world's mark");
-        assertFalse(original.player.abilities.flying());
+        assertFalse(SaveSystem.load(original, save), "every save of this build records its mode");
+        assertEquals(GameMode.CREATIVE, original.gameMode(), "the live world keeps its own");
+        assertTrue(original.creativeMarked() && original.player.abilities.flying());
     }
 
     @Test

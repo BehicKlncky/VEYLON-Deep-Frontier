@@ -135,8 +135,9 @@ class UrbanMetaSectionTest {
         assertFalse(SaveSystem.load(loaded, write("wrong-plan-layout.sav", withPayload(bytes,
                 meta(1, UrbanRevision.LAYOUT_STREET_NETWORK, UrbanRevision.STARTER_CONTENT)))));
         assertSame(preserved, loaded.world);
-        assertTrue(SaveSystem.load(loaded, write("plans-absent-meta.sav", withoutSection(bytes, UrbanMetaSection.ID))));
-        assertEquals(1, loaded.world.urban.buildingTemplateRevision(), "generator pins template even without optional meta");
+        assertFalse(SaveSystem.load(loaded, write("plans-absent-meta.sav", withoutSection(bytes, UrbanMetaSection.ID))),
+                "a city save without its revisions is refused");
+        assertSame(preserved, loaded.world);
         assertEquals(plan, loaded.world.urban.buildingAt(parcel.x0(), parcel.z0()));
 
         loaded.newWorld(SEED + 1, true, World.GEN_URBAN_PLANS, GameMode.CREATIVE);
@@ -176,15 +177,15 @@ class UrbanMetaSectionTest {
     }
 
     @Test
-    void anUrbanSaveWithoutUrbanMetaTakesTheDocumentedDefault() throws IOException {
+    void anUrbanSaveWithoutUrbanMetaOrWithAnotherContentRevisionIsRefused() throws IOException {
         byte[] bytes = Files.readAllBytes(save(urbanWorld(SEED), "urban.sav"));
-        Path stripped = write("stripped.sav", withoutSection(bytes, UrbanMetaSection.ID));
-
-        Game loaded = new Game();
-        assertTrue(SaveSystem.load(loaded, stripped));
-        assertTrue(loaded.world.urban.contentRevisionResolved(),
-                "the loader resolves the revision even when the section is absent");
-        assertEquals(UrbanRevision.ABSENT_CONTENT, loaded.world.urban.contentRevision());
+        assertFalse(SaveSystem.load(new Game(), write("stripped.sav", withoutSection(bytes, UrbanMetaSection.ID))),
+                "every city this build saves records its revisions");
+        // A new world of this generator records the starter content; this build writes no other.
+        for (int other : new int[]{1, 2}) {
+            assertFalse(SaveSystem.load(new Game(), write("content-" + other + ".sav", withPayload(bytes,
+                    meta(1, UrbanRevision.LAYOUT_DATUM_PLACEHOLDER, other)))), "content " + other);
+        }
     }
 
     @Test
@@ -250,13 +251,13 @@ class UrbanMetaSectionTest {
         assertEquals(UrbanRevision.ECONOMY_CONTENT, loaded.world.urban.contentRevision());
 
         World live = loaded.world;
-        for (int other : new int[]{UrbanRevision.ABSENT_CONTENT, UrbanRevision.STARTER_CONTENT}) {
+        for (int other : new int[]{1, UrbanRevision.STARTER_CONTENT}) {
             assertFalse(SaveSystem.load(loaded, write("economy-" + other + ".sav", withPayload(bytes,
                     meta(1, UrbanRevision.LAYOUT_ECONOMY, other)))), "content " + other + " in the economy city");
             assertSame(live, loaded.world, "a refused revision leaves the live world alone");
         }
         assertFalse(SaveSystem.load(loaded, write("economy-no-meta.sav", withoutSection(bytes, UrbanMetaSection.ID))),
-                "without urban.meta the documented default (content 1) is no economy revision either");
+                "a city save without urban.meta is refused");
         assertSame(live, loaded.world);
     }
 

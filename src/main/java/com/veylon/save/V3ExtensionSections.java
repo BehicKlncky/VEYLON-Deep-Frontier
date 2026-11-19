@@ -31,9 +31,15 @@ import static com.veylon.save.SaveSystem.requireFaction;
 import static com.veylon.save.SaveSystem.writeVec;
 
 /**
- * Owns the optional stable-ID envelope independently of the immutable v3 body.
- * Keeping section codecs here leaves room for additive state without growing
- * the save transaction and legacy migration orchestrator.
+ * Owns the stable-id section envelope that ends every save, apart from the core body that
+ * {@link SaveSystem} reads. Each section is length-prefixed and carries its own version.
+ *
+ * <p>Within one save epoch the reader accepts exactly what the writer writes (0.9.1 D-18): a
+ * section id this build does not know, a section repeated, a version it does not write or a
+ * section it always writes left out fails the whole load. The sections written only when they
+ * hold something ({@code world.fixtures}, {@code urban.discovery}, {@code urban.visits}) mean
+ * "nothing" when absent; the city sections a world's generator calls for are required by their
+ * own {@code finishLoad}.
  */
 final class V3ExtensionSections {
 
@@ -59,10 +65,16 @@ final class V3ExtensionSections {
             "combat.keg-fuse-attribution";
     private static final int KEG_FUSE_ATTRIBUTION_SECTION_VERSION = 1;
 
+    /** The sections {@link #write} writes for every world; a save without one of them is refused. */
+    private static final Set<String> ALWAYS_WRITTEN = Set.of(V3_SECTION_LANTERNS,
+            V3_SECTION_PARTY_STATE, V3_SECTION_COUNTERATTACKS, V3_SECTION_QUEST_TARGET,
+            V3_SECTION_REPUTATION_ACTIONS, V3_SECTION_ACTIVE_EXPLOSIVES,
+            V3_SECTION_KEG_FUSE_ATTRIBUTION, GameModeSection.ID, CreativeControlsSection.ID,
+            BodiesSection.ID, RemainsSection.ID);
+
     /**
-     * Extension v2 keeps the v1 payload intact, then adds stable-ID, length-prefixed
-     * sections. New systems can append a section without coupling their byte layout
-     * to lanterns or requiring another top-level save-format version.
+     * Writes the envelope: the sections every world has, then those its state or its city calls
+     * for, each as a stable id, a length and its payload.
      */
     static void write(DataOutputStream out, Game g)
             throws IOException {
@@ -86,7 +98,7 @@ final class V3ExtensionSections {
             if (com.veylon.entity.UrbanEncounterDirector.manages(g.world)) {
                 sections.add(new V3Section(UrbanPopulationSection.ID, UrbanPopulationSection.write(g)));
             }
-            // Legacy saves stay byte-identical: the section exists only for urban worlds.
+            // Every city has its revisions; a wilderness world has none to write.
             sections.add(new V3Section(UrbanMetaSection.ID, UrbanMetaSection.write(g)));
             if (g.world.urban.hasStarter()) {
                 sections.add(new V3Section(UrbanRefugesSection.ID, UrbanRefugesSection.write(g)));
@@ -380,8 +392,14 @@ final class V3ExtensionSections {
                 urbanMissions = payload;
             } else if (UrbanPopulationSection.ID.equals(id)) {
                 population = payload;
+            } else {
+                throw new IOException("unknown save section " + id);
             }
-            // Unknown stable IDs are intentionally skipped using their bounded length.
+        }
+        for (String required : ALWAYS_WRITTEN) {
+            if (!seen.contains(required)) {
+                throw new IOException("missing save section " + required);
+            }
         }
         // The pieces' harvest links name carcasses of the core body, read before any section.
         if (remains != null) { RemainsSection.read(remains, g); }

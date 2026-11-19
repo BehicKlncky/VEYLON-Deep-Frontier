@@ -11,9 +11,7 @@ import com.veylon.util.Vec3i;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Arrays;
 import java.util.EnumSet;
 import java.util.HashSet;
 
@@ -136,34 +134,6 @@ class LanternGameplayTest {
         assertEquals(2, loaded.world.lanterns.size());
     }
 
-    @Test
-    void extensionVersionOneLoadsPlacedLanternWithSafeUnlitDefault() throws Exception {
-        Game original = newGame(424242L);
-        Vec3i pos = emptyHighCell(original, 6, 0);
-        original.world.setBlock(pos.x(), pos.y(), pos.z(), BlockType.LANTERN, true);
-        assertTrue(original.world.restoreLanternState(pos, 611.5f, true));
-        original.world.refreshLoadedLights();
-
-        Path save = tempDir.resolve("extension-v1.sav");
-        assertTrue(SaveSystem.save(original, save));
-        byte[] bytes = Files.readAllBytes(save);
-        int sectionEnvelopeOffset = lastIndexOf(bytes,
-                new byte[]{0x53, 0x33, 0x45, 0x43});
-        assertTrue(sectionEnvelopeOffset > 0, "current fixture contains the v2 section envelope");
-        int extensionOffset = lastIndexOf(bytes, new byte[]{0x57, 0x33, 0x45, 0x58});
-        assertTrue(extensionOffset > 0);
-        writeInt(bytes, extensionOffset + Integer.BYTES, 1);
-        Files.write(save, Arrays.copyOf(bytes, sectionEnvelopeOffset));
-
-        Game loaded = new Game();
-        assertTrue(SaveSystem.load(loaded, save));
-        assertEquals(BlockType.LANTERN, loaded.world.getBlock(pos.x(), pos.y(), pos.z()));
-        World.LanternState safeDefault = loaded.world.lanternState(pos);
-        assertNotNull(safeDefault);
-        assertEquals(0, safeDefault.fuelSeconds(), 0.001f);
-        assertFalse(safeDefault.lit());
-        assertFalse(hasExactLight(loaded.world, pos));
-    }
 
     private static Game newGame(long seed) {
         Game game = new Game();
@@ -201,25 +171,5 @@ class LanternGameplayTest {
                 Math.floorDiv(pos.z(), Chunk.SZ));
         return chunk != null && chunk.lights.stream().anyMatch(light ->
                 light[0] == pos.x() && light[1] == pos.y() && light[2] == pos.z());
-    }
-
-    private static int lastIndexOf(byte[] bytes, byte[] needle) {
-        outer:
-        for (int i = bytes.length - needle.length; i >= 0; i--) {
-            for (int j = 0; j < needle.length; j++) {
-                if (bytes[i + j] != needle[j]) {
-                    continue outer;
-                }
-            }
-            return i;
-        }
-        return -1;
-    }
-
-    private static void writeInt(byte[] bytes, int offset, int value) {
-        bytes[offset] = (byte) (value >>> 24);
-        bytes[offset + 1] = (byte) (value >>> 16);
-        bytes[offset + 2] = (byte) (value >>> 8);
-        bytes[offset + 3] = (byte) value;
     }
 }

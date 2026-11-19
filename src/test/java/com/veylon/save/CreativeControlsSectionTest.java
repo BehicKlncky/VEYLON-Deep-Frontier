@@ -37,16 +37,17 @@ class CreativeControlsSectionTest {
     }
 
     @Test
-    void anAbsentSectionMeansEveryControlIsOff() throws Exception {
+    void aSaveWithoutTheSectionIsRefusedAndKeepsTheLiveControls() throws Exception {
         Game original = creativeGame();
         original.restoreCreativeControls(true, true, true);
         Path save = directory.resolve("without-controls.sav");
         assertTrue(SaveSystem.save(original, save));
         Files.write(save, CreativeSaveSections.replace(Files.readAllBytes(save),
                 CreativeControlsSection.ID, null));
-        assertTrue(SaveSystem.load(original, save), "R25: the section is optional");
-        assertFalse(original.daylightFrozen() || original.weatherLocked() || original.spawningPaused(),
-                "R25: a save written before 0.6.11 holds no control");
+        original.restoreCreativeControls(false, true, false);
+        assertFalse(SaveSystem.load(original, save), "every save of this build records its controls");
+        assertTrue(!original.daylightFrozen() && original.weatherLocked() && !original.spawningPaused(),
+                "the live world keeps its own");
     }
 
     @Test
