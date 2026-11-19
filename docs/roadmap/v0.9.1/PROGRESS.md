@@ -7,8 +7,8 @@ the first milestone below that is not complete.
 | Milestone | Status | Commits |
 | --- | --- | --- |
 | 01 Release plan and defect audit | Complete (documentation only) | `95d09c5`, `1aadd19` |
-| 02 Test reliability and continuous integration | Complete; the verify workflow's first run waits for a push | `91975e9`, `ec4d960`, `6517ef0`, `0252fbd`, `bfb0176`, then the records commit that adds this section; 03 records its hash |
-| 03 Current-version save epoch | Not started | |
+| 02 Test reliability and continuous integration | Complete; the verify workflow's first run waits for a push | `91975e9`, `ec4d960`, `6517ef0`, `0252fbd`, `bfb0176`, `8b87cd6` |
+| 03 Current-version save epoch | Complete | `ce4686d`, `843dce8`, `14ca773`, `3d98b70`, `6bae538`, `f3fe760`, `13486ca`, `2600134`, `0fbc816`, `71972aa`, `f3aed69`, `369d65e`, then the records commit that adds this section; 04 records its hash |
 | 04 Three save slots and backups | Not started | |
 | 05 Autosave | Not started | |
 | 06 Session and control comfort | Not started | |
@@ -356,3 +356,167 @@ commits ahead of the remote `main` (`4b6bed9`): 01's two and these six.
 
 Start from DESIGN §8, the save code and tests that O1 makes dead, and B11, the writer cap's
 missing test, then the epoch (D-01). D-15 is for 04.
+
+## Milestone 03 — Current-version save epoch
+
+**Status:** complete on 2026-11-20.
+**Base:** `main` at `8b87cd6`, clean. 01's and 02's eight commits are local and not pushed.
+
+### What was done
+
+1. **The header and refusal (D-16).** Saves begin with format 4: `VEYL`, the format, the save
+   epoch (1), the seed and the generator (`save.SaveHeader`). `SaveSystem.open` judges those
+   bytes first, so another format or epoch builds no world, never reaches the verifier pass,
+   leaves the live world alone and never touches the file. `LoadResult` gives the player a
+   sentence on the title and a short line for F9's log, and the console the technical reason.
+2. **Strict reading within the epoch (D-18).** The extension tail, the eleven sections every
+   save holds and `urban.meta` are required, each section in the one version the writer
+   writes; an unknown section id, `world.bodies` version 1, an unknown body family, piece or
+   joint table, another content revision and an unknown affliction or rack ordinal are refused.
+3. **One record of the settled pieces (D-19):** `world.fragments` is no longer written or read.
+4. **Old-save code and fixtures removed (D-20, DESIGN §8 outcome):** the v2 migration, the
+   version branches, `legacyBone`, the content-1 absence default and adoption, the two quest
+   overloads without context, and the authentic saves of 0.2.0, 0.3.0, 0.8.1 and urban packages
+   06 and 20 with every test that loaded them. Refusal tests build the headers in code.
+5. **B11:** the writer's size limit goes through a package-private seam, and a test proves a
+   snapshot one byte over it is refused while the last save stays byte for byte.
+6. **The epoch guard (D-17).** `SaveEpochGuardTest` digests five inputs: a sample save of each
+   world kind, the stored enum tables, and both world kinds' generation through
+   `WorldFingerprints`, which `WorldGeneratorFingerprintTest` now shares. Epoch 1 is recorded,
+   unreleased, with the digest `6a9644da92c446dcf8bbade5b05803e049760f85feb79d31aead2d5618e65408`;
+   09 adds it to `RELEASED`. The fingerprint test's advice follows O1.
+7. **Native refusal route:** `VEYLON_FRONTEND=route-refusal` (below). Its first run found F9's
+   sentence cut short in the HUD's log panel, which `2600134` fixed with a log line of at most
+   32 characters.
+8. **Documents:** ARCHITECTURE's save section ("The save epoch", "Saves of other versions"),
+   DEVELOPING ("Saves and the save epoch"), the README's save format and known limitations,
+   CHANGELOG [Unreleased] and the save compatibility skill, rewritten for the epoch.
+
+### The epoch guard's checks
+
+`.\gradlew.bat test --tests "com.veylon.save.SaveEpochGuardTest" --console=plain` with one
+temporary change at a time, each reverted (`build/v091-m03-guard-mutations.txt`):
+
+| Change | Inputs that moved | Verdict |
+| --- | --- | --- |
+| None, with epoch 1 marked released | none | passes |
+| `world.lanterns` version 1 to 2 | `layout.city`, `layout.wilderness` | re-record (unreleased) |
+| `Npc.PartyKind` reordered | `enums` | re-record (unreleased) |
+| One economy loot chance, 60 to 61 | `generation.city` | re-record (unreleased) |
+| The wilderness's tunnel threshold, 0.065 to 0.066 | `generation.wilderness` | re-record (unreleased) |
+| `Npc.PartyKind` reordered, epoch 1 marked released | `enums` | "Raise SaveHeader.EPOCH to 2" |
+
+Appending a constant to `Npc.PartyKind` did not compile (two exhaustive switches), so the
+enum case uses a reorder; the guard compares the whole table, so an append moves it the same
+way. The guard passed with the same digest in six separate JVMs, three of them inside full builds
+beside seven other workers; alone it takes about 13 s.
+
+### Native evidence
+
+All in one isolated directory, `build/qa/v091-m03-refusal/` (ignored), on the owner's host at
+1280 x 720.
+
+- **A real 0.9.0 save.** A worktree at tag `v0.9.0` (`41dbfd6`), run with
+  `VEYLON_SEED=20261120 VEYLON_FRONTEND=route VEYLON_CAPTURE_TAG=v090-route ./gradlew.bat run
+  -PveylonDataDir=<that directory>`: `[frontend-route] launch=new pass=true`, generator 20,
+  Survival. Its F5 wrote `saves/veylon.sav`: 2,477 bytes beginning `56 45 59 4c 00 00 00 03`
+  (format 3), seed 20,261,120, generator 20; SHA-256
+  `10c47c051ddb774a3fdc83bbf0a590f4dc126e9c5a4ce8d8a60475bf62e88521`, modified 01:20:38 +03:00
+  (`build/v091-m03-native-hash-before.txt`).
+- **This build on it,** `VEYLON_FRONTEND=route-refusal`, twice. Both runs printed
+  `launch=refusal pass=true`, logged `Load refused: save format 3 (VEYLON 0.9.0 or earlier);
+  this build reads format 4 only` for L and for F9, kept the new city live after F9, and printed
+  the same SHA-256 before and after. The title capture (`v091-refusal_02-title-refused`) shows
+  "This save was written by an older version of VEYLON. Start a new world." under the menu. In
+  the first run the F9 capture showed the log line cut to "This save was written by an older
+  versi…"; after `2600134` the second run's (`v091-refusal-2_04-f9-refused`) shows "Save is from
+  an older version." whole. Logs: `build/v091-m03-native-v090-route.log`,
+  `build/v091-m03-native-refusal.log`, `build/v091-m03-native-refusal-2.log`.
+- **The file afterwards:** the same SHA-256, size and modification time
+  (`build/v091-m03-native-hash-after.txt`).
+
+### Changed paths
+
+- Production: `save/SaveHeader.java` and `save/LoadResult.java` (new), `save/SaveSystem.java`,
+  `save/V3ExtensionSections.java`, `save/BodiesSection.java`, `save/RemainsSection.java`,
+  `save/UrbanMetaSection.java`, `save/UrbanContainersSection.java`, `save/FragmentsSection.java`
+  (deleted), `world/urban/UrbanRevision.java`, `world/urban/UrbanContainers.java`,
+  `FrontendController.java`, `HotkeyRouter.java`, `ui/TitleScreen.java`, `FrontendRouteQa.java`,
+  `ai/FactionSystem.java`, `ai/Quest.java`, and the save notes in `entity/BodyFragment.java`,
+  `FragmentAnatomy.java`, `FragmentPiece.java` and `NpcAppearance.java`.
+- Tests: new `save/SaveEpochRefusalTest`, `save/ForeignSaves`, `save/SaveEpochGuardTest`,
+  `SaveRefusalRoutingTest`, `world/WorldFingerprints`; `SaveMigrationTest` became
+  `CoreSaveRoundTripTest` and `FragmentsSectionTest` became `PersonPiecesSaveTest`; deleted
+  `HistoricalV020SaveCompatibilityTest`, `HistoricalV3SaveCompatibilityTest` and
+  `UrbanEarlierRevisionSaveTest` with their fixtures under `src/test/resources/com/veylon/save/`
+  and `src/test/resources/saves/`; updated the save, section, corruption, fingerprint, enum,
+  lantern, revision and save audit tests.
+- Documents: `docs/ARCHITECTURE.md`, `docs/DEVELOPING.md`, `README.md`, `CHANGELOG.md`,
+  `.agents/skills/veylon-save-compatibility/SKILL.md`, DESIGN and this file.
+
+### Validation
+
+Every build ran from the repository root in Git Bash with `JAVA_HOME` set to
+`build/tools/jdk25/jdk-25.0.4.1+1`. Each code commit's tree was built whole in a detached
+worktree (`build/v091-m03-wt-1`, `-wt-2`) after its focused checks:
+
+| Commit | Focused checks | `build --console=plain` on its tree |
+| --- | --- | --- |
+| `ce4686d` | `CorruptSaveResilienceTest`, 17 tests; the new test fails with the guard disabled | 4m 37s, 2,376 tests in 308 classes |
+| `843dce8` | the save package and seven routing, loop and quest classes, 181 tests in 38 classes | 4m 55s, 2,379 tests in 307 classes |
+| `14ca773` | the save package, enum order, anatomy, remains, all-living and fingerprint classes, 366 tests in 37 classes | 5m 0s, 2,373 tests in 307 classes |
+| `3d98b70` | the save package and ten more classes, 181 tests in 41 classes; then the whole `test` task, 2,370 tests | 5m 29s, 2,370 tests in 307 classes |
+| `6bae538` | `WorldGeneratorFingerprintTest`, 23 tests against the unchanged pins | 5m 10s, 2,370 tests in 307 classes |
+| `f3fe760` | the fingerprint test and the guard, 27 tests; the mutation table above | 4m 48s, 2,374 tests in 308 classes |
+| `13486ca` | the quest, quest-target, map and HUD scene classes, 15 tests | the final build only |
+| `2600134` | the refusal, routing, mode selection and default-city classes, 26 tests; native run 2 | the final build only |
+| `0fbc816` | `compileJava`; both native runs | the final build only |
+
+Every build passed, with the two symbolic-link skips and no failure. The documentation commits
+(`71972aa`, `f3aed69`, `369d65e` and the records) had link, anchor, path and
+`git diff --check` checks: 68 relative links and anchors resolve.
+
+**The final tree**, `369d65e`: `./gradlew.bat build --rerun-tasks --console=plain`, BUILD SUCCESSFUL in
+5m 32s with all 10 tasks run: 2,375 tests in 308 classes, no failure, the two symbolic-link
+skips, and no temporary-directory retry (`build/v091-m03-final-build.log`). The guard printed
+the recorded digest again. `graphify update . --no-cluster` then rebuilt the graph: 12,299
+nodes. The three worktrees, including the one at `v0.9.0`, were removed afterwards.
+
+### Commits
+
+| Commit | Subject |
+| --- | --- |
+| `ce4686d` | test(save): prove the writer refuses a save no load would read |
+| `843dce8` | feat(save): open only saves of this build's format and epoch |
+| `14ca773` | refactor(save): keep settled pieces in world.remains alone |
+| `3d98b70` | feat(save): read only what a save of this epoch can hold |
+| `6bae538` | refactor(test): share the world fingerprints |
+| `f3fe760` | test(save): guard the save epoch's inputs |
+| `13486ca` | refactor(quest): drop the event overloads kept for core-only quests |
+| `2600134` | fix(save): keep F9's refusal line short enough for the HUD log |
+| `0fbc816` | feat(qa): play a refused save natively from the title and F9 |
+| `71972aa` | docs(save): describe the save epoch |
+| `f3aed69` | docs(skills): rewrite the save skill for the save epoch |
+| `369d65e` | docs(developing): ask for a section version when its rows change |
+| the records commit | docs(roadmap): record milestone 03 of 0.9.1 |
+
+No commit carries a co-author line. Nothing is pushed.
+
+### Limitations and pending gates
+
+- **Pending, from 02:** the first run of `verify.yml` on GitHub, until the owner pushes.
+- 0.9.0 refusing a 0.9.1 save was read in 0.9.0's source (its format check runs before
+  `newWorld`), not run natively.
+- The city sample carries most city sections without rows; a row change is guarded through the
+  section's version, which DEVELOPING now asks for (`369d65e`).
+- The 32-character log line is a proxy for the HUD panel's pixel width, checked natively at
+  1280 x 720 only.
+- Content revisions 1 and 2 keep their runtime rules until 0.9.2 retires generators 4–19;
+  no save of this epoch can carry them.
+- `RELEASED` is empty until 09 ships epoch 1.
+
+### Next: milestone 04
+
+Three save slots and backups (D-02), with D-15's rule for foreign files in save folders.
+`SaveHeader` can judge a slot from its first bytes without loading it, and `LoadResult` already
+says why a slot does not open.

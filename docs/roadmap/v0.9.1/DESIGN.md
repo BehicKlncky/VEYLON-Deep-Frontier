@@ -1,7 +1,8 @@
 # VEYLON 0.9.1 "Safe Saves" — Design
 
 Written by milestone 01 on 2026-11-19 against `main` at `95d09c5` (build version 0.9.0).
-Milestone 02 added D-10 to D-15 and closed B02 and B16 the same day. Source line numbers are as
+Milestone 02 added D-10 to D-15 and closed B02 and B16 the same day. Milestone 03 added D-16 to
+D-20, closed B11 and settled §8 on 2026-11-20. Source line numbers are as
 of `95d09c5`: re-verify one before relying on it. Milestone
 records are in [PROGRESS.md](PROGRESS.md); the index of all versions and the owner decisions
 O1–O9 is [the roadmap index](../README.md).
@@ -48,6 +49,11 @@ them. D-08 onward are this release's own.
 | D-13 | **Continuous integration.** `.github/workflows/verify.yml` runs `build` on Windows x64 for every push and pull request; `release-recovery/**` pushes are left to the release workflow, which builds them already. macOS arm64 runs for pull requests to `main`, every Monday at 04:00 UTC and on demand, not on every push: a hosted macOS runner is slower and scarcer, and the release workflow already gives its full build 30 minutes. A failed run uploads the test reports. `release-build.yml` is unchanged. The first run waits until the owner pushes. | 02 |
 | D-14 | **No quick test task.** The milestone left one optional. With D-12 the whole test task takes about four and a half minutes. A task that skipped the heaviest classes would need a tag on each of them and a rule for tagging new ones, and it would be a second suite that could be mistaken for the first. `--tests` filters remain the quick path while iterating, and `build` runs everything. | 02 |
 | D-15 | **Foreign files in save folders.** D-10's antivirus copies can also appear in a player's save folder when the game deletes a file it has just written, such as a rotated backup or a failed save's temporary file. Slot listing and backup rotation (04) must ignore files the game did not write, and must not fail when a directory is briefly not empty. | 04 |
+| D-16 | **The header, and refusal from it.** Format 4 begins `VEYL`, the format, the save epoch, the seed and the generator id (`save.SaveHeader`); every later format keeps the magic, the format and the epoch at those offsets, so any build tells a save it must refuse from a damaged one. Formats 2 and 3 (0.1.0 to 0.9.0) carry no epoch and are older by format. The header carries no game version: the epoch alone decides, older and newer follow from comparing it, a development run has no version to write (the jar manifest holds it), and 04 can keep whatever a slot summary shows in its own record. `SaveSystem.open` reads the header first; another format or epoch builds no world, never reaches the isolated verifier pass, leaves the live world as it was and never touches the file. Its `LoadResult` says why for the player (older version, newer version, not a VEYLON save, damaged, unreadable, no save): a sentence LOAD FRONTIER shows under the title menu, and a line of at most 32 characters that F9 writes to the log, since the HUD's log panel cut the sentence short in the native check. The technical reason goes to the console. | 03 |
+| D-17 | **What an epoch means, and its guard.** Two builds share an epoch only if each opens every save the other writes, into the same world and state. `SaveEpochGuardTest` digests what decides that as five recorded inputs: a sample save of each world kind (header, core body with one record of each list, the extension tail and every section's version), the enum tables a save stores by ordinal, name, code or id (with each body family's pieces and the faction ids), and the generation of both world kinds through the shared `WorldFingerprints` (with the settlements the wilderness plans, what city containers hold on their first search, the generators a load accepts and the city revisions each names). While no release has shipped the current epoch, a changed input is re-recorded. Once `RELEASED` names it, any change fails with the instruction to raise `SaveHeader.EPOCH`; a released entry is never edited. An appended enum constant counts as a change, because a build of the same epoch must read every save of that epoch; appending is still preferred, since it keeps ordinals stable while an epoch is developed. `RELEASED` stays empty until 09 adds epoch 1 with the digest the passing test prints. | 03, 09 |
+| D-18 | **Strict reading within an epoch.** The reader accepts exactly what the writer writes. Refused: a save without the extension tail or with its version 1; a section id the build does not know; a save missing any of the eleven sections every save holds (lanterns, party state, counterattacks, quest target, settlement reputation, active explosives, keg attribution, game mode, Creative controls, bodies, remains); `world.bodies` version 1; a body family, piece id or joint table `world.remains` does not have; a city save without `urban.meta`, or naming another content revision than `UrbanRevision.contentFor` its generator; a city that manages containers without `urban.containers`; an affliction or drying-rack ordinal past its enum; more lit kegs than the explosion system holds. `world.fixtures`, `urban.discovery` and `urban.visits` are written only when they hold something, so their absence means "nothing". The runtime rules for earlier content revisions (content 1's empty markers, content 2 in tests) stay until 0.9.2 retires generators 4–19, as §4 asks; only their save-loading code went. | 03 |
+| D-19 | **One record of the settled pieces.** The writer no longer writes `world.fragments` beside `world.remains`: it existed so that 0.8.0 could open a newer save, which O1 does not ask for. `FragmentsSection` is gone, and a save that still holds the section is refused as unknown. | 03 |
+| D-20 | **Evidence without fixtures.** The authentic saves of 0.2.0, 0.3.0, 0.8.1 and urban packages 06 and 20, and every test that loaded them, are gone. Refusal tests put 0.9.0's header, format 2, later formats, other epochs and cut headers on a save this build wrote (`ForeignSaves`); the native check writes a real 0.9.0 save with the tagged build. The quest constructor and `Quest.Status.LEGACY_UNBOUND` stay, since offers are built through the one and the HUD's QA scene stages the other; the two quest event overloads without context had no caller and went. | 03 |
 
 ## 4. What 0.9.1 does not include
 
@@ -80,7 +86,7 @@ the document that reported the defect. Every entry was checked against current s
 | B08 | While the game is paused, living bodies' idle animation follows the wall clock, so a paused burning body breathes under frozen flames. | `Game.java:362` (`totalTime` is `glfwGetTime()`); `engine/Renderer.java:517, 531` pose living bodies with it, while flames use the paused clock `engine/ParticleSystem.java:97`. Record: ALL_LIVING_COMBAT_FIRE_PROGRESS lines 1443-1445. | Confirmed | 07 |
 | B09 | A burning log or leaf block barely shows: the block-fire glow cube and its flame and ember particles sit inside the opaque block. | `engine/Renderer.java:548-555` (the cube is at most one block); `AmbienceSystem.java:174-183` (flame at y + 0.2, ember at y + 0.6; only the smoke at y + 1 is outside). Record: [COMBAT_LETHALITY_AND_MOLOTOV](../../engineering/COMBAT_LETHALITY_AND_MOLOTOV.md) lines 303-305. | Confirmed | 07 |
 | B10 | `ItemConditionSystem` keeps its own rained-on test (a literal `0.9f`) for drying racks and rain collectors, against the documented one-predicate rule. Behaviour is identical today. | `simulation/ItemConditionSystem.java:110, 135`; the shared rule is `simulation/FireSystem.java:142-156` with `RAIN_EXPOSURE_SKYLIGHT` (`simulation/FireConstants.java:42`). Rule: [DEVELOPING](../../DEVELOPING.md) lines 1168-1171; [ARCHITECTURE](../../ARCHITECTURE.md) line 1718. | Confirmed (maintenance) | 07 |
-| B11 | The save writer's 128 MiB guard has no test. | `save/SaveSystem.java:107` and `:349-354`; only the read cap is tested (`src/test/java/com/veylon/save/CorruptSaveResilienceTest.java:246-262`). Record: [urban DECISIONS](../../urban-survival/DECISIONS.md) D-249 (line 339). | Confirmed (coverage gap) | 03 |
+| B11 | The save writer's 128 MiB guard has no test. | `save/SaveSystem.java:107` and `:349-354`; only the read cap is tested (`src/test/java/com/veylon/save/CorruptSaveResilienceTest.java:246-262`). Record: [urban DECISIONS](../../urban-survival/DECISIONS.md) D-249 (line 339). | Fixed in 03 (`ce4686d`): the writer takes its limit through a package-private seam, and a test proves a snapshot one byte over it is refused while the last save stays byte for byte | 03 |
 | B12 | A resident killed by a projectile in a frame without a fast tick is written back as dead without the death's bookkeeping (trust, mission failure, loot, log) if its settlement deactivates on that frame's slow tick. | `Game.java:584-586` (the ticks run before `projectiles.update`); `simulation/SimulationScheduler.java:21-52` (separate accumulators); `settlement/SettlementManager.java:640-646` and `:758-771` (`r.alive = !n.dead`, then `removeNpc`); the bookkeeping is in the fast tick, `entity/EntityManager.java:79` onward. Record: ALL_LIVING_COMBAT_FIRE_PROGRESS lines 1214-1217. | Confirmed by reading; not yet reproduced | 07 |
 | B13 | On the paused death card after a lethal blast, the camera sits inside the player's rest-pose head piece, and the remains fall only after respawn. | `PlayerLifeCycle.java:10-17` spawns the remains on entering DEATH; `entity/BodyFragmentSystem.java:183-194` places them in the rest pose; `Game.java:560` keeps the camera at the eye; `Game.java:576-578` stops `advanceWorld` outside PLAYING. Record: ALL_LIVING_COMBAT_FIRE_PROGRESS lines 438-442. | Confirmed in source; never captured natively | 07 |
 | B14 | The day's temperature curve is inverted in every world: 14:00 is the coldest hour and 02:00 the warmest. | `simulation/TimeSystem.java:99-104`. Records: urban DECISIONS P-15 (line 410); [README](../../../README.md) lines 575-577. | Confirmed | 08 (D-07) |
@@ -104,9 +110,9 @@ release that takes one on is named.
 - **Engine.** Sky-column lighting baked at mesh time, not flood-fill (0.11.0); face-culled
   meshing and cuboid models without skeletal animation; full-cell water without levels; no
   dropped-item entities.
-- **Saves.** One save slot (04, D-02); no autosave (05, D-03); the downgrade notes for 0.7.x
-  and 0.8.1 and "v2 worlds never gain new content", which O1 makes moot (03 and 09 rewrite that
-  text, §8); save and load time grow with the places a city names (urban D-246; 0.9.2).
+- **Saves.** One save slot (04, D-02); no autosave (05, D-03); save and load time grow with the
+  places a city names (urban D-246; 0.9.2). The README's downgrade notes for 0.7.x and 0.8.1 and
+  "v2 worlds never gain new content", which O1 made moot, were removed by 03.
 - **City.** First-touch planning hitches in fast travel (urban D-247; 0.9.2's look-ahead
   planner); no gardening (0.12.0); the city is generous in total, so its pressure comes from
   distance, risk, time and spoilage (urban DESIGN §16.6; the 0.10.0 balance pass).
@@ -138,7 +144,8 @@ Carried from the 0.8.x series. Until the owner answers, the current behaviour st
 
 ## 8. Save code and tests that O1 makes dead
 
-Input for milestone 03. Nothing here is deleted by 01. "Dead" means that only a save written
+Input for milestone 03, which settled every row; the outcome follows the table. Nothing here is
+deleted by 01. "Dead" means that only a save written
 before epoch 1 can reach it once D-01 lands, or that it exists only to keep such saves or older
 builds working. 03 removes each item or turns it into a refusal test; the docs listed last
 follow.
@@ -154,3 +161,28 @@ follow.
 | Historical fixtures and their tests | `HistoricalV020SaveCompatibilityTest` with `v0.2.0-authentic.sav.b64` (also `GameModeSectionTest.authenticV020FixtureLoadsAsSurvivalWithLegacyTerrain`, lines 77-86); `HistoricalV3SaveCompatibilityTest` with `v0.3.0-authentic.sav.b64` and `v0.8.1-{survival,creative}-authentic.sav.b64` (also `SaveAuditQaSceneTest` lines 45-46); `SaveMigrationTest`; `UrbanEarlierRevisionSaveTest` with `urban-gen19-m20-authentic.{sav.b64,describe.txt,facts.txt}`; `UrbanContainersSectionTest` line 67 with `saves/urban-preloot-m06.sav` and its `README.md`. Tests are under `src/test/java/com/veylon/save/` (`SaveAuditQaSceneTest` under `com/veylon/`), fixtures under `src/test/resources/com/veylon/save/` and `src/test/resources/saves/` | O1 keeps no historical fixture or compatibility test; a refusal test can use a synthesized pre-epoch header instead |
 | Earlier urban revisions in saves | `world/urban/UrbanWorldState.java:215-233` (`resolveContentRevision` pairing), `UrbanRevision.requireSupportedContent`, the layout check in `save/UrbanMetaSection.java:68-72`, per-generator section versions such as `save/UrbanRefugesSection.java:34-35` | Their save-loading role ends with D-01. The code stays while tests and QA can still build generators 4–19; 0.9.2 retires it with them, and 03 must not polish it |
 | Documents that describe the old behaviour | `docs/ARCHITECTURE.md` "Save / load" (the v2 migration, and the policy's "Status" paragraph); README "Known limitations" lines 573-574, 590-595 and 601-602; `.agents/skills/veylon-save-compatibility/SKILL.md` | 03 rewrites the skill and the save documents; 09 updates the README. The urban records stay historical: their R10 note (urban DESIGN line 34) already points to the policy |
+
+Outcome of milestone 03 (2026-11-20), row by row:
+
+- **The v2 core reader:** gone. `SaveHeader` replaced `MIN_SUPPORTED` and the version branches,
+  and the stack and inventory readers lost their version parameter (`843dce8`).
+- **The v1 extension payload:** refused; the extension tail is required, in version 2 only
+  (`3d98b70`).
+- **`world.bodies` v1:** refused, and `legacyBone` and its test are gone (`3d98b70`).
+- **`world.fragments` beside `world.remains`:** no longer written or read (D-19, `14ca773`).
+  `FragmentsSectionTest`'s tests through the whole save live on as `PersonPiecesSaveTest`.
+- **Core-only historical quests:** the constructor and `LEGACY_UNBOUND` stay, because they are
+  live outside saves; the two event overloads without context had no caller and went (D-20,
+  `13486ca`).
+- **Absence defaults and forward-compatibility skips:** refused rather than removed (D-18,
+  `3d98b70`): an unknown section id, a missing always-written section, a city without
+  `urban.meta`, and an unknown body family, piece or joint table in `world.remains`.
+  `UrbanRevision.ABSENT_CONTENT` and the containers' adoption of content-1 inventories are gone.
+- **Historical fixtures and their tests:** all removed (`843dce8`), replaced by refusal tests
+  on synthesized headers (D-20). `SaveMigrationTest` kept its round trip and corruption cases as
+  `CoreSaveRoundTripTest`; the save audit's headless test tours current wilderness saves instead.
+- **Earlier urban revisions in saves:** a load now accepts only the content revision a new world
+  of the save's generator records (`3d98b70`); the runtime rules for earlier revisions stay until
+  0.9.2 retires their generators, as the row says.
+- **Documents:** the save sections of ARCHITECTURE, DEVELOPING, the README and the changelog, and
+  the save compatibility skill, describe the epoch (the documentation commit of 03).
