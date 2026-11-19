@@ -3,6 +3,7 @@ package com.veylon;
 import com.veylon.entity.GameMode;
 import com.veylon.item.Inventory;
 import com.veylon.item.ItemStack;
+import com.veylon.save.LoadResult;
 import com.veylon.save.SaveSystem;
 import com.veylon.util.AppPaths;
 import com.veylon.util.Vec3i;
@@ -17,9 +18,12 @@ import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.Locale;
 import java.util.function.BooleanSupplier;
@@ -46,10 +50,18 @@ import static org.lwjgl.glfw.GLFW.*;
  * {@code [frontend-route]} line reports each check. The route refuses to run without an isolated
  * data directory, since it writes the slot. Its screens draw only with a GL context, so it has no
  * headless twin; the headless default-path tests drive the same controller through its seams.
+ *
+ * <p>0.9.1 milestone 03 adds {@code VEYLON_FRONTEND=route-refusal}, for a slot that holds a save of
+ * another version, such as one the 0.9.0 build's first launch wrote: the slot's SHA-256; the title,
+ * L, and the title again with the reason under the menu; N and Enter into a new city; F9 over it,
+ * which must keep that city and log the reason; the slot's SHA-256 again, which must be unchanged;
+ * then the pause menu and Q. It never presses F5. {@code SaveRefusalRoutingTest} drives the same
+ * paths headlessly.
  */
 final class FrontendRouteQa {
     static final String ROUTE = "route";
     static final String ROUTE_LOAD = "route-load";
+    static final String ROUTE_REFUSAL = "route-refusal";
     private static final double DEADLINE_SECONDS = 240;
 
     private interface Step {
@@ -59,6 +71,7 @@ final class FrontendRouteQa {
     private final Game game;
     private final AutomatedRunDriver driver;
     private final boolean loadLaunch;
+    private final boolean refusalLaunch;
     private final GameMode mode;
     private final Path digest;
     private final ArrayDeque<String> labels = new ArrayDeque<>();
@@ -73,10 +86,13 @@ final class FrontendRouteQa {
     private List<String> saved = List.of();
     private String carried;
     private BuildingPlan.Fixture cupboard;
+    private String slotBefore = "";
+    private String slotAfter = "";
+    private World liveCity;
 
     /** Whether a {@code VEYLON_FRONTEND} screen names this route. */
     static boolean names(String screen) {
-        return ROUTE.equals(screen) || ROUTE_LOAD.equals(screen);
+        return ROUTE.equals(screen) || ROUTE_LOAD.equals(screen) || ROUTE_REFUSAL.equals(screen);
     }
 
     FrontendRouteQa(Game game, AutomatedRunDriver driver, String screen, GameMode mode) {
@@ -87,16 +103,74 @@ final class FrontendRouteQa {
         this.game = game;
         this.driver = driver;
         this.loadLaunch = ROUTE_LOAD.equals(screen);
+        this.refusalLaunch = ROUTE_REFUSAL.equals(screen);
         this.mode = mode;
         this.digest = SaveSystem.SAVE_PATH.resolveSibling("frontend-route.digest");
-        if (loadLaunch) {
+        if (refusalLaunch) {
+            planRefusalLaunch();
+        } else if (loadLaunch) {
             planLoadLaunch();
         } else {
             planNewLaunch();
         }
-        System.out.println("[frontend-route] launch=" + (loadLaunch ? "load" : "new") + " mode="
+        System.out.println("[frontend-route] launch=" + launchName() + " mode="
                 + mode.name().toLowerCase(Locale.ROOT) + " slot=" + SaveSystem.SAVE_PATH
                 + " saveExisted=" + Files.exists(SaveSystem.SAVE_PATH));
+    }
+
+    private String launchName() {
+        return refusalLaunch ? "refusal" : loadLaunch ? "load" : "new";
+    }
+
+    /**
+     * A slot holding another version's save: refused from the title and by F9 over a new city, the
+     * reason shown both times, the file never changed. Nothing here writes the slot.
+     */
+    private void planRefusalLaunch() {
+        LoadResult refused = new LoadResult(LoadResult.Outcome.OLDER_VERSION, "");
+        String older = refused.message();
+        step("hash the slot", run(() -> slotBefore = slotHash()));
+        step("a save of another version is in the slot", check(() -> !slotBefore.isEmpty()));
+        step("title", wait(1.5));
+        step("title capture", capture("01-title"));
+        step("L", press(GLFW_KEY_L));
+        step("back at the title", await(() -> game.appState == Game.AppState.TITLE && game.world == null, 30));
+        step("the title says why", check(() -> older.equals(game.titleScreen.notice())));
+        step("notice settle", wait(0.6));
+        step("refused capture", capture("02-title-refused"));
+        step("N", press(GLFW_KEY_N));
+        step("new frontier", await(() -> game.appState == Game.AppState.TITLE_NEW_WORLD, 3));
+        step("it warns about the file in the slot", check(() -> game.newFrontierScreen.showsReplaceNotice()));
+        step("Enter", press(GLFW_KEY_ENTER));
+        step("loading", await(() -> game.appState == Game.AppState.LOADING, 2));
+        step("playing", await(() -> game.appState == Game.AppState.PLAYING, 90));
+        step("a new city", check(() -> game.world.isUrban() && game.world.changedBlocks.isEmpty()));
+        step("meshes", wait(3.0));
+        step("remember the city", run(() -> liveCity = game.world));
+        step("city capture", capture("03-new-city"));
+        step("F9 over the live city", press(GLFW_KEY_F9));
+        step("F9 says why", await(() -> logged(refused.logLine()), 5));
+        step("the city is kept", check(() -> game.world == liveCity && game.appState == Game.AppState.PLAYING));
+        step("log settle", wait(1.0));
+        step("F9 capture", capture("04-f9-refused"));
+        step("hash the slot again", run(() -> slotAfter = slotHash()));
+        step("the slot is untouched", check(() -> slotBefore.equals(slotAfter)));
+        pauseScreens(5);
+        step("report", run(this::report));
+        step("Q quits", press(GLFW_KEY_Q));
+    }
+
+    /** The slot's SHA-256, or empty when it holds no file. */
+    private static String slotHash() {
+        try {
+            if (!Files.isRegularFile(SaveSystem.SAVE_PATH)) {
+                return "";
+            }
+            byte[] sha = MessageDigest.getInstance("SHA-256").digest(Files.readAllBytes(SaveSystem.SAVE_PATH));
+            return HexFormat.of().formatHex(sha);
+        } catch (IOException | NoSuchAlgorithmException e) {
+            throw new IllegalStateException("could not hash the slot", e);
+        }
     }
 
     private void planNewLaunch() {
@@ -412,10 +486,14 @@ final class FrontendRouteQa {
                 System.out.println("[frontend-route] loaded " + line);
             }
         }
-        System.out.println("[frontend-route] launch=" + (loadLaunch ? "load" : "new") + " pass=" + failures.isEmpty()
+        if (refusalLaunch) {
+            System.out.println("[frontend-route] slot sha256 before=" + slotBefore + " after=" + slotAfter
+                    + " notice=\"" + game.titleScreen.notice() + "\"");
+        }
+        System.out.println("[frontend-route] launch=" + launchName() + " pass=" + failures.isEmpty()
                 + " failures=" + failures + " generator=" + (game.world == null ? -1 : game.world.generatorVersion)
                 + " mode=" + (game.world == null ? mode : game.gameMode()).name().toLowerCase(Locale.ROOT)
-                + " evidence=keys(" + (loadLaunch ? "L,Esc,O,V,Q"
+                + " evidence=keys(" + (refusalLaunch ? "L,N,Enter,F9,Esc,O,V,Q" : loadLaunch ? "L,Esc,O,V,Q"
                 : "N,W,C,Enter,9,RMB,Esc,W-held,M,Esc,F5,Enter|Space,F9,O,V,Q") + ")"
                 + " glErrors=" + game.window.glErrorCount() + " khrErrors=" + game.window.glDebugErrorCount());
     }
