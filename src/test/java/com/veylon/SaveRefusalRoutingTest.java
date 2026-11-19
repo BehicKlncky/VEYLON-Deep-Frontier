@@ -1,6 +1,7 @@
 package com.veylon;
 
 import com.veylon.save.ForeignSaves;
+import com.veylon.save.LoadResult;
 import com.veylon.save.SaveSystem;
 import com.veylon.ui.TitleScreen;
 import com.veylon.world.World;
@@ -23,8 +24,9 @@ import static org.lwjgl.glfw.GLFW.GLFW_PRESS;
 
 /**
  * 0.9.1 milestone 03: where a player meets a refused save. LOAD FRONTIER returns to the title with
- * the reason under the menu, and F9 keeps the live world and says why in the log; neither touches
- * the file. The saves are VEYLON 0.9.0's header put on a save this build wrote.
+ * the reason under the menu, and F9 keeps the live world and says why in a log line short enough
+ * for the HUD; neither touches the file. The saves are VEYLON 0.9.0's header put on a save this
+ * build wrote.
  */
 class SaveRefusalRoutingTest {
 
@@ -72,9 +74,20 @@ class SaveRefusalRoutingTest {
         assertSame(live, game.world, "the live world is kept");
         assertSame(player, game.player);
         List<String> log = game.eventLog.recent(1);
-        assertTrue(log.getFirst().endsWith("This save was written by an older version of VEYLON. Start a new world."),
-                log.toString());
+        assertTrue(log.getFirst().endsWith("Save is from an older version."), log.toString());
         assertArrayEquals(older, Files.readAllBytes(SaveSystem.SAVE_PATH), "the file is untouched");
+    }
+
+    /**
+     * The HUD's log panel cuts a longer line short; the native capture of 0.9.1 milestone 03 showed
+     * the title's sentence cut there, so F9 reports the short line.
+     */
+    @Test
+    void everyLogLineFitsTheLogPanel() {
+        for (LoadResult.Outcome outcome : LoadResult.Outcome.values()) {
+            String line = new LoadResult(outcome, "").logLine();
+            assertTrue(!line.isBlank() && line.length() <= LoadResult.LOG_LINE_LIMIT, outcome + ": " + line);
+        }
     }
 
     @Test

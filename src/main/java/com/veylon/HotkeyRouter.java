@@ -132,7 +132,7 @@ final class HotkeyRouter {
             if (result.loaded()) {
                 game.closeScreens();
             }
-            game.log(result.message());
+            game.log(result.logLine());
         }
     }
 
