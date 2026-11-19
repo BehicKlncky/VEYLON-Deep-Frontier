@@ -103,8 +103,11 @@ public final class SaveSystem {
      * is ~52 MB of deltas — beyond any played world, and still finite.
      */
     private static final int MAX_SERIALIZED_BLOCK_EDITS = 4_000_000;
-    /** Hard cap before a file is retained in memory for a transaction-safe load. */
-    private static final int MAX_SAVE_BYTES = 128 * 1024 * 1024;
+    /**
+     * Hard cap before a file is retained in memory for a transaction-safe load, and the largest
+     * save the writer publishes.
+     */
+    static final int MAX_SAVE_BYTES = 128 * 1024 * 1024;
     public static final Path SAVE_PATH = AppPaths.dataDirectory().resolve("saves/veylon.sav");
 
     private SaveSystem() {
@@ -115,6 +118,15 @@ public final class SaveSystem {
     }
 
     public static boolean save(Game g, Path savePath) {
+        return save(g, savePath, MAX_SAVE_BYTES);
+    }
+
+    /**
+     * Saves with the size limit as a parameter, so a test can prove the writer's guard against a
+     * file no load reads without writing {@value #MAX_SAVE_BYTES} bytes. Every other caller goes
+     * through {@link #save(Game, Path)}, whose limit is the reader's.
+     */
+    static boolean save(Game g, Path savePath, int sizeLimit) {
         Objects.requireNonNull(g, "g");
         Objects.requireNonNull(savePath, "savePath");
         g.entities.flushInfectedDeaths(g);
@@ -348,9 +360,9 @@ public final class SaveSystem {
                 writeV3Extension(out, g, npcs);
                 // A file larger than any load reads would replace the last good save with one
                 // nothing can open; refuse it like any other invalid snapshot.
-                if (out.size() > MAX_SAVE_BYTES) {
+                if (out.size() > sizeLimit) {
                     throw new IOException("save of " + out.size() + " bytes exceeds the "
-                            + MAX_SAVE_BYTES + " a load reads");
+                            + sizeLimit + " a load reads");
                 }
                 out.flush();
                 channel.force(true);

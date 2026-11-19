@@ -243,6 +243,40 @@ class CorruptSaveResilienceTest {
         assertEquals(100_000, target.world.discoveredPois.size());
     }
 
+    /**
+     * 0.9.1 B11: a snapshot larger than a load reads is refused by the writer, and the last save
+     * stays byte for byte. The test sets the limit through the writer's seam instead of writing
+     * 128 MiB; {@link SaveSystem#save(Game, Path)} passes the reader's own cap to it.
+     */
+    @Test
+    void aSnapshotLargerThanALoadReadsIsNeverPublished(@TempDir Path dir, @TempDir Path elsewhere)
+            throws IOException {
+        Game game = new Game();
+        game.newWorld(40_117L, true, World.GEN_CAVE_IDENTITIES);
+        Path slot = dir.resolve("slot.dat");
+        assertTrue(SaveSystem.save(game, slot));
+        byte[] last = Files.readAllBytes(slot);
+
+        for (int i = 0; i < 64; i++) {
+            game.world.discoveredPois.add(new Vec3i(i, 64, -i));
+        }
+        Path measured = elsewhere.resolve("measured.dat");
+        assertTrue(SaveSystem.save(game, measured), "precondition: the grown snapshot saves");
+        byte[] grown = Files.readAllBytes(measured);
+        assertTrue(grown.length > last.length, "precondition: the next snapshot is larger");
+
+        assertFalse(SaveSystem.save(game, slot, grown.length - 1),
+                "one byte more than the limit must not be published");
+        assertArrayEquals(last, Files.readAllBytes(slot), "the last save is untouched");
+        try (var files = Files.list(dir)) {
+            assertEquals(java.util.List.of(slot), files.toList(), "and no temporary file is left beside it");
+        }
+
+        assertTrue(SaveSystem.save(game, slot, grown.length), "a snapshot at the limit is published");
+        assertArrayEquals(grown, Files.readAllBytes(slot));
+        assertTrue(SaveSystem.load(new Game(), slot), "and loads");
+    }
+
     /** Urban package 25: a file larger than any load reads is refused before anything is parsed or replaced. */
     @Test
     void aFileLargerThanAnyLoadReadsIsRefusedBeforeAnythingChanges(@TempDir Path dir) throws IOException {
@@ -252,7 +286,7 @@ class CorruptSaveResilienceTest {
         try (var channel = java.nio.channels.FileChannel.open(huge, java.nio.file.StandardOpenOption.CREATE_NEW,
                 java.nio.file.StandardOpenOption.WRITE)) {
             channel.write(java.nio.ByteBuffer.wrap(complete));
-            channel.write(java.nio.ByteBuffer.wrap(new byte[1]), 128L * 1024 * 1024);
+            channel.write(java.nio.ByteBuffer.wrap(new byte[1]), SaveSystem.MAX_SAVE_BYTES);
         }
         Game target = new Game();
         target.newWorld(91_339L, true, World.GEN_CAVE_IDENTITIES);
