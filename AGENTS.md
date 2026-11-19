@@ -19,6 +19,7 @@
 | Graphics, materials or HUD | Relevant file in `docs/graphics/`, especially `ART_DIRECTION.md`, `ASSET_PIPELINE.md` or `HUD_VALIDATION.md` |
 | Audio | `docs/audio/AUDIO_DESIGN.md` |
 | Creative/Survival behavior | `docs/creative/CREATIVE_DESIGN.md` |
+| Anything a player reads: names, signs, notices, records, dialogue, map labels | `docs/lore/CANON.md` |
 | Release preparation or packaging | `.github/workflows/release-build.yml`; `veylon-release` skill |
 
 Project skills live in `.agents/skills/<name>/SKILL.md`. Read the matching skill only when its workflow applies.
