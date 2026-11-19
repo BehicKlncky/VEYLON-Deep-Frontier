@@ -28,10 +28,13 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  *
  * <p>So these fingerprints are recorded constants. If a change moves one, that
  * is the test working. The response is a deliberate decision — either the
- * change was not meant to alter output and is wrong, or it was, and then a new
- * generator version must be added so old saves keep their old terrain, exactly
- * as {@code GEN_DEEP} and {@code GEN_CAVE_IDENTITIES} did. Re-recording the
- * constant on its own is never the right answer.
+ * change was not meant to alter output and is wrong, or it was. Under the
+ * owner's save policy (0.9.1 O1) only the generators new worlds use, the
+ * wilderness's 3 and the city's 20, may then change: re-record their pins, and
+ * {@code SaveEpochGuardTest}, which digests the same fingerprints through
+ * {@link WorldFingerprints}, decides whether the save epoch must rise. No new
+ * generator version is added to keep an old save's world. Generators 1, 2 and
+ * 4–19 stay exactly as they are until 0.9.2 retires them.
  *
  * <p>Each pin names its generator explicitly rather than "the current one":
  * the generator new worlds use and the generators a save may name are
@@ -131,8 +134,8 @@ class WorldGeneratorFingerprintTest {
                 }
             }
         }
-        assertTrue(moved.isEmpty(), () -> "saved urban catalogues changed; add a generator version "
-                + "instead of re-recording:\n  " + String.join("\n  ", moved));
+        assertTrue(moved.isEmpty(), () -> "saved urban catalogues changed; it stays as it is until 0.9.2 "
+                + "retires it:\n  " + String.join("\n  ", moved));
     }
 
     /**
@@ -159,8 +162,8 @@ class WorldGeneratorFingerprintTest {
                 moved.add(String.format("seed %d: blocks 0x%016xL, plans 0x%016xL", SEEDS[i], blocks, plans));
             }
         }
-        assertTrue(moved.isEmpty(), () -> "generator 11 changed; add a generator version instead of "
-                + "re-recording:\n  " + String.join("\n  ", moved));
+        assertTrue(moved.isEmpty(), () -> "generator 11 changed; it stays as it is until 0.9.2 "
+                + "retires it:\n  " + String.join("\n  ", moved));
     }
 
     /**
@@ -194,8 +197,8 @@ class WorldGeneratorFingerprintTest {
                         SEEDS[i], blocks, plans, districts));
             }
         }
-        assertTrue(moved.isEmpty(), () -> "generator 12 changed; add a generator version instead of "
-                + "re-recording:\n  " + String.join("\n  ", moved));
+        assertTrue(moved.isEmpty(), () -> "generator 12 changed; it stays as it is until 0.9.2 "
+                + "retires it:\n  " + String.join("\n  ", moved));
     }
 
     /**
@@ -227,8 +230,8 @@ class WorldGeneratorFingerprintTest {
                         SEEDS[i], terrain, plans, routes));
             }
         }
-        assertTrue(moved.isEmpty(), () -> "generator 13 changed; add a generator version instead of "
-                + "re-recording:\n  " + String.join("\n  ", moved));
+        assertTrue(moved.isEmpty(), () -> "generator 13 changed; it stays as it is until 0.9.2 "
+                + "retires it:\n  " + String.join("\n  ", moved));
     }
 
     /**
@@ -252,8 +255,8 @@ class WorldGeneratorFingerprintTest {
                 moved.add(String.format("seed %d: terrain 0x%016xL, plans 0x%016xL", SEEDS[i], terrain, plans));
             }
         }
-        assertTrue(moved.isEmpty(), () -> "generator 14 changed; add a generator version instead of "
-                + "re-recording:\n  " + String.join("\n  ", moved));
+        assertTrue(moved.isEmpty(), () -> "generator 14 changed; it stays as it is until 0.9.2 "
+                + "retires it:\n  " + String.join("\n  ", moved));
     }
 
     /**
@@ -273,8 +276,8 @@ class WorldGeneratorFingerprintTest {
                 moved.add(String.format("seed %d: anchors 0x%016xL", SEEDS[i], anchors));
             }
         }
-        assertTrue(moved.isEmpty(), () -> "encounter catalogue 5 changed; add a generator version instead of "
-                + "re-recording:\n  " + String.join("\n  ", moved));
+        assertTrue(moved.isEmpty(), () -> "encounter catalogue 5 changed; it stays as it is until 0.9.2 "
+                + "retires it:\n  " + String.join("\n  ", moved));
     }
 
     /**
@@ -296,8 +299,8 @@ class WorldGeneratorFingerprintTest {
                 moved.add(String.format("seed %d: terrain 0x%016xL, sites 0x%016xL", SEEDS[i], terrain, sites));
             }
         }
-        assertTrue(moved.isEmpty(), () -> "generator 15 changed; add a generator version instead of "
-                + "re-recording:\n  " + String.join("\n  ", moved));
+        assertTrue(moved.isEmpty(), () -> "generator 15 changed; it stays as it is until 0.9.2 "
+                + "retires it:\n  " + String.join("\n  ", moved));
     }
 
     /**
@@ -325,8 +328,8 @@ class WorldGeneratorFingerprintTest {
                         SEEDS[i], terrain, compounds, chunks));
             }
         }
-        assertTrue(moved.isEmpty(), () -> "generator 16 changed; add a generator version instead of "
-                + "re-recording:\n  " + String.join("\n  ", moved));
+        assertTrue(moved.isEmpty(), () -> "generator 16 changed; it stays as it is until 0.9.2 "
+                + "retires it:\n  " + String.join("\n  ", moved));
     }
 
     /**
@@ -354,8 +357,8 @@ class WorldGeneratorFingerprintTest {
                         SEEDS[i], terrain, vehicles, chunks));
             }
         }
-        assertTrue(moved.isEmpty(), () -> "generator 17 changed; add a generator version instead of "
-                + "re-recording:\n  " + String.join("\n  ", moved));
+        assertTrue(moved.isEmpty(), () -> "generator 17 changed; it stays as it is until 0.9.2 "
+                + "retires it:\n  " + String.join("\n  ", moved));
     }
 
     /**
@@ -376,8 +379,8 @@ class WorldGeneratorFingerprintTest {
                         SEEDS[i], terrain, vehicles, chunks));
             }
         }
-        assertTrue(moved.isEmpty(), () -> "generator 18 left generator 17's city; add a generator version "
-                + "instead of re-recording:\n  " + String.join("\n  ", moved));
+        assertTrue(moved.isEmpty(), () -> "generator 18 left generator 17's city; it stays as it is until 0.9.2 "
+                + "retires it:\n  " + String.join("\n  ", moved));
     }
 
     /**
@@ -408,8 +411,8 @@ class WorldGeneratorFingerprintTest {
                         + " relay chunk 0x%016xL", SEEDS[i], terrain, vehicles, chunks, site, relayChunk));
             }
         }
-        assertTrue(moved.isEmpty(), () -> "generator 19 changed; add a generator version instead of "
-                + "re-recording:\n  " + String.join("\n  ", moved));
+        assertTrue(moved.isEmpty(), () -> "generator 19 changed; it stays as it is until 0.9.2 "
+                + "retires it:\n  " + String.join("\n  ", moved));
     }
 
     /**
@@ -500,8 +503,8 @@ class WorldGeneratorFingerprintTest {
                         SEEDS[i], URBAN_STREETS_PLAN_FINGERPRINTS[i], actual));
             }
         }
-        assertTrue(moved.isEmpty(), () -> "generator 5 plans changed; add a generator version "
-                + "instead of re-recording:\n  " + String.join("\n  ", moved));
+        assertTrue(moved.isEmpty(), () -> "generator 5 plans changed; it stays as it is until 0.9.2 "
+                + "retires it:\n  " + String.join("\n  ", moved));
     }
 
     private static void assertTerrainPinned(int generatorVersion, long[] recorded) {
@@ -522,10 +525,10 @@ class WorldGeneratorFingerprintTest {
                 world under every existing save pinned to generator %d.
 
                 If the change was not meant to alter output, it is a bug -- a
-                refactor or optimization must be bit-identical. If it was meant to,
-                add a new generator version and leave the old one producing the old
-                terrain, as GEN_DEEP and GEN_CAVE_IDENTITIES did. Updating these
-                constants alone silently breaks saved worlds.""".formatted(
+                refactor or optimization must be bit-identical. Only the generators
+                new worlds use (3 and 20) may change on purpose: re-record their pins
+                and let SaveEpochGuardTest decide whether the save epoch must rise.
+                Every other generator stays as it is until 0.9.2 retires it.""".formatted(
                 generatorVersion, moved.size(), SEEDS.length, String.join("\n  ", moved),
                 generatorVersion));
     }

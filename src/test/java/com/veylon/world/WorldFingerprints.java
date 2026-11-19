@@ -22,8 +22,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * Fingerprints of what a world generates from its seed and generator: terrain, the per-column
  * queries, and the city's plans, sites and stamped chunks. {@code WorldGeneratorFingerprintTest}
- * pins them per generator against recorded values. Each takes the generator it fingerprints, so
- * one function serves every generator that has the planned feature.
+ * pins them per generator against recorded values; {@code SaveEpochGuardTest} digests them for the
+ * two world kinds new worlds use. Each takes the generator it fingerprints, so one function serves
+ * every generator that has the planned feature.
  *
  * <p>Mixing is FNV-1a style: order-sensitive and cheap. Record hash codes are not specified across
  * JDKs, so rectangles hash their corners; the plan records hashed through {@code toString} are the
