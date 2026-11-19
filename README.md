@@ -147,11 +147,10 @@ worlds; NEW FRONTIER warns when a save exists that saving the new world will rep
 ```
 
 On Windows, saves go to `saves\veylon.sav`. On macOS, saves, graphics and audio settings
-go under `~/Library/Application Support/VEYLON Deep Frontier/`. The binary format is
-**v3**; **v2 saves (0.1.0–0.2.0) still load** and keep their original legacy terrain.
-Settlements, deep caves and the new underground resources only generate in worlds
-created on 0.3.0 or later — old saves stay playable but need a new world for the new
-world content. Saves from the pre-0.1.0 prototype are not loadable.
+go under `~/Library/Application Support/VEYLON Deep Frontier/`. A build opens only the
+saves of its own **save epoch**: saves written by 0.9.0 and earlier releases are
+refused with a message and left untouched, and need a new world (see
+[Save format](#save-format)).
 
 ## Build & distribute
 
@@ -505,7 +504,7 @@ com.veylon
   ui/                         - title/options/presentation, Hud (ammo/draw/reload),
                                 Inventory/Crafting/Crate/Npc/Map screens, AudioOptionsScreen, PauseMenu,
                                 DebugOverlay, SimulationPanel, EventLog
-  save/                       - SaveSystem (binary v3 + explicit v2 migration path)
+  save/                       - SaveSystem and SaveHeader (format 4, one save epoch), section codecs
   util/                       - Noise, Vec3i, FloatList, MathUtil
 ```
 
@@ -518,7 +517,16 @@ are bounded and reused.
 
 ## Save format
 
-Binary v3: seed, **world-generator version**, time, weather, full player state (stats,
+Every save starts with a header: the magic `VEYL`, the **format** (4), the **save
+epoch**, the seed and the **world-generator version**. A build opens only saves of its
+own format and epoch. 0.9.1 writes epoch 1, so every save written by 0.9.0 and earlier
+releases (formats 2 and 3) is refused before anything is loaded: the title screen and
+F9 say that the save was written by an older version of VEYLON, the world you are in
+stays as it was, and the file is never changed. A save of a newer version is refused
+the same way. A release keeps the epoch only when its saves would load into exactly the
+same world and state; a test (`SaveEpochGuardTest`) holds every release to that.
+
+After the header come the time, weather, full player state (stats,
 nutrition, afflictions, inventory and equipment with durability/freshness/**loaded
 rounds**, blueprints), changed blocks, campfire fuel, crates, drying racks, rain
 collectors, discovered POIs, beacon position and repair stage, faction (trust, stocks,
@@ -530,36 +538,23 @@ health/hunger/illness/rout state), patrol origin/mission/report state, per-facti
 reputation and bounty, open-gate close timers, and lit powder-keg fuses**. Settlement structure itself is
 re-derived deterministically from the seed — only deltas and dynamic state are stored.
 
-0.7.0 adds two **optional, length-prefixed v3 sections** rather than changing the base
-layout: `player.game-mode` (mode, permanent Creative mark, flight) and
-`world.creative-controls` (frozen daylight, weather lock, paused spawning). A save
-without them loads as an unmarked Survival world, so **every existing save keeps
-working**. A malformed section fails the whole load rather than loading partial state,
-and the live world survives the attempt. 0.7.2 adds `world.bodies` for settled carcass
-poses and human corpses; 0.7.4 moves it to version 2 for three-axis joint poses and
-still reads version 1. A further section, `world.fragments`, holds the pieces of
-people blown apart once they have come to rest. It is a new section rather than a new
-version of an existing one, so **older builds still open the save** — they skip what
-they do not know and the pieces are simply absent. `world.remains` (added in 0.8.1,
-the same way) holds the settled pieces of every body blown apart — people, animals and
-the player — in the pose each died in, with an animal's harvest record tied to its
-torso; `world.fragments` is still written unchanged, so 0.8.0 opens such a save with
-its people's pieces in a standing pose and each animal as a whole carcass. Pools of
-burning liquid, burning blocks, burning bodies and panic are deliberately not saved:
-a save taken mid-fire loads with every fire out and everyone calm. A fire bomb still
-in the air is saved, and shatters where it lands.
+An extension tail then holds the rest in **versioned, length-prefixed sections**,
+among them `player.game-mode` (mode, permanent Creative mark, flight),
+`world.creative-controls` (frozen daylight, weather lock, paused spawning),
+`world.bodies` (settled carcass poses and human corpses) and `world.remains` (the
+settled pieces of every body blown apart — people, animals and the player — in the
+pose each died in, with an animal's harvest record tied to its torso). Every save holds
+these. A missing or malformed section, a section the build does not know or a version
+it does not write fails the whole load rather than loading partial state, and the live
+world survives the attempt. Pools of burning liquid, burning blocks, burning bodies and
+panic are deliberately not saved: a save taken mid-fire loads with every fire out and
+everyone calm. A fire bomb still in the air is saved, and shatters where it lands.
 
-A city save records its generator in the same base and adds versioned `urban.*` sections
-(the content revision, containers, population, discoveries, sites, compounds,
-fortifications, refuges, utilities, missions and visits). The city's streets, buildings
-and people are re-planned from the seed and generator; only what changed is stored, and
-a damaged section fails the whole load. The section inventory and the compatibility
-directions are in [the architecture notes](docs/ARCHITECTURE.md).
-
-**v2 saves (0.1.0–0.2.0) load via an explicit migration path**: the world is pinned to
-the legacy terrain generator (identical terrain, no silent regeneration), and all new
-state gets safe defaults. Deep caves and settlements require a new world. v1 prototype
-saves are rejected with a console message — no migration.
+A city save adds versioned `urban.*` sections (the content revision, containers,
+population, discoveries, sites, compounds, fortifications, refuges, utilities, missions
+and visits). The city's streets, buildings and people are re-planned from the seed and
+generator; only what changed is stored, and a damaged section fails the whole load. The
+section inventory and the epoch rules are in [the architecture notes](docs/ARCHITECTURE.md).
 
 ## Known limitations
 
@@ -570,8 +565,10 @@ saves are rejected with a console message — no migration.
 - No dropped-item entities (drops go straight to your inventory).
 - One save slot, shared by city and wilderness worlds in either mode: starting or
   loading any of them replaces it on the next save.
-- Releases up to 0.8.1 refuse a city save before touching their live world; a newer
-  city generator is never promised to open in an older build.
+- Saves written by 0.9.0 and earlier do not open in 0.9.1: they are refused with a
+  message and left untouched, and a new world is needed. A later release refuses 0.9.1
+  saves the same way whenever it changes the save epoch, and no release opens a save
+  written by a newer one.
 - The day's temperature curve is inverted in every world, city and wilderness alike:
   14:00 is the coldest hour. It is a known issue awaiting a decision, left unchanged so
   existing worlds keep their outcomes.
@@ -587,19 +584,11 @@ saves are rejected with a console message — no migration.
   itself (water, gates, alarm bells, beds, berry bushes, herbs, saplings, the resonant
   core and the lit beacon); each exclusion and its reason is recorded in
   [the Creative plan](docs/creative/CREATIVE_MODE_PLAN.md).
-- Builds older than 0.7.0 open a Creative save as Survival and lose the mark, flight and
-  world controls if they save over it; a save holding the new Creative-only block items
-  loads there but silently drops those stacks.
-- 0.7.2 and 0.7.3 cannot open a save written by 0.7.4 or later: they reject its
-  version-2 body section and report "No compatible save was found." The file is not
-  modified, and a current build still opens it.
 - Wildlife AI uses steering + jump; settlement humans use bounded A*
   with a steering fallback (not a full navmesh — rough terrain can still stall them).
 - Crouching lowers the camera and slows you but doesn't shrink the collision box.
 - Sleeping fast-forwards the clock (~3 game hours per real second) rather than
   simulating the whole night at full rate.
-- v2 worlds never gain settlements, deep caves or the new ores — that content needs
-  a new world (documented above); the old save itself keeps working.
 - Gates are block swaps (closed/open) rather than animated doors; there is no
   right-click aim-down-sights (bows and firearms use LMB plus `R` to reload).
 - An in-progress reload is intentionally cancelled by weapon-slot changes and by

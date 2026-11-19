@@ -284,27 +284,63 @@ only save-compatibility promise VEYLON makes.
   changes and the build refuses saves of any other epoch.
 - Prefer appending to persisted enums; reorder or remove constants only together
   with an epoch change.
-- Old-save code is removed, not extended. The 0.9.1 roadmap replaces the v2
-  migration and the historical-save tests with the epoch check; the 0.9.2 roadmap
-  retires generators 1, 2 and 4–19, leaving the city (20) and the wilderness (3).
+- Old-save code is removed, not extended. 0.9.1 replaced the v2 migration and
+  the historical-save tests with the epoch check; the 0.9.2 roadmap retires
+  generators 1, 2 and 4–19, leaving the city (20) and the wilderness (3).
 
-**Status.** Decided, not yet implemented. Until the 0.9.1 save-epoch work lands,
-the code still behaves as the rest of this section describes (v2 migration,
-frozen generators, historical fixtures). That machinery is scheduled for
-removal: do not extend it.
+**Status.** Implemented in 0.9.1 (roadmap milestone 03, decisions D-01 and
+D-16 to D-19 in [the 0.9.1 design](roadmap/v0.9.1/DESIGN.md)). Saves carry the
+save epoch in their header; 0.9.1 writes epoch 1 and opens only epoch 1, so
+every save of 0.9.0 and earlier is refused. Generators 1, 2 and 4–19 still load
+and save in this build because tests and QA build them; 0.9.2 retires them.
+
+#### The save epoch
+
+A save starts with a fixed header (`save.SaveHeader`): the magic `VEYL`, the
+format (4), the save epoch, the seed and the generator id. Formats 2 (0.1.0 to
+0.2.0) and 3 (0.3.0 to 0.9.0) put the seed straight after the format and carry
+no epoch. Every later format keeps the magic, the format and the epoch at the
+same offsets, so any build can tell a save it must refuse from a damaged one.
+The header carries no game version: the epoch alone decides, older and newer
+follow from comparing it, and a development run has no version to write
+(D-16).
+
+`SaveSystem.open` reads the header before anything else. Another format or
+epoch is refused at once: no world is built, the isolated verifier pass never
+runs, the live world is untouched and the file is never modified. The result
+(`save.LoadResult`) says why for the player: LOAD FRONTIER shows a sentence
+under the title menu ("This save was written by an older version of VEYLON.
+Start a new world."), and F9 writes a line short enough for the HUD's log panel
+("Save is from an older version."). The technical reason goes to the console.
+A missing, unreadable, foreign or damaged file has its own sentence and line.
+`load(Game, Path)` keeps its boolean for callers that need no reason.
+
+Two builds share an epoch only if each opens every save the other writes, into
+the same world and state (D-17). `SaveEpochGuardTest` digests what decides that:
+a sample save of each world kind (the layout and every section's version), the
+enum tables a save stores, and what the new-world generators of both kinds make
+from a seed, including what a city's containers hold on their first search. Its
+record of the current epoch may be re-recorded until a release ships the
+epoch; after that any change, an appended enum constant included, fails with
+the instruction to raise `SaveHeader.EPOCH`. Milestone 09 records epoch 1 as
+released.
+
+Within one epoch the reader accepts exactly what the writer writes (D-18): the
+extension tail and the eleven sections every save holds are required, one
+version per section (per generator where the city's differ), and a section id
+it does not know fails the load.
 
 #### How saving works
 
-`SaveSystem.save(Game)` walks the live object graph and writes binary v3;
+`SaveSystem.save(Game)` walks the live object graph and writes format 4;
 `load` reconstructs it. Load **goes through `newWorld` first**, so a load always
 inherits the full reset above rather than merging into a live world
 (`GameLoopIntegrationTest.loadingOverALiveWorldReplacesItRatherThanMerging`).
 
 Structure is *re-derived*, not stored: settlement layouts and terrain come back
 from the seed plus the generator version. Only deltas and dynamic state are
-serialized. This is why `world.generatorVersion` is part of the save — pinning
-it is what lets v2 saves load with identical terrain instead of silently
-regenerating under a newer generator.
+serialized. This is why `world.generatorVersion` is part of the save: a save
+names the generator its world was made with.
 
 Generator versions form an explicit set (`World.isSupportedGenerator`): 1 legacy,
 2 deep, 3 cave identities, 4 the urban street datum, 5 the urban street network,
@@ -342,17 +378,17 @@ An urban world's layout revision follows from its generator, so it is known
 before bootstrap generates a chunk; a geometry change means a new generator
 version, never a change under an old one (`UrbanRevision`). Its content revision
 (the rolled loot, encounter and trade tables) is saved in `urban.meta`, which
-only urban worlds write. Until that section, or its absent default, has been
-read, a loading world's content revision cannot be read at all. Revision 1 is the
-absent-metadata default and is honoured only by the layouts before the starter
-neighbourhood; generators 9–19 require content 3 and generator 20 requires
-content 4, and no other layout accepts 4. The tables and their hash inputs are
+every city writes and a city save must carry. Until that section has been read,
+a loading world's content revision cannot be read at all. A load accepts only
+the revision a new world of the save's generator records
+(`UrbanRevision.contentFor`): 3 for generators 4–19 and 4 for generator 20, and
+no other layout accepts 4. The tables and their hash inputs are
 frozen under each revision. Encounter catalogues are additive and versioned in
 `urban.population` (1 for generator 10, 2 for 11, 3 for 12, 4 for 13, 5 for
 14–19 and 6 for 20; catalogues 5 and 6 write codec 2); they do not reroll loot or
 add encounters to older generators.
 
-City state lives in stable-id sections of the v3 envelope, each with its own
+City state lives in stable-id sections of the extension envelope, each with its own
 version, bounded counts and an explicit meaning when absent. The writer of every
 city section reads its own bytes back with the load's checks before the save is
 published. Sections are read in any order: those that cross-check others are
@@ -361,9 +397,9 @@ held until every section is in (urban package 25 loads them shuffled).
 | Section | Version | Written by | When absent | Bounds |
 | --- | --- | --- | --- | --- |
 | `world.fixtures` | 1 | any world whose doors or windows hold state | as generated, unlocked | 32,768 cells, exact length |
-| `urban.meta` | 1 | generators 4–20 | content revision 1, which generators 9–20 refuse | fixed 12 bytes |
+| `urban.meta` | 1 | generators 4–20 | load fails | fixed 12 bytes |
 | `urban.refuges` | 1 (9–16), 2 (17–20) | generators 9–20 | load fails | one starter anchor, 3 claims |
-| `urban.containers` | 1 | generators 7–20 | content 1 adopts the core inventories; else the load fails | 32,768 rows of 36 bytes, exact length |
+| `urban.containers` | 1 | generators 7–20 | load fails | 32,768 rows of 36 bytes, exact length |
 | `urban.population` | codec 1 (10–13), 2 (14–20) | generators 10–20 | load fails | 32,768 rows |
 | `urban.discovery` | 1 | generators 13–20 | nothing found | 4,096 ascending ids |
 | `urban.sites` | 1 | generators 15–20 | load fails | 1,024 sites |
@@ -371,7 +407,7 @@ held until every section is in (urban package 25 loads them shuffled).
 | `urban.fortifications` | 1 | generators 17–20 | load fails | 2,048 cells, 256 braces |
 | `urban.utilities` | 1 | generators 18–20 | load fails | 1,024 tapped buildings, 64 devices |
 | `urban.missions` | 1 | generators 19–20 | load fails | 256 records, 4 in hand |
-| `urban.visits` | 1 | generators 19–20 | nothing walked or entered (a package-20 save) | 1,024 + 4,096 ascending ids |
+| `urban.visits` | 1 | generators 19–20 | nothing walked or entered | 1,024 + 4,096 ascending ids |
 
 An absent default holds only while nothing else contradicts it: a refuge whose
 people were met needs its discovery, and a brace needs its barred door, so
@@ -383,9 +419,10 @@ section repeated, a version this world does not read, a payload cut short or
 followed by stray bytes, a count past its cap or not matching its length, an
 invalid id, kind, code or ordinal, a non-finite or out-of-range number, a
 contradiction between sections and a file over 128 MiB each fail the whole load.
-A section id this build does not know is skipped by its length and is not
-written again. A load over a live world is first proved on a throwaway `Game`,
-so a refused load changes nothing in the session and never touches the file.
+So does a section id this build does not know, since only another build could
+have written it (D-18). A load over a live world is first proved on a throwaway
+`Game`, so a refused load changes nothing in the session and never touches the
+file.
 
 Saves are published from a sibling temporary file only after the whole payload
 is written, flushed and checked. Besides each section's own read-back, the core
@@ -403,25 +440,18 @@ extension sections are written again byte for byte after a load. The core's
 block edits and crates iterate in hash order, which a load may change; their
 contents are equal and no reader depends on their order.
 
-Compatibility directions, each with genuine evidence:
+Saves of other versions:
 
-- this build, a legacy save: unchanged rules and terrain, and no city state is
-  created. Saves written by the archived v0.2.0, v0.3.0 and v0.8.1 writers load
-  with their settlements, quests, beacon progress, progression and Creative
-  controls; fresh chunks match the releases' own generators byte for byte; saved
-  again they gain only the optional sections later releases introduced
-  (`HistoricalV020SaveCompatibilityTest`, `HistoricalV3SaveCompatibilityTest`);
-- this build, an earlier urban revision: the same city through its frozen
-  generator and its content revision from `urban.meta`. Saves written by the
-  package-06 build (generator 7, content 1) and the package-20 build (generator 19,
-  before `urban.visits`) load fact for fact (`UrbanContainersSectionTest`,
-  `UrbanEarlierRevisionSaveTest`);
-- a release build (0.8.1 or older), any urban save: refused as an unsupported
-  generator before the live world is touched;
-- an older development build, a newer urban save: refused when the generator,
-  the content revision or a known section's version is newer than it reads; an
-  optional section it does not know is skipped and lost when it saves again. A
-  newer generator makes downgrading unsafe, so no downgrade is promised.
+- this build, a save of 0.9.0 or earlier (format 2 or 3): refused from its
+  header as written by an older version, before anything is built, with the file
+  left byte for byte (`SaveEpochRefusalTest`, `SaveRefusalRoutingTest`; natively,
+  a save written by the 0.9.0 build, in the 0.9.1 milestone 03 record);
+- this build, a save of another epoch or a later format: refused the same way,
+  as older or newer;
+- 0.9.0 and earlier, a save of this build: they read formats 2 and 3 only, so
+  they refuse format 4 before touching their live world. No downgrade is
+  promised.
+
 Urban ids (`world.urban.UrbanIds`) are packed from plan coordinates, never from
 visit or list order. `urban.containers` validates generated fixture ids against
 their immutable reservation and survivor owner building. An invalid, wrong-kind
@@ -1014,12 +1044,11 @@ Creative or salvage can bring one into a legacy world.
   chunk does not exist yet waits for `World.getOrCreateChunk`, which applies saved
   state after generation and drops stale entries. Forcing, shattering and
   dismantling are ordinary recorded edits, and `World.setBlock` drops the state of a
-  cell that stops being an operable fixture. An absent section retains generated
-  or edited defaults: generator 7 still derives occupied-door locks from its plan,
-  while an explicit saved unlock overrides them. Earlier generators default to
-  unlocked. An older build skips the section and loads doors and windows closed;
-  before package 04 a build reads their ids as air. A malformed section fails the
-  whole load.
+  cell that stops being an operable fixture. A save holds the section only when
+  a door or window holds state, so an absent one means generated or edited
+  defaults: generator 7 still derives occupied-door locks from its plan, while an
+  explicit saved unlock overrides them. Earlier generators default to unlocked. A
+  malformed section fails the whole load.
 - **Player.** F on an aimed door or window comes before nearby people
   (`WorldInteractions.interact`, `InteractPromptBuilder`, one decision). Crouch and F
   bars a door or latches a window from the player's side; in Creative it toggles a
@@ -1107,20 +1136,17 @@ fit below the frozen core's 100,000-entry reader cap. Inventory bytes occur only
 in that existing core map. The generated-urban core reader additionally requires
 12 slots, unique cells and valid item counts, ordinals, condition, freshness and
 charge. The section checks exact length, identities, owners, progress, active
-cells and inventory references. Known unsupported versions fail; unknown ids
-retain the existing skip policy.
+cells and inventory references. Another version fails, as does an unknown
+section id.
 
 Load applies this section after `urban.meta`, regardless of section order.
-Content 2 requires it, including a zero-entry ledger: absence cannot refill loot.
-For authentic pre-loot content-1 saves, absence adopts core inventories (including
-empties) and tombstones edited generated reservations. Touched content-1 empties
-retain a core empty marker so dropping the optional section cannot refill them;
-untouched decorative furniture still allocates nothing. New/load replaces the
-world-owned ledger; open targets and noise timers reset, saved search progress
-does not. Save preparation binds/compacts the core map before the existing
-sibling-temp, flush, force and atomic replacement path. Invalid loads preserve
-the live session; failed writes preserve the previous save. Older binaries were
-not executed, and no downgrade guarantee is made for new content-2 saves.
+Every city that manages containers requires it, a zero-entry ledger included:
+absence cannot refill loot. Untouched decorative furniture allocates nothing.
+New/load replaces the world-owned ledger; open targets and noise timers reset,
+saved search progress does not. Save preparation binds/compacts the core map
+before the existing sibling-temp, flush, force and atomic replacement path.
+Invalid loads preserve the live session; failed writes preserve the previous
+save.
 
 ### Urban starter progression
 
@@ -1182,7 +1208,7 @@ Saturation stops new encounters without evicting tombstones. A save commits
 pending infected deaths before settling remains. Read waits until `urban.meta`,
 validates planned anchors, duplicates, bounds and one-to-one core bindings, and
 rejects missing/unknown/corrupt required state before publishing. Earlier worlds
-remain encounter-free. Older builds reject generator 10 or the unknown body id.
+remain encounter-free.
 Generator 14 writes codec 2: each row names its species' stable id and binds to
 the core NPC list (humanoids) or the creature list (the Veilmaw and wildlife); a
 creature's yaw lives only in the ledger. Codec 1 is unchanged for generators
@@ -1205,7 +1231,7 @@ of burning liquid and burning blocks are not saved either: a save taken with
 the world alight loads with the fires out. What does survive is the remains of
 every body blown apart once they have settled — people, animals and the
 player, in the pose each died in, with an animal's harvest record still tied
-to its torso (`world.remains`, beside the older `world.fragments`) — and a fire
+to its torso (`world.remains`) — and a fire
 bomb still in the air, which is saved with the other explosives and shatters
 where it lands. If you add state, decide explicitly which side of that line it
 sits on.
@@ -1425,14 +1451,13 @@ Where the gates live:
   natural spawning, after the despawn pass). `SleepSystem` refuses to sleep while
   the clock is frozen, because sleeping fast-forwards that clock.
 
-The save format stays binary v3. Two optional, versioned, length-prefixed
-sections are appended to the v3 extension envelope and dispatched by
-`save/V3ExtensionSections`: `player.game-mode` (mode id, mark, flying) and
-`world.creative-controls` (frozen, locked, spawning paused), written in that
-order so a load restores the mode first. Each codec rejects an unsupported
-version, a truncated payload and trailing bytes, so a corrupt section fails the
-whole load and the verifier leaves the live world intact. Unknown ids are still
-skipped, so older builds load a Creative save as an unmarked Survival world.
+Two versioned, length-prefixed sections of the extension envelope, dispatched
+by `save/V3ExtensionSections`, hold the mode: `player.game-mode` (mode id, mark,
+flying) and `world.creative-controls` (frozen, locked, spawning paused), written
+in that order so a load restores the mode first. Each codec rejects an
+unsupported version, a truncated payload and trailing bytes, so a corrupt
+section fails the whole load and the verifier leaves the live world intact.
+Every save holds both, and since 0.9.1 a save without either is refused.
 
 Reset and restore contract: every control and every transient timer is released
 in the `newWorld` path and asserted in
@@ -1600,15 +1625,10 @@ bodies can emit fits inside the 1,200 slots weather already reserves.
 | Bodies still falling | no — a save settles them first, so a save taken mid-fall comes back as a corpse rather than a lost body | — |
 | Solver accumulator, settle timers, lifetime counters | no | reset with the world |
 
-The base v3 layout is untouched; `world.bodies` is an optional stable-ID section
-in the v3 extension envelope, entirely numeric (the archetype travels as a
-bounds-checked ordinal) so no byte anchor the migration tests rely on moves. An
-absent section means what every save written before 0.7.2 means: every carcass
-keeps its constructed pose and there are no human corpses. 0.7.4 moved the
-section to version 2, which writes three floats per joint; version 1 still
-loads, with its flat bone indices mapped by name into the new tree and new child
-joints left straight. 0.7.2 and 0.7.3 accept only version 1, so they refuse a
-0.7.4 save as a whole rather than load part of it.
+`world.bodies` is a stable-ID section of the extension envelope, entirely
+numeric (the archetype travels as a bounds-checked ordinal). 0.7.4 moved it to
+version 2, which writes three floats per joint. Every save holds it, in
+version 2 only: since 0.9.1 a save without it, or with version 1, is refused.
 
 A human corpse is deliberately not an `Npc` and never enters `entities.npcs`, so
 it is not a perception or combat target, costs nothing against
@@ -1830,31 +1850,24 @@ stands still while the game is paused. Details, budgets and QA in the contract �
 | State | Persisted | Where |
 | --- | --- | --- |
 | Settled pieces of every body (family, piece, position, orientation, decay, appearance, the pose it died in) | yes | `world.remains`, one record per piece, oldest first; one pose per body |
-| An animal's harvest record tied to its torso, and the arrows lodged in it | yes | the carcass in the v3 body; the tie and the arrows in `world.remains` |
-| People's settled pieces, for older builds | yes, unchanged | `world.fragments` version 1, read only when `world.remains` is absent |
+| An animal's harvest record tied to its torso, and the arrows lodged in it | yes | the carcass in the core body; the tie and the arrows in `world.remains` |
 | Pieces still in flight | no — a save settles them first, so they come to rest rather than being lost | — |
 | Pools of burning liquid, burning blocks | no — a save taken mid-burn loads with the fires out | — |
 | A fire bomb still in the air | yes, with the other explosives; it shatters where it lands | active explosives |
 | Torso wounds, the last shot id, the blast record, a living body's fire and panic | no — they live on the entity and die with it | — |
 | The flames and scorch remains died with (`BurnResidue`) | no — a save leaves them burning; a load builds remains without them | — |
 
-`world.fragments` (0.8.0) and `world.remains` are optional stable-ID sections in
-the v3 extension envelope, so the frozen v3 body and the bodies layout are
-untouched. Only people had pieces in 0.8.0, and its reader refuses any version
-of `world.fragments` but 1 — and with it the whole save — so the pieces of every
-body went into a new ID instead: `world.fragments` is still written, byte for byte
-as before, and a 0.8.0 build skips `world.remains` by its length and opens the
-world with its people's pieces in the standing rest pose, without the animals'
-pieces, and with each animal's record as an ordinary whole carcass. This build
-reads `world.remains` when it is there and `world.fragments` otherwise,
-whichever order they come in. Records are entirely numeric: a piece is its body
-family's ordinal plus its id in that family's list, both append only
-(`SerializedEnumOrderTest` pins them), and a person's id is its `world.fragments`
-ordinal. A piece the reader would refuse is left out on write, so one bad piece
-of debris can never cost the save; a malformed section fails the whole load,
-while a body family this build does not know is skipped rather than read as
-anything else. The exact layout and policy are in the `RemainsSection` class
-comment and in
+`world.remains` (0.8.1) is the stable-ID section of the extension envelope that
+holds every settled piece. Until 0.9.1 the people's pieces were also written to
+`world.fragments` version 1, which 0.8.0 read; 0.9.1 stopped writing it, and a
+save that still holds it is refused like any section this build does not know.
+Records are entirely numeric: a piece is its body family's ordinal plus its id
+in that family's list, both append only (`SerializedEnumOrderTest` pins them),
+and a person's id is its `BodyFragment.Piece` ordinal. A piece the reader would
+refuse is left out on write, so one bad piece of debris can never cost the save;
+a malformed section fails the whole load, and so does one that names a body
+family, a piece or a joint table this build does not have. The exact layout and
+policy are in the `RemainsSection` class comment and in
 [the combat and fire contract](engineering/ALL_LIVING_COMBAT_FIRE_CONTRACT.md) §14.1.
 
 Drawing reuses what the bodies already use. A piece is the shared humanoid model

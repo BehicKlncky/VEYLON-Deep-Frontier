@@ -4,6 +4,21 @@ All notable user-facing changes to VEYLON: Deep Frontier are recorded here.
 
 ## [Unreleased]
 
+### Changed
+
+- Saves carry a save epoch, and a build opens only the saves of its own. Saves
+  written by 0.9.0 and earlier releases no longer open: they are refused before
+  anything is loaded, the world you are in stays as it was, and the file is left
+  exactly as it is. Start a new world to play this version.
+- When a save cannot be opened, the title screen and F9 say why: written by an
+  older or a newer version of VEYLON, not a VEYLON save, damaged or unreadable,
+  instead of "No compatible save was found."
+
+### Removed
+
+- Loading saves of 0.1.0 to 0.9.0, with the v2 migration and every reader for
+  earlier save layouts.
+
 ## [0.9.0] - 2026-11-06
 
 ### Added

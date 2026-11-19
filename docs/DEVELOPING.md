@@ -73,7 +73,7 @@ runs. All are inert when unset. Everything below is handled by `QaHarness`;
 | `VEYLON_SMOKE=<seconds>` | Release smoke gate on this session's world (the city unless `VEYLON_GENERATOR=wilderness`): a world edit and an equip, an isolated save and load, fire and storm, then a pass/fail report; in the wilderness also a generated-fortress approach. Throws on failure |
 | `VEYLON_SCENE=<name>` | Stage a deterministic benchmark scene (`day`, `pinefog`, `nightfire`, `ruin`, `toxic`, `ao_shadow`, `phase4`, `ashwolf`, `silhouette30`, `vfx_blood`, `vfx_mining`, `vfx_beacon`, `death_ragdoll_showcase`, `death_ragdoll_sequence`, `dismember_showcase`, `dismember_wall`, `dismember_bomb` (a real scrap bomb thrown into a group of six, one outside the lethal radius; it goes off at 2.4 s), `dismember_species`, `dismember_species_wall` and `dismember_species_close` (every species, a guard and the player's remains blown apart at 1 s; open meadow, a step and a wall, and a close view of the small bodies), `molotov_ground`, `molotov_tree` and `molotov_rain` (a real fire bomb thrown at 0.5 s onto a dry clearing at dusk, beside a round tree that catches, or with rain from 3 s that puts the pool out; shots `0.7,1.2,3,7,11`, `1,4,10,20` and `2,3.5,5`), the burning-body scenes `body_fire_row`, `body_fire_row_night`, `body_fire_close`, `body_fire_out`, `body_fire_blast`, `body_fire_panic`, `body_fire_bird`, `body_fire_rain`, `body_fire_ragdoll` and `body_fire_player` (see "Burning bodies QA" below), `movement`, `inventory`, `ui_cycle`, `held_*`, `creative_flight` with `VEYLON_GAME_MODE=creative`, which flies east at Shift speed and prints a `[flight]` streaming report at 29 s, and the urban scenes `urban_streets`, `urban_intersection`, `urban_seam_walk`, `urban_fixtures`, `urban_fixtures_night`, `urban_apartments`, `urban_apartments_night`, `urban_apartments_lit_night`, `urban_apartments_manual`, `urban_apartments_manual_night`, `urban_loot`, the playable-slice route `urban_slice`, the catalogue walk `urban_catalogue`, the district tour `urban_districts`, the route tour `urban_underground`, the ecology tour `urban_ecology`, the survivor tour `urban_survivors`, the stronghold tour `urban_strongholds`, the refuge tour `urban_refuge`, the utility tour `urban_utilities`, the mission tour `urban_missions`, the onboarding tour `urban_onboarding`, the atmosphere tour `urban_atmosphere` and the performance tour `urban_performance` on the default city (see "Urban planning QA" below), and the save audit `save_audit` on any save placed in an isolated slot (see the same table)). A city scene (`urban_*`) and `save_audit` play this session's world and refuse to start without an isolated data directory; every other scene was made for the wilderness and builds it unless `VEYLON_GENERATOR` names a world |
 | `VEYLON_SHOT="5,10"` | Capture screenshots at those elapsed seconds |
-| `VEYLON_FRONTEND=<name>` | Pin a front-end screen (`options`, `audio`, `loading`, `death`, `victory`, `glyphs`, `newworld`). `newworld-save` shows the replace-save notice without writing a save. `route` and then `route-load` play the default new-world path natively from the title over two launches (see "Default-path acceptance" below). Staged worlds are this session's world, the city unless `VEYLON_GENERATOR=wilderness`. `pause` and `gamemode` stage a Survival world with the pause menu or the mode confirmation open; `pause-creative`, `gamemode-creative` and `victory-creative` stage a Creative world; `catalog`, `catalog-tools`, `catalog-search` (query "iron") and `catalog-inventory` open the Creative catalog; `worldcontrols` and `worldcontrols-held` open the Creative world controls, the second with dusk, a frozen clock, a locked storm and paused spawning already applied |
+| `VEYLON_FRONTEND=<name>` | Pin a front-end screen (`options`, `audio`, `loading`, `death`, `victory`, `glyphs`, `newworld`). `newworld-save` shows the replace-save notice without writing a save. `route` and then `route-load` play the default new-world path natively from the title over two launches, and `route-refusal` plays a slot holding another version's save (see "Default-path acceptance" below). Staged worlds are this session's world, the city unless `VEYLON_GENERATOR=wilderness`. `pause` and `gamemode` stage a Survival world with the pause menu or the mode confirmation open; `pause-creative`, `gamemode-creative` and `victory-creative` stage a Creative world; `catalog`, `catalog-tools`, `catalog-search` (query "iron") and `catalog-inventory` open the Creative catalog; `worldcontrols` and `worldcontrols-held` open the Creative world controls, the second with dusk, a frozen clock, a locked storm and paused spawning already applied |
 | `VEYLON_RESOLUTION=1920x1080` | Framebuffer override |
 | `VEYLON_UI_SCALE`, `VEYLON_VSYNC`, `VEYLON_FULLSCREEN`, `VEYLON_SHADOWS` | Settings overrides |
 | `VEYLON_AUDIO_QA=1` | Add three positional audio reports per second to the smoke, without gameplay effects |
@@ -140,6 +140,16 @@ launch prints `[frontend-route] ... pass=true` with the keys it pressed; the rou
 has no headless twin because its screens draw only with GL, and
 `DefaultCityAcceptanceTest` drives the same controller through its seams.
 
+`route-refusal` (0.9.1 milestone 03) plays what a player meets when the slot
+holds a save of another version, such as the one the 0.9.0 build's `route`
+launch writes into the same isolated directory. It hashes the slot, presses `L`
+and captures the title with the reason under the menu, starts a new city with
+`N` and Enter, presses F9 over it and captures the log line, checks that the
+city is still the live world and that the slot's SHA-256 is unchanged, then
+visits the pause screens and quits. It never presses F5, and prints
+`[frontend-route] slot sha256 before=… after=…` before its pass line.
+`SaveRefusalRoutingTest` drives the same paths headlessly.
+
 The release smoke runs on the city by default; the wilderness smoke, with its
 fortress approach, needs `VEYLON_GENERATOR=wilderness`. Wilderness benchmark and
 capture scenes keep the wilderness without a selector.
@@ -179,7 +189,7 @@ the spawn column.
 | `urban_atmosphere` | The package-22 atmosphere tour in either mode on a generator-19 world, held still so captures taken at any revision frame the same views: by day a street in each of the six districts (`01` to `06`), a walk-up's entrance, kitchen, upper floor, stairs and basement (`07` to `11`), the hidden cellar of the refuge nearest the spawn with its people (`12`), the nearest stronghold's gate (`13`) and the first alien growth (`14`); at 23:00 the residential street, the kitchen, the cellar, the gate, the growth and the flooded street (`15` to `20`); in fog the quarantine and residential streets (`21`, `22`); in rain the upper floor and the commercial street (`23`, `24`); and at 15:00 the chalk mark beside that refuge's street door (`25`). Each view prints the acoustic zone, shelter, depth below the street, the light at the eye, the ambient mix, the weather's reach, the city's sounds so far and the interaction line. Poses, the clock and the weather are staged and printed as staged; no block, item or person is (standing in the cellar finds it, as walking in would). Prints `[urban-atmosphere] pass=true`, writes 25 labelled captures and closes itself; it refuses to stage on an older generator, and `UrbanAtmosphereQaSceneTest` plays it headlessly in both modes. Run it again with `VEYLON_NO_EFX=1` for the dry audio route, whose log reads `EFX unavailable; dry playback enabled`. |
 | `urban_economy` | The package-23 extended-play tour in either mode on a generator-20 world, in real time: the refuge's ground-floor stores searched with F, the first trip to the starter block's quiet apartment (its inner door forced by holding the left button, its utility locker, kitchen and bathroom searched), the reinforced spear at the refuge's bench through the crafting screen's command, a meal and a drink with the use button, the corner shop's shelf, a skin filled at the rain collector and another at the refuge's tap, the courtyard fire fuelled with planks and the tap water boiled, the day out indoors, the night slept in the refuge's bed with F; on day two the morning meal, a quiet flat in the next block searched floor by floor (a container behind a locked door is passed by), home, water and a second night; on day three F5 and F9, with the container ledger and the food and water in hand compared before and after. Captures `01-day1-refuge-morning`, `02-forced-door`, `03-first-trip`, `04-first-upgrade`, `05-corner-shop`, `06-water`, `07-afternoon`, `08-day2-morning`, `09-next-block`, `10-day3-morning` and `11-after-load`. The clock is never staged: days pass in real time (about 18 minutes in all) and nights by sleeping; the only staged pose is the next block's street door, printed as staged; infected that come near are fought by the route with the held weapon. Each morning and evening prints a `ledger` line (day, time, health, hunger, thirst, food, clean water, searches, meals, drinks, nights, threats). Prints `[urban-economy] pass=true` and closes itself; it refuses to stage on an older generator, and `UrbanEconomyQaSceneTest` plays it headlessly in both modes. |
 | `urban_performance` | The package-24 performance tour in either mode on a generator-19 or -20 world: measured legs, each after a 2 s settle, through a local street walked at walking pace across the region seam (28 s), the kitchen, upper floor and basement of the atmosphere tour's walk-up and the nearest transit platform and tunnel, each looked around for 10 s, the nearest stronghold's yard and the first quarantine growth site (15 s each, their people and threats about), a storm over the kitchen with 40 cells of the building set alight (15 s), five minutes of fast travel east above the roofs at 21.6 blocks a second, reported minute by minute and then with the heap collected, and F5 then F9 on the street. Each leg prints `[urban-performance] leg=…` with frames, average FPS, frame-time mean and p50/p95/p99/max, the CPU milliseconds of the control and simulation step, chunk generation, mesh rebuilds and world rendering, chunks generated and meshed, draw calls, triangles, chunks drawn, retained chunks, resident chunk meshes, heap and populations; the last prints the F5 and F9 frames. Poses, the pace along a leg (the player is carried, never falling), full health during a leg and the fire are staged and printed as staged. Prints `[urban-performance] pass=true` and closes itself; it refuses to stage on an older generator, and `UrbanPerformanceQaSceneTest` plays it headlessly with a short journey. Run it with `VEYLON_VSYNC=0` and no concurrent build. |
-| `save_audit` | The package-25 save audit on any world, legacy or urban, Survival or Creative: it needs no `VEYLON_GENERATOR`, but it reads and writes the save slot, so it refuses to run without an isolated data directory or without a save already in its slot (`<data directory>/saves/veylon.sav`). The automated world is replaced by that save exactly as F9 loads one, and a `[save-audit] loaded …` digest prints what a save must hold (blocks, containers and their contents, mode and Creative controls, and the city's or the wilderness's records). Then, with ordinary controls: a walk with W and mouse look to the nearest stored container at least two blocks off (F at doors on the way), its screen opened with the use button (F would serve a carcass or a person within reach first), or with no container within 24 blocks a short walk with W that must travel a block; the pack (or in Creative the catalog) with E and the map with M, each closed with its own key; then F5 and F9, after which the digest must be exactly what F5 wrote. Captures `01-loaded`, `02-container`, `03-pack`, `04-map` and `05-after-f9`; prints `[save-audit] pass=true` and closes itself. `SaveAuditQaSceneTest` plays it headlessly on the integrated city and on genuine v0.3.0 and v0.8.1 saves. To run it, copy a save into the slot first, for example the release fixtures decoded from `src/test/resources/com/veylon/save/*.b64`. |
+| `save_audit` | The package-25 save audit on any world, legacy or urban, Survival or Creative: it needs no `VEYLON_GENERATOR`, but it reads and writes the save slot, so it refuses to run without an isolated data directory or without a save already in its slot (`<data directory>/saves/veylon.sav`). The automated world is replaced by that save exactly as F9 loads one, and a `[save-audit] loaded …` digest prints what a save must hold (blocks, containers and their contents, mode and Creative controls, and the city's or the wilderness's records). Then, with ordinary controls: a walk with W and mouse look to the nearest stored container at least two blocks off (F at doors on the way), its screen opened with the use button (F would serve a carcass or a person within reach first), or with no container within 24 blocks a short walk with W that must travel a block; the pack (or in Creative the catalog) with E and the map with M, each closed with its own key; then F5 and F9, after which the digest must be exactly what F5 wrote. Captures `01-loaded`, `02-container`, `03-pack`, `04-map` and `05-after-f9`; prints `[save-audit] pass=true` and closes itself. `SaveAuditQaSceneTest` plays it headlessly on the integrated city and on wilderness saves in both modes. To run it, put a save of this build into the slot first, for example one F5 wrote in another isolated session; a save of another version is refused as F9 refuses it, and the tour does not start. |
 | `urban_catalogue` | The package-12 catalogue walk in either mode on a generator-11 or generator-12 world. It visits the nearest building of each commercial and civic family: a damaged grocer, a clinic and a security post that keep their locks, a school and an office block with upper floors, and a warehouse. Moving between buildings is a staged pose at each street door, and the run starts with a staged spear and pry tool; both are printed as staged. Inside it plays through the production input seam: the sign, a shop floor, the clinic's locked staff door, the street door, the dispensary forced by holding the left button and its stock searched with F, a treatment room, ground and upper classrooms and offices, the armoury lock, the squad room, a rack aisle and the workbench. Prints `[urban-catalogue] pass=true`, writes 16 labelled captures and closes itself. |
 
 ```powershell
@@ -782,9 +792,9 @@ transfers, equipping) keeps the Survival rule in both modes and needs no gate.
    section below). The family's ordinal and its pieces' ids are what
    `world.remains` saves, so append the family, pin it and its piece names in
    `SerializedEnumOrderTest`, and only ever append pieces afterwards. A save
-   stores each pose joint by joint: changing a family's joint table later makes
-   older saves load that family's pieces in its rest pose (in place, without
-   their articulation) unless `RemainsSection` learns the old layout.
+   stores each pose joint by joint and refuses a joint table it does not have,
+   so the new family, and any later change to a family's joints, moves
+   `SaveEpochGuardTest`'s inputs (see "Saves and the save epoch" below).
 5. Add spawn rules to `EntityManager` (biome, time of day, density cap).
 6. Only touch `CreatureAI` if it needs behaviour the existing states don't
    cover, and put any new decision after the `FirePanic` call at the top of
@@ -900,8 +910,9 @@ its reasons are in the
 4. If it holds a `Random`, keep it on an instance reachable from `Game`, give
    that owner a seed hook and seed it from `WorldBootstrap` with a salt no other
    stream uses. Never put outcome randomness in a static field.
-5. If it holds state that must survive a save, add a v3 extension section in
-   `SaveSystem` — do not change the base v3 layout.
+5. If it holds state that must survive a save, give it a stable-id section in
+   `V3ExtensionSections` rather than growing the core body, and follow "Saves and
+   the save epoch" below.
 
 ### A city save section
 
@@ -911,9 +922,11 @@ its reasons are in the
    assertion in `GameLoopIntegrationTest`.
 2. Write its codec in `save/` with a stable `urban.*` id and an int version, read
    every count with `readCount` against the same cap the live ledger enforces, and
-   give absence an explicit meaning, or fail the load in `finishLoad` when absence
-   would refill, resurrect or forget something. Name the generators it applies to
-   through their predicates (`hasRefuges()` and so on), never with `>=`.
+   read only the version the writer writes. Either write the section for every
+   world its predicate names and fail the load in `finishLoad` without it, or
+   write it only when it holds something and let absence mean exactly "nothing".
+   Name the generators it applies to through their predicates (`hasRefuges()` and
+   so on), never with `>=`.
 3. Let the writer read its own bytes back through the reader's checks before
    returning them, and hold the read in `V3ExtensionSections.read` until the
    sections it cross-checks are in, so the order sections appear in never matters.
@@ -921,9 +934,31 @@ its reasons are in the
    `describe`) and the section to `UrbanSaveCorruptionTest.COUNT_AT` with the
    offset of its first count. Every round trip, revisit order, live-world load and
    corruption case of urban package 25 then covers it.
-5. Never regenerate the authentic saves under `src/test/resources/com/veylon/save/`
-   and `src/test/resources/saves/`: they are what released and earlier builds
-   wrote, and a new section must leave every one of them loading.
+5. A new section changes the city's sample save, so re-record
+   `SaveEpochGuardTest` as below.
+
+### Saves and the save epoch
+
+A build opens only saves of its own format and save epoch
+(`save.SaveHeader`; the owner's policy and decisions D-01 and D-16 to D-18 of
+[the 0.9.1 design](roadmap/v0.9.1/DESIGN.md)). Nothing reads an older save:
+there are no migrations, legacy readers, absence defaults for sections every
+save holds, or historical fixtures, and none may be added.
+
+- **What a change to saved state needs.** Change the writer and the reader
+  together, keep the reader strict (bounded counts, validated ordinals and ids,
+  exact lengths) and add round-trip and corruption cases. A refusal test builds
+  foreign headers in code (`ForeignSaves`), never from a fixture.
+- **The guard.** `SaveEpochGuardTest` digests the layout (a sample save of each
+  world kind), the enum tables a save stores and both world kinds' generation.
+  When it fails while the epoch is unreleased, check that the change was meant
+  to alter saves, then paste the new values it prints into `RECORDED`. When it
+  fails under a released epoch (`RELEASED` names it), raise `SaveHeader.EPOCH`
+  by one and record the new epoch's inputs; never edit a released entry.
+- **Generation.** Only the generators new worlds use, 3 and 20, may change on
+  purpose: re-record their pins in `WorldGeneratorFingerprintTest`, and the
+  guard decides the epoch. Generators 1, 2 and 4–19 stay as they are until
+  0.9.2 retires them.
 
 ---
 
@@ -932,7 +967,10 @@ its reasons are in the
 **Reordering an enum breaks every save.** `BlockType`, `ItemType`, `Affliction`,
 `Biome`, `SettlementType`, `NpcArchetype`, `CreatureType`, `BodyFamily` and the
 creature/NPC state enums are persisted by ordinal, and so is each body family's
-fragment piece list. Append only. `SerializedEnumOrderTest` will catch you.
+fragment piece list. Append only, so ordinals stay stable while an epoch is
+developed; `SerializedEnumOrderTest` pins the orders, and `SaveEpochGuardTest`
+counts any change, an appended constant included, as one that needs a new epoch
+once the current one is released.
 
 **Bulk block edits with `notify = true` are quadratic.** Each notified
 `setBlock` triggers listener work. For anything larger than a few blocks, pass
