@@ -153,9 +153,10 @@ class CorruptSaveResilienceTest {
         byte[] whole = Files.readAllBytes(save);
 
         // Breadth over the readers between the named fields, which is where the
-        // next unguarded read would appear.
+        // next unguarded read would appear. The sweep starts past the magic, the
+        // format and the epoch, which SaveEpochRefusalTest covers.
         for (int i = 1; i <= SWEEP_POINTS; i++) {
-            int offset = 8 + (whole.length - 12) * i / (SWEEP_POINTS + 1);
+            int offset = 12 + (whole.length - 16) * i / (SWEEP_POINTS + 1);
             Path mangled = corrupt(dir, save, offset, 0x7F00_00FF);
             Game target = new Game();
             assertDoesNotThrow(() -> SaveSystem.load(target, mangled),
@@ -322,8 +323,9 @@ class CorruptSaveResilienceTest {
     void unsupportedGeneratorVersionIsRejectedBeforeWorldReplacement(@TempDir Path dir)
             throws IOException {
         Path save = fixture(dir, 40_113L);
-        // magic + save version + seed = 16 bytes before generatorVersion.
-        Path futureGenerator = corrupt(dir, save, 16, World.MAX_SUPPORTED_GENERATOR + 1);
+        // The generator id ends the header: magic, format, epoch and seed come first.
+        Path futureGenerator = corrupt(dir, save, SaveHeader.LENGTH - Integer.BYTES,
+                World.MAX_SUPPORTED_GENERATOR + 1);
         Game target = new Game();
         target.newWorld(91_338L, true, World.GEN_CAVE_IDENTITIES);
         World liveWorld = target.world;
@@ -411,7 +413,7 @@ class CorruptSaveResilienceTest {
             try (DataInputStream in = new DataInputStream(
                     new BufferedInputStream(Files.newInputStream(save)))) {
                 Cursor c = new Cursor(in);
-                c.skip(4 + 4 + 8 + 4 + 8);              // magic, version, seed, generator, clock
+                c.skip(SaveHeader.LENGTH + 8);          // the header, then the clock
                 int weatherOrdinal = c.position();
                 c.skip(4 + 4 + 4 + 4);                  // weather current, next, blend, timer
                 c.skip(5 * 4);                          // player position, camera yaw/pitch

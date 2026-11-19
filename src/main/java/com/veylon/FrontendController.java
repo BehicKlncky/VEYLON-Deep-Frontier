@@ -1,6 +1,7 @@
 package com.veylon;
 
 import com.veylon.entity.GameMode;
+import com.veylon.save.LoadResult;
 import com.veylon.save.SaveSystem;
 import com.veylon.ui.GraphicsOptionsScreen;
 import com.veylon.ui.AudioOptionsScreen;
@@ -204,31 +205,31 @@ final class FrontendController {
      */
     boolean performLoad() {
         loadingPresented = false;
-        boolean loaded;
+        LoadResult result;
         if (loadRequest == LoadRequest.LOAD_GAME) {
-            loaded = SaveSystem.load(game, savePath);
+            result = SaveSystem.open(game, savePath);
         } else {
             game.newWorld(game.sessionSeed, true, chosenGenerator, newWorldMode);
-            loaded = true;
+            result = LoadResult.LOADED;
         }
         loadRequest = null;
         newWorldMode = GameMode.SURVIVAL;
         chosenGenerator = newWorldGenerator;
-        if (loaded) {
+        if (result.loaded()) {
             game.appState = Game.AppState.PLAYING;
             game.closeScreens();
         } else {
-            // A failed load has already replaced the previous world, so there is
-            // nothing to fall back to; drop to the title rather than to a
-            // half-restored game.
+            // A save refused from its header built nothing, but one that failed further in may
+            // have half built a world; drop to the title either way, with the reason in the
+            // player's words.
             game.audio.resetWorld();
             game.releaseWorldMeshes();
             game.world = null;
             game.player = null;
-            game.titleScreen.notice("No compatible save was found.");
+            game.titleScreen.notice(result.message());
             game.appState = Game.AppState.TITLE;
         }
-        return loaded;
+        return result.loaded();
     }
 
     /** The in-game pause menu's options screen, which returns to PAUSE, not TITLE. */

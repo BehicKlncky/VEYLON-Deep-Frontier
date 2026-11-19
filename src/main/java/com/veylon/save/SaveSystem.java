@@ -49,20 +49,21 @@ import java.util.Objects;
 import java.util.Set;
 
 /**
- * Binary save format v3. Stores the seed, the world-generator version, every
- * delta from the generated world (changed blocks, structures, item state,
- * equipment, afflictions, blueprints, racks, collectors, POI discovery,
- * beacon progress, faction quests/upgrades, NPCs, creatures, carcasses,
- * weather, time, active events) plus the 0.3.0 expansion state: settlements
- * (alignment, stocks, capture, residents), per-faction reputation/bounty,
- * NPC residency/loadout, lit powder-keg fuses and in-flight fused throwables.
+ * Binary save format {@value SaveHeader#FORMAT}. After the {@link SaveHeader} (magic, format,
+ * epoch, seed and world-generator version) it stores every delta from the generated world
+ * (changed blocks, structures, item state, equipment, afflictions, blueprints, racks,
+ * collectors, POI discovery, beacon progress, faction quests/upgrades, NPCs, creatures,
+ * carcasses, weather, time, active events), the settlements (alignment, stocks, capture,
+ * residents), per-faction reputation/bounty, NPC residency/loadout and lit powder-keg fuses,
+ * then the extension tail and its stable-id sections ({@link V3ExtensionSections}).
  *
- * <p><b>v2 saves still load</b>: an explicit migration path reads the old
- * layout, pins the world to the legacy terrain generator (no settlements or
- * deep caves — those need a new world) and defaults all new state.</p>
+ * <h2>One epoch</h2>
  *
- * <p>Version 1 saves (pre-overhaul prototype) are not migrated; loading one
- * fails with a clear console message and the game keeps running.</p>
+ * <p>A build opens only saves of its own format and save epoch (0.9.1 D-01). Every other save,
+ * including all that VEYLON 0.9.0 and earlier wrote, is refused from its header before anything
+ * else happens: no world is built, the isolated verifier pass does not run and the file is never
+ * touched. {@link #open} says why in the player's words; the log keeps the technical reason.
+ * There is no migration path and no reader for a layout this build does not write.</p>
  *
  * <h2>Reading untrusted bytes</h2>
  *
@@ -89,10 +90,7 @@ import java.util.Set;
  */
 public final class SaveSystem {
 
-    private static final int MAGIC = 0x5645594C; // "VEYL"
-    private static final int VERSION = 3;
-    private static final int MIN_SUPPORTED = 2;
-    /** Optional tail added to v3 without invalidating already-shipped v3 files. */
+    /** Marks the extension tail after the core body. */
     private static final int V3_EXTENSION_MAGIC = 0x57334558; // "W3EX"
     private static final int V3_EXTENSION_VERSION = 2;
     private static final int MAX_SERIALIZED_ENTRIES = 100_000;
@@ -152,10 +150,7 @@ public final class SaveSystem {
                     StandardOpenOption.WRITE, StandardOpenOption.TRUNCATE_EXISTING);
                  DataOutputStream out = new DataOutputStream(
                          new BufferedOutputStream(Channels.newOutputStream(channel)))) {
-                out.writeInt(MAGIC);
-                out.writeInt(VERSION);
-                out.writeLong(g.world.seed);
-                out.writeInt(g.world.generatorVersion);
+                SaveHeader.write(out, g.world.seed, g.world.generatorVersion);
                 out.writeDouble(g.time.totalMinutes);
 
                 // Weather.
@@ -401,21 +396,37 @@ public final class SaveSystem {
     }
 
     public static boolean load(Game g, Path savePath) {
+        return open(g, savePath).loaded();
+    }
+
+    /** {@link #open(Game, Path)} on the save slot. */
+    public static LoadResult open(Game g) {
+        return open(g, SAVE_PATH);
+    }
+
+    /**
+     * Loads the save at {@code savePath} into {@code g} and says what happened. A save of another
+     * format or epoch is refused from its header, before the live world, the isolated verifier
+     * pass or the file is touched; every refusal and failure is logged with its technical reason.
+     */
+    public static LoadResult open(Game g, Path savePath) {
         Objects.requireNonNull(g, "g");
         Objects.requireNonNull(savePath, "savePath");
         if (!Files.exists(savePath)) {
-            return false;
+            return new LoadResult(LoadResult.Outcome.NO_SAVE, "no save at " + savePath);
         }
         final byte[] payload;
         try (BufferedInputStream source = new BufferedInputStream(Files.newInputStream(savePath))) {
             payload = source.readNBytes(MAX_SAVE_BYTES + 1);
-            if (payload.length > MAX_SAVE_BYTES) {
-                System.err.println("Load failed: save exceeds " + MAX_SAVE_BYTES + " bytes");
-                return false;
-            }
         } catch (IOException ex) {
-            System.err.println("Load failed: " + ex);
-            return false;
+            return logged(new LoadResult(LoadResult.Outcome.UNREADABLE, ex.toString()));
+        }
+        LoadResult refused = SaveHeader.refusal(payload);
+        if (refused != null) {
+            return logged(refused);
+        }
+        if (payload.length > MAX_SAVE_BYTES) {
+            return logged(LoadResult.damaged("save exceeds " + MAX_SAVE_BYTES + " bytes"));
         }
 
         // Loading is destructive because newWorld releases the current GPU
@@ -423,30 +434,28 @@ public final class SaveSystem {
         // an isolated graph before touching a live session. Title-screen loads
         // have no state to protect and keep the one-pass fast path.
         if (g.world != null || g.player != null) {
-            Game verifier = new Game();
-            if (!loadPayload(verifier, payload)) {
-                return false;
+            LoadResult verified = loadPayload(new Game(), payload);
+            if (!verified.loaded()) {
+                return logged(verified);
             }
         }
-        return loadPayload(g, payload);
+        return logged(loadPayload(g, payload));
     }
 
-    private static boolean loadPayload(Game g, byte[] payload) {
+    private static LoadResult logged(LoadResult result) {
+        if (result.otherVersion()) {
+            System.err.println("Load refused: " + result.reason());
+        } else if (!result.loaded()) {
+            System.err.println("Load failed: " + result.reason());
+        }
+        return result;
+    }
+
+    private static LoadResult loadPayload(Game g, byte[] payload) {
         try (DataInputStream in = new DataInputStream(new ByteArrayInputStream(payload))) {
-            if (in.readInt() != MAGIC) {
-                System.err.println("Save file has wrong magic");
-                return false;
-            }
-            int version = in.readInt();
-            if (version < MIN_SUPPORTED || version > VERSION) {
-                System.err.println("Save is version " + version + "; this build reads versions "
-                        + MIN_SUPPORTED + "-" + VERSION
-                        + ". Old prototype saves can't be migrated - start a new world.");
-                return false;
-            }
+            SaveHeader.skipChecked(in);
             long seed = in.readLong();
-            // v2 worlds keep their legacy terrain forever; v3 records the version.
-            int generatorVersion = version >= 3 ? in.readInt() : com.veylon.world.World.GEN_LEGACY;
+            int generatorVersion = in.readInt();
             // Checked before newWorld replaces anything. The version also fixes
             // an urban world's layout revision, so geometry is never built under
             // the wrong one; its content revision comes later, from urban.meta.
@@ -454,10 +463,6 @@ public final class SaveSystem {
                 throw new IOException("unsupported world generator version " + generatorVersion);
             }
             g.newWorld(seed, false, generatorVersion);
-            if (version == 2) {
-                System.out.println("[save] migrating v2 save: legacy terrain preserved; "
-                        + "settlements and deep caves need a new world.");
-            }
 
             g.time.totalMinutes = in.readDouble();
 
@@ -504,9 +509,9 @@ public final class SaveSystem {
                 p.blueprints.add(in.readUTF());
             }
 
-            readInventory(in, p.inventory, version);
+            readInventory(in, p.inventory, false);
             for (int i = 0; i < EquipSlot.values().length; i++) {
-                p.equipment[i] = readStack(in, version);
+                p.equipment[i] = readStack(in, false);
             }
 
             // Changed blocks: ensure target chunks exist, then apply. The
@@ -541,7 +546,7 @@ public final class SaveSystem {
                     throw new IOException("invalid or duplicate urban crate position");
                 }
                 Inventory inv = new Inventory(12);
-                readInventory(in, inv, version,urbanStorage);
+                readInventory(in, inv, urbanStorage);
                 crates.put(pos, inv);
             }
             g.world.crateContents.clear();
@@ -647,15 +652,13 @@ public final class SaveSystem {
                 if (hasFaction) {
                     n.faction = g.faction;
                 }
-                if (version >= 3) {
-                    String archetypeId = in.readUTF();
-                    n.archetype = archetypeId.isEmpty() ? null : requireArchetype(archetypeId);
-                    if (n.infected()) { n.maxHealth = n.archetype.maxHealth; }
-                    n.settlementId = in.readLong();
-                    n.residentIndex = in.readInt();
-                    n.loadedAmmo = in.readInt();
-                    n.warParty = in.readBoolean();
-                }
+                String archetypeId = in.readUTF();
+                n.archetype = archetypeId.isEmpty() ? null : requireArchetype(archetypeId);
+                if (n.infected()) { n.maxHealth = n.archetype.maxHealth; }
+                n.settlementId = in.readLong();
+                n.residentIndex = in.readInt();
+                n.loadedAmmo = in.readInt();
+                n.warParty = in.readBoolean();
                 g.entities.npcs.add(n);
             }
 
@@ -702,29 +705,27 @@ public final class SaveSystem {
                 g.eventLog.add(in.readUTF());
             }
 
-            // ---- v3 sections (v2 saves: defaults already in place) ----
+            // ---- Settlements, faction state and lit kegs ----
             g.world.kegFuses.clear();
             g.world.kegFusePlayerAttribution.clear();
-            if (version >= 3) {
-                readSettlements(in, g);
-                readFactionState(in, g);
-                int nKegs = readCount(in, "powder-keg fuse");
-                for (int i = 0; i < nKegs; i++) {
-                    Vec3i keg = readVec(in);
-                    float fuse = in.readFloat();
-                    if (!Float.isFinite(fuse)) {
-                        throw new IOException("invalid powder-keg fuse time");
-                    }
-                    // Pre-limit v3 saves remain readable: consume every entry,
-                    // retain a bounded prefix, and let non-positive legacy
-                    // timers resolve on the next simulation tick.
-                    if (g.world.kegFuses.size() < ExplosionSystem.MAX_ACTIVE_FUSES) {
-                        g.world.kegFuses.put(keg, fuse);
-                    }
+            readSettlements(in, g);
+            readFactionState(in, g);
+            int nKegs = readCount(in, "powder-keg fuse");
+            for (int i = 0; i < nKegs; i++) {
+                Vec3i keg = readVec(in);
+                float fuse = in.readFloat();
+                if (!Float.isFinite(fuse)) {
+                    throw new IOException("invalid powder-keg fuse time");
                 }
-                if (in.available() > 0) {
-                    readV3Extension(in, g);
+                // Pre-limit v3 saves remain readable: consume every entry,
+                // retain a bounded prefix, and let non-positive legacy
+                // timers resolve on the next simulation tick.
+                if (g.world.kegFuses.size() < ExplosionSystem.MAX_ACTIVE_FUSES) {
+                    g.world.kegFuses.put(keg, fuse);
                 }
+            }
+            if (in.available() > 0) {
+                readV3Extension(in, g);
             }
             UrbanMetaSection.finishLoad(g);
             UrbanContainersSection.finishLoad(g);
@@ -736,17 +737,15 @@ public final class SaveSystem {
             UrbanUtilitiesSection.finishLoad(g);
             UrbanMissionsSection.finishLoad(g);
             g.settlementManager.onWorldLoaded(g);
-            return true;
+            return LoadResult.LOADED;
         } catch (IOException ex) {
-            System.err.println("Load failed: " + ex);
-            return false;
+            return LoadResult.damaged(ex.toString());
         } catch (RuntimeException ex) {
             // Defence in depth for the validation above. Every known bad-input
             // path now throws IOException, but an unchecked exception escaping
             // here would leave Game.run with no world and take the process with
             // it, which is strictly worse than reporting a failed load.
-            System.err.println("Load failed on malformed save data: " + ex);
-            return false;
+            return LoadResult.damaged("malformed save data: " + ex);
         }
     }
 
@@ -1139,16 +1138,12 @@ public final class SaveSystem {
         }
     }
 
-    private static ItemStack readStack(DataInputStream in, int version) throws IOException {
-        return readStack(in,version,false);
-    }
-
-    private static ItemStack readStack(DataInputStream in, int version, boolean urbanStorage) throws IOException {
+    private static ItemStack readStack(DataInputStream in, boolean urbanStorage) throws IOException {
         int ord = in.readInt();
         int count = in.readInt();
         float durability = in.readFloat();
         float freshness = in.readFloat();
-        int charge = version >= 3 ? in.readInt() : 0;
+        int charge = in.readInt();
         ItemType[] types = ItemType.values();
         if (ord < 0 || ord >= types.length || count <= 0) {
             if (urbanStorage && (ord != -1 || count != 0 || durability != 0 || freshness != 0 || charge != 0)) {
@@ -1171,17 +1166,12 @@ public final class SaveSystem {
         }
     }
 
-    private static void readInventory(DataInputStream in, Inventory inv, int version)
-            throws IOException {
-        readInventory(in,inv,version,false);
-    }
-
-    private static void readInventory(DataInputStream in, Inventory inv, int version, boolean urbanStorage)
+    private static void readInventory(DataInputStream in, Inventory inv, boolean urbanStorage)
             throws IOException {
         int size = readCount(in, "inventory slot", urbanStorage ? 12 : PlayerConstants.INVENTORY_SLOTS);
         if (urbanStorage && size != 12) { throw new IOException("invalid urban inventory capacity"); }
         for (int i = 0; i < size; i++) {
-            ItemStack stack = readStack(in, version,urbanStorage);
+            ItemStack stack = readStack(in, urbanStorage);
             if (i < inv.size()) {
                 inv.set(i, stack);
             }

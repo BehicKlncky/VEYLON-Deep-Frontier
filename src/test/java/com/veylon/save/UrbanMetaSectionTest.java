@@ -211,8 +211,8 @@ class UrbanMetaSectionTest {
         damaged.put("urban.meta in a legacy world",
                 withExtraSection(legacy, UrbanMetaSection.ID, meta(1, layout, content)));
         damaged.put("generator above the supported maximum",
-                withInt(urban, 16, World.MAX_SUPPORTED_GENERATOR + 1));
-        damaged.put("generator zero", withInt(urban, 16, 0));
+                withInt(urban, SaveHeader.LENGTH - Integer.BYTES, World.MAX_SUPPORTED_GENERATOR + 1));
+        damaged.put("generator zero", withInt(urban, SaveHeader.LENGTH - Integer.BYTES, 0));
 
         Game live = new Game();
         live.newWorld(SEED + 3, true, World.GEN_CAVE_IDENTITIES);

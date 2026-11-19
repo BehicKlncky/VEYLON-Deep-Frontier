@@ -1,6 +1,7 @@
 package com.veylon;
 
 import com.veylon.entity.PlayerConstants;
+import com.veylon.save.LoadResult;
 import com.veylon.save.SaveSystem;
 
 import static org.lwjgl.glfw.GLFW.*;
@@ -126,12 +127,12 @@ final class HotkeyRouter {
             game.log(SaveSystem.save(game) ? "Game saved." : "Save FAILED (see console).");
         }
         if (game.input.wasKeyPressed(GLFW_KEY_F9)) {
-            if (SaveSystem.load(game)) {
+            // A refused or failed load leaves the live world as it was; the log says why.
+            LoadResult result = SaveSystem.open(game);
+            if (result.loaded()) {
                 game.closeScreens();
-                game.log("Game loaded.");
-            } else {
-                game.log("No save found (or load failed).");
             }
+            game.log(result.message());
         }
     }
 

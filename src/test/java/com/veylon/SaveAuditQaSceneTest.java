@@ -1,25 +1,21 @@
 package com.veylon;
 
+import com.veylon.entity.GameMode;
 import com.veylon.save.SaveSystem;
 import com.veylon.world.World;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
-import java.io.InputStream;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Base64;
-import java.util.List;
-import java.util.Objects;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * The {@code save_audit} tour, played headlessly in {@link Game#run}'s frame order from a save placed in
- * the test JVM's isolated slot: the integrated city and genuine saves of the first and last legacy
- * releases, Survival and Creative. Each is loaded as F9 loads one, walked, its screens opened with
- * their keys, then F5 and F9 restore what F5 wrote. Captures are the native run's to judge.
+ * the test JVM's isolated slot: the integrated city, and a wilderness world in each mode. Each is
+ * loaded as F9 loads one, walked, its screens opened with their keys, then F5 and F9 restore what F5
+ * wrote. Captures are the native run's to judge.
  */
 class SaveAuditQaSceneTest {
     private static final float DT = 1f / 60f;
@@ -32,20 +28,17 @@ class SaveAuditQaSceneTest {
     @Test
     void theIntegratedCityIsLoadedWalkedOpenedSavedAndLoadedAgain() throws Exception {
         IntegratedCityFixture.Built built = IntegratedCityFixture.build();
-        Path file = Files.createTempFile("integrated-", ".sav");
-        assertTrue(SaveSystem.save(built.game(), file));
-        byte[] bytes = Files.readAllBytes(file);
-        Files.delete(file);
-        SaveAuditQaScene tour = play(bytes);
+        SaveAuditQaScene tour = play(bytesOf(built.game()));
         assertEquals(IntegratedCityFixture.GENERATOR, tour.durable().isEmpty() ? -1 : generatorOf(tour));
     }
 
     @Test
-    void genuineLegacyWorldsAreLoadedWalkedOpenedSavedAndLoadedAgain() throws Exception {
-        for (String resource : List.of("v0.8.1-survival-authentic.sav.b64", "v0.8.1-creative-authentic.sav.b64",
-                "v0.3.0-authentic.sav.b64")) {
-            SaveAuditQaScene tour = play(fixture(resource));
-            assertEquals(3, generatorOf(tour), resource);
+    void wildernessWorldsInBothModesAreLoadedWalkedOpenedSavedAndLoadedAgain() throws Exception {
+        for (GameMode mode : GameMode.values()) {
+            Game world = new Game();
+            world.newWorld(81_081_928L, true, World.GEN_CAVE_IDENTITIES, mode);
+            SaveAuditQaScene tour = play(bytesOf(world));
+            assertEquals(World.GEN_CAVE_IDENTITIES, generatorOf(tour), mode.name());
             emptyTheSlot();
         }
     }
@@ -89,10 +82,14 @@ class SaveAuditQaSceneTest {
         return Integer.parseInt(world.substring(world.indexOf("generator=") + 10, world.indexOf(" mode=")));
     }
 
-    private static byte[] fixture(String resource) throws Exception {
-        try (InputStream in = Objects.requireNonNull(SaveAuditQaSceneTest.class.getResourceAsStream(
-                "/com/veylon/save/" + resource), resource)) {
-            return Base64.getDecoder().decode(new String(in.readAllBytes(), StandardCharsets.US_ASCII).trim());
+    /** A save of {@code game} written by this build, as its bytes. */
+    private static byte[] bytesOf(Game game) throws Exception {
+        Path file = Files.createTempFile("audit-", ".sav");
+        try {
+            assertTrue(SaveSystem.save(game, file));
+            return Files.readAllBytes(file);
+        } finally {
+            Files.delete(file);
         }
     }
 }

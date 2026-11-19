@@ -62,29 +62,6 @@ class UrbanContainersSectionTest {
     }
 
     @Test
-    void anAbsentSectionPreservesLegacyEmptyInventoriesAndEditedReservations() throws Exception {
-        Path save=directory.resolve("old.sav");
-        try (var fixture=getClass().getResourceAsStream("/saves/urban-preloot-m06.sav")) {
-            assertNotNull(fixture); Files.copy(fixture,save);
-        }
-        Game loaded=new Game(); assertTrue(SaveSystem.load(loaded,save));
-        var state=loaded.world.urban.containers;
-        var empty=state.byId(6917529027642524226L);
-        assertEquals(UrbanContainers.State.EMPTY,empty.state);
-        assertTrue(loaded.world.crateContents.get(empty.position).isEmpty(),"content-one core depletion marker retained");
-        assertSame(empty,state.touch(loaded.world,empty.position),"legacy emptiness never permits a roll");
-        var stocked=state.byId(6917529027642524258L);
-        assertEquals(3,loaded.world.crateContents.get(stocked.position).count(ItemType.BANDAGE));
-        var destroyed=state.byId(6917529027642524290L);
-        assertEquals(UrbanContainers.State.DESTROYED,destroyed.state);
-        assertEquals(BlockType.AIR,loaded.world.getBlock(79,37,111));
-        assertEquals(2,loaded.world.crateContents.size());
-        Path resaved=directory.resolve("migrated.sav"); assertTrue(SaveSystem.save(loaded,resaved));
-        assertTrue(SaveSystem.load(loaded,resaved));
-        assertEquals(UrbanContainers.State.EMPTY,loaded.world.urban.containers.byId(empty.id).state);
-    }
-
-    @Test
     void corruptSectionsFailBeforeReplacingTheLiveWorld() throws Exception {
         var f=UrbanLootFixture.create(BuildingPlan.Variant.INTACT); Game g=f.game();
         g.world.urban.containers.touch(g.world,f.position());

@@ -10,11 +10,9 @@ import org.junit.jupiter.api.io.TempDir;
 import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
-import java.util.Base64;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -71,22 +69,6 @@ class GameModeSectionTest {
         assertTrue(SaveSystem.load(original, save), "R15: real Creative save must load successfully");
         assertEquals(GameMode.CREATIVE, original.gameMode());
         assertTrue(original.creativeMarked() && original.player.abilities.flying());
-    }
-
-    @Test
-    void authenticV020FixtureLoadsAsSurvivalWithLegacyTerrain() throws Exception {
-        Path save = directory.resolve("historical.sav");
-        try (var input = getClass().getResourceAsStream("/com/veylon/save/v0.2.0-authentic.sav.b64")) {
-            assertNotNull(input, "R1: authentic historical fixture must remain available");
-            Files.write(save, Base64.getDecoder().decode(
-                    new String(input.readAllBytes(), StandardCharsets.US_ASCII).trim()));
-        }
-        Game game = new Game();
-        game.newWorld(4422, true, World.GEN_CAVE_IDENTITIES, GameMode.CREATIVE);
-        assertTrue(SaveSystem.load(game, save), "R1: authentic v2 saves must still load");
-        assertEquals(World.GEN_LEGACY, game.world.generatorVersion);
-        assertEquals(GameMode.SURVIVAL, game.gameMode());
-        assertFalse(game.creativeMarked() || game.player.abilities.flying());
     }
 
     @Test

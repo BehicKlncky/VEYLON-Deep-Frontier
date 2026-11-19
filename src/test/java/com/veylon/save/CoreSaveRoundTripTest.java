@@ -1,7 +1,6 @@
 package com.veylon.save;
 
 import com.veylon.Game;
-import com.veylon.item.ItemType;
 import com.veylon.settlement.NpcArchetype;
 import com.veylon.settlement.Settlement;
 import com.veylon.util.Vec3i;
@@ -11,8 +10,6 @@ import com.veylon.world.World;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-import java.io.BufferedOutputStream;
-import java.io.DataOutputStream;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -24,128 +21,18 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Save compatibility: a byte-exact v2 fixture must load and migrate to valid
- * v3 runtime state (legacy terrain, no settlements), and v3 must round-trip
- * settlements, capture state, residents and faction reputation.
+ * The core body round-trips the wilderness's settlements, capture state, residents, faction
+ * reputation, patrols, gates and lit kegs, and a stable id it does not know fails the load
+ * instead of becoming another one. 0.9.1 removed the v2 migration this class once also tested:
+ * a save of another format or epoch is refused ({@code SaveEpochRefusalTest}).
  */
-class SaveMigrationTest {
+class CoreSaveRoundTripTest {
 
     private static final long SEED = 1122334455L;
 
-    /** Writes a minimal but complete v2 save exactly as the 0.2.0 format did. */
-    private static void writeV2Fixture(Path path, long seed) throws IOException {
-        try (DataOutputStream out = new DataOutputStream(
-                new BufferedOutputStream(Files.newOutputStream(path)))) {
-            out.writeInt(0x5645594C);       // magic "VEYL"
-            out.writeInt(2);                // version
-            out.writeLong(seed);
-            out.writeDouble(9 * 60);        // time
-            out.writeInt(0);                // weather current CLEAR
-            out.writeInt(0);                // weather next
-            out.writeFloat(1f);             // blend
-            out.writeFloat(100f);           // changeTimer
-            // Player.
-            out.writeFloat(20.5f);          // pos x
-            out.writeFloat(40f);            // pos y
-            out.writeFloat(21.5f);          // pos z
-            out.writeFloat(35f);            // yaw
-            out.writeFloat(8f);             // pitch
-            out.writeFloat(77f);            // health
-            out.writeFloat(80f);            // hunger
-            out.writeFloat(70f);            // thirst
-            out.writeFloat(90f);            // stamina
-            out.writeFloat(37f);            // bodyTemp
-            out.writeFloat(10f);            // fatigue
-            out.writeFloat(0f);             // wetness
-            out.writeFloat(60f);            // protein
-            out.writeFloat(60f);            // vitamins
-            out.writeFloat(0f);             // smokeExposure
-            out.writeBoolean(false);        // woundClean
-            out.writeInt(2);                // hotbarSel
-            out.writeInt(0);                // afflictions
-            out.writeInt(0);                // blueprints
-            // Inventory: one stack + one empty slot (v2 stack = 2 ints + 2 floats).
-            out.writeInt(2);
-            out.writeInt(ItemType.SPEAR.ordinal());
-            out.writeInt(1);
-            out.writeFloat(55f);
-            out.writeFloat(-1f);
-            out.writeInt(-1);
-            out.writeInt(0);
-            out.writeFloat(0f);
-            out.writeFloat(0f);
-            // Equipment: 5 empty slots.
-            for (int i = 0; i < 5; i++) {
-                out.writeInt(-1);
-                out.writeInt(0);
-                out.writeFloat(0f);
-                out.writeFloat(0f);
-            }
-            out.writeInt(0);                // changed blocks
-            out.writeInt(0);                // campfire fuel
-            out.writeInt(0);                // crates
-            out.writeInt(0);                // racks
-            out.writeInt(0);                // collectors
-            out.writeInt(0);                // discovered POIs
-            out.writeBoolean(false);        // beacon pos
-            out.writeInt(-1);               // beacon stage
-            out.writeFloat(41f);            // trust
-            out.writeFloat(0f);             // alert
-            out.writeInt(9);                // food stock
-            out.writeInt(7);                // wood stock
-            out.writeBoolean(false);        // hostile
-            out.writeInt(1);                // upgrade stage
-            out.writeBoolean(false);        // allied gift
-            out.writeBoolean(false);        // quest
-            // One camp NPC (v2 layout: no archetype/settlement fields).
-            out.writeInt(1);
-            out.writeUTF("Maro");
-            out.writeFloat(30f);
-            out.writeFloat(40f);
-            out.writeFloat(30f);
-            out.writeFloat(0f);             // yaw
-            out.writeFloat(35f);            // health
-            out.writeFloat(20f);            // hunger
-            out.writeFloat(65f);            // mood
-            out.writeBoolean(false);        // trader
-            out.writeBoolean(false);        // raider
-            out.writeBoolean(false);        // sick
-            out.writeFloat(0f);             // sickTimer
-            out.writeInt(0);                // campIndex
-            out.writeFloat(0f);             // leaveTimer
-            out.writeBoolean(true);         // has faction
-            out.writeInt(0);                // creatures
-            out.writeInt(0);                // carcasses
-            out.writeInt(0);                // events
-            out.writeInt(0);                // log
-        }
-    }
-
     @Test
-    void v2SaveLoadsAndMigratesToLegacyGenerator(@TempDir Path dir) throws IOException {
-        Path save = dir.resolve("v2.sav");
-        writeV2Fixture(save, SEED);
-
-        Game g = new Game();
-        assertTrue(SaveSystem.load(g, save), "v2 save must not be rejected");
-        assertEquals(World.GEN_LEGACY, g.world.generatorVersion,
-                "v2 worlds keep legacy terrain generation");
-        assertTrue(g.world.settlements.isEmpty(), "no settlements planned in legacy worlds");
-        assertEquals(77f, g.player.health, 0.01f);
-        assertEquals(2, g.player.hotbarSel);
-        assertEquals(41f, g.faction.trust, 0.01f);
-        assertEquals(1, g.entities.npcs.size());
-        assertEquals("Maro", g.entities.npcs.getFirst().name);
-        assertEquals(1, g.player.inventory.count(ItemType.SPEAR));
-        // New v3 fields defaulted safely.
-        assertFalse(g.entities.npcs.getFirst().settled());
-        assertTrue(g.world.kegFuses.isEmpty());
-        assertTrue(g.world.factionReputation.isEmpty());
-    }
-
-    @Test
-    void v3RoundTripPreservesSettlementsFactionsAndGenerator(@TempDir Path dir) {
-        Path save = dir.resolve("v3.sav");
+    void theCoreBodyRoundTripsSettlementsFactionsAndGenerator(@TempDir Path dir) {
+        Path save = dir.resolve("core.sav");
         Game g = new Game();
         g.newWorld(SEED, true, World.GEN_CAVE_IDENTITIES);
         assertEquals(World.GEN_CAVE_IDENTITIES, g.world.generatorVersion);

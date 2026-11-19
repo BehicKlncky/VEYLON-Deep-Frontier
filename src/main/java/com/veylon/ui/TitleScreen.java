@@ -88,4 +88,9 @@ public final class TitleScreen {
     public void notice(String message) {
         notice = message == null ? "" : message;
     }
+
+    /** The line shown under the menu, such as why a save did not load; empty for none. */
+    public String notice() {
+        return notice;
+    }
 }
