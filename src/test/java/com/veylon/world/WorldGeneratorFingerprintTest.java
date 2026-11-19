@@ -1,11 +1,8 @@
 package com.veylon.world;
 
 import org.junit.jupiter.api.Test;
-import com.veylon.world.urban.DistrictPlan;
-import com.veylon.world.urban.ParcelPlan;
 
 import java.util.ArrayList;
-import java.util.LinkedHashSet;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -126,8 +123,8 @@ class WorldGeneratorFingerprintTest {
             int generator = URBAN_LATER_GENERATORS[g];
             assertTerrainPinned(generator, URBAN_LATER_TERRAIN_FINGERPRINTS);
             for (int i = 0; i < SEEDS.length; i++) {
-                long blocks = furnishedBuildingFingerprint(SEEDS[i], generator);
-                long plans = buildingPlanFingerprint(SEEDS[i], generator);
+                long blocks = WorldFingerprints.furnishedBuildings(SEEDS[i], generator);
+                long plans = WorldFingerprints.buildingPlans(SEEDS[i], generator);
                 if (blocks != URBAN_LATER_BUILDING_FINGERPRINTS[g][i] || plans != URBAN_LATER_PLAN_FINGERPRINTS[g][i]) {
                     moved.add(String.format("generator %d seed %d: blocks 0x%016xL, plans 0x%016xL",
                             generator, SEEDS[i], blocks, plans));
@@ -156,8 +153,8 @@ class WorldGeneratorFingerprintTest {
         assertTerrainPinned(World.GEN_URBAN_CIVIC, URBAN_CIVIC_TERRAIN_FINGERPRINTS);
         List<String> moved = new ArrayList<>();
         for (int i = 0; i < SEEDS.length; i++) {
-            long blocks = furnishedBuildingFingerprint(SEEDS[i], World.GEN_URBAN_CIVIC);
-            long plans = buildingPlanFingerprint(SEEDS[i], World.GEN_URBAN_CIVIC);
+            long blocks = WorldFingerprints.furnishedBuildings(SEEDS[i], World.GEN_URBAN_CIVIC);
+            long plans = WorldFingerprints.buildingPlans(SEEDS[i], World.GEN_URBAN_CIVIC);
             if (blocks != URBAN_CIVIC_BUILDING_FINGERPRINTS[i] || plans != URBAN_CIVIC_PLAN_FINGERPRINTS[i]) {
                 moved.add(String.format("seed %d: blocks 0x%016xL, plans 0x%016xL", SEEDS[i], blocks, plans));
             }
@@ -188,9 +185,9 @@ class WorldGeneratorFingerprintTest {
         assertTerrainPinned(World.GEN_URBAN_DISTRICTS, URBAN_DISTRICT_TERRAIN_FINGERPRINTS);
         List<String> moved = new ArrayList<>();
         for (int i = 0; i < SEEDS.length; i++) {
-            long blocks = furnishedBuildingFingerprint(SEEDS[i], World.GEN_URBAN_DISTRICTS);
-            long plans = buildingPlanFingerprint(SEEDS[i], World.GEN_URBAN_DISTRICTS);
-            long districts = districtFingerprint(SEEDS[i]);
+            long blocks = WorldFingerprints.furnishedBuildings(SEEDS[i], World.GEN_URBAN_DISTRICTS);
+            long plans = WorldFingerprints.buildingPlans(SEEDS[i], World.GEN_URBAN_DISTRICTS);
+            long districts = WorldFingerprints.districts(SEEDS[i], World.GEN_URBAN_DISTRICTS);
             if (blocks != URBAN_DISTRICT_BUILDING_FINGERPRINTS[i] || plans != URBAN_DISTRICT_PLAN_FINGERPRINTS[i]
                     || districts != URBAN_DISTRICT_SIX_FINGERPRINTS[i]) {
                 moved.add(String.format("seed %d: blocks 0x%016xL, plans 0x%016xL, districts 0x%016xL",
@@ -221,9 +218,9 @@ class WorldGeneratorFingerprintTest {
     void theUndergroundAndRooftopRoutesKeepTheirRecordedBlocksAndPlans() {
         List<String> moved = new ArrayList<>();
         for (int i = 0; i < SEEDS.length; i++) {
-            long terrain = terrainFingerprint(SEEDS[i], World.GEN_URBAN_UNDERGROUND);
-            long plans = buildingPlanFingerprint(SEEDS[i], World.GEN_URBAN_UNDERGROUND);
-            long routes = routeFingerprint(SEEDS[i]);
+            long terrain = WorldFingerprints.terrain(SEEDS[i], World.GEN_URBAN_UNDERGROUND);
+            long plans = WorldFingerprints.buildingPlans(SEEDS[i], World.GEN_URBAN_UNDERGROUND);
+            long routes = WorldFingerprints.routes(SEEDS[i], World.GEN_URBAN_UNDERGROUND);
             if (terrain != URBAN_UNDERGROUND_TERRAIN_FINGERPRINTS[i] || plans != URBAN_UNDERGROUND_PLAN_FINGERPRINTS[i]
                     || routes != URBAN_UNDERGROUND_ROUTE_FINGERPRINTS[i]) {
                 moved.add(String.format("seed %d: terrain 0x%016xL, plans 0x%016xL, routes 0x%016xL",
@@ -249,41 +246,14 @@ class WorldGeneratorFingerprintTest {
     void theAlienEcologyKeepsItsRecordedBlocksAndPlans() {
         List<String> moved = new ArrayList<>();
         for (int i = 0; i < SEEDS.length; i++) {
-            long terrain = terrainFingerprint(SEEDS[i], World.GEN_URBAN_ECOLOGY);
-            long plans = ecologyPlanFingerprint(SEEDS[i]);
+            long terrain = WorldFingerprints.terrain(SEEDS[i], World.GEN_URBAN_ECOLOGY);
+            long plans = WorldFingerprints.ecologyPlans(SEEDS[i], World.GEN_URBAN_ECOLOGY);
             if (terrain != URBAN_ECOLOGY_TERRAIN_FINGERPRINTS[i] || plans != URBAN_ECOLOGY_PLAN_FINGERPRINTS[i]) {
                 moved.add(String.format("seed %d: terrain 0x%016xL, plans 0x%016xL", SEEDS[i], terrain, plans));
             }
         }
         assertTrue(moved.isEmpty(), () -> "generator 14 changed; add a generator version instead of "
                 + "re-recording:\n  " + String.join("\n  ", moved));
-    }
-
-    /** Growth sites and wildlife slots near the spawn, and the first site's stamped chunks. */
-    private static long ecologyPlanFingerprint(long seed) {
-        World world = new World(seed, World.GEN_URBAN_ECOLOGY);
-        long hash = 0xcbf29ce484222325L;
-        com.veylon.world.urban.EcologySites.GrowthSite first = null;
-        for (int rz = -3; rz <= 3; rz++) {
-            for (int rx = -3; rx <= 3; rx++) {
-                var eco = world.urban.ecology(rx, rz);
-                for (var site : eco.growthSites()) {
-                    hash = mix(hash, site.toString().hashCode());
-                    if (first == null) { first = site; }
-                }
-                for (var slot : eco.slots()) {
-                    hash = mix(hash, slot.toString().hashCode());
-                }
-            }
-        }
-        assertTrue(first != null, "a growth site near the spawn");
-        for (int dz = -1; dz <= 1; dz++) {
-            for (int dx = -1; dx <= 1; dx++) {
-                hash = mix(hash, hashChunk(world.getOrCreateChunk(Math.floorDiv(first.node().x(), Chunk.SX) + dx,
-                        Math.floorDiv(first.node().z(), Chunk.SZ) + dz)));
-            }
-        }
-        return hash;
     }
 
     /**
@@ -298,39 +268,13 @@ class WorldGeneratorFingerprintTest {
     void encounterCatalogueFiveKeepsItsRecordedAnchors() {
         List<String> moved = new ArrayList<>();
         for (int i = 0; i < SEEDS.length; i++) {
-            long anchors = ecologyAnchorFingerprint(SEEDS[i]);
+            long anchors = WorldFingerprints.ecologyAnchors(SEEDS[i], World.GEN_URBAN_ECOLOGY);
             if (anchors != URBAN_ECOLOGY_ANCHOR_FINGERPRINTS[i]) {
                 moved.add(String.format("seed %d: anchors 0x%016xL", SEEDS[i], anchors));
             }
         }
         assertTrue(moved.isEmpty(), () -> "encounter catalogue 5 changed; add a generator version instead of "
                 + "re-recording:\n  " + String.join("\n  ", moved));
-    }
-
-    /** Ecology anchors with roof flocks, and the species of every building and station anchor, near the spawn. */
-    private static long ecologyAnchorFingerprint(long seed) {
-        World world = new World(seed, World.GEN_URBAN_ECOLOGY);
-        long hash = 0xcbf29ce484222325L;
-        for (int rz = -3; rz <= 3; rz++) {
-            for (int rx = -3; rx <= 3; rx++) {
-                for (int sb = 0; sb < 16; sb++) {
-                    for (var a : com.veylon.world.urban.EncounterAnchors.forEcology(world, rx, rz, sb)) {
-                        hash = mix(hash, a.toString().hashCode());
-                    }
-                }
-                for (ParcelPlan parcel : world.urban.regionPlan(rx, rz).parcels()) {
-                    for (var a : com.veylon.world.urban.EncounterAnchors.forParcel(world, parcel)) {
-                        hash = mix(hash, a.id());
-                        hash = mix(hash, a.species().id.hashCode());
-                    }
-                }
-                for (var a : com.veylon.world.urban.EncounterAnchors.forStation(world, rx, rz)) {
-                    hash = mix(hash, a.id());
-                    hash = mix(hash, a.species().id.hashCode());
-                }
-            }
-        }
-        return hash;
     }
 
     /**
@@ -346,8 +290,8 @@ class WorldGeneratorFingerprintTest {
     void theSurvivorSitesKeepTheCityAndTheirRecordedPlans() {
         List<String> moved = new ArrayList<>();
         for (int i = 0; i < SEEDS.length; i++) {
-            long terrain = terrainFingerprint(SEEDS[i], World.GEN_URBAN_SURVIVORS);
-            long sites = sitePlanFingerprint(SEEDS[i]);
+            long terrain = WorldFingerprints.terrain(SEEDS[i], World.GEN_URBAN_SURVIVORS);
+            long sites = WorldFingerprints.survivorSites(SEEDS[i], World.GEN_URBAN_SURVIVORS);
             if (terrain != URBAN_ECOLOGY_TERRAIN_FINGERPRINTS[i] || sites != URBAN_SURVIVOR_SITE_FINGERPRINTS[i]) {
                 moved.add(String.format("seed %d: terrain 0x%016xL, sites 0x%016xL", SEEDS[i], terrain, sites));
             }
@@ -372,9 +316,9 @@ class WorldGeneratorFingerprintTest {
     void theCompoundsKeepTheCityAndTheirRecordedPlans() {
         List<String> moved = new ArrayList<>();
         for (int i = 0; i < SEEDS.length; i++) {
-            long terrain = terrainFingerprint(SEEDS[i], World.GEN_URBAN_STRONGHOLDS);
-            long compounds = compoundFingerprint(SEEDS[i]);
-            long chunks = compoundChunkFingerprint(SEEDS[i]);
+            long terrain = WorldFingerprints.terrain(SEEDS[i], World.GEN_URBAN_STRONGHOLDS);
+            long compounds = WorldFingerprints.compounds(SEEDS[i], World.GEN_URBAN_STRONGHOLDS);
+            long chunks = WorldFingerprints.compoundChunks(SEEDS[i], World.GEN_URBAN_STRONGHOLDS);
             if (terrain != URBAN_ECOLOGY_TERRAIN_FINGERPRINTS[i] || compounds != URBAN_COMPOUND_FINGERPRINTS[i]
                     || chunks != URBAN_COMPOUND_CHUNK_FINGERPRINTS[i]) {
                 moved.add(String.format("seed %d: terrain 0x%016xL, compounds 0x%016xL, chunks 0x%016xL",
@@ -401,9 +345,9 @@ class WorldGeneratorFingerprintTest {
     void theWrecksKeepTheCityAndTheirRecordedPlans() {
         List<String> moved = new ArrayList<>();
         for (int i = 0; i < SEEDS.length; i++) {
-            long terrain = terrainFingerprint(SEEDS[i], World.GEN_URBAN_REFUGES);
-            long vehicles = vehicleFingerprint(SEEDS[i], World.GEN_URBAN_REFUGES);
-            long chunks = vehicleChunkFingerprint(SEEDS[i], World.GEN_URBAN_REFUGES);
+            long terrain = WorldFingerprints.terrain(SEEDS[i], World.GEN_URBAN_REFUGES);
+            long vehicles = WorldFingerprints.vehicles(SEEDS[i], World.GEN_URBAN_REFUGES);
+            long chunks = WorldFingerprints.vehicleChunks(SEEDS[i], World.GEN_URBAN_REFUGES);
             if (terrain != URBAN_ECOLOGY_TERRAIN_FINGERPRINTS[i] || vehicles != URBAN_VEHICLE_FINGERPRINTS[i]
                     || chunks != URBAN_VEHICLE_CHUNK_FINGERPRINTS[i]) {
                 moved.add(String.format("seed %d: terrain 0x%016xL, vehicles 0x%016xL, chunks 0x%016xL",
@@ -423,9 +367,9 @@ class WorldGeneratorFingerprintTest {
     void theUtilityCityIsTheRefugeCityExactly() {
         List<String> moved = new ArrayList<>();
         for (int i = 0; i < SEEDS.length; i++) {
-            long terrain = terrainFingerprint(SEEDS[i], World.GEN_URBAN_UTILITIES);
-            long vehicles = vehicleFingerprint(SEEDS[i], World.GEN_URBAN_UTILITIES);
-            long chunks = vehicleChunkFingerprint(SEEDS[i], World.GEN_URBAN_UTILITIES);
+            long terrain = WorldFingerprints.terrain(SEEDS[i], World.GEN_URBAN_UTILITIES);
+            long vehicles = WorldFingerprints.vehicles(SEEDS[i], World.GEN_URBAN_UTILITIES);
+            long chunks = WorldFingerprints.vehicleChunks(SEEDS[i], World.GEN_URBAN_UTILITIES);
             if (terrain != URBAN_ECOLOGY_TERRAIN_FINGERPRINTS[i] || vehicles != URBAN_VEHICLE_FINGERPRINTS[i]
                     || chunks != URBAN_VEHICLE_CHUNK_FINGERPRINTS[i]) {
                 moved.add(String.format("seed %d: terrain 0x%016xL, vehicles 0x%016xL, chunks 0x%016xL",
@@ -452,15 +396,11 @@ class WorldGeneratorFingerprintTest {
     void theMissionCityIsTheUtilityCityWithOneRelayMast() {
         List<String> moved = new ArrayList<>();
         for (int i = 0; i < SEEDS.length; i++) {
-            long terrain = terrainFingerprint(SEEDS[i], World.GEN_URBAN_MISSIONS);
-            long vehicles = vehicleFingerprint(SEEDS[i], World.GEN_URBAN_MISSIONS);
-            long chunks = vehicleChunkFingerprint(SEEDS[i], World.GEN_URBAN_MISSIONS);
-            World world = new World(SEEDS[i], World.GEN_URBAN_MISSIONS);
-            var relay = world.urban.relay();
-            assertTrue(relay != null, "seed " + SEEDS[i] + " has a relay");
-            long site = mix(0xcbf29ce484222325L, relay.toString().hashCode());
-            long relayChunk = hashChunk(world.getOrCreateChunk(Math.floorDiv(relay.relay().x(), Chunk.SX),
-                    Math.floorDiv(relay.relay().z(), Chunk.SZ)));
+            long terrain = WorldFingerprints.terrain(SEEDS[i], World.GEN_URBAN_MISSIONS);
+            long vehicles = WorldFingerprints.vehicles(SEEDS[i], World.GEN_URBAN_MISSIONS);
+            long chunks = WorldFingerprints.vehicleChunks(SEEDS[i], World.GEN_URBAN_MISSIONS);
+            long site = WorldFingerprints.relay(SEEDS[i], World.GEN_URBAN_MISSIONS);
+            long relayChunk = WorldFingerprints.relayChunk(SEEDS[i], World.GEN_URBAN_MISSIONS);
             if (terrain != URBAN_ECOLOGY_TERRAIN_FINGERPRINTS[i] || vehicles != URBAN_VEHICLE_FINGERPRINTS[i]
                     || chunks != URBAN_VEHICLE_CHUNK_FINGERPRINTS[i] || site != URBAN_RELAY_FINGERPRINTS[i]
                     || relayChunk != URBAN_RELAY_CHUNK_FINGERPRINTS[i]) {
@@ -482,15 +422,11 @@ class WorldGeneratorFingerprintTest {
     void theEconomyCityIsTheMissionCityExactly() {
         List<String> moved = new ArrayList<>();
         for (int i = 0; i < SEEDS.length; i++) {
-            long terrain = terrainFingerprint(SEEDS[i], World.GEN_URBAN_ECONOMY);
-            long vehicles = vehicleFingerprint(SEEDS[i], World.GEN_URBAN_ECONOMY);
-            long chunks = vehicleChunkFingerprint(SEEDS[i], World.GEN_URBAN_ECONOMY);
-            World world = new World(SEEDS[i], World.GEN_URBAN_ECONOMY);
-            var relay = world.urban.relay();
-            assertTrue(relay != null, "seed " + SEEDS[i] + " has a relay");
-            long site = mix(0xcbf29ce484222325L, relay.toString().hashCode());
-            long relayChunk = hashChunk(world.getOrCreateChunk(Math.floorDiv(relay.relay().x(), Chunk.SX),
-                    Math.floorDiv(relay.relay().z(), Chunk.SZ)));
+            long terrain = WorldFingerprints.terrain(SEEDS[i], World.GEN_URBAN_ECONOMY);
+            long vehicles = WorldFingerprints.vehicles(SEEDS[i], World.GEN_URBAN_ECONOMY);
+            long chunks = WorldFingerprints.vehicleChunks(SEEDS[i], World.GEN_URBAN_ECONOMY);
+            long site = WorldFingerprints.relay(SEEDS[i], World.GEN_URBAN_ECONOMY);
+            long relayChunk = WorldFingerprints.relayChunk(SEEDS[i], World.GEN_URBAN_ECONOMY);
             if (terrain != URBAN_ECOLOGY_TERRAIN_FINGERPRINTS[i] || vehicles != URBAN_VEHICLE_FINGERPRINTS[i]
                     || chunks != URBAN_VEHICLE_CHUNK_FINGERPRINTS[i] || site != URBAN_RELAY_FINGERPRINTS[i]
                     || relayChunk != URBAN_RELAY_CHUNK_FINGERPRINTS[i]) {
@@ -501,185 +437,6 @@ class WorldGeneratorFingerprintTest {
         assertTrue(moved.isEmpty(), () -> "generator 20 left generator 19's city; its economy must be rules and "
                 + "content only:\n  " + String.join("\n  ", moved));
     }
-
-    /** Every wreck within three regions of the spawn, and the compounds and sites planned beside them. */
-    private static long vehicleFingerprint(long seed, int generator) {
-        World world = new World(seed, generator);
-        long hash = 0xcbf29ce484222325L;
-        for (int rz = -3; rz <= 3; rz++) {
-            for (int rx = -3; rx <= 3; rx++) {
-                for (var w : world.urban.vehicles(rx, rz).wrecks()) { hash = mix(hash, w.toString().hashCode()); }
-                var sites = world.urban.sites(rx, rz);
-                for (var s : sites.sites()) { hash = mix(hash, s.toString().hashCode()); }
-                for (var c : sites.compounds()) { hash = mix(hash, c.toString().hashCode()); }
-            }
-        }
-        return hash;
-    }
-
-    /** The stamped chunks under the wreck nearest the spawn. */
-    private static long vehicleChunkFingerprint(long seed, int generator) {
-        World world = new World(seed, generator);
-        com.veylon.world.urban.VehicleSites.Wreck nearest = null;
-        for (int rz = -1; rz <= 1; rz++) {
-            for (int rx = -1; rx <= 1; rx++) {
-                for (var w : world.urban.vehicles(rx, rz).wrecks()) {
-                    if (nearest == null || (long) w.x0() * w.x0() + (long) w.z0() * w.z0()
-                            < (long) nearest.x0() * nearest.x0() + (long) nearest.z0() * nearest.z0()) {
-                        nearest = w;
-                    }
-                }
-            }
-        }
-        assertTrue(nearest != null, "a wreck lies within a region of the spawn");
-        long hash = 0xcbf29ce484222325L;
-        LinkedHashSet<Long> chunks = new LinkedHashSet<>();
-        for (var cell : nearest.cells()) {
-            chunks.add(((long) Math.floorDiv(cell.x(), Chunk.SX) << 32) | (Math.floorDiv(cell.z(), Chunk.SZ) & 0xffffffffL));
-        }
-        for (long chunk : chunks) {
-            hash = mix(hash, hashChunk(world.getOrCreateChunk((int) (chunk >> 32), (int) chunk)));
-        }
-        return hash;
-    }
-
-    /** Every compound claim and plan within three regions of the spawn, with the camps and refuges beside them. */
-    private static long compoundFingerprint(long seed) {
-        World world = new World(seed, World.GEN_URBAN_STRONGHOLDS);
-        long hash = 0xcbf29ce484222325L;
-        for (int rz = -3; rz <= 3; rz++) {
-            for (int rx = -3; rx <= 3; rx++) {
-                var claims = world.urban.routes(rx, rz).claims();
-                hash = mix(hash, String.valueOf(claims.stronghold()).hashCode());
-                hash = mix(hash, String.valueOf(claims.raiders()).hashCode());
-                var sites = world.urban.sites(rx, rz);
-                hash = mix(hash, String.valueOf(sites.camp()).hashCode());
-                hash = mix(hash, String.valueOf(sites.refuge()).hashCode());
-                for (var c : sites.compounds()) { hash = mix(hash, c.toString().hashCode()); }
-            }
-        }
-        return hash;
-    }
-
-    /** The stamped chunks of the nearest stronghold's and raider yard's gates. */
-    private static long compoundChunkFingerprint(long seed) {
-        World world = new World(seed, World.GEN_URBAN_STRONGHOLDS);
-        long hash = 0xcbf29ce484222325L;
-        for (var kind : new com.veylon.world.urban.SurvivorSites.Kind[]{com.veylon.world.urban.SurvivorSites.Kind.STRONGHOLD,
-                com.veylon.world.urban.SurvivorSites.Kind.RAIDERS}) {
-            com.veylon.world.urban.CompoundSites.Compound nearest = null;
-            for (int rz = -3; rz <= 3; rz++) {
-                for (int rx = -3; rx <= 3; rx++) {
-                    for (var c : world.urban.sites(rx, rz).compounds()) {
-                        if (c.kind() == kind && (nearest == null
-                                || c.site().anchor().distSq(0, 41, 0) < nearest.site().anchor().distSq(0, 41, 0))) {
-                            nearest = c;
-                        }
-                    }
-                }
-            }
-            assertTrue(nearest != null, "a " + kind + " lies within three regions of the spawn");
-            for (var line : nearest.barricades()) {
-                var cell = line.cells().get(1);
-                hash = mix(hash, hashChunk(world.getOrCreateChunk(Math.floorDiv(cell.x(), Chunk.SX),
-                        Math.floorDiv(cell.z(), Chunk.SZ))));
-            }
-        }
-        return hash;
-    }
-
-    /** Every survivor site within three regions of the spawn, as planned. */
-    private static long sitePlanFingerprint(long seed) {
-        World world = new World(seed, World.GEN_URBAN_SURVIVORS);
-        long hash = 0xcbf29ce484222325L;
-        for (int rz = -3; rz <= 3; rz++) {
-            for (int rx = -3; rx <= 3; rx++) {
-                for (var site : world.urban.sites(rx, rz).sites()) {
-                    hash = mix(hash, site.toString().hashCode());
-                }
-            }
-        }
-        return hash;
-    }
-
-    /** Transit segments around the spawn, three route catalogues and the spawn station's chunks. */
-    private static long routeFingerprint(long seed) {
-        World world = new World(seed, World.GEN_URBAN_UNDERGROUND);
-        long hash = 0xcbf29ce484222325L;
-        for (int line = -2; line <= 2; line += 2) {
-            for (int index = -1; index <= 1; index++) {
-                for (boolean ns : new boolean[]{true, false}) {
-                    var s = world.urban.segment(ns, line, index);
-                    hash = mix(hash, (s.present() ? 1 : 0) | (s.flooded() ? 2 : 0) | (s.plugLow() ? 4 : 0) | (s.plugHigh() ? 8 : 0));
-                    for (int m : s.mounds()) { hash = mix(hash, m); }
-                    if (s.present()) {
-                        hash = mix(hash, s.station().id());
-                        hash = mix(hash, s.station().start());
-                        hash = mix(hash, com.veylon.world.urban.BuildingPlanDiagnostics.fingerprint(s.station().plan()));
-                    }
-                }
-            }
-        }
-        for (int[] region : new int[][]{{0, 0}, {-1, -1}, {1, -1}}) {
-            var routes = world.urban.routes(region[0], region[1]);
-            hash = mix(hash, routes.corridors().toString().hashCode());
-            hash = mix(hash, routes.fireEscapes().toString().hashCode());
-            hash = mix(hash, routes.connectors().toString().hashCode());
-            hash = mix(hash, routes.hiddenCellar());
-        }
-        var top = world.urban.segment(true, 0, 0).station().plan().approaches().getFirst();
-        for (int dz = -2; dz <= 0; dz++) {
-            hash = mix(hash, hashChunk(world.getOrCreateChunk(Math.floorDiv(top.x(), Chunk.SX),
-                    Math.floorDiv(top.z(), Chunk.SZ) + dz)));
-        }
-        return hash;
-    }
-
-    /** The first region of each district near the spawn: rasters, first plans, two chunks. */
-    private static long districtFingerprint(long seed) {
-        World world = new World(seed, World.GEN_URBAN_DISTRICTS);
-        long hash = 0xcbf29ce484222325L;
-        for (com.veylon.world.urban.UrbanDistrict district : com.veylon.world.urban.UrbanDistrict.values()) {
-            DistrictPlan plan = null;
-            for (int rz = -3; rz <= 3 && plan == null; rz++) {
-                for (int rx = -3; rx <= 3 && plan == null; rx++) {
-                    if ((rx != 0 || rz != 0) && com.veylon.world.urban.DistrictMap.districtOf(seed, rx, rz) == district) {
-                        plan = world.urban.regionPlan(rx, rz);
-                    }
-                }
-            }
-            assertTrue(plan != null, district + " near the spawn");
-            hash = mix(hash, plan.rx * 31L + plan.rz);
-            for (int z = plan.originZ(); z < plan.originZ() + com.veylon.world.urban.StreetNetwork.REGION_SIZE; z++) {
-                for (int x = plan.originX(); x < plan.originX() + com.veylon.world.urban.StreetNetwork.REGION_SIZE; x++) {
-                    hash = mix(hash, plan.surfaceAt(x, z).code * 64L + plan.overlayAt(x, z).code);
-                }
-            }
-            for (ParcelPlan parcel : plan.parcels().subList(0, Math.min(8, plan.parcels().size()))) {
-                hash = mix(hash, com.veylon.world.urban.BuildingPlanDiagnostics.fingerprint(
-                        world.urban.buildingAt(parcel.x0(), parcel.z0())));
-            }
-            hash = mix(hash, hashChunk(world.getOrCreateChunk(plan.rx * 16, plan.rz * 16)));
-            hash = mix(hash, hashChunk(world.getOrCreateChunk(plan.rx * 16 + 8, plan.rz * 16 + 8)));
-        }
-        return hash;
-    }
-
-    /** Every building plan (geometry, rooms, fixtures, ids) of three regions, in parcel order. */
-    private static long buildingPlanFingerprint(long seed, int generatorVersion) {
-        World world = new World(seed, generatorVersion);
-        long hash = 0xcbf29ce484222325L;
-        for (int[] region : new int[][]{{0, 0}, {-1, -1}, {1, -1}}) {
-            for (ParcelPlan parcel : world.urban.regionPlan(region[0], region[1]).parcels()) {
-                hash = mix(hash, com.veylon.world.urban.BuildingPlanDiagnostics.fingerprint(
-                        world.urban.buildingAt(parcel.x0(), parcel.z0())));
-            }
-        }
-        return hash;
-    }
-
-    /** Chunks fingerprinted per seed: origin, offset, and two negative ones. */
-    private static final int[][] CHUNKS = {{0, 0}, {3, -2}, {-1, -1}, {-4, 5}};
 
     @Test
     void generatedTerrainMatchesTheRecordedFingerprint() {
@@ -719,7 +476,7 @@ class WorldGeneratorFingerprintTest {
     void completeGeneratedRefugeAndShopMatchTheirRecordedBlocksAndHeightmaps() {
         for (int i = 0; i < SEEDS.length; i++) {
             assertEquals(URBAN_FURNISHED_BUILDING_FINGERPRINTS[i],
-                    furnishedBuildingFingerprint(SEEDS[i], World.GEN_URBAN_APARTMENTS),
+                    WorldFingerprints.furnishedBuildings(SEEDS[i], World.GEN_URBAN_APARTMENTS),
                     "generator 7 furnished building cells and heights are a saved-world contract; seed=" + SEEDS[i]);
         }
     }
@@ -737,7 +494,7 @@ class WorldGeneratorFingerprintTest {
     void theUrbanStreetPlansMatchTheirRecordedFingerprint() {
         List<String> moved = new ArrayList<>();
         for (int i = 0; i < SEEDS.length; i++) {
-            long actual = planFingerprint(SEEDS[i]);
+            long actual = WorldFingerprints.streetPlans(SEEDS[i], World.GEN_URBAN_STREETS);
             if (actual != URBAN_STREETS_PLAN_FINGERPRINTS[i]) {
                 moved.add(String.format("seed %d: recorded 0x%016xL, generated 0x%016xL",
                         SEEDS[i], URBAN_STREETS_PLAN_FINGERPRINTS[i], actual));
@@ -747,43 +504,10 @@ class WorldGeneratorFingerprintTest {
                 + "instead of re-recording:\n  " + String.join("\n  ", moved));
     }
 
-    private static long planFingerprint(long seed) {
-        World world = new World(seed, World.GEN_URBAN_STREETS);
-        long hash = 0xcbf29ce484222325L;
-        for (int[] region : new int[][]{{0, 0}, {-1, -1}, {1, -1}}) {
-            com.veylon.world.urban.DistrictPlan plan = world.urban.regionPlan(region[0], region[1]);
-            hash = mix(hash, plan.district.code);
-            hash = mix(hash, Long.hashCode(plan.districtId));
-            for (com.veylon.world.urban.SuperblockPlan block : plan.superblocks()) {
-                hash = mix(hash, block.kind().name().hashCode());
-                hash = mixRect(hash, block.bounds());
-            }
-            for (com.veylon.world.urban.ParcelPlan parcel : plan.parcels()) {
-                hash = mix(hash, Long.hashCode(parcel.id()));
-                hash = mix(hash, parcel.use().id.hashCode());
-                hash = mix(hash, parcel.x0() * 31 + parcel.z0());
-                hash = mix(hash, parcel.x1() * 31 + parcel.z1());
-                hash = mix(hash, parcel.frontage().name().hashCode());
-                for (com.veylon.world.urban.ParcelPlan.Entrance door : parcel.entrances()) {
-                    hash = mix(hash, door.x() * 31 + door.z());
-                    hash = mix(hash, door.facing().name().hashCode());
-                }
-                hash = mixRect(hash, parcel.core());
-                hash = mix(hash, parcel.maxStoreys());
-            }
-            for (com.veylon.world.urban.DistrictPlan.Tree tree : plan.trees()) {
-                hash = mix(hash, tree.x() * 31 + tree.z());
-                hash = mix(hash, tree.trunkHeight());
-            }
-        }
-        int[] spawn = world.urban.spawnColumn();
-        return mix(mix(hash, spawn[0]), spawn[1]);
-    }
-
     private static void assertTerrainPinned(int generatorVersion, long[] recorded) {
         List<String> moved = new ArrayList<>();
         for (int i = 0; i < SEEDS.length; i++) {
-            long actual = terrainFingerprint(SEEDS[i], generatorVersion);
+            long actual = WorldFingerprints.terrain(SEEDS[i], generatorVersion);
             if (actual != recorded[i]) {
                 moved.add(String.format("seed %d: recorded 0x%016xL, generated 0x%016xL",
                         SEEDS[i], recorded[i], actual));
@@ -814,7 +538,7 @@ class WorldGeneratorFingerprintTest {
         // change there is attributed to the query rather than to the terrain.
         List<String> moved = new ArrayList<>();
         for (int i = 0; i < SEEDS.length; i++) {
-            long actual = columnQueryFingerprint(SEEDS[i]);
+            long actual = WorldFingerprints.columnQueries(SEEDS[i], World.GEN_CAVE_IDENTITIES);
             if (actual != COLUMN_QUERY_FINGERPRINTS[i]) {
                 moved.add(String.format("seed %d: recorded 0x%016xL, generated 0x%016xL",
                         SEEDS[i], COLUMN_QUERY_FINGERPRINTS[i], actual));
@@ -829,12 +553,12 @@ class WorldGeneratorFingerprintTest {
         // The whole point of the generator version is that an old save keeps
         // its world. Two versions of one seed must disagree, and each must
         // agree with itself.
-        long legacy = terrainFingerprint(SEEDS[0], World.GEN_LEGACY);
-        long identities = terrainFingerprint(SEEDS[0], World.GEN_CAVE_IDENTITIES);
+        long legacy = WorldFingerprints.terrain(SEEDS[0], World.GEN_LEGACY);
+        long identities = WorldFingerprints.terrain(SEEDS[0], World.GEN_CAVE_IDENTITIES);
 
         assertNotEquals(legacy, identities,
                 "the legacy generator must not have collapsed onto generator 3");
-        assertEquals(legacy, terrainFingerprint(SEEDS[0], World.GEN_LEGACY),
+        assertEquals(legacy, WorldFingerprints.terrain(SEEDS[0], World.GEN_LEGACY),
                 "the legacy generator must still be deterministic");
     }
 
@@ -843,102 +567,13 @@ class WorldGeneratorFingerprintTest {
         // A fingerprint that ignored most of the chunk would pass forever.
         World world = new World(SEEDS[0], World.GEN_CAVE_IDENTITIES);
         Chunk chunk = world.getOrCreateChunk(0, 0);
-        long before = hashChunk(chunk);
+        long before = WorldFingerprints.chunk(chunk);
 
         int y = chunk.height(4, 4);
         chunk.set(4, y, 4, chunk.get(4, y, 4) == BlockType.STONE
                 ? BlockType.DIRT : BlockType.STONE);
 
-        assertNotEquals(before, hashChunk(chunk),
+        assertNotEquals(before, WorldFingerprints.chunk(chunk),
                 "one changed block must move the fingerprint");
-    }
-
-    // ------------------------------------------------------------------
-
-    private static long terrainFingerprint(long seed, int generatorVersion) {
-        World world = new World(seed, generatorVersion);
-        long hash = 0xcbf29ce484222325L;
-        for (int[] chunk : CHUNKS) {
-            hash = mix(hash, hashChunk(world.getOrCreateChunk(chunk[0], chunk[1])));
-        }
-        // POIs are placed by generation and persisted by position, so they are
-        // part of what a save re-derives.
-        List<String> pois = new ArrayList<>();
-        for (Poi poi : world.pois) {
-            pois.add(poi.type + "@" + poi.pos);
-        }
-        pois.sort(null);
-        for (String poi : pois) {
-            hash = mix(hash, poi.hashCode());
-        }
-        return hash;
-    }
-
-    private static long furnishedBuildingFingerprint(long seed, int generatorVersion) {
-        World world = new World(seed, generatorVersion);
-        DistrictPlan district = world.urban.regionPlan(0, 0);
-        LinkedHashSet<Long> chunks = new LinkedHashSet<>();
-        for (ParcelPlan.Use use : new ParcelPlan.Use[]{ParcelPlan.Use.REFUGE, ParcelPlan.Use.COMMERCIAL}) {
-            ParcelPlan parcel = district.parcels().stream().filter(p -> p.use() == use).findFirst().orElseThrow();
-            for (int cx = Math.floorDiv(parcel.x0(), Chunk.SX); cx <= Math.floorDiv(parcel.x1(), Chunk.SX); cx++) {
-                for (int cz = Math.floorDiv(parcel.z0(), Chunk.SZ); cz <= Math.floorDiv(parcel.z1(), Chunk.SZ); cz++) {
-                    chunks.add(((long) cx << 32) | (cz & 0xffffffffL));
-                }
-            }
-        }
-        assertTrue(chunks.size() >= 10, "the frozen refuge/shop sample covers both complete crossing buildings");
-        long hash = 0xcbf29ce484222325L;
-        for (long chunk : chunks) {
-            hash = mix(hash, hashChunk(world.getOrCreateChunk((int) (chunk >> 32), (int) chunk)));
-        }
-        assertTrue(world.pois.isEmpty());
-        return hash;
-    }
-
-    /** Every block plus the derived heightmap of one chunk. */
-    private static long hashChunk(Chunk chunk) {
-        long hash = 0xcbf29ce484222325L;
-        for (int y = 0; y < Chunk.SY; y++) {
-            for (int z = 0; z < Chunk.SZ; z++) {
-                for (int x = 0; x < Chunk.SX; x++) {
-                    hash = mix(hash, chunk.get(x, y, z).ordinal());
-                }
-            }
-        }
-        for (int x = 0; x < Chunk.SX; x++) {
-            for (int z = 0; z < Chunk.SZ; z++) {
-                hash = mix(hash, chunk.height(x, z));
-            }
-        }
-        return mix(hash, Float.floatToIntBits(chunk.moisture));
-    }
-
-    /** The pure per-column queries, sampled over a wide, sparse grid. */
-    private static long columnQueryFingerprint(long seed) {
-        World world = new World(seed, World.GEN_CAVE_IDENTITIES);
-        WorldGenerator generator = world.generator;
-        long hash = 0xcbf29ce484222325L;
-        for (int x = -600; x <= 600; x += 37) {
-            for (int z = -600; z <= 600; z += 41) {
-                int height = generator.heightAt(x, z);
-                hash = mix(hash, height);
-                hash = mix(hash, generator.biomeAt(x, z).ordinal());
-                hash = mix(hash, Double.doubleToLongBits(generator.mountainFactor(x, z)));
-                hash = mix(hash, Double.doubleToLongBits(generator.temperature01(x, z)));
-                hash = mix(hash, Double.doubleToLongBits(generator.moisture01(x, z)));
-                hash = mix(hash, generator.caveZoneAt(x, height - 20, z).ordinal());
-            }
-        }
-        return hash;
-    }
-
-    /** FNV-1a style mixing: order-sensitive and cheap. */
-    /** Record hash codes are not specified across JDKs, so rectangles hash their corners. */
-    private static long mixRect(long hash, com.veylon.world.urban.ParcelPlan.Rect rect) {
-        return mix(mix(hash, rect.x0() * 31L + rect.z0()), rect.x1() * 31L + rect.z1());
-    }
-
-    private static long mix(long hash, long value) {
-        return (hash ^ value) * 0x100000001b3L;
     }
 }
