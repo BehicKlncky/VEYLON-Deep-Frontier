@@ -951,6 +951,9 @@ save holds, or historical fixtures, and none may be added.
   foreign headers in code (`ForeignSaves`), never from a fixture.
 - **The guard.** `SaveEpochGuardTest` digests the layout (a sample save of each
   world kind), the enum tables a save stores and both world kinds' generation.
+  The city sample holds the sections as a new city writes them, so most city
+  sections reach it with no rows: when a section's rows change, raise that
+  section's version, which the sample does carry.
   When it fails while the epoch is unreleased, check that the change was meant
   to alter saves, then paste the new values it prints into `RECORDED`. When it
   fails under a released epoch (`RELEASED` names it), raise `SaveHeader.EPOCH`
