@@ -131,12 +131,30 @@ tasks.named('run', JavaExec) {
     }
 }
 
+// The portable suite runs in parallel worker JVMs, each with its own data
+// directory (see above). On the owner's 12-thread host 8, 10 and 12 workers
+// finished in the same time and 6 took a tenth longer, so the default is two
+// thirds of the logical processors (docs/roadmap/v0.9.1, milestone 02).
+// -PveylonTestForks=N overrides it, for example 1 to run every class in one JVM
+// while debugging.
+def testForks = providers.gradleProperty('veylonTestForks').map { value ->
+    if (!(value ==~ /[1-9]\d*/)) {
+        throw new GradleException("veylonTestForks must be a positive whole number, not '${value}'")
+    }
+    Integer.parseInt(value)
+}.orElse(Math.max(1, (Runtime.runtime.availableProcessors() * 2).intdiv(3)))
+
 // Wall-clock budgets are calibrated for one reference machine and therefore
 // are opt-in rather than part of the portable deterministic suite.
 tasks.named('test', Test) {
     useJUnitPlatform {
         excludeTags 'performance'
     }
+    maxParallelForks = testForks.get()
+    // Gradle's default 512 MiB kept the heaviest city worker at its ceiling
+    // (evacuation failures and compacting full collections); 1 GiB removed them
+    // at the same speed.
+    maxHeapSize = '1g'
 }
 
 // Broken API documentation is a source-quality failure, so the ordinary
