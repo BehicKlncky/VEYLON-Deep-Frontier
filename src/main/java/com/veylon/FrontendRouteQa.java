@@ -4,6 +4,7 @@ import com.veylon.entity.GameMode;
 import com.veylon.item.Inventory;
 import com.veylon.item.ItemStack;
 import com.veylon.save.LoadResult;
+import com.veylon.save.SaveHeader;
 import com.veylon.save.SaveSlots;
 import com.veylon.ui.SlotPickerScreen;
 import com.veylon.util.AppPaths;
@@ -16,6 +17,7 @@ import com.veylon.world.urban.UrbanIds;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -62,11 +64,23 @@ import static org.lwjgl.glfw.GLFW.*;
  * file's note; 2 and Enter, and the reason under the cards; Esc, then N, Enter and Enter into a new
  * city in slot 1; both hashes again, which must be unchanged; then the pause menu and Q. It never
  * presses F5. {@code SaveRefusalRoutingTest} drives the same paths headlessly.
+ *
+ * <p>{@code VEYLON_FRONTEND=route-slots} (0.9.1 milestone 04) plays every state of the picker in
+ * one launch from an empty isolated directory: a new city in slot 1 saved with F5 and the pause
+ * menu naming it; a Creative wilderness in slot 2 saved with F5; then, staged between title
+ * visits, slot 1's save damaged on the disk and slot 3 given a save of another version (0.9.0's
+ * file when it is there, else slot 2's save under a later epoch). LOAD FRONTIER then shows a damaged
+ * slot with its backup, a ready slot and another version; Enter on slot 3 says why it does not
+ * open; R and Y restore slot 1 from its backup, which must load the world its first save held and
+ * set the damaged save aside unchanged. Back at the title, NEW FRONTIER's picker asks before
+ * replacing slot 2 and before deleting it, and both are cancelled with N. Every state and both
+ * confirmations are captured. {@code SlotPickerRoutingTest} drives the same paths headlessly.
  */
 final class FrontendRouteQa {
     static final String ROUTE = "route";
     static final String ROUTE_LOAD = "route-load";
     static final String ROUTE_REFUSAL = "route-refusal";
+    static final String ROUTE_SLOTS = "route-slots";
     private static final double DEADLINE_SECONDS = 240;
 
     private interface Step {
@@ -94,10 +108,13 @@ final class FrontendRouteQa {
     private String slotAfter = "";
     private String legacyBefore = "";
     private String legacyAfter = "";
+    private String damagedHash = "";
+    private List<String> firstSave = List.of();
 
     /** Whether a {@code VEYLON_FRONTEND} screen names this route. */
     static boolean names(String screen) {
-        return ROUTE.equals(screen) || ROUTE_LOAD.equals(screen) || ROUTE_REFUSAL.equals(screen);
+        return ROUTE.equals(screen) || ROUTE_LOAD.equals(screen) || ROUTE_REFUSAL.equals(screen)
+                || ROUTE_SLOTS.equals(screen);
     }
 
     FrontendRouteQa(Game game, AutomatedRunDriver driver, String screen, GameMode mode) {
@@ -110,6 +127,7 @@ final class FrontendRouteQa {
         this.launch = switch (screen) {
             case ROUTE_REFUSAL -> "refusal";
             case ROUTE_LOAD -> "load";
+            case ROUTE_SLOTS -> "slots";
             default -> "new";
         };
         this.mode = mode;
@@ -117,6 +135,7 @@ final class FrontendRouteQa {
         switch (launch) {
             case "refusal" -> planRefusalLaunch();
             case "load" -> planLoadLaunch();
+            case "slots" -> planSlotsLaunch();
             default -> planNewLaunch();
         }
         System.out.println("[frontend-route] launch=" + launch + " mode=" + mode.name().toLowerCase(Locale.ROOT)
@@ -194,6 +213,112 @@ final class FrontendRouteQa {
         step("Q quits", press(GLFW_KEY_Q));
     }
 
+    /**
+     * Every state of the picker, both confirmations and a restore, from an empty isolated directory.
+     * The title visits between worlds are staged as the death card's Esc makes them, since the pause
+     * menu has no way back to the title before 0.9.1 milestone 06.
+     */
+    private void planSlotsLaunch() {
+        step("every slot is empty", check(() -> states().stream().allMatch(s -> s == SaveSlots.State.EMPTY)));
+        step("title", wait(1.5));
+        step("title capture", capture("01-title"));
+        step("N", press(GLFW_KEY_N));
+        step("new frontier", await(() -> game.appState == Game.AppState.TITLE_NEW_WORLD, 3));
+        step("Enter", press(GLFW_KEY_ENTER));
+        step("the picker for a new world", await(() -> picking(SlotPickerScreen.Purpose.NEW), 3));
+        step("on the empty slot 1", check(() -> game.frontend.slotPicker.selected() == 1));
+        step("picker settle", wait(0.5));
+        step("empty capture", capture("02-new-all-empty"));
+        step("Enter starts in slot 1", press(GLFW_KEY_ENTER));
+        step("a city in slot 1", await(() -> game.appState == Game.AppState.PLAYING, 90));
+        step("written at once", check(() -> game.world.isUrban() && game.saves.activeSlot() == 1
+                && slots().describe(1).state() == SaveSlots.State.READY));
+        step("remember its first save", run(() -> firstSave = SaveAuditQaScene.durable(game)));
+        step("meshes", wait(3.0));
+        step("F5", press(GLFW_KEY_F5));
+        step("saved to slot 1", await(() -> logged(SaveSession.savedLine(1)), 3));
+        step("its first save is the newest backup", check(() -> slots().newestIntactBackup(1) != null));
+        step("Esc", press(GLFW_KEY_ESCAPE));
+        step("pause", await(() -> game.uiMode == Game.UiMode.PAUSE, 2));
+        step("pause settle", wait(0.5));
+        step("pause capture", capture("03-pause-slot-1"));
+        step("Esc resumes", press(GLFW_KEY_ESCAPE));
+        step("to the title", run(() -> game.frontend.returnToTitle()));
+        step("N again", press(GLFW_KEY_N));
+        step("new frontier again", await(() -> game.appState == Game.AppState.TITLE_NEW_WORLD, 3));
+        step("W", press(GLFW_KEY_W));
+        step("C", press(GLFW_KEY_C));
+        step("a Creative wilderness chosen", await(() -> !game.newFrontierScreen.showsCity()
+                && game.newFrontierScreen.selectedMode() == GameMode.CREATIVE, 2));
+        step("Enter", press(GLFW_KEY_ENTER));
+        step("the picker on slot 2", await(() -> picking(SlotPickerScreen.Purpose.NEW)
+                && game.frontend.slotPicker.selected() == 2, 3));
+        step("picker settle 2", wait(0.5));
+        step("one used capture", capture("04-new-one-used"));
+        step("Enter starts in slot 2", press(GLFW_KEY_ENTER));
+        step("a wilderness in slot 2", await(() -> game.appState == Game.AppState.PLAYING, 90));
+        step("in Creative", check(() -> !game.world.isUrban() && game.gameMode() == GameMode.CREATIVE
+                && game.saves.activeSlot() == 2));
+        step("meshes 2", wait(2.0));
+        step("F5 into slot 2", press(GLFW_KEY_F5));
+        step("saved to slot 2", await(() -> logged(SaveSession.savedLine(2)), 3));
+        step("to the title again", run(() -> game.frontend.returnToTitle()));
+        step("damage slot 1 on the disk", run(this::damageSlotOne));
+        step("another version into slot 3", run(this::otherVersionIntoSlotThree));
+        step("L", press(GLFW_KEY_L));
+        step("the picker to load", await(() -> picking(SlotPickerScreen.Purpose.LOAD), 3));
+        step("every state shows", check(() -> shown(1) == SaveSlots.State.DAMAGED
+                && game.frontend.slotPicker.slots().getFirst().backup() != null
+                && shown(2) == SaveSlots.State.READY && shown(3) == SaveSlots.State.OTHER_VERSION
+                && game.frontend.slotPicker.selected() == 2));
+        step("states settle", wait(0.6));
+        step("states capture", capture("05-load-states"));
+        step("3", press(GLFW_KEY_3));
+        step("Enter on slot 3", press(GLFW_KEY_ENTER));
+        step("it says why", await(() -> !game.frontend.slotPicker.notice().isBlank(), 2));
+        step("other settle", wait(0.5));
+        step("other version capture", capture("06-other-version"));
+        step("1", press(GLFW_KEY_1));
+        step("R", press(GLFW_KEY_R));
+        step("the restore asks", await(() -> game.frontend.slotPicker.asking() == SlotPickerScreen.Ask.RESTORE, 2));
+        step("ask settle", wait(0.5));
+        step("restore capture", capture("07-restore-confirm"));
+        step("Y restores", press(GLFW_KEY_Y));
+        step("restored", await(() -> game.appState == Game.AppState.PLAYING, 90));
+        step("its first save's world", check(() -> game.saves.activeSlot() == 1
+                && SaveAuditQaScene.durable(game).equals(firstSave)));
+        step("the damaged save set aside", check(() -> damagedHash.equals(hash(slots().setAside(1, 1)))
+                && slots().describe(1).state() == SaveSlots.State.READY));
+        step("restored meshes", wait(3.0));
+        step("restored capture", capture("08-restored"));
+        step("to the title a third time", run(() -> game.frontend.returnToTitle()));
+        step("N a third time", press(GLFW_KEY_N));
+        step("new frontier a third time", await(() -> game.appState == Game.AppState.TITLE_NEW_WORLD, 3));
+        step("Enter to the picker", press(GLFW_KEY_ENTER));
+        step("no empty slot left", await(() -> picking(SlotPickerScreen.Purpose.NEW), 3));
+        step("2", press(GLFW_KEY_2));
+        step("Enter on slot 2", press(GLFW_KEY_ENTER));
+        step("the replacement asks", await(() -> game.frontend.slotPicker.asking() == SlotPickerScreen.Ask.REPLACE, 2));
+        step("replace settle", wait(0.5));
+        step("replace capture", capture("09-replace-confirm"));
+        step("N keeps it", press(GLFW_KEY_N));
+        step("still picking", await(() -> game.frontend.slotPicker.asking() == SlotPickerScreen.Ask.NONE
+                && picking(SlotPickerScreen.Purpose.NEW), 2));
+        step("Del", press(GLFW_KEY_DELETE));
+        step("the delete asks", await(() -> game.frontend.slotPicker.asking() == SlotPickerScreen.Ask.DELETE, 2));
+        step("delete settle", wait(0.5));
+        step("delete capture", capture("10-delete-confirm"));
+        step("N keeps it again", press(GLFW_KEY_N));
+        step("slot 2 is kept", await(() -> game.frontend.slotPicker.asking() == SlotPickerScreen.Ask.NONE
+                && slots().describe(2).state() == SaveSlots.State.READY, 2));
+        step("Esc to the new frontier", press(GLFW_KEY_ESCAPE));
+        step("back on the new frontier", await(() -> game.appState == Game.AppState.TITLE_NEW_WORLD, 2));
+        step("Esc to the title", press(GLFW_KEY_ESCAPE));
+        step("back at the title", await(() -> game.appState == Game.AppState.TITLE, 2));
+        step("report", run(this::report));
+        step("Q quits", press(GLFW_KEY_Q));
+    }
+
     /** Copies VEYLON 0.9.0's file into an empty slot, reading the old file only. */
     private void copyLegacyInto(int slot) {
         try {
@@ -203,6 +328,36 @@ final class FrontendRouteQa {
             }
         } catch (IOException e) {
             throw new UncheckedIOException("could not stage slot " + slot, e);
+        }
+    }
+
+    /** Changes one byte in the middle of slot 1's save, as damage on the disk would. */
+    private void damageSlotOne() {
+        try {
+            Path file = slots().current(1);
+            byte[] bytes = Files.readAllBytes(file);
+            bytes[bytes.length / 2] ^= 0x5A;
+            Files.write(file, bytes);
+            damagedHash = hash(file);
+            System.out.println("[frontend-route] damaged slot 1 at byte " + bytes.length / 2 + " sha256=" + damagedHash);
+        } catch (IOException e) {
+            throw new UncheckedIOException("could not damage slot 1", e);
+        }
+    }
+
+    /** Slot 3 gets VEYLON 0.9.0's file when it is there, else slot 2's save under a later epoch. */
+    private void otherVersionIntoSlotThree() {
+        copyLegacyInto(3);
+        if (Files.exists(slots().current(3))) {
+            return;
+        }
+        try {
+            byte[] bytes = Files.readAllBytes(slots().current(2));
+            ByteBuffer.wrap(bytes).putInt(Integer.BYTES * 2, SaveHeader.EPOCH + 1);
+            Files.write(slots().current(3), bytes);
+            System.out.println("[frontend-route] slot 3 holds slot 2's save under epoch " + (SaveHeader.EPOCH + 1));
+        } catch (IOException e) {
+            throw new UncheckedIOException("could not stage slot 3", e);
         }
     }
 
@@ -550,9 +705,14 @@ final class FrontendRouteQa {
             System.out.println("[frontend-route] slot 2 sha256 before=" + slotBefore + " after=" + slotAfter
                     + " veylon.sav sha256 before=" + legacyBefore + " after=" + legacyAfter);
         }
+        if ("slots".equals(launch)) {
+            System.out.println("[frontend-route] slots " + states() + " damaged set aside sha256=" + damagedHash
+                    + " legacy=" + slots().holdsLegacySave());
+        }
         String keys = switch (launch) {
             case "refusal" -> "L,2,Enter,Esc,N,Enter,Enter,Esc,O,V,Q";
             case "load" -> "L,Enter,Esc,O,V,Q";
+            case "slots" -> "N,Enter,Enter,F5,Esc,Esc,N,W,C,Enter,Enter,F5,L,3,Enter,1,R,Y,N,Enter,2,Enter,N,Del,N,Esc,Esc,Q";
             default -> "N,W,C,Enter,Enter,9,RMB,Esc,W-held,M,Esc,F5,Enter|Space,F9,O,V,Q";
         };
         System.out.println("[frontend-route] launch=" + launch + " pass=" + failures.isEmpty()
