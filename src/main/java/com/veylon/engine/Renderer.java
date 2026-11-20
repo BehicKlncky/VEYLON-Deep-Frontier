@@ -1124,6 +1124,16 @@ public class Renderer {
         return shake;
     }
 
+    /**
+     * Forgets the outgoing world: its shake and the chunks last selected to draw or rebuild. Plain
+     * CPU state, so it needs no GL context; the chunks' meshes are released by their owner.
+     */
+    public void releaseWorld() {
+        shake = 0;
+        visible.clear();
+        dirtyQueue.clear();
+    }
+
     private void drawModel(EntityModel entityModel, Matrix4f base) {
         drawPart(entityModel.root, base);
     }

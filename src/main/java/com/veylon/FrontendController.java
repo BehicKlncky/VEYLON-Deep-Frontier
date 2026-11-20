@@ -344,12 +344,9 @@ final class FrontendController {
             game.closeScreens();
         } else {
             // A save refused from its header built nothing, but one that failed further in may
-            // have half built a world; drop it either way and go back to the slots, with the
+            // have half built a world; release it either way and go back to the slots, with the
             // reason in the player's words.
-            game.audio.resetWorld();
-            game.releaseWorldMeshes();
-            game.world = null;
-            game.player = null;
+            game.bootstrap.releaseWorld();
             boolean damaged = result.outcome() == LoadResult.Outcome.DAMAGED
                     || result.outcome() == LoadResult.Outcome.UNREADABLE;
             refreshSlots(request == LoadRequest.LOAD_GAME && damaged ? requestedSlot : 0);
@@ -379,19 +376,14 @@ final class FrontendController {
         game.renderer.settings.save();
     }
 
-    /** Abandons the live world and returns to the title screen. */
+    /**
+     * Abandons the live world and returns to the title screen. Everything the world leaves behind is
+     * released ({@link WorldBootstrap#releaseWorld}), so a world started or loaded afterwards begins
+     * as it would after a fresh launch.
+     */
     void returnToTitle() {
-        game.audio.resetWorld();
-        game.releaseWorldMeshes();
-        game.world = null;
-        game.player = null;
-        game.particles.count = 0;
-        game.entities.creatures.clear();
-        game.entities.npcs.clear();
-        game.entities.carcasses.clear();
-        game.entities.tracks.clear();
         game.closeScreens();
-        game.simPaused = false;
+        game.bootstrap.releaseWorld();
         game.appState = Game.AppState.TITLE;
         game.titleScreen.notice("");
     }

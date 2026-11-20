@@ -206,8 +206,8 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
     /** Opt-in benchmark, capture and release-smoke scaffolding. Inert without VEYLON_* env. */
     final QaHarness qa = new QaHarness(this);
 
-    /** Reset, reseed, construct and camp placement for every new or loaded world. */
-    private final WorldBootstrap bootstrap = new WorldBootstrap(this);
+    /** Reset, reseed, construct and camp placement for every new or loaded world, and its release. */
+    final WorldBootstrap bootstrap = new WorldBootstrap(this);
     final GameModeController gameModes = new GameModeController(this);
     final CreativeWorldControls creativeControls = new CreativeWorldControls(this);
 

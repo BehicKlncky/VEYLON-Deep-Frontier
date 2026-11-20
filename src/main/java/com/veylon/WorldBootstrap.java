@@ -92,13 +92,33 @@ final class WorldBootstrap {
     }
 
     /**
+     * Lets the live world go, as returning to the title does (0.9.1 milestone 06): its meshes and
+     * sounds are released, every system that outlives a world is reset and every per-world record
+     * cleared, so the title holds what it holds after a fresh launch. The next {@link #newWorld}
+     * then starts as it would have at launch.
+     */
+    void releaseWorld() {
+        resetSystems();
+        clearPerWorldState();
+        game.world = null;
+        game.player = null;
+    }
+
+    /**
      * Releases the outgoing world and resets everything that outlives one.
      *
      * <p>Save-load and front-end transitions can replace a live world, so this
      * runs before the new one is constructed rather than after.
      */
     private void resetForNewWorld(long seed) {
+        resetSystems();
+        reseedSimulation(seed);
+    }
+
+    /** The outgoing world's meshes, sounds and camera shake, and every system that outlives a world. */
+    private void resetSystems() {
         game.releaseWorldMeshes();
+        game.renderer.releaseWorld();
         game.scheduler.reset();
         game.audio.resetWorld();
         game.time.reset();
@@ -124,7 +144,6 @@ final class WorldBootstrap {
         game.particles.count = 0;
         // A new world is unplayed; a load restores the play time its save recorded.
         game.saves.resetForNewWorld();
-        reseedSimulation(seed);
     }
 
     /**
