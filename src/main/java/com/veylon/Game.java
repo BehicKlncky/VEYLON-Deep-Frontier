@@ -70,12 +70,12 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
 
     public enum UiMode {
         NONE, INVENTORY, CRAFTING, PAUSE, OPTIONS, MAP, CRATE, NPC, AUDIO_OPTIONS, GAME_MODE,
-        CREATIVE_CATALOG, WORLD_CONTROLS;
+        CREATIVE_CATALOG, WORLD_CONTROLS, AUTOSAVE_OPTIONS;
 
         /** The pause menu and the screens opened from it freeze the world. */
         public boolean pausesSimulation() {
             return this == PAUSE || this == OPTIONS || this == AUDIO_OPTIONS || this == GAME_MODE
-                    || this == WORLD_CONTROLS;
+                    || this == WORLD_CONTROLS || this == AUTOSAVE_OPTIONS;
         }
     }
 
@@ -96,12 +96,12 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
     }
 
     enum AppState {
-        TITLE, TITLE_OPTIONS, LOADING, PLAYING, DEATH, VICTORY, TITLE_AUDIO_OPTIONS, TITLE_NEW_WORLD, TITLE_SLOTS;
+        TITLE, TITLE_OPTIONS, LOADING, PLAYING, DEATH, VICTORY, TITLE_AUDIO_OPTIONS, TITLE_NEW_WORLD, TITLE_SLOTS,
+        TITLE_AUTOSAVE_OPTIONS;
 
         /** True while a live world is being drawn, so render stats are meaningful. */
         boolean rendersWorld() {
-            return this != TITLE && this != TITLE_OPTIONS && this != TITLE_AUDIO_OPTIONS && this != LOADING
-                    && this != TITLE_NEW_WORLD && this != TITLE_SLOTS;
+            return this == PLAYING || this == DEATH || this == VICTORY;
         }
     }
 
@@ -505,6 +505,7 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
             case AUDIO_OPTIONS -> frontend.handlePauseAudio(audioOptionsScreen.update(this));
             case GAME_MODE -> gameModes.handleScreen(gameModeScreen.update(this));
             case WORLD_CONTROLS -> creativeControls.handleScreen(worldControlsScreen.update(this));
+            case AUTOSAVE_OPTIONS -> frontend.updatePauseAutosave();
             case CREATIVE_CATALOG -> {
                 if (creativeCatalogScreen.update(this) == com.veylon.ui.CreativeCatalogScreen.Action.CLOSE) {
                     closeScreens();

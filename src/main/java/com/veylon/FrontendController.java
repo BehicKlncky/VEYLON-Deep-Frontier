@@ -5,6 +5,7 @@ import com.veylon.save.LoadResult;
 import com.veylon.save.SaveSlots;
 import com.veylon.ui.GraphicsOptionsScreen;
 import com.veylon.ui.AudioOptionsScreen;
+import com.veylon.ui.AutosaveOptionsScreen;
 import com.veylon.ui.NewFrontierScreen;
 import com.veylon.ui.PresentationOverlay;
 import com.veylon.ui.SlotPickerScreen;
@@ -43,6 +44,8 @@ final class FrontendController {
     private final Game game;
     /** LOAD FRONTIER's and NEW FRONTIER's slot picker. */
     final SlotPickerScreen slotPicker = new SlotPickerScreen();
+    /** The autosave options, from the title and from the pause menu (0.9.1 milestone 05). */
+    final AutosaveOptionsScreen autosaveOptions = new AutosaveOptionsScreen();
     private LoadRequest loadRequest;
     /** The slot the pending load reads or the new world is saved in. */
     private int requestedSlot = 1;
@@ -69,7 +72,8 @@ final class FrontendController {
     boolean owns(Game.AppState state) {
         return state == Game.AppState.TITLE || state == Game.AppState.TITLE_OPTIONS
                 || state == Game.AppState.TITLE_AUDIO_OPTIONS || state == Game.AppState.LOADING
-                || state == Game.AppState.TITLE_NEW_WORLD || state == Game.AppState.TITLE_SLOTS;
+                || state == Game.AppState.TITLE_NEW_WORLD || state == Game.AppState.TITLE_SLOTS
+                || state == Game.AppState.TITLE_AUTOSAVE_OPTIONS;
     }
 
     void frame(float dt) {
@@ -80,6 +84,7 @@ final class FrontendController {
             case TITLE -> applyTitle(game.titleScreen.update(game));
             case TITLE_NEW_WORLD -> applyNewFrontier(game.newFrontierScreen.update(game));
             case TITLE_SLOTS -> applySlots(slotPicker.update(game));
+            case TITLE_AUTOSAVE_OPTIONS -> updateAutosave();
             case TITLE_OPTIONS -> updateOptions(dt);
             case TITLE_AUDIO_OPTIONS -> updateAudio();
             default -> presentLoading();
@@ -103,6 +108,10 @@ final class FrontendController {
             case AUDIO -> {
                 game.audioOptionsScreen.open(game.audio.settings);
                 game.appState = Game.AppState.TITLE_AUDIO_OPTIONS;
+            }
+            case AUTOSAVE -> {
+                autosaveOptions.open(game.saves.autosave().settings());
+                game.appState = Game.AppState.TITLE_AUTOSAVE_OPTIONS;
             }
             case QUIT -> game.window.requestClose();
             case NONE -> {
@@ -227,6 +236,31 @@ final class FrontendController {
     void handlePauseAudio(AudioOptionsScreen.Action result) {
         if (result == AudioOptionsScreen.Action.NONE) return;
         if (result == AudioOptionsScreen.Action.APPLY) game.audio.settings.save();
+        game.uiMode = Game.UiMode.PAUSE;
+    }
+
+    /** The title's autosave options; APPLY writes them for the next launch too. */
+    private void updateAutosave() {
+        AutosaveOptionsScreen.Action result = autosaveOptions.update(game);
+        if (result == AutosaveOptionsScreen.Action.NONE) return;
+        if (result == AutosaveOptionsScreen.Action.APPLY) {
+            game.saves.autosave().settings().save();
+            game.titleScreen.notice("Autosave settings applied.");
+        }
+        game.appState = Game.AppState.TITLE;
+    }
+
+    /** [A] in the pause menu opens the autosave options over the paused world. */
+    void openPauseAutosave() {
+        autosaveOptions.open(game.saves.autosave().settings());
+        game.uiMode = Game.UiMode.AUTOSAVE_OPTIONS;
+    }
+
+    /** The pause menu's autosave options, which return to PAUSE. */
+    void updatePauseAutosave() {
+        AutosaveOptionsScreen.Action result = autosaveOptions.update(game);
+        if (result == AutosaveOptionsScreen.Action.NONE) return;
+        if (result == AutosaveOptionsScreen.Action.APPLY) game.saves.autosave().settings().save();
         game.uiMode = Game.UiMode.PAUSE;
     }
 
@@ -367,6 +401,7 @@ final class FrontendController {
                 game.audioOptionsScreen.open(game.audio.settings);
                 game.appState = Game.AppState.TITLE_AUDIO_OPTIONS;
             }
+            case "autosave" -> applyTitle(TitleScreen.Action.AUTOSAVE);
             case "options" -> {
                 game.graphicsOptionsScreen.open(game.renderer.settings,
                         game.window.windowedWidth(), game.window.windowedHeight());

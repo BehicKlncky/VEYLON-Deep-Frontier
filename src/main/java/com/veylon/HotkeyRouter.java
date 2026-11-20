@@ -34,7 +34,7 @@ final class HotkeyRouter {
     void update() {
         if (game.uiMode == Game.UiMode.OPTIONS || game.uiMode == Game.UiMode.AUDIO_OPTIONS
                 || game.uiMode == Game.UiMode.GAME_MODE || game.uiMode == Game.UiMode.CREATIVE_CATALOG
-                || game.uiMode == Game.UiMode.WORLD_CONTROLS) {
+                || game.uiMode == Game.UiMode.WORLD_CONTROLS || game.uiMode == Game.UiMode.AUTOSAVE_OPTIONS) {
             return; // These screens own Escape, F5, typed text and navigation while open.
         }
         if (game.uiMode == Game.UiMode.PAUSE && game.input.wasKeyPressed(GLFW_KEY_G)) {
@@ -55,6 +55,11 @@ final class HotkeyRouter {
         if (game.uiMode == Game.UiMode.PAUSE && game.input.wasKeyPressed(GLFW_KEY_V)) {
             game.audioOptionsScreen.open(game.audio.settings);
             game.uiMode = Game.UiMode.AUDIO_OPTIONS;
+            return;
+        }
+        if (game.uiMode == Game.UiMode.PAUSE && game.input.wasKeyPressed(GLFW_KEY_A)) {
+            game.frontend.openPauseAutosave();
+            game.input.consumePress(GLFW_KEY_A); // the screen opened this frame reads A as "less"
             return;
         }
         handleEscape();

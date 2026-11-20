@@ -57,9 +57,9 @@ public class PauseMenu {
         }
     }
 
-    /** The save keys, naming the slot the live world belongs to (0.9.1 milestone 04). */
+    /** The save keys, naming the slot the live world belongs to (0.9.1 milestones 04 and 05). */
     public static String saveKeys(int slot) {
-        return "[F5] Save to slot " + slot + "   [F9] Load slot " + slot + "   [Q] Quit";
+        return "[F5] Save to slot " + slot + "   [F9] Load slot " + slot + "   [A] Autosave   [Q] Quit";
     }
 
     /** Under the mode in a city: what kind of world this is (urban milestone 21). */

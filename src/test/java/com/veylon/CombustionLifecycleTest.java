@@ -673,7 +673,7 @@ class CombustionLifecycleTest {
     void onlyASimulatedFrameAdvancesAFireAPanicOrARemainsFlame() {
         Game g = arena();
         Set<Game.UiMode> pausing = Set.of(Game.UiMode.PAUSE, Game.UiMode.OPTIONS, Game.UiMode.AUDIO_OPTIONS,
-                Game.UiMode.GAME_MODE, Game.UiMode.WORLD_CONTROLS);
+                Game.UiMode.GAME_MODE, Game.UiMode.WORLD_CONTROLS, Game.UiMode.AUTOSAVE_OPTIONS);
         for (Game.UiMode mode : Game.UiMode.values()) {
             g.uiMode = mode;
             assertEquals(!pausing.contains(mode), g.simulates(), mode + " pauses the game");
