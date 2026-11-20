@@ -100,6 +100,8 @@ final class UrbanQaScenes {
      * integrated city, walked, its screens opened, then F5 and F9 ({@code save_audit}).
      */
     private final SaveAuditQaScene saveAudit;
+    /** 0.9.1 milestone 05: every autosave trigger in a city, into an isolated slot ({@code urban_autosave}). */
+    private final AutosaveQaScene autosave;
     private final PlayerMovementSystem.Command walk = new PlayerMovementSystem.Command();
     private boolean holding;
     private float holdX;
@@ -146,6 +148,7 @@ final class UrbanQaScenes {
         this.economy = new UrbanEconomyQaScene(game);
         this.performance = new UrbanPerformanceQaScene(game);
         this.saveAudit = new SaveAuditQaScene(game);
+        this.autosave = new AutosaveQaScene(game);
     }
 
     /** Stages one of the urban scenes; inert, with a notice, outside a street-network world. */
@@ -214,6 +217,10 @@ final class UrbanQaScenes {
         }
         if (scene.equals("urban_performance")) {
             performance.stage(); // a normal session: poses, the pace along a leg, safety and one fire are staged
+            return;
+        }
+        if (scene.equals("urban_autosave")) {
+            autosave.stage(); // a normal session: poses between legs, the clock (forward), the timer and a hunting body are staged
             return;
         }
         if (scene.equals("save_audit")) {
@@ -322,6 +329,7 @@ final class UrbanQaScenes {
     UrbanEconomyQaScene economy() { return economy; }
     UrbanPerformanceQaScene performance() { return performance; }
     SaveAuditQaScene saveAudit() { return saveAudit; }
+    AutosaveQaScene autosave() { return autosave; }
 
     /** Per-frame hook, before streaming and rendering; inert unless a scene is staged. */
     void update(double elapsed) {
@@ -355,6 +363,7 @@ final class UrbanQaScenes {
         economy.update(elapsed);
         performance.update(elapsed);
         saveAudit.update(elapsed);
+        autosave.update(elapsed);
         if (holding) {
             apply();
         }
