@@ -1,6 +1,7 @@
 package com.veylon;
 
 import com.veylon.entity.GameMode;
+import com.veylon.input.ControlSettings;
 import com.veylon.item.Inventory;
 import com.veylon.item.ItemStack;
 import com.veylon.save.LoadResult;
@@ -10,6 +11,7 @@ import com.veylon.ui.SlotPickerScreen;
 import com.veylon.util.AppPaths;
 import com.veylon.util.Vec3i;
 import com.veylon.world.World;
+import com.veylon.world.WorldSeed;
 import com.veylon.world.urban.BuildingPlan;
 import com.veylon.world.urban.ParcelPlan;
 import com.veylon.world.urban.UrbanContainers;
@@ -75,12 +77,29 @@ import static org.lwjgl.glfw.GLFW.*;
  * set the damaged save aside unchanged. Back at the title, NEW FRONTIER's picker asks before
  * replacing slot 2 and before deleting it, and both are cancelled with N. Every state and both
  * confirmations are captured. {@code SlotPickerRoutingTest} drives the same paths headlessly.
+ *
+ * <p>{@code VEYLON_FRONTEND=route-session} (0.9.1 milestone 06) needs an empty isolated directory
+ * and plays the session: NEW FRONTIER showing the seed it offers, the seed typed as words with E
+ * and rolled again with R, then typed once more and a city of it started in slot 1; the pause menu
+ * naming the city and its seed; C and the controls set to 170% and invert-Y, applied with F5,
+ * which must write the settings file; R and the way back to the title, cancelled with Esc, then
+ * taken with Enter, which must save slot 1 first; L and the slot again; R and N, which must leave
+ * slot 1 byte for byte; and NEW FRONTIER once more with nothing typed carried over.
+ * {@code route-session-relaunch} then must find those mouse settings read at launch and shows them
+ * on the title's controls screen. {@code NewFrontierSeedTest}, {@code ReturnToTitleRoutingTest}
+ * and {@code ControlsOptionsRoutingTest} drive the same paths headlessly.
  */
 final class FrontendRouteQa {
     static final String ROUTE = "route";
     static final String ROUTE_LOAD = "route-load";
     static final String ROUTE_REFUSAL = "route-refusal";
     static final String ROUTE_SLOTS = "route-slots";
+    static final String ROUTE_SESSION = "route-session";
+    static final String ROUTE_SESSION_RELAUNCH = "route-session-relaunch";
+    /** The words {@code route-session} types as a seed. */
+    static final String TYPED_SEED = "deep frontier";
+    /** The mouse sensitivity {@code route-session} applies, with invert-Y, and its relaunch must find. */
+    static final int ROUTE_SENSITIVITY = 170;
     private static final double DEADLINE_SECONDS = 240;
 
     private interface Step {
@@ -110,11 +129,13 @@ final class FrontendRouteQa {
     private String legacyAfter = "";
     private String damagedHash = "";
     private List<String> firstSave = List.of();
+    /** The seeds {@code route-session} saw offered and rolled. */
+    private long offeredSeed, rolledSeed;
 
     /** Whether a {@code VEYLON_FRONTEND} screen names this route. */
     static boolean names(String screen) {
         return ROUTE.equals(screen) || ROUTE_LOAD.equals(screen) || ROUTE_REFUSAL.equals(screen)
-                || ROUTE_SLOTS.equals(screen);
+                || ROUTE_SLOTS.equals(screen) || ROUTE_SESSION.equals(screen) || ROUTE_SESSION_RELAUNCH.equals(screen);
     }
 
     FrontendRouteQa(Game game, AutomatedRunDriver driver, String screen, GameMode mode) {
@@ -128,6 +149,8 @@ final class FrontendRouteQa {
             case ROUTE_REFUSAL -> "refusal";
             case ROUTE_LOAD -> "load";
             case ROUTE_SLOTS -> "slots";
+            case ROUTE_SESSION -> "session";
+            case ROUTE_SESSION_RELAUNCH -> "relaunch";
             default -> "new";
         };
         this.mode = mode;
@@ -136,6 +159,8 @@ final class FrontendRouteQa {
             case "refusal" -> planRefusalLaunch();
             case "load" -> planLoadLaunch();
             case "slots" -> planSlotsLaunch();
+            case "session" -> planSessionLaunch();
+            case "relaunch" -> planRelaunch();
             default -> planNewLaunch();
         }
         System.out.println("[frontend-route] launch=" + launch + " mode=" + mode.name().toLowerCase(Locale.ROOT)
@@ -372,6 +397,143 @@ final class FrontendRouteQa {
         } catch (IOException | NoSuchAlgorithmException e) {
             throw new IllegalStateException("could not hash " + file, e);
         }
+    }
+
+    /**
+     * 0.9.1 milestone 06 from an empty isolated directory: NEW FRONTIER with the seed it offers,
+     * the seed typed as words and rolled again; the words typed once more and a city of their seed
+     * in slot 1; the pause menu naming it; the controls set to 170% and invert-Y and applied; the
+     * way back to the title, cancelled, then taken with Save and return; LOAD FRONTIER and the
+     * slot's world again; Return without saving, which leaves the slot byte for byte; and NEW
+     * FRONTIER once more with nothing typed carried over.
+     */
+    private void planSessionLaunch() {
+        long typedSeed = WorldSeed.of(TYPED_SEED);
+        step("every slot is empty", check(() -> states().stream().allMatch(s -> s == SaveSlots.State.EMPTY)));
+        step("the controls are the defaults", check(() -> game.controls.sensitivity() == ControlSettings.DEFAULT_SENSITIVITY
+                && !game.controls.invertY));
+        step("title", wait(1.5));
+        step("title capture", capture("01-title"));
+        step("N", press(GLFW_KEY_N));
+        step("new frontier", await(() -> game.appState == Game.AppState.TITLE_NEW_WORLD, 3));
+        step("it shows the seed it offers", check(() -> {
+            offeredSeed = game.newFrontierScreen.seed();
+            return game.newFrontierScreen.fieldText().equals(Long.toString(offeredSeed));
+        }));
+        step("offered settle", wait(0.6));
+        step("offered capture", capture("02-new-frontier-offered"));
+        typeSeed("typed");
+        step("the words make the seed", check(() -> game.newFrontierScreen.seed() == typedSeed
+                && game.newFrontierScreen.seedNote().contains(Long.toString(typedSeed))));
+        step("typed settle", wait(0.6));
+        step("typed capture", capture("03-new-frontier-typed"));
+        step("R", press(GLFW_KEY_R));
+        step("another seed", await(() -> game.newFrontierScreen.typedSeed().isEmpty()
+                && game.newFrontierScreen.seed() != typedSeed && game.newFrontierScreen.seed() != offeredSeed, 2));
+        step("remember it", run(() -> rolledSeed = game.newFrontierScreen.seed()));
+        step("rolled settle", wait(0.6));
+        step("rolled capture", capture("04-new-frontier-rerolled"));
+        typeSeed("again");
+        step("Enter", press(GLFW_KEY_ENTER));
+        step("the picker on slot 1", await(() -> picking(SlotPickerScreen.Purpose.NEW)
+                && game.frontend.slotPicker.selected() == 1, 3));
+        step("Enter starts in slot 1", press(GLFW_KEY_ENTER));
+        step("loading", await(() -> game.appState == Game.AppState.LOADING, 2));
+        step("playing", await(() -> game.appState == Game.AppState.PLAYING, 90));
+        step("a city of the typed seed in slot 1", check(() -> game.world.isUrban() && game.world.seed == typedSeed
+                && game.saves.activeSlot() == 1 && slots().describe(1).state() == SaveSlots.State.READY));
+        step("meshes", wait(3.0));
+        step("Esc", press(GLFW_KEY_ESCAPE));
+        step("pause", await(() -> game.uiMode == Game.UiMode.PAUSE, 2));
+        step("pause settle", wait(0.5));
+        step("pause capture", capture("05-pause-city"));
+        step("C", press(GLFW_KEY_C));
+        step("controls", await(() -> game.uiMode == Game.UiMode.CONTROLS_OPTIONS, 2));
+        step("controls settle", wait(0.5));
+        step("controls capture", capture("06-controls"));
+        for (int n = 1; n <= (ROUTE_SENSITIVITY - ControlSettings.DEFAULT_SENSITIVITY) / ControlSettings.SENSITIVITY_STEP; n++) {
+            step("Right " + n, press(GLFW_KEY_RIGHT));
+        }
+        step("Down", press(GLFW_KEY_DOWN));
+        step("Enter inverts Y", press(GLFW_KEY_ENTER));
+        step("170% and inverted", await(() -> game.controls.sensitivity() == ROUTE_SENSITIVITY && game.controls.invertY, 2));
+        step("changed settle", wait(0.5));
+        step("changed capture", capture("07-controls-changed"));
+        step("F5 applies", press(GLFW_KEY_F5));
+        step("back in the pause menu", await(() -> game.uiMode == Game.UiMode.PAUSE, 2));
+        step("written for the next launch", check(this::controlsApplied));
+        step("R", press(GLFW_KEY_R));
+        step("the question", await(() -> game.uiMode == Game.UiMode.RETURN_TO_TITLE, 2));
+        step("question settle", wait(0.5));
+        step("question capture", capture("08-return-question"));
+        step("Esc stays", press(GLFW_KEY_ESCAPE));
+        step("the pause menu again", await(() -> game.uiMode == Game.UiMode.PAUSE && game.world != null, 2));
+        step("hash slot 1", run(() -> slotBefore = hash(slots().current(1))));
+        step("R again", press(GLFW_KEY_R));
+        step("the question again", await(() -> game.uiMode == Game.UiMode.RETURN_TO_TITLE, 2));
+        step("Enter saves and returns", press(GLFW_KEY_ENTER));
+        step("the title", await(() -> game.appState == Game.AppState.TITLE && game.world == null, 5));
+        step("slot 1 was written first", check(() -> "Saved to slot 1.".equals(game.titleScreen.notice())
+                && !slotBefore.equals(hash(slots().current(1))) && slots().newestIntactBackup(1) != null));
+        step("title settle", wait(0.6));
+        step("saved capture", capture("09-title-saved"));
+        step("L", press(GLFW_KEY_L));
+        step("the picker to load", await(() -> picking(SlotPickerScreen.Purpose.LOAD), 3));
+        step("Enter loads slot 1", press(GLFW_KEY_ENTER));
+        step("loaded", await(() -> game.appState == Game.AppState.PLAYING, 90));
+        step("the city of the typed seed", check(() -> game.world.seed == typedSeed && game.saves.activeSlot() == 1));
+        step("loaded meshes", wait(2.0));
+        step("Esc once more", press(GLFW_KEY_ESCAPE));
+        step("pause once more", await(() -> game.uiMode == Game.UiMode.PAUSE, 2));
+        step("hash slot 1 again", run(() -> slotBefore = hash(slots().current(1))));
+        step("R once more", press(GLFW_KEY_R));
+        step("the question once more", await(() -> game.uiMode == Game.UiMode.RETURN_TO_TITLE, 2));
+        step("N returns without saving", press(GLFW_KEY_N));
+        step("the title again", await(() -> game.appState == Game.AppState.TITLE && game.world == null, 5));
+        step("slot 1 is byte for byte what it was", check(() -> slotBefore.equals(hash(slots().current(1)))
+                && "Slot 1 keeps its last save.".equals(game.titleScreen.notice())));
+        step("returned settle", wait(0.6));
+        step("returned capture", capture("10-title-returned"));
+        step("N", press(GLFW_KEY_N));
+        step("new frontier anew", await(() -> game.appState == Game.AppState.TITLE_NEW_WORLD, 3));
+        step("nothing typed carried over", check(() -> game.newFrontierScreen.typedSeed().isEmpty()
+                && game.newFrontierScreen.seed() != typedSeed));
+        step("Esc to the title", press(GLFW_KEY_ESCAPE));
+        step("at the title", await(() -> game.appState == Game.AppState.TITLE, 2));
+        step("report", run(this::report));
+        step("Q quits", press(GLFW_KEY_Q));
+    }
+
+    /** E, the words typed in one frame, then Enter, which finishes the seed and stays on NEW FRONTIER. */
+    private void typeSeed(String label) {
+        step("E " + label, press(GLFW_KEY_E));
+        step("typing " + label, await(() -> game.newFrontierScreen.typingSeed(), 2));
+        step("the words " + label, run(() -> TYPED_SEED.codePoints().forEach(game.input::onTyped)));
+        step("they are in the field " + label, await(() -> TYPED_SEED.equals(game.newFrontierScreen.typedSeed()), 2));
+        step("Enter finishes " + label, press(GLFW_KEY_ENTER));
+        step("finished " + label, await(() -> !game.newFrontierScreen.typingSeed()
+                && game.appState == Game.AppState.TITLE_NEW_WORLD, 2));
+    }
+
+    /** Whether the player's settings file holds what the session route applied. */
+    private boolean controlsApplied() {
+        ControlSettings read = ControlSettings.loadOrDefaults();
+        return read.sensitivity() == ROUTE_SENSITIVITY && read.invertY;
+    }
+
+    /** The relaunch after {@code route-session}: the mouse settings it applied were read at launch. */
+    private void planRelaunch() {
+        step("read at launch", check(() -> game.controls.sensitivity() == ROUTE_SENSITIVITY && game.controls.invertY));
+        step("title", wait(1.5));
+        step("C", press(GLFW_KEY_C));
+        step("controls", await(() -> game.appState == Game.AppState.TITLE_CONTROLS_OPTIONS, 2));
+        step("controls settle", wait(0.6));
+        step("persisted capture", capture("01-controls-persisted"));
+        step("Esc", press(GLFW_KEY_ESCAPE));
+        step("back at the title", await(() -> game.appState == Game.AppState.TITLE, 2));
+        step("BACK changed nothing", check(this::controlsApplied));
+        step("report", run(this::report));
+        step("Q quits", press(GLFW_KEY_Q));
     }
 
     private void planNewLaunch() {
@@ -709,10 +871,20 @@ final class FrontendRouteQa {
             System.out.println("[frontend-route] slots " + states() + " damaged set aside sha256=" + damagedHash
                     + " legacy=" + slots().holdsLegacySave());
         }
+        if ("session".equals(launch) || "relaunch".equals(launch)) {
+            ControlSettings read = ControlSettings.loadOrDefaults();
+            System.out.println("[frontend-route] session offered=" + offeredSeed + " typed='" + TYPED_SEED + "'="
+                    + WorldSeed.of(TYPED_SEED) + " rerolled=" + rolledSeed + " slots=" + states()
+                    + " controls file=" + ControlSettings.file().getFileName() + " sensitivity=" + read.sensitivity()
+                    + "% invertY=" + read.invertY);
+        }
         String keys = switch (launch) {
             case "refusal" -> "L,2,Enter,Esc,N,Enter,Enter,Esc,O,V,Q";
             case "load" -> "L,Enter,Esc,O,V,Q";
             case "slots" -> "N,Enter,Enter,F5,Esc,Esc,N,W,C,Enter,Enter,F5,L,3,Enter,1,R,Y,N,Enter,2,Enter,N,Del,N,Esc,Esc,Q";
+            case "session" -> "N,E,typed,Enter,R,E,typed,Enter,Enter,Enter,Esc,C,Right*7,Down,Enter,F5,R,Esc,R,Enter,"
+                    + "L,Enter,Esc,R,N,N,Esc,Q";
+            case "relaunch" -> "C,Esc,Q";
             default -> "N,W,C,Enter,Enter,9,RMB,Esc,W-held,M,Esc,F5,Enter|Space,F9,O,V,Q";
         };
         System.out.println("[frontend-route] launch=" + launch + " pass=" + failures.isEmpty()
