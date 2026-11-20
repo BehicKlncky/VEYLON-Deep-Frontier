@@ -70,12 +70,12 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
 
     public enum UiMode {
         NONE, INVENTORY, CRAFTING, PAUSE, OPTIONS, MAP, CRATE, NPC, AUDIO_OPTIONS, GAME_MODE,
-        CREATIVE_CATALOG, WORLD_CONTROLS, AUTOSAVE_OPTIONS;
+        CREATIVE_CATALOG, WORLD_CONTROLS, AUTOSAVE_OPTIONS, RETURN_TO_TITLE;
 
         /** The pause menu and the screens opened from it freeze the world. */
         public boolean pausesSimulation() {
             return this == PAUSE || this == OPTIONS || this == AUDIO_OPTIONS || this == GAME_MODE
-                    || this == WORLD_CONTROLS || this == AUTOSAVE_OPTIONS;
+                    || this == WORLD_CONTROLS || this == AUTOSAVE_OPTIONS || this == RETURN_TO_TITLE;
         }
     }
 
@@ -506,6 +506,7 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
             case GAME_MODE -> gameModes.handleScreen(gameModeScreen.update(this));
             case WORLD_CONTROLS -> creativeControls.handleScreen(worldControlsScreen.update(this));
             case AUTOSAVE_OPTIONS -> frontend.updatePauseAutosave();
+            case RETURN_TO_TITLE -> frontend.updateReturnPrompt(); // may let the world go; nothing below needs it
             case CREATIVE_CATALOG -> {
                 if (creativeCatalogScreen.update(this) == com.veylon.ui.CreativeCatalogScreen.Action.CLOSE) {
                     closeScreens();
@@ -514,7 +515,7 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
             case NONE -> {
             }
         }
-        if (debugShown) {
+        if (debugShown && world != null) {
             debugOverlay.render(this);
         }
         if (simPanelShown) {

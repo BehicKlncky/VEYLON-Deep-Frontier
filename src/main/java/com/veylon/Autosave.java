@@ -175,6 +175,14 @@ public final class Autosave {
         sinceSave = seconds;
     }
 
+    /**
+     * Real seconds of play since the live world's slot was last written, whether or not autosave is
+     * on: what returning to the title without saving would lose (0.9.1 milestone 06).
+     */
+    public double secondsSinceSave() {
+        return sinceSave;
+    }
+
     // ------------------------------------------------------------------
     // The frame
     // ------------------------------------------------------------------

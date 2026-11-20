@@ -30,7 +30,7 @@ public class PauseMenu {
         // milestone 06 every world does, with its seed.
         boolean city = g.world.isUrban();
         float extra = 20;
-        float pw = 600, ph = 548 + extra;
+        float pw = 600, ph = 548 + extra + 22; // and a third line of keys since milestone 06
         float x0 = w / 2f - pw / 2f, y0 = h / 2f - ph / 2f;
         ui.panel(x0, y0, pw, ph);
 
@@ -43,13 +43,11 @@ public class PauseMenu {
                 city ? 0.90f : 0.80f, city ? 0.72f : 0.94f, city ? 0.42f : 0.95f, 1f);
 
         float oy = y0 + 102 + extra;
-        ui.textCentered(w / 2f, oy, 1.10f, creative
-                        ? "[Esc] Resume   [G] Game mode   [T] World controls   [O] Graphics   [V] Audio"
-                        : "[Esc] Resume   [G] Game mode   [O] Graphics   [V] Audio",
-                1f, 1f, 1f, 1f);
-        oy += 22;
-        ui.textCentered(w / 2f, oy, 1.10f, saveKeys(g.saves.activeSlot()), 1f, 1f, 1f, 1f);
-        oy += 34;
+        for (String keys : keyLines(creative, g.saves.activeSlot())) {
+            ui.textCentered(w / 2f, oy, 1.10f, keys, 1f, 1f, 1f, 1f);
+            oy += 22;
+        }
+        oy += 12;
 
         for (String line : controls(city, g.world.urban != null && g.world.urban.hasMissions())) {
             ui.textShadow(x0 + 36, oy, 1.3f, line, 0.85f, 0.88f, 0.92f, 1f);
@@ -57,9 +55,21 @@ public class PauseMenu {
         }
     }
 
-    /** The save keys, naming the slot the live world belongs to (0.9.1 milestones 04 and 05). */
+    /**
+     * The pause menu's own keys, a line each: playing on and the mode, the settings, then saving and
+     * leaving (0.9.1 milestone 06).
+     */
+    public static String[] keyLines(boolean creative, int slot) {
+        return new String[]{creative ? "[Esc] Resume   [G] Game mode   [T] World controls" : "[Esc] Resume   [G] Game mode",
+                "[O] Graphics   [V] Audio   [A] Autosave", saveKeys(slot)};
+    }
+
+    /**
+     * The save keys, naming the slot the live world belongs to, and the ways out (0.9.1 milestones 04
+     * and 06): R returns to the title with a save choice, Q quits the game.
+     */
     public static String saveKeys(int slot) {
-        return "[F5] Save to slot " + slot + "   [F9] Load slot " + slot + "   [A] Autosave   [Q] Quit";
+        return "[F5] Save to slot " + slot + "   [F9] Load slot " + slot + "   [R] Return to title   [Q] Quit";
     }
 
     /**

@@ -8,6 +8,7 @@ import com.veylon.ui.AudioOptionsScreen;
 import com.veylon.ui.AutosaveOptionsScreen;
 import com.veylon.ui.NewFrontierScreen;
 import com.veylon.ui.PresentationOverlay;
+import com.veylon.ui.ReturnToTitlePrompt;
 import com.veylon.ui.SlotPickerScreen;
 import com.veylon.ui.TitleScreen;
 import com.veylon.world.World;
@@ -46,6 +47,8 @@ final class FrontendController {
     final SlotPickerScreen slotPicker = new SlotPickerScreen();
     /** The autosave options, from the title and from the pause menu (0.9.1 milestone 05). */
     final AutosaveOptionsScreen autosaveOptions = new AutosaveOptionsScreen();
+    /** The pause menu's way back to the title (0.9.1 milestone 06). */
+    final ReturnToTitlePrompt returnPrompt = new ReturnToTitlePrompt();
     private LoadRequest loadRequest;
     /** The slot the pending load reads or the new world is saved in. */
     private int requestedSlot = 1;
@@ -265,6 +268,48 @@ final class FrontendController {
         game.uiMode = Game.UiMode.AUTOSAVE_OPTIONS;
     }
 
+    /**
+     * [R] in the pause menu (0.9.1 milestone 06, D-04): asks whether to save into the world's slot
+     * before returning to the title, over the paused world.
+     */
+    void openReturnPrompt() {
+        returnPrompt.open(game.saves.activeSlot(), game.saves.bound(), game.saves.autosave().secondsSinceSave());
+        game.uiMode = Game.UiMode.RETURN_TO_TITLE;
+    }
+
+    /** The prompt's frame; its answer is applied at once. */
+    void updateReturnPrompt() {
+        applyReturnPrompt(returnPrompt.update(game));
+    }
+
+    /**
+     * Save and return writes the active slot as F5 does and returns only once it is written; a save
+     * that fails keeps the world and the prompt open and says so. Return without saving leaves the
+     * slot as it is; Cancel goes back to the pause menu. The title then says what became of the slot.
+     */
+    void applyReturnPrompt(ReturnToTitlePrompt.Action action) {
+        int slot = game.saves.activeSlot();
+        boolean bound = game.saves.bound();
+        switch (action) {
+            case SAVE_AND_RETURN -> {
+                if (game.saves.saveActive()) {
+                    returnToTitle();
+                    game.titleScreen.notice(SaveSession.savedLine(slot));
+                } else {
+                    game.log(SaveSession.saveFailedLine(slot));
+                    returnPrompt.notice(SaveSession.saveFailedLine(slot) + " The world is still open.");
+                }
+            }
+            case RETURN -> {
+                returnToTitle();
+                game.titleScreen.notice(bound ? "Slot " + slot + " keeps its last save." : "");
+            }
+            case CANCEL -> game.uiMode = Game.UiMode.PAUSE;
+            case NONE -> {
+            }
+        }
+    }
+
     /** The pause menu's autosave options, which return to PAUSE. */
     void updatePauseAutosave() {
         AutosaveOptionsScreen.Action result = autosaveOptions.update(game);
@@ -377,9 +422,10 @@ final class FrontendController {
     }
 
     /**
-     * Abandons the live world and returns to the title screen. Everything the world leaves behind is
-     * released ({@link WorldBootstrap#releaseWorld}), so a world started or loaded afterwards begins
-     * as it would after a fresh launch.
+     * Abandons the live world and returns to the title screen, from the death card and, since 0.9.1
+     * milestone 06, from the pause menu. Everything the world leaves behind is released
+     * ({@link WorldBootstrap#releaseWorld}), so a world started or loaded afterwards begins as it
+     * would after a fresh launch.
      */
     void returnToTitle() {
         game.closeScreens();
