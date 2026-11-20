@@ -335,3 +335,70 @@ line, the keys and the buttons apart at both sizes; the title's six buttons, its
 key line do not touch; the pause menu's save line fits its panel. At 1920×1080 the strip spans the
 whole gap, as the pause panel always has. `ui.AutosaveOptionsScreenTest` holds every new line within
 its room with the game's own font.
+
+## 0.9.1 milestone 06 — the seed field, the way back to the title and the controls (2026-11-20)
+
+NEW FRONTIER has a seed row under the world's note: SEED, a field holding the offered seed's
+number (or the words typed, with a caret while typing and the placeholder "a number or any
+words" while empty) and REROLL [R]; a line under it says where the seed comes from, or for
+words, "These words make seed N."; the slot line and the buttons follow, and the key line names
+`E` and `R` (while typing it lists the typing keys instead). The pause menu names every world
+with its seed under the mode, "The abandoned city  /  seed N" in amber or "The wilderness  /
+seed N" in teal, without the development notice, and its keys take three lines: playing on and
+the mode, the settings ("[O] Graphics   [V] Audio   [C] Controls   [A] Autosave"), and saving
+and leaving ("[F5] Save to slot 1   [F9] Load slot 1   [R] Return to title   [Q] Quit"); the
+panel is 590 units tall. `R` opens **RETURN TO THE TITLE** over the world: how much play the
+slot's save is behind, what returning without saving leaves, three stacked buttons (SAVE AND
+RETURN [Enter], RETURN WITHOUT SAVING [N], CANCEL [Esc]), room for a failed save's line, and the
+keys. The **CONTROLS** screen, the title's seventh button (`C`) and `C` in the pause menu, has
+Mouse sensitivity (10–300%) and Invert mouse Y, a line on what invert does, the keys, and
+APPLY [F5] / BACK [Esc]. After a return the title's notice reads "Saved to slot 1." or "Slot 1
+keeps its last save." under QUIT.
+
+### Reproduce
+
+```bash
+export VEYLON_SEED=20261120
+VEYLON_FRONTEND=route-session VEYLON_RESOLUTION=1280x720 VEYLON_CAPTURE_TAG=v091-m06-session-720 \
+  ./gradlew.bat run -PveylonDataDir=build/qa/v091-m06-session-720
+VEYLON_FRONTEND=route-session-relaunch VEYLON_RESOLUTION=1280x720 \
+  VEYLON_CAPTURE_TAG=v091-m06-session-720-relaunch ./gradlew.bat run -PveylonDataDir=build/qa/v091-m06-session-720
+# likewise 1920x1080 at 1 and 0.75, each pair in a new directory. VEYLON_FRONTEND=newworld,
+# controls, pause, pause-creative, or pause with VEYLON_GENERATOR=wilderness, with VEYLON_SHOT=2
+# or 3, show the screens statically. The script is build/v091-m06-native.sh.
+```
+
+### Validation record
+
+All runs on 2026-11-20, NVIDIA GeForce RTX 3060 Ti, driver 621.01, OpenGL 3.3.0, windowed, seed
+20261120, each in a new directory `build/qa/v091-m06-<tag>/` (a relaunch in its launch's); logs
+are `build/v091-m06-native-<tag>.log`. Every route printed `pass=true` with `glErrors=0
+khrErrors=0`, and every run's shutdown summary read `glGetError=0` and 0 KHR errors (only the
+usual MEDIUM pixel-transfer notes).
+
+| Tag | Screens | Framebuffer | Requested → effective scale |
+| --- | --- | --- | --- |
+| `session-720`, `session-720-relaunch` | `01-title` to `10-title-returned`, then `01-controls-persisted` | 1280×720 | 1 → 1 |
+| `session-1080`, `session-1080-relaunch` | the same | 1920×1080 | 1 → 1 |
+| `session-1080-s075`, `session-1080-s075-relaunch` | the same | 1920×1080 | 0.75 → 0.75 |
+| `slots-720` | milestone 04's `01-title` to `10-delete-confirm`, each world now left with `R` and `N` | 1280×720 | 1 → 1 |
+| `route-720`, `route-720-load` | the default path's two launches (15 and 7 captures) | 1280×720 | 1 → 1 |
+| `screen-pause-wild-720`, `screen-pause-creative-720` | the pause menu in a Survival wilderness and a Creative city | 1280×720 | 1 → 1 |
+| `screen-newworld-720`, `screen-controls-1080-s075` | NEW FRONTIER and the title's controls screen, statically | 1280×720, 1920×1080 | 1, 0.75 |
+
+Each `session` set holds the title with its seven buttons (`01-title`), NEW FRONTIER offering
+20261120 (`02-new-frontier-offered`), the words "deep frontier" typed with "These words make seed
+287000769." under them (`03-new-frontier-typed`), the rolled seed 4110970681813779
+(`04-new-frontier-rerolled`), the pause menu in the city of seed 287000769 (`05-pause-city`), the
+controls at their defaults and at 170% with invert on (`06-controls`, `07-controls-changed`), the
+question with "Since slot 1 was last saved: under a minute of play." (`08-return-question`), and
+the title after Save and return and after Return without saving (`09-title-saved`,
+`10-title-returned`); each relaunch shows 170% and On read at launch. In them the seed row, its
+line, the slot line and the buttons keep their order without overlap, the field holds every
+seed whole, and every line stays inside its panel; the title's notice sits between QUIT and the
+key line. At 720 rows the taller pause panel reaches to within a few units of the hotbar's top,
+which the menu's dim covers. `ui.CityOnboardingScreensTest`, `ui.ReturnToTitlePromptTest` and
+`ui.ControlsOptionsScreenTest` hold every new line within its room with the game's own font, the
+seed field and the pause menu's world line for the longest seed there is. Limits: a requested 1.5
+at 1280×720 is clamped to 1, as before; mouse look is off in automated sessions, so the captures
+show the settings, not a turn.
