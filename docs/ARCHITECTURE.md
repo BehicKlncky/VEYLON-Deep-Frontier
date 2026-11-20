@@ -36,7 +36,8 @@ Main.main
               QaHarness              opt-in benchmark/capture scaffolding
               AutomatedRunDriver     VEYLON_* sessions and the release smoke gate
               WorldBootstrap         reset, reseed, construct, spawn, camp
-              FrontendController     title / options / loading, and transitions
+              FrontendController     title / options / slots / loading, and transitions
+              SaveSession            save slots, the active slot, play time
               HotkeyRouter           global keys, screens, quick save/load
               PlayerEnvironmentSystem shelter, smoke, vents, discovery, stations
               PlayerCombatSystem     melee, bow, firearm, thrown, reload, durability
@@ -308,12 +309,65 @@ follow from comparing it, and a development run has no version to write
 `SaveSystem.open` reads the header before anything else. Another format or
 epoch is refused at once: no world is built, the isolated verifier pass never
 runs, the live world is untouched and the file is never modified. The result
-(`save.LoadResult`) says why for the player: LOAD FRONTIER shows a sentence
-under the title menu ("This save was written by an older version of VEYLON.
-Start a new world."), and F9 writes a line short enough for the HUD's log panel
-("Save is from an older version."). The technical reason goes to the console.
-A missing, unreadable, foreign or damaged file has its own sentence and line.
+(`save.LoadResult`) says why for the player: the slot picker shows a sentence
+under its cards ("This save was written by an older version of VEYLON. Start a
+new world."), and F9 writes a line short enough for the HUD's log panel ("Save
+is from an older version."). The technical reason goes to the console. A
+missing, unreadable, foreign or damaged file has its own sentence and line.
 `load(Game, Path)` keeps its boolean for callers that need no reason.
+
+#### The checksum and the summary
+
+Since 0.9.1 milestone 04 (D-22) the header is followed by two things the slot
+picker reads without building a world. `save.SaveChecksum` is a CRC-32C of the
+whole file with its own four bytes read as zero; the writer fills it in once
+everything else is on disk. `save.SaveSummary` is a length-prefixed record of
+at most 1 KiB: when the save was written and by which build, the real seconds
+played (`SaveSession` counts the frames that advance the world), the game mode
+and the Creative mark, the in-game clock, and where the survivor stood (the
+district and the HUD's building line in a city, the biome outside). The world
+kind follows from the header's generator. `SaveSummary.inspect` reads the
+header, the summary and the checksum of a file in bounded pieces and says
+whether it is intact or why it would not open.
+
+A load reads the summary right after the header and checks the checksum last,
+after every other check, so each refusal still names its own cause and the
+checksum catches damage that happens to parse. A summary whose mode, mark or
+clock disagrees with the body is refused; the play time lives in the summary
+alone. The summary's time, version and place describe a save and decide
+nothing, so `SaveEpochGuardTest` writes its samples with a fixed summary and
+masks the checksum, and tests that compare two saves of one state compare them
+without it (`SaveSeal.withoutSummary`). A test that edits save bytes reseals
+them (`SaveSeal.resealed`), so the reader's own checks judge the edit.
+
+#### Slots and backups
+
+`save.SaveSlots` holds the three slots (O3, D-02, D-21) in the data directory's
+`saves` folder: `slot-N.sav` and its backups `slot-N.backup-1.sav` (newest) and
+`slot-N.backup-2.sav`. A save is written in full to a temporary file first
+(`SaveSystem`'s writer takes the step that puts the file in place as a
+parameter). Only then is the current save copied to a second temporary file and
+the new one moved over it, and only once that replacement has happened do the
+backups move along: backup 1 to backup 2, the copy to backup 1. A save that
+fails at any step before the replacement keeps the slot and both backups byte
+for byte. `describe` reads each slot's files as `inspect` does and reports it
+empty, ready, of another version, or damaged (a current save that is not
+intact, or none while a backup remains) with its newest intact backup.
+`restore` loads that backup through `SaveSystem.open` first and only then
+copies it over the slot's save, setting the damaged file aside as
+`slot-N.damaged.sav`; `delete` removes a slot's save and backups. The folder's
+other files, VEYLON 0.9.0's `veylon.sav` included, are never listed, moved or
+deleted (D-15).
+
+`SaveSession` (on `Game`, public as `saves`) owns the session's `SaveSlots` and
+the active slot: the one a world was loaded from, restored into or started in.
+F5 saves into it and F9 opens it (`HotkeyRouter`), the pause menu names it, and
+NEW FRONTIER writes the new world into its slot at once, so F9 never brings
+back what the slot held before. The frontend's slot picker
+(`ui.SlotPickerScreen`, the `TITLE_SLOTS` state) sits between the title and
+loading: LOAD FRONTIER opens it to load, restore or delete, NEW FRONTIER's
+Enter to choose where the new world goes. Tests and the release smoke give a
+session a folder of slots of their own.
 
 Two builds share an epoch only if each opens every save the other writes, into
 the same world and state (D-17). `SaveEpochGuardTest` digests what decides that:
@@ -332,7 +386,7 @@ it does not know fails the load.
 
 #### How saving works
 
-`SaveSystem.save(Game)` walks the live object graph and writes format 4;
+`SaveSystem.save(Game, Path)` walks the live object graph and writes format 4;
 `load` reconstructs it. Load **goes through `newWorld` first**, so a load always
 inherits the full reset above rather than merging into a live world
 (`GameLoopIntegrationTest.loadingOverALiveWorldReplacesItRatherThanMerging`).
@@ -1330,7 +1384,8 @@ in a named collaborator:
 |---|---|
 | `WorldBootstrap` | reset, reseed, construct, dry-land spawn, starter camp |
 | `AutomatedRunDriver` | `VEYLON_*` scenes and captures, the smoke script and gate |
-| `FrontendController` | title, graphics options, two-frame loading, return to title |
+| `FrontendController` | title, graphics options, the slot picker, two-frame loading, return to title |
+| `SaveSession` | the save slots, the active slot F5 and F9 use, the play time a save records |
 | `HotkeyRouter` | global keys: screens, debug toggles, quick save/load, hotbar |
 | `PlayerEnvironmentSystem` | shelter, smoke, fumaroles, POI discovery, station scan, mesh eviction |
 | `PlayerCombatSystem` | all damage the player deals, durability, kill reputation |

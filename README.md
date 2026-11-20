@@ -205,7 +205,8 @@ $env:VEYLON_SMOKE = "30"; .\gradlew.bat run
 ```
 
 The default new-world path itself (title, NEW FRONTIER, play, F5, quit, relaunch, load)
-has a native route, `VEYLON_FRONTEND=route` then `route-load`; see
+has a native route, `VEYLON_FRONTEND=route` then `route-load`, and every state of the
+slot picker has `route-slots`; see
 [Developing](docs/DEVELOPING.md#default-path-acceptance-urban-package-26).
 
 Release performance gate on the validation machine:
@@ -261,7 +262,8 @@ java --enable-native-access=ALL-UNNAMED -Xmx2G -jar build\libs\veylon-0.9.0-all.
 | `O` (paused) | Graphics options |
 | `V` (title or paused) | Audio options: live sliders, Apply/F5 saves, Back/Esc restores |
 | `F3` | Debug overlay |
-| `F5` / `F9` | Save / Load |
+| `F5` / `F9` | Save into / load the world's slot: the one it was loaded from or started in (the pause menu names it) |
+| `1`-`3`, arrows (slot picker) | Choose a slot; `Enter` loads it or starts the new world in it, `R` restores a damaged slot's backup, `Del` deletes a slot; replacing, restoring and deleting ask first |
 
 ## The city
 
@@ -517,16 +519,33 @@ are bounded and reused.
 
 ## Save format
 
+There are **three save slots**, in the `saves` folder of the data directory. Each slot is
+one current save, `slot-N.sav`, and up to two backups, `slot-N.backup-1.sav` (the save
+before it) and `slot-N.backup-2.sav`. LOAD FRONTIER lists the slots with what each holds:
+the world and mode, the in-game day and time, the time played, where you stood, when it
+was saved and by which version, or that the slot is empty, from another version or
+damaged. NEW FRONTIER asks which slot the new world goes into and saves it there at
+once; a slot that holds a save asks before it is replaced. A save is written in full
+before anything is replaced, and only then does the save it replaces become the newest
+backup, so a failed save keeps the slot and both backups as they were. A damaged slot
+offers its newest good backup; restoring it keeps the damaged save beside it as
+`slot-N.damaged.sav` rather than deleting it. Deleting a slot asks first and removes its
+save and backups, nothing else. The game reads, moves and deletes no other file in the
+folder: the single save of 0.9.0 and earlier, `saves/veylon.sav`, is mentioned in the
+picker but never opened, imported or changed.
+
 Every save starts with a header: the magic `VEYL`, the **format** (4), the **save
 epoch**, the seed and the **world-generator version**. A build opens only saves of its
 own format and epoch. 0.9.1 writes epoch 1, so every save written by 0.9.0 and earlier
-releases (formats 2 and 3) is refused before anything is loaded: the title screen and
-F9 say that the save was written by an older version of VEYLON, the world you are in
-stays as it was, and the file is never changed. A save of a newer version is refused
-the same way. A release keeps the epoch only when its saves would load into exactly the
-same world and state; a test (`SaveEpochGuardTest`) holds every release to that.
+releases (formats 2 and 3) is refused before anything is loaded: the slot picker and F9
+say that the save was written by an older version of VEYLON, the world you are in stays
+as it was, and the file is never changed. A save of a newer version is refused the same
+way. A release keeps the epoch only when its saves would load into exactly the same
+world and state; a test (`SaveEpochGuardTest`) holds every release to that.
 
-After the header come the time, weather, full player state (stats,
+After the header come a **checksum** of the whole file, which catches damage anywhere in
+it, and the **summary** the slot picker reads without loading a world. Then the time,
+weather, full player state (stats,
 nutrition, afflictions, inventory and equipment with durability/freshness/**loaded
 rounds**, blueprints), changed blocks, campfire fuel, crates, drying racks, rain
 collectors, discovered POIs, beacon position and repair stage, faction (trust, stocks,
@@ -563,8 +582,9 @@ section inventory and the epoch rules are in [the architecture notes](docs/ARCHI
   not skeletal animation.
 - Water is full-cell cellular flow without levels; bounded by sea level by design.
 - No dropped-item entities (drops go straight to your inventory).
-- One save slot, shared by city and wilderness worlds in either mode: starting or
-  loading any of them replaces it on the next save.
+- Three save slots with two backups each. A backup is offered only when its slot's own
+  save is damaged or missing, and damaged saves set aside by a restore stay in the
+  saves folder until you remove them.
 - Saves written by 0.9.0 and earlier do not open in 0.9.1: they are refused with a
   message and left untouched, and a new world is needed. A later release refuses 0.9.1
   saves the same way whenever it changes the save epoch, and no release opens a save

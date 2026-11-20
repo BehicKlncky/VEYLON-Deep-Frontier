@@ -4,20 +4,41 @@ All notable user-facing changes to VEYLON: Deep Frontier are recorded here.
 
 ## [Unreleased]
 
+### Added
+
+- Three save slots, each with two rotating backups. LOAD FRONTIER lists the slots
+  with what each holds (the world and mode, the day and time, the time played,
+  where you stood, when it was saved and by which version) or that it is empty,
+  from another version or damaged, without loading anything. NEW FRONTIER asks
+  which slot the new world goes into and saves it there at once; a slot that
+  holds a save asks before it is replaced. F5 saves into the world's own slot and
+  F9 loads it, and the pause menu names it.
+- A damaged slot offers its newest good backup. Restoring it keeps the damaged
+  save beside it in the saves folder instead of deleting it. Deleting a slot asks
+  first.
+- Every save carries a checksum, so damage anywhere in the file is caught: the
+  slot picker shows the slot as damaged, and such a save never replaces the
+  world you are in.
+
 ### Changed
 
 - Saves carry a save epoch, and a build opens only the saves of its own. Saves
   written by 0.9.0 and earlier releases no longer open: they are refused before
   anything is loaded, the world you are in stays as it was, and the file is left
   exactly as it is. Start a new world to play this version.
-- When a save cannot be opened, the title screen and F9 say why: written by an
+- When a save cannot be opened, the slot picker and F9 say why: written by an
   older or a newer version of VEYLON, not a VEYLON save, damaged or unreadable,
   instead of "No compatible save was found."
+- A failed save keeps the slot's save and both its backups as they were.
+- The single save file of 0.9.0 and earlier, `saves/veylon.sav`, is no longer
+  read. The slot picker mentions it, and it is never changed or deleted.
 
 ### Removed
 
 - Loading saves of 0.1.0 to 0.9.0, with the v2 migration and every reader for
   earlier save layouts.
+- NEW FRONTIER's notice that the new world would replace your save; the slot
+  picker asks instead.
 
 ## [0.9.0] - 2026-11-06
 

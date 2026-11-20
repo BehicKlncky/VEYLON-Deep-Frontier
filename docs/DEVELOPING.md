@@ -73,7 +73,7 @@ runs. All are inert when unset. Everything below is handled by `QaHarness`;
 | `VEYLON_SMOKE=<seconds>` | Release smoke gate on this session's world (the city unless `VEYLON_GENERATOR=wilderness`): a world edit and an equip, an isolated save and load, fire and storm, then a pass/fail report; in the wilderness also a generated-fortress approach. Throws on failure |
 | `VEYLON_SCENE=<name>` | Stage a deterministic benchmark scene (`day`, `pinefog`, `nightfire`, `ruin`, `toxic`, `ao_shadow`, `phase4`, `ashwolf`, `silhouette30`, `vfx_blood`, `vfx_mining`, `vfx_beacon`, `death_ragdoll_showcase`, `death_ragdoll_sequence`, `dismember_showcase`, `dismember_wall`, `dismember_bomb` (a real scrap bomb thrown into a group of six, one outside the lethal radius; it goes off at 2.4 s), `dismember_species`, `dismember_species_wall` and `dismember_species_close` (every species, a guard and the player's remains blown apart at 1 s; open meadow, a step and a wall, and a close view of the small bodies), `molotov_ground`, `molotov_tree` and `molotov_rain` (a real fire bomb thrown at 0.5 s onto a dry clearing at dusk, beside a round tree that catches, or with rain from 3 s that puts the pool out; shots `0.7,1.2,3,7,11`, `1,4,10,20` and `2,3.5,5`), the burning-body scenes `body_fire_row`, `body_fire_row_night`, `body_fire_close`, `body_fire_out`, `body_fire_blast`, `body_fire_panic`, `body_fire_bird`, `body_fire_rain`, `body_fire_ragdoll` and `body_fire_player` (see "Burning bodies QA" below), `movement`, `inventory`, `ui_cycle`, `held_*`, `creative_flight` with `VEYLON_GAME_MODE=creative`, which flies east at Shift speed and prints a `[flight]` streaming report at 29 s, and the urban scenes `urban_streets`, `urban_intersection`, `urban_seam_walk`, `urban_fixtures`, `urban_fixtures_night`, `urban_apartments`, `urban_apartments_night`, `urban_apartments_lit_night`, `urban_apartments_manual`, `urban_apartments_manual_night`, `urban_loot`, the playable-slice route `urban_slice`, the catalogue walk `urban_catalogue`, the district tour `urban_districts`, the route tour `urban_underground`, the ecology tour `urban_ecology`, the survivor tour `urban_survivors`, the stronghold tour `urban_strongholds`, the refuge tour `urban_refuge`, the utility tour `urban_utilities`, the mission tour `urban_missions`, the onboarding tour `urban_onboarding`, the atmosphere tour `urban_atmosphere` and the performance tour `urban_performance` on the default city (see "Urban planning QA" below), and the save audit `save_audit` on any save placed in an isolated slot (see the same table)). A city scene (`urban_*`) and `save_audit` play this session's world and refuse to start without an isolated data directory; every other scene was made for the wilderness and builds it unless `VEYLON_GENERATOR` names a world |
 | `VEYLON_SHOT="5,10"` | Capture screenshots at those elapsed seconds |
-| `VEYLON_FRONTEND=<name>` | Pin a front-end screen (`options`, `audio`, `loading`, `death`, `victory`, `glyphs`, `newworld`). `newworld-save` shows the replace-save notice without writing a save. `route` and then `route-load` play the default new-world path natively from the title over two launches, and `route-refusal` plays a slot holding another version's save (see "Default-path acceptance" below). Staged worlds are this session's world, the city unless `VEYLON_GENERATOR=wilderness`. `pause` and `gamemode` stage a Survival world with the pause menu or the mode confirmation open; `pause-creative`, `gamemode-creative` and `victory-creative` stage a Creative world; `catalog`, `catalog-tools`, `catalog-search` (query "iron") and `catalog-inventory` open the Creative catalog; `worldcontrols` and `worldcontrols-held` open the Creative world controls, the second with dusk, a frozen clock, a locked storm and paused spawning already applied |
+| `VEYLON_FRONTEND=<name>` | Pin a front-end screen (`options`, `audio`, `loading`, `death`, `victory`, `glyphs`, `newworld`). `slots` and `slots-new` open the slot picker on the data directory's slots as they are, to load and to start a new world, and change no file. `route` and then `route-load` play the default new-world path natively from the title over two launches, `route-refusal` plays slot 2 holding another version's save, and `route-slots` plays every state of the slot picker with a restore and both confirmations (see "Default-path acceptance" below). Staged worlds are this session's world, the city unless `VEYLON_GENERATOR=wilderness`. `pause` and `gamemode` stage a Survival world with the pause menu or the mode confirmation open; `pause-creative`, `gamemode-creative` and `victory-creative` stage a Creative world; `catalog`, `catalog-tools`, `catalog-search` (query "iron") and `catalog-inventory` open the Creative catalog; `worldcontrols` and `worldcontrols-held` open the Creative world controls, the second with dusk, a frozen clock, a locked storm and paused spawning already applied |
 | `VEYLON_RESOLUTION=1920x1080` | Framebuffer override |
 | `VEYLON_UI_SCALE`, `VEYLON_VSYNC`, `VEYLON_FULLSCREEN`, `VEYLON_SHADOWS` | Settings overrides |
 | `VEYLON_AUDIO_QA=1` | Add three positional audio reports per second to the smoke, without gameplay effects |
@@ -91,19 +91,25 @@ VEYLON_SEED=20260716 VEYLON_SCENE=day VEYLON_SHOT=6 ./gradlew run
 #### Isolated QA data
 
 Saves, settings and captures live in the data directory, which on Windows is the
-working directory — the checkout itself when you run from Gradle. Keep QA away
-from the real save slot:
+working directory — the checkout itself when you run from Gradle. The three save
+slots and their backups are `saves/slot-N.sav`, `saves/slot-N.backup-1.sav` and
+`saves/slot-N.backup-2.sav` inside it. Keep QA away from the real slots:
 
 - Tests always run with `-Dveylon.dataDir=build/test-data/<task>`, set by
   `build.gradle` for every `Test` task, and each worker JVM moves to its own
   `worker-<id>` directory inside it (see "Test workers, isolation and CI"
-  above). `SaveSlotIsolationTest` checks both.
+  above). `SaveSlotIsolationTest` checks both, and that every slot, backup and
+  set-aside file resolves inside it.
 - For a native QA session pass `-PveylonDataDir=build/qa/<name>` to `run`. The
   game then reads and writes only there, including F5 saves.
 - `VEYLON_GENERATOR=urban-dev`, every city scene (`urban_*`), `save_audit` and the
-  `route`/`route-load` frontend route refuse to start unless the data directory
-  is set and differs from the player's own (`AppPaths.isolatedFromPlayerData`):
-  each of them can press F5 into the slot.
+  frontend routes (`route`, `route-load`, `route-refusal`, `route-slots`) refuse
+  to start unless the data directory is set and differs from the player's own
+  (`AppPaths.isolatedFromPlayerData`): each of them can press F5 into a slot.
+  Automated sessions start on slot 1.
+- The release smoke runs without an isolated directory, so it saves and loads
+  through a folder of slots of its own, `build/qa/smoke-slots` inside the data
+  directory, and never touches the player's.
 
 ```powershell
 $env:VEYLON_SEED='20260731'
@@ -126,29 +132,55 @@ $env:VEYLON_FRONTEND='route-load'; $env:VEYLON_CAPTURE_TAG='route-survival-load'
 .\gradlew.bat run -PveylonDataDir=build/qa/route-survival
 ```
 
-The first launch captures the title, NEW FRONTIER on the city and on the
-wilderness, the loading card and the refuge; searches a ground-floor cupboard of
-the refuge with the use button from an empty hand (its pose staged beside it) and
-takes one stack through the screen's transfer command; walks, opens the map and
-presses F5. In Survival it then dies through the player damage gate, captures the
-city's death card, wakes at the refuge with what it carried and loads the save over
-the live world with F9; with `VEYLON_GAME_MODE=creative` it chooses Creative with
-`C` and flies instead. Then the pause menu, graphics and audio screens, and `Q`. The
-second launch loads from the title with `L` and must hold exactly what the first
-saved (`SaveAuditQaScene.durable`), then visits the pause screens and quits. Each
+The first launch needs an empty slot 1. It captures the title, NEW FRONTIER on
+the city and on the wilderness, the slot picker on slot 1 (0.9.1 milestone 04),
+the loading card and the refuge, and checks that the new city was written into
+slot 1 at once; searches a ground-floor cupboard of the refuge with the use
+button from an empty hand (its pose staged beside it) and takes one stack through
+the screen's transfer command; walks, opens the map and presses F5. In Survival
+it then dies through the player damage gate, captures the city's death card,
+wakes at the refuge with what it carried and loads the slot over the live world
+with F9; with `VEYLON_GAME_MODE=creative` it chooses Creative with `C` and flies
+instead. Then the pause menu, which names the slot, its graphics and audio
+screens, and `Q`. The second launch opens the slot picker with `L` on the slot
+saved last, loads it with Enter and must hold exactly what the first saved
+(`SaveAuditQaScene.durable`), then visits the pause screens and quits. Each
 launch prints `[frontend-route] ... pass=true` with the keys it pressed; the route
 has no headless twin because its screens draw only with GL, and
 `DefaultCityAcceptanceTest` drives the same controller through its seams.
 
-`route-refusal` (0.9.1 milestone 03) plays what a player meets when the slot
-holds a save of another version, such as the one the 0.9.0 build's `route`
-launch writes into the same isolated directory. It hashes the slot, presses `L`
-and captures the title with the reason under the menu, starts a new city with
-`N` and Enter, presses F9 over it and captures the log line, checks that the
-city is still the live world and that the slot's SHA-256 is unchanged, then
-visits the pause screens and quits. It never presses F5, and prints
-`[frontend-route] slot sha256 before=… after=…` before its pass line.
-`SaveRefusalRoutingTest` drives the same paths headlessly.
+`route-refusal` (0.9.1 milestones 03 and 04) plays what a player meets when a
+slot holds a save of another version. When slot 2 is empty and the 0.9.0 build's
+`route` launch has left `saves/veylon.sav` in the same isolated directory, it
+copies that file into slot 2 first, reading the old file only. It hashes slot 2
+and `veylon.sav`, presses `L` and captures the picker with slot 2 as another
+version and the old file's note, chooses slot 2 with `2` and Enter and captures
+the reason under the cards, then starts a new city in the empty slot 1 with `Esc`,
+`N`, Enter and Enter, checks that both hashes are unchanged, visits the pause
+screens and quits. It never presses F5, and prints the hashes before its pass
+line. `SaveRefusalRoutingTest` drives the same paths headlessly; F9 on a slot of
+another version is covered there.
+
+`route-slots` (0.9.1 milestone 04) needs an empty isolated directory and plays
+every state of the slot picker in one launch: the picker with every slot empty;
+a new city in slot 1, F5 (its first save becomes the newest backup) and the pause
+menu naming slot 1; a Creative wilderness in slot 2 and F5. Staged between title
+visits (as the death card's `Esc` makes them), slot 1's save is damaged on the
+disk and slot 3 is given a save of another version: `veylon.sav` when it is
+there, else slot 2's save under a later epoch. `L` then shows a damaged slot with
+its backup, a ready slot and another version; Enter on slot 3 says why it does
+not open; `R` asks to restore slot 1 and `Y` restores it, which must load the
+world of its first save and set the damaged file aside unchanged as
+`slot-1.damaged.sav`. NEW FRONTIER's picker then asks before replacing slot 2
+and before deleting it, and `N` keeps it both times. Captures `01-title` to
+`10-delete-confirm`; prints `[frontend-route] slots …` and its pass line.
+`SlotPickerRoutingTest` drives the same paths headlessly.
+
+```powershell
+$env:VEYLON_SEED='20261120'; $env:VEYLON_CAPTURE_TAG='slots-720p'
+$env:VEYLON_FRONTEND='route-slots'; $env:VEYLON_RESOLUTION='1280x720'
+.\gradlew.bat run -PveylonDataDir=build/qa/slots-720p
+```
 
 The release smoke runs on the city by default; the wilderness smoke, with its
 fortress approach, needs `VEYLON_GENERATOR=wilderness`. Wilderness benchmark and
@@ -189,7 +221,7 @@ the spawn column.
 | `urban_atmosphere` | The package-22 atmosphere tour in either mode on a generator-19 world, held still so captures taken at any revision frame the same views: by day a street in each of the six districts (`01` to `06`), a walk-up's entrance, kitchen, upper floor, stairs and basement (`07` to `11`), the hidden cellar of the refuge nearest the spawn with its people (`12`), the nearest stronghold's gate (`13`) and the first alien growth (`14`); at 23:00 the residential street, the kitchen, the cellar, the gate, the growth and the flooded street (`15` to `20`); in fog the quarantine and residential streets (`21`, `22`); in rain the upper floor and the commercial street (`23`, `24`); and at 15:00 the chalk mark beside that refuge's street door (`25`). Each view prints the acoustic zone, shelter, depth below the street, the light at the eye, the ambient mix, the weather's reach, the city's sounds so far and the interaction line. Poses, the clock and the weather are staged and printed as staged; no block, item or person is (standing in the cellar finds it, as walking in would). Prints `[urban-atmosphere] pass=true`, writes 25 labelled captures and closes itself; it refuses to stage on an older generator, and `UrbanAtmosphereQaSceneTest` plays it headlessly in both modes. Run it again with `VEYLON_NO_EFX=1` for the dry audio route, whose log reads `EFX unavailable; dry playback enabled`. |
 | `urban_economy` | The package-23 extended-play tour in either mode on a generator-20 world, in real time: the refuge's ground-floor stores searched with F, the first trip to the starter block's quiet apartment (its inner door forced by holding the left button, its utility locker, kitchen and bathroom searched), the reinforced spear at the refuge's bench through the crafting screen's command, a meal and a drink with the use button, the corner shop's shelf, a skin filled at the rain collector and another at the refuge's tap, the courtyard fire fuelled with planks and the tap water boiled, the day out indoors, the night slept in the refuge's bed with F; on day two the morning meal, a quiet flat in the next block searched floor by floor (a container behind a locked door is passed by), home, water and a second night; on day three F5 and F9, with the container ledger and the food and water in hand compared before and after. Captures `01-day1-refuge-morning`, `02-forced-door`, `03-first-trip`, `04-first-upgrade`, `05-corner-shop`, `06-water`, `07-afternoon`, `08-day2-morning`, `09-next-block`, `10-day3-morning` and `11-after-load`. The clock is never staged: days pass in real time (about 18 minutes in all) and nights by sleeping; the only staged pose is the next block's street door, printed as staged; infected that come near are fought by the route with the held weapon. Each morning and evening prints a `ledger` line (day, time, health, hunger, thirst, food, clean water, searches, meals, drinks, nights, threats). Prints `[urban-economy] pass=true` and closes itself; it refuses to stage on an older generator, and `UrbanEconomyQaSceneTest` plays it headlessly in both modes. |
 | `urban_performance` | The package-24 performance tour in either mode on a generator-19 or -20 world: measured legs, each after a 2 s settle, through a local street walked at walking pace across the region seam (28 s), the kitchen, upper floor and basement of the atmosphere tour's walk-up and the nearest transit platform and tunnel, each looked around for 10 s, the nearest stronghold's yard and the first quarantine growth site (15 s each, their people and threats about), a storm over the kitchen with 40 cells of the building set alight (15 s), five minutes of fast travel east above the roofs at 21.6 blocks a second, reported minute by minute and then with the heap collected, and F5 then F9 on the street. Each leg prints `[urban-performance] leg=…` with frames, average FPS, frame-time mean and p50/p95/p99/max, the CPU milliseconds of the control and simulation step, chunk generation, mesh rebuilds and world rendering, chunks generated and meshed, draw calls, triangles, chunks drawn, retained chunks, resident chunk meshes, heap and populations; the last prints the F5 and F9 frames. Poses, the pace along a leg (the player is carried, never falling), full health during a leg and the fire are staged and printed as staged. Prints `[urban-performance] pass=true` and closes itself; it refuses to stage on an older generator, and `UrbanPerformanceQaSceneTest` plays it headlessly with a short journey. Run it with `VEYLON_VSYNC=0` and no concurrent build. |
-| `save_audit` | The package-25 save audit on any world, legacy or urban, Survival or Creative: it needs no `VEYLON_GENERATOR`, but it reads and writes the save slot, so it refuses to run without an isolated data directory or without a save already in its slot (`<data directory>/saves/veylon.sav`). The automated world is replaced by that save exactly as F9 loads one, and a `[save-audit] loaded …` digest prints what a save must hold (blocks, containers and their contents, mode and Creative controls, and the city's or the wilderness's records). Then, with ordinary controls: a walk with W and mouse look to the nearest stored container at least two blocks off (F at doors on the way), its screen opened with the use button (F would serve a carcass or a person within reach first), or with no container within 24 blocks a short walk with W that must travel a block; the pack (or in Creative the catalog) with E and the map with M, each closed with its own key; then F5 and F9, after which the digest must be exactly what F5 wrote. Captures `01-loaded`, `02-container`, `03-pack`, `04-map` and `05-after-f9`; prints `[save-audit] pass=true` and closes itself. `SaveAuditQaSceneTest` plays it headlessly on the integrated city and on wilderness saves in both modes. To run it, put a save of this build into the slot first, for example one F5 wrote in another isolated session; a save of another version is refused as F9 refuses it, and the tour does not start. |
+| `save_audit` | The package-25 save audit on any world, legacy or urban, Survival or Creative: it needs no `VEYLON_GENERATOR`, but it reads and writes the save slot, so it refuses to run without an isolated data directory or without a save already in its slot (`<data directory>/saves/slot-1.sav`, the slot automated sessions start on). The automated world is replaced by that save exactly as F9 loads one, and a `[save-audit] loaded …` digest prints what a save must hold (blocks, containers and their contents, mode and Creative controls, and the city's or the wilderness's records). Then, with ordinary controls: a walk with W and mouse look to the nearest stored container at least two blocks off (F at doors on the way), its screen opened with the use button (F would serve a carcass or a person within reach first), or with no container within 24 blocks a short walk with W that must travel a block; the pack (or in Creative the catalog) with E and the map with M, each closed with its own key; then F5 and F9, after which the digest must be exactly what F5 wrote. Captures `01-loaded`, `02-container`, `03-pack`, `04-map` and `05-after-f9`; prints `[save-audit] pass=true` and closes itself. `SaveAuditQaSceneTest` plays it headlessly on the integrated city and on wilderness saves in both modes. To run it, put a save of this build into slot 1 first, for example one F5 wrote in another isolated session; a save of another version is refused as F9 refuses it, and the tour does not start. |
 | `urban_catalogue` | The package-12 catalogue walk in either mode on a generator-11 or generator-12 world. It visits the nearest building of each commercial and civic family: a damaged grocer, a clinic and a security post that keep their locks, a school and an office block with upper floors, and a warehouse. Moving between buildings is a staged pose at each street door, and the run starts with a staged spear and pry tool; both are printed as staged. Inside it plays through the production input seam: the sign, a shop floor, the clinic's locked staff door, the street door, the dispensary forced by holding the left button and its stock searched with F, a treatment room, ground and upper classrooms and offices, the armoury lock, the squad room, a rack aisle and the workbench. Prints `[urban-catalogue] pass=true`, writes 16 labelled captures and closes itself. |
 
 ```powershell
@@ -949,6 +981,20 @@ save holds, or historical fixtures, and none may be added.
   together, keep the reader strict (bounded counts, validated ordinals and ids,
   exact lengths) and add round-trip and corruption cases. A refusal test builds
   foreign headers in code (`ForeignSaves`), never from a fixture.
+- **The checksum and the summary** (0.9.1 D-22). Every save carries a CRC-32C of
+  the whole file after its header, and then the summary the slot picker reads.
+  A test that edits save bytes and means the reader's own check to refuse them
+  reseals them first (`SaveSeal.resealed`, which `SaveEnvelope` and
+  `CreativeSaveSections` already do); an unsealed edit is refused by the
+  checksum, which a load checks last. Two saves of one state differ in their
+  summaries (when, by which build, where), so compare them with
+  `SaveSeal.withoutSummary`. The summary describes a save; only its play time is
+  state, and its mode, mark and clock must match the body.
+- **Slots.** The game's own saves go through `SaveSlots` (three slots, two
+  rotating backups each); `SaveSystem.save(Game, Path)` writes a single file for
+  tests and tools. A test that reaches the title, F5 or F9 gives its game a folder
+  of slots of its own (`game.saves.useSlots(new SaveSlots(dir))`), since classes
+  share a worker's data directory.
 - **The guard.** `SaveEpochGuardTest` digests the layout (a sample save of each
   world kind), the enum tables a save stores and both world kinds' generation.
   The city sample holds the sections as a new city writes them, so most city
