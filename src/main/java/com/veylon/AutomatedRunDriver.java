@@ -96,6 +96,9 @@ final class AutomatedRunDriver {
         frontendQa = frontendScreen != null && !frontendScreen.isBlank();
         boolean automated = smoke || (scene != null && !scene.isBlank())
                 || (shotEnv != null && !shotEnv.isBlank()) || frontendQa;
+        // Milestone 05: no scene, capture, route or smoke run autosaves unless VEYLON_AUTOSAVE=on asks.
+        // Decided before any scene stages, since a scene may need to know.
+        game.saves.autosave().startSession(automated, System.getenv("VEYLON_AUTOSAVE"));
         String selector = System.getenv("VEYLON_GENERATOR");
         int generator = configuredGenerator(selector, AppPaths.isolatedFromPlayerData());
         game.frontend.newWorldGenerator = generator;

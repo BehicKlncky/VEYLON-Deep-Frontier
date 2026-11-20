@@ -210,6 +210,7 @@ final class RefugeSystem {
         game.player.forgetPlace();
         game.log("You claim " + describe(made.floor) + " as a refuge (" + refuges.size() + " of "
                 + UrbanRefuges.MAX_CLAIMS + "). It is home now: you will wake here.");
+        game.saves.autosave().request(Autosave.Trigger.CLAIM); // milestone 05: kept once it is safe
         return true;
     }
 

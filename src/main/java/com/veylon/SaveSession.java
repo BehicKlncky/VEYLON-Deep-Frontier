@@ -14,20 +14,39 @@ import java.util.Objects;
  * This session's saves (0.9.1 milestone 04): the three slots it reads and writes, the one the live
  * world belongs to, how long that world has been played, and the words a save's summary uses for
  * where the survivor stands. The active slot is the one a world was loaded from or started in;
- * F5 saves into it and F9 opens it. None of this changes anything the simulation does.
+ * F5 saves into it and F9 opens it. Since milestone 05 the session also owns the {@link Autosave}
+ * that writes into that slot by itself. None of this changes anything the simulation does.
  */
 public final class SaveSession {
 
     private final Game game;
+    private final Autosave autosave;
     /** Real seconds the live world has been simulated, over every session that played it. */
     private double playSeconds;
     /** The player's slots, or a test's or QA run's own folder of them. */
     private SaveSlots slots = SaveSlots.inDataDirectory();
     /** The slot the live world belongs to. */
     private int active = 1;
+    /** Whether the live world belongs to a slot yet: started, loaded or saved into one. */
+    private boolean bound;
 
     SaveSession(Game game) {
         this.game = game;
+        this.autosave = new Autosave(game, this);
+    }
+
+    /** The autosave that writes the live world into its slot. */
+    public Autosave autosave() {
+        return autosave;
+    }
+
+    /**
+     * Whether the live world belongs to a slot: NEW FRONTIER started it in one, LOAD FRONTIER, a
+     * restore or F9 opened it from one, or F5 saved it into one. A world built any other way, such
+     * as a QA scene's, belongs to none until then, and nothing autosaves it.
+     */
+    public boolean bound() {
+        return bound;
     }
 
     /** The slots this session reads and writes. */
@@ -45,36 +64,46 @@ public final class SaveSession {
         return active;
     }
 
-    /** Makes {@code slot} the active one without saving or loading anything. */
+    /** Makes {@code slot} the active one, the live world's from now on, without saving or loading. */
     void activate(int slot) {
         slots.current(slot); // refuses a slot that does not exist
         active = slot;
+        bound = true;
     }
 
-    /** F5: saves the live world into the active slot. */
+    /**
+     * F5, and every autosave: saves the live world into the active slot, which it then belongs to,
+     * and starts the autosave interval again.
+     */
     boolean saveActive() {
-        return slots.save(game, active);
+        boolean saved = slots.save(game, active);
+        if (saved) {
+            bound = true;
+            autosave.saved();
+        }
+        return saved;
     }
 
     /** F9: opens the active slot over the live world, which a refused or failed load keeps. */
     LoadResult openActive() {
-        return slots.open(game, active);
+        return opened(slots.open(game, active), active);
     }
 
     /** LOAD FRONTIER: opens {@code slot}; once it has loaded, it is the active slot. */
     LoadResult load(int slot) {
-        LoadResult result = slots.open(game, slot);
-        if (result.loaded()) {
-            active = slot;
-        }
-        return result;
+        return opened(slots.open(game, slot), slot);
     }
 
     /** Restores a damaged slot from one of its backups; once it has loaded, it is the active slot. */
     LoadResult restore(int slot, int generation) {
-        LoadResult result = slots.restore(game, slot, generation);
+        return opened(slots.restore(game, slot, generation), slot);
+    }
+
+    /** A loaded world belongs to the slot it came from. */
+    private LoadResult opened(LoadResult result, int slot) {
         if (result.loaded()) {
             active = slot;
+            bound = true;
         }
         return result;
     }
@@ -87,7 +116,7 @@ public final class SaveSession {
      */
     boolean startIn(int slot) {
         activate(slot);
-        return slots.save(game, slot);
+        return saveActive();
     }
 
     /** F5's line after a save. */
@@ -128,9 +157,14 @@ public final class SaveSession {
         playSeconds += realSeconds;
     }
 
-    /** A new or loaded world starts its count again; a load then restores the saved one. */
-    void resetPlayTime() {
+    /**
+     * A new or loaded world starts its count again, which a load then restores from its save; it
+     * belongs to no slot until one is named, and its autosave interval starts over.
+     */
+    void resetForNewWorld() {
         playSeconds = 0;
+        bound = false;
+        autosave.reset();
     }
 
     /**

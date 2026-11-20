@@ -18,6 +18,9 @@ import static com.veylon.ui.HudStyle.*;
 
 /** Read-only gameplay HUD. All widgets append to the existing ordered UI batch. */
 public class Hud {
+    /** Shown from just before an autosave until it is written (0.9.1 milestone 05). */
+    public static final String SAVING_LABEL = "SAVING...";
+
     /** Exact player-facing bow ammo readout used by rendering and workflow tests. */
     public static String bowAmmoLabel(Game g) {
         if (g.player.abilities.unlimitedItems()) {
@@ -79,6 +82,12 @@ public class Hud {
                     layout.mission.x() - layout.context.right() - GAP * 2, 30);
             ui.panel(pause.x(), pause.y(), pause.width(), pause.height(), PANEL_CORNER);
             centered(ui, pause, pause.y() + 6, SMALL, "SIMULATION PAUSED [P]", AMBER);
+        } else if (g.saves.autosave().announcing()) {
+            // 0.9.1 milestone 05: shown before an autosave stalls the frame, in the same gap.
+            Rect saving = new Rect(layout.context.right() + GAP, MARGIN,
+                    layout.mission.x() - layout.context.right() - GAP * 2, 30);
+            ui.panel(saving.x(), saving.y(), saving.width(), saving.height(), PANEL_CORNER);
+            centered(ui, saving, saving.y() + 6, SMALL, SAVING_LABEL, AMBER);
         }
         if (g.sleepFade > 0.01f) {
             ui.rect(0, 0, w, h, 0, 0, 0, Math.min(0.92f, g.sleepFade));

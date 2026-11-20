@@ -123,7 +123,7 @@ final class WorldBootstrap {
         game.burnResidues.reset();
         game.particles.count = 0;
         // A new world is unplayed; a load restores the play time its save recorded.
-        game.saves.resetPlayTime();
+        game.saves.resetForNewWorld();
         reseedSimulation(seed);
     }
 

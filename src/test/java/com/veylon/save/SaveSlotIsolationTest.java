@@ -61,6 +61,14 @@ class SaveSlotIsolationTest {
         }
     }
 
+    /** 0.9.1 milestone 05: the autosave settings sit beside the graphics and audio settings. */
+    @Test
+    void theAutosaveSettingsResolveInsideTheDataDirectory() {
+        Path dataDirectory = AppPaths.dataDirectory().toAbsolutePath().normalize();
+        assertEquals(dataDirectory.resolve("veylon_autosave.properties"),
+                AutosaveSettings.file().toAbsolutePath().normalize());
+    }
+
     @Test
     void everyWorkerOfATestTaskHasItsOwnDataDirectory() {
         String worker = System.getProperty("org.gradle.test.worker");

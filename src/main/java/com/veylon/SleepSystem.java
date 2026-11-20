@@ -213,9 +213,19 @@ final class SleepSystem {
         }
     }
 
+    /** Escape: the sleeper gets up before the night is over. */
+    void wakeEarly() {
+        game.sleeping = false;
+        disturbAt = -1;
+        game.log("You wake up early.");
+        game.saves.autosave().request(Autosave.Trigger.WAKE);
+    }
+
+    /** Every waking asks for an autosave (milestone 05), which waits until the moment is safe. */
     private void wake(boolean attacked, boolean burning, boolean disturbed) {
         game.sleeping = false;
         disturbAt = -1;
+        game.saves.autosave().request(Autosave.Trigger.WAKE);
         if (burning) {
             game.log("You wake up on fire!");
             return;

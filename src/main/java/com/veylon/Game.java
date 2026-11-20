@@ -566,6 +566,7 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
         audio.update(dt);
 
         enterDeathIfDue();
+        saves.autosave().frame(dt); // after the frame's outcome, so it judges where the frame left the player
     }
 
     void beginUiFrame() {

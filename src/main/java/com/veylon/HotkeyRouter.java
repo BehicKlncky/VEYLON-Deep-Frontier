@@ -78,8 +78,7 @@ final class HotkeyRouter {
             return;
         }
         if (game.sleeping) {
-            game.sleeping = false;
-            game.log("You wake up early.");
+            game.sleep.wakeEarly();
         } else if (game.uiMode == Game.UiMode.NONE) {
             game.uiMode = Game.UiMode.PAUSE;
         } else {
