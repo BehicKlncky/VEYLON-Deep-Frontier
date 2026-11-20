@@ -133,14 +133,34 @@ public final class SaveSystem {
     }
 
     /**
-     * The writer itself.
-     *
-     * @param summary the summary to write, or null for the live session's as of now; a test fixes it
-     *                to get the same bytes twice
+     * Saves with a fixed summary, or with the live session's as of now when it is null; a test fixes
+     * it to get the same bytes twice.
      */
     static boolean save(Game g, Path savePath, int sizeLimit, SaveSummary summary) {
+        return save(g, savePath, sizeLimit, summary, SaveSystem::replaceAtomically);
+    }
+
+    /**
+     * Puts a complete save in place of the old one. It throws only while the old file is still as it
+     * was, and the writer then removes the temporary file; once the old file is replaced it must not
+     * throw.
+     */
+    @FunctionalInterface
+    interface Publisher {
+        void publish(Path complete, Path target) throws IOException;
+    }
+
+    /**
+     * The writer itself.
+     *
+     * @param publisher puts the complete, flushed temporary file in place of {@code savePath}: an
+     *                  atomic replacement, or a slot's replacement that keeps backups
+     *                  ({@link SaveSlots})
+     */
+    static boolean save(Game g, Path savePath, int sizeLimit, SaveSummary summary, Publisher publisher) {
         Objects.requireNonNull(g, "g");
         Objects.requireNonNull(savePath, "savePath");
+        Objects.requireNonNull(publisher, "publisher");
         g.entities.flushInfectedDeaths(g);
         g.entities.flushSiteDeaths(g);
         // Falling bodies are transient and are not written. Freezing them here
@@ -381,7 +401,7 @@ public final class SaveSystem {
                 writeChecksum(channel, (int) checksum.getValue());
                 channel.force(true);
             }
-            replaceAtomically(temporary, target);
+            publisher.publish(temporary, target);
             temporary = null;
             return true;
         } catch (IOException | RuntimeException ex) {
@@ -408,7 +428,7 @@ public final class SaveSystem {
         }
     }
 
-    private static void replaceAtomically(Path source, Path target) throws IOException {
+    static void replaceAtomically(Path source, Path target) throws IOException {
         try {
             Files.move(source, target, StandardCopyOption.ATOMIC_MOVE,
                     StandardCopyOption.REPLACE_EXISTING);

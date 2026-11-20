@@ -34,6 +34,32 @@ class SaveSlotIsolationTest {
                 "the save slot every default save and load uses resolves inside it");
     }
 
+    /**
+     * 0.9.1 milestone 04: every file a slot writes, its backups, a damaged save a restore sets aside
+     * and VEYLON 0.9.0's file the picker mentions all resolve inside this worker's data directory.
+     */
+    @Test
+    void everySlotAndBackupFileResolvesInsideTheDataDirectory() {
+        Path dataDirectory = AppPaths.dataDirectory().toAbsolutePath().normalize();
+        SaveSlots slots = SaveSlots.inDataDirectory();
+        assertEquals(dataDirectory.resolve("saves"), slots.directory(), "the player's slots are its saves folder");
+        java.util.List<Path> files = new java.util.ArrayList<>();
+        for (int slot = 1; slot <= SaveSlots.COUNT; slot++) {
+            files.addAll(slots.files(slot));
+            for (int n = 1; n <= SaveSlots.MAX_SET_ASIDE; n++) {
+                files.add(slots.setAside(slot, n));
+            }
+        }
+        files.add(slots.legacySave());
+        assertEquals(SaveSlots.COUNT * (1 + SaveSlots.BACKUPS + SaveSlots.MAX_SET_ASIDE) + 1,
+                new java.util.HashSet<>(files).size(), "every file has its own name");
+        for (Path file : files) {
+            Path resolved = file.toAbsolutePath().normalize();
+            assertTrue(resolved.startsWith(dataDirectory.resolve("saves")), () -> resolved + " is outside the data directory");
+            assertTrue(AppPaths.isolatedFromPlayerData());
+        }
+    }
+
     @Test
     void everyWorkerOfATestTaskHasItsOwnDataDirectory() {
         String worker = System.getProperty("org.gradle.test.worker");
