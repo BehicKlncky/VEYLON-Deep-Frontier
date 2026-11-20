@@ -35,7 +35,7 @@ final class HotkeyRouter {
         if (game.uiMode == Game.UiMode.OPTIONS || game.uiMode == Game.UiMode.AUDIO_OPTIONS
                 || game.uiMode == Game.UiMode.GAME_MODE || game.uiMode == Game.UiMode.CREATIVE_CATALOG
                 || game.uiMode == Game.UiMode.WORLD_CONTROLS || game.uiMode == Game.UiMode.AUTOSAVE_OPTIONS
-                || game.uiMode == Game.UiMode.RETURN_TO_TITLE) {
+                || game.uiMode == Game.UiMode.CONTROLS_OPTIONS || game.uiMode == Game.UiMode.RETURN_TO_TITLE) {
             return; // These screens own Escape, Enter, F5, typed text and navigation while open.
         }
         if (game.uiMode == Game.UiMode.PAUSE && game.input.wasKeyPressed(GLFW_KEY_G)) {
@@ -61,6 +61,10 @@ final class HotkeyRouter {
         if (game.uiMode == Game.UiMode.PAUSE && game.input.wasKeyPressed(GLFW_KEY_A)) {
             game.frontend.openPauseAutosave();
             game.input.consumePress(GLFW_KEY_A); // the screen opened this frame reads A as "less"
+            return;
+        }
+        if (game.uiMode == Game.UiMode.PAUSE && game.input.wasKeyPressed(GLFW_KEY_C)) {
+            game.frontend.openPauseControls(); // 0.9.1 milestone 06; crafting opens from play, not from here
             return;
         }
         if (game.uiMode == Game.UiMode.PAUSE && game.input.wasKeyPressed(GLFW_KEY_R)) {

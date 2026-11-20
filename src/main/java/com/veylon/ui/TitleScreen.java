@@ -4,6 +4,7 @@ import com.veylon.Game;
 import com.veylon.engine.UiRenderer;
 
 import static org.lwjgl.glfw.GLFW.GLFW_KEY_A;
+import static org.lwjgl.glfw.GLFW.GLFW_KEY_C;
 import static org.lwjgl.glfw.GLFW.GLFW_KEY_ENTER;
 import static org.lwjgl.glfw.GLFW.GLFW_KEY_L;
 import static org.lwjgl.glfw.GLFW.GLFW_KEY_N;
@@ -17,7 +18,7 @@ import static org.lwjgl.glfw.GLFW.GLFW_MOUSE_BUTTON_LEFT;
 public final class TitleScreen {
 
     public enum Action {
-        NONE, NEW_GAME, LOAD_GAME, OPTIONS, QUIT, AUDIO, AUTOSAVE
+        NONE, NEW_GAME, LOAD_GAME, OPTIONS, QUIT, AUDIO, AUTOSAVE, CONTROLS
     }
 
     private int selection;
@@ -42,9 +43,9 @@ public final class TitleScreen {
         ui.textCentered(w / 2f, h * 0.20f + 70, 1.15f,
                 "SURVIVE  /  UNDERSTAND  /  SIGNAL", 0.46f, 0.62f, 0.66f, 1f);
 
-        String[] labels = {"NEW FRONTIER", "LOAD FRONTIER", "GRAPHICS", "AUDIO", "AUTOSAVE", "QUIT"};
-        Action[] actions = {Action.NEW_GAME, Action.LOAD_GAME, Action.OPTIONS, Action.AUDIO, Action.AUTOSAVE,
-                Action.QUIT};
+        String[] labels = {"NEW FRONTIER", "LOAD FRONTIER", "GRAPHICS", "AUDIO", "CONTROLS", "AUTOSAVE", "QUIT"};
+        Action[] actions = {Action.NEW_GAME, Action.LOAD_GAME, Action.OPTIONS, Action.AUDIO, Action.CONTROLS,
+                Action.AUTOSAVE, Action.QUIT};
         float bw = Math.min(360, w * 0.52f), bh = 36;
         float x = w / 2f - bw / 2f, y0 = h * 0.45f;
         double mx = g.input.cursorX(), my = g.input.cursorY();
@@ -73,7 +74,7 @@ public final class TitleScreen {
             ui.textCentered(w / 2f, y0 + labels.length * 44 + 8, 1.2f, notice, 1f, 0.65f, 0.42f, 1f);
         }
         ui.textCentered(w / 2f, h - 34, 1.05f,
-                "N / L / O / V / A / Q     Enter selects     Esc quits",
+                "N / L / O / V / C / A / Q     Enter selects     Esc quits",
                 0.42f, 0.50f, 0.56f, 1f);
 
         if (g.input.wasKeyPressed(GLFW_KEY_N)) return Action.NEW_GAME;
@@ -81,6 +82,7 @@ public final class TitleScreen {
         if (g.input.wasKeyPressed(GLFW_KEY_V)) return Action.AUDIO;
         if (g.input.wasKeyPressed(GLFW_KEY_O)) return Action.OPTIONS;
         if (g.input.wasKeyPressed(GLFW_KEY_A)) return Action.AUTOSAVE;
+        if (g.input.wasKeyPressed(GLFW_KEY_C)) return Action.CONTROLS;
         if (g.input.wasKeyPressed(GLFW_KEY_Q) || g.input.wasKeyPressed(GLFW_KEY_ESCAPE)) {
             return Action.QUIT;
         }

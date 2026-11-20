@@ -6,6 +6,7 @@ import com.veylon.save.SaveSlots;
 import com.veylon.ui.GraphicsOptionsScreen;
 import com.veylon.ui.AudioOptionsScreen;
 import com.veylon.ui.AutosaveOptionsScreen;
+import com.veylon.ui.ControlsOptionsScreen;
 import com.veylon.ui.NewFrontierScreen;
 import com.veylon.ui.PresentationOverlay;
 import com.veylon.ui.ReturnToTitlePrompt;
@@ -17,8 +18,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * The states with no world in them: title, new-frontier mode choice, the slot picker, graphics
- * and audio options, and loading, plus the transitions in and out of a live game.
+ * The states with no world in them: title, new-frontier mode choice, the slot picker, graphics,
+ * audio, controls and autosave options, and loading, plus the transitions in and out of a live game.
  *
  * <p>These share one property that makes them worth separating from the play
  * loop: {@code world} and {@code player} are null throughout, so nothing here
@@ -49,6 +50,8 @@ final class FrontendController {
     final AutosaveOptionsScreen autosaveOptions = new AutosaveOptionsScreen();
     /** The pause menu's way back to the title (0.9.1 milestone 06). */
     final ReturnToTitlePrompt returnPrompt = new ReturnToTitlePrompt();
+    /** The mouse settings, from the title and from the pause menu (0.9.1 milestone 06). */
+    final ControlsOptionsScreen controlsOptions = new ControlsOptionsScreen();
     private LoadRequest loadRequest;
     /** The slot the pending load reads or the new world is saved in. */
     private int requestedSlot = 1;
@@ -83,7 +86,7 @@ final class FrontendController {
         return state == Game.AppState.TITLE || state == Game.AppState.TITLE_OPTIONS
                 || state == Game.AppState.TITLE_AUDIO_OPTIONS || state == Game.AppState.LOADING
                 || state == Game.AppState.TITLE_NEW_WORLD || state == Game.AppState.TITLE_SLOTS
-                || state == Game.AppState.TITLE_AUTOSAVE_OPTIONS;
+                || state == Game.AppState.TITLE_AUTOSAVE_OPTIONS || state == Game.AppState.TITLE_CONTROLS_OPTIONS;
     }
 
     void frame(float dt) {
@@ -95,6 +98,7 @@ final class FrontendController {
             case TITLE_NEW_WORLD -> applyNewFrontier(game.newFrontierScreen.update(game));
             case TITLE_SLOTS -> applySlots(slotPicker.update(game));
             case TITLE_AUTOSAVE_OPTIONS -> updateAutosave();
+            case TITLE_CONTROLS_OPTIONS -> applyTitleControls(controlsOptions.update(game));
             case TITLE_OPTIONS -> updateOptions(dt);
             case TITLE_AUDIO_OPTIONS -> updateAudio();
             default -> presentLoading();
@@ -122,6 +126,10 @@ final class FrontendController {
             case AUTOSAVE -> {
                 autosaveOptions.open(game.saves.autosave().settings());
                 game.appState = Game.AppState.TITLE_AUTOSAVE_OPTIONS;
+            }
+            case CONTROLS -> {
+                controlsOptions.open(game.controls);
+                game.appState = Game.AppState.TITLE_CONTROLS_OPTIONS;
             }
             case QUIT -> game.window.requestClose();
             case NONE -> {
@@ -260,6 +268,33 @@ final class FrontendController {
             game.titleScreen.notice("Autosave settings applied.");
         }
         game.appState = Game.AppState.TITLE;
+    }
+
+    /** The title's controls screen: APPLY writes the mouse settings for the next launch too. */
+    void applyTitleControls(ControlsOptionsScreen.Action result) {
+        if (result == ControlsOptionsScreen.Action.NONE) return;
+        if (result == ControlsOptionsScreen.Action.APPLY) {
+            game.controls.save();
+            game.titleScreen.notice("Control settings applied.");
+        }
+        game.appState = Game.AppState.TITLE;
+    }
+
+    /** [C] in the pause menu opens the controls over the paused world (0.9.1 milestone 06). */
+    void openPauseControls() {
+        controlsOptions.open(game.controls);
+        game.uiMode = Game.UiMode.CONTROLS_OPTIONS;
+    }
+
+    /** The pause menu's controls screen, which returns to PAUSE. */
+    void updatePauseControls() {
+        applyPauseControls(controlsOptions.update(game));
+    }
+
+    void applyPauseControls(ControlsOptionsScreen.Action result) {
+        if (result == ControlsOptionsScreen.Action.NONE) return;
+        if (result == ControlsOptionsScreen.Action.APPLY) game.controls.save();
+        game.uiMode = Game.UiMode.PAUSE;
     }
 
     /** [A] in the pause menu opens the autosave options over the paused world. */
@@ -449,6 +484,7 @@ final class FrontendController {
                 game.appState = Game.AppState.TITLE_AUDIO_OPTIONS;
             }
             case "autosave" -> applyTitle(TitleScreen.Action.AUTOSAVE);
+            case "controls" -> applyTitle(TitleScreen.Action.CONTROLS);
             case "options" -> {
                 game.graphicsOptionsScreen.open(game.renderer.settings,
                         game.window.windowedWidth(), game.window.windowedHeight());

@@ -70,12 +70,13 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
 
     public enum UiMode {
         NONE, INVENTORY, CRAFTING, PAUSE, OPTIONS, MAP, CRATE, NPC, AUDIO_OPTIONS, GAME_MODE,
-        CREATIVE_CATALOG, WORLD_CONTROLS, AUTOSAVE_OPTIONS, RETURN_TO_TITLE;
+        CREATIVE_CATALOG, WORLD_CONTROLS, AUTOSAVE_OPTIONS, RETURN_TO_TITLE, CONTROLS_OPTIONS;
 
         /** The pause menu and the screens opened from it freeze the world. */
         public boolean pausesSimulation() {
             return this == PAUSE || this == OPTIONS || this == AUDIO_OPTIONS || this == GAME_MODE
-                    || this == WORLD_CONTROLS || this == AUTOSAVE_OPTIONS || this == RETURN_TO_TITLE;
+                    || this == WORLD_CONTROLS || this == AUTOSAVE_OPTIONS || this == CONTROLS_OPTIONS
+                    || this == RETURN_TO_TITLE;
         }
     }
 
@@ -97,7 +98,7 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
 
     enum AppState {
         TITLE, TITLE_OPTIONS, LOADING, PLAYING, DEATH, VICTORY, TITLE_AUDIO_OPTIONS, TITLE_NEW_WORLD, TITLE_SLOTS,
-        TITLE_AUTOSAVE_OPTIONS;
+        TITLE_AUTOSAVE_OPTIONS, TITLE_CONTROLS_OPTIONS;
 
         /** True while a live world is being drawn, so render stats are meaningful. */
         boolean rendersWorld() {
@@ -108,6 +109,8 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
     // Engine.
     public final Window window = new Window();
     public final Input input = new Input();
+    /** How the mouse turns the view: defaults until {@link #run} reads the player's (0.9.1 milestone 06). */
+    public final com.veylon.input.ControlSettings controls = new com.veylon.input.ControlSettings();
     public final Camera camera = new Camera();
     public final Renderer renderer = new Renderer();
     public final UiRenderer ui = new UiRenderer();
@@ -349,6 +352,7 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
         ui.init();
         audio.init();
         sessionSeed = qa.configuredSeed();
+        controls.copyFrom(com.veylon.input.ControlSettings.loadOrDefaults());
         automatedRun = automation.configure();
 
         double last = glfwGetTime();
@@ -506,6 +510,7 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
             case GAME_MODE -> gameModes.handleScreen(gameModeScreen.update(this));
             case WORLD_CONTROLS -> creativeControls.handleScreen(worldControlsScreen.update(this));
             case AUTOSAVE_OPTIONS -> frontend.updatePauseAutosave();
+            case CONTROLS_OPTIONS -> frontend.updatePauseControls();
             case RETURN_TO_TITLE -> frontend.updateReturnPrompt(); // may let the world go; nothing below needs it
             case CREATIVE_CATALOG -> {
                 if (creativeCatalogScreen.update(this) == com.veylon.ui.CreativeCatalogScreen.Action.CLOSE) {
@@ -631,13 +636,7 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
     // ------------------------------------------------------------------
 
     private void updateMouseLook() {
-        float sens = 0.115f;
-        camera.yaw += (float) (input.mouseDX() * sens);
-        camera.pitch += (float) (input.mouseDY() * sens);
-        if (camera.pitch > 89.5f) camera.pitch = 89.5f;
-        if (camera.pitch < -89.5f) camera.pitch = -89.5f;
-        if (camera.yaw > 360) camera.yaw -= 360;
-        if (camera.yaw < -360) camera.yaw += 360;
+        com.veylon.input.MouseLook.turn(camera, input.mouseDX(), input.mouseDY(), controls);
     }
 
     private void updateMovement(float dt) {

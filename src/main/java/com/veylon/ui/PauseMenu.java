@@ -61,7 +61,7 @@ public class PauseMenu {
      */
     public static String[] keyLines(boolean creative, int slot) {
         return new String[]{creative ? "[Esc] Resume   [G] Game mode   [T] World controls" : "[Esc] Resume   [G] Game mode",
-                "[O] Graphics   [V] Audio   [A] Autosave", saveKeys(slot)};
+                "[O] Graphics   [V] Audio   [C] Controls   [A] Autosave", saveKeys(slot)};
     }
 
     /**

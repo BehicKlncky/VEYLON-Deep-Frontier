@@ -61,12 +61,17 @@ class SaveSlotIsolationTest {
         }
     }
 
-    /** 0.9.1 milestone 05: the autosave settings sit beside the graphics and audio settings. */
+    /**
+     * 0.9.1 milestones 05 and 06: the autosave and the mouse settings sit beside the graphics and
+     * audio settings.
+     */
     @Test
-    void theAutosaveSettingsResolveInsideTheDataDirectory() {
+    void theAutosaveAndControlSettingsResolveInsideTheDataDirectory() {
         Path dataDirectory = AppPaths.dataDirectory().toAbsolutePath().normalize();
         assertEquals(dataDirectory.resolve("veylon_autosave.properties"),
                 AutosaveSettings.file().toAbsolutePath().normalize());
+        assertEquals(dataDirectory.resolve("veylon_controls.properties"),
+                com.veylon.input.ControlSettings.file().toAbsolutePath().normalize());
     }
 
     @Test
