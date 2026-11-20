@@ -287,3 +287,51 @@ fixed before the runs above: a dimmed button kept its red channel and read as a 
 0.75 on 1080p the block sat at the top of the screen. `ui.SlotPickerScreenTest` holds every line
 within its room with the game's own font, and the picker cuts a place name that would not fit.
 Limit: a requested 1.5 at 1280×720 is clamped to 1, as before.
+
+## 0.9.1 milestone 05 — SAVING..., the autosave options and their keys (2026-11-20)
+
+Before an autosave stalls a frame, the HUD shows **SAVING...** for 0.35 s in an amber-on-panel
+strip in the gap between the two top cards, where SIMULATION PAUSED [P] goes (an autosave never
+happens while P holds the world, so the two never show together); the log then reads
+"Autosaved to slot N." The **AUTOSAVE** screen, from the title's new AUTOSAVE button (`A`) and
+`A` in the pause menu, has two rows, Autosave (On/Off) and Every (5, 10, 15 or 30 minutes; dimmed
+while autosave is off), a line on when it waits, the keys, and APPLY [F5] / BACK [Esc]. The title
+has six buttons, its notice moves below the sixth and its key line reads "N / L / O / V / A / Q";
+the pause menu's save line reads "[F5] Save to slot 1   [F9] Load slot 1   [A] Autosave   [Q] Quit".
+
+### Reproduce
+
+```bash
+export VEYLON_SEED=20261120
+VEYLON_SCENE=urban_autosave VEYLON_AUTOSAVE=on VEYLON_RESOLUTION=1280x720 \
+  VEYLON_CAPTURE_TAG=v091-m05-autosave-survival-1280x720 \
+  ./gradlew.bat run -PveylonDataDir=build/qa/v091-m05-autosave-survival-1280x720
+# likewise 1920x1080 at 1 and 0.75, and VEYLON_GAME_MODE=creative, each in a new directory.
+# VEYLON_FRONTEND=autosave (the options screen), pause (the pause menu) or glyphs (the title)
+# with VEYLON_SHOT=2 show the screens statically.
+```
+
+### Validation record
+
+All runs on 2026-11-20, NVIDIA GeForce RTX 3060 Ti, driver 621.01, OpenGL 3.3.0, windowed, seed
+20261120, each in a new directory `build/qa/v091-m05-<tag>/`; logs are
+`build/v091-m05-native-<tag>.log`. Every run's shutdown summary read `glGetError=0` and 0 KHR
+errors; every tour printed `[urban-autosave] pass=true`.
+
+| Tag | Screens | Framebuffer | Requested → effective scale |
+| --- | --- | --- | --- |
+| `autosave-survival-1280x720` | `01-claim-saving` to `06-after-the-pursuit-autosaved` (10) | 1280×720 | 1 → 1 |
+| `autosave-survival-1920x1080` | the same | 1920×1080 | 1 → 1 |
+| `autosave-survival-1920x1080-s075` | the same | 1920×1080 | 0.75 → 0.75 |
+| `autosave-creative-1280x720` | the same without the hunt (7) | 1280×720 | 1 → 1 |
+| `screen-autosave-720`, `screen-autosave-1080-s075` | the options screen | 1280×720, 1920×1080 | 1, 0.75 |
+| `screen-pause-720`, `screen-title-720` | the pause menu in a city, the title (`glyphs`) | 1280×720 | 1 → 1 |
+
+In each `-saving` capture SAVING... sits centred in the strip between the two top cards and
+clears both; in each `-autosaved` capture the log's last line is "Autosaved to slot 1.", after
+"You claim the first-floor flat as a refuge…" or "You wake after 2.0 hours." The hunted capture
+shows the timer's autosave due with no strip up. The options screen keeps its rows, the waiting
+line, the keys and the buttons apart at both sizes; the title's six buttons, its notice and its
+key line do not touch; the pause menu's save line fits its panel. At 1920×1080 the strip spans the
+whole gap, as the pause panel always has. `ui.AutosaveOptionsScreenTest` holds every new line within
+its room with the game's own font.
