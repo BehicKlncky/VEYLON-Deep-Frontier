@@ -3,14 +3,13 @@ package com.veylon;
 import com.veylon.gfx.ScreenshotUtil;
 import com.veylon.entity.GameMode;
 import com.veylon.item.ItemType;
-import com.veylon.save.SaveSystem;
+import com.veylon.save.SaveSlots;
 import com.veylon.simulation.WeatherSystem;
 import com.veylon.util.AppPaths;
 import com.veylon.world.BlockType;
 import com.veylon.world.World;
 import com.veylon.world.urban.UrbanRevision;
 
-import java.nio.file.Path;
 import java.util.ArrayDeque;
 import java.util.Locale;
 
@@ -70,8 +69,13 @@ final class AutomatedRunDriver {
     private boolean finishAfterCaptures;
     /** The native default-path route ({@code VEYLON_FRONTEND=route}), or null. */
     private FrontendRouteQa frontendRoute;
-    private final Path smokeSave =
-            AppPaths.dataDirectory().resolve("build/qa/smoke-save.dat");
+    /**
+     * The release smoke's own folder of slots (0.9.1 milestone 04): it saves into and loads slot 1
+     * there through the slots' own path, backups included, and never touches the player's slots,
+     * since it runs without an isolated data directory.
+     */
+    private final SaveSlots smokeSlots =
+            new SaveSlots(AppPaths.dataDirectory().resolve("build/qa/smoke-slots"));
 
     AutomatedRunDriver(Game game) {
         this.game = game;
@@ -309,18 +313,18 @@ final class AutomatedRunDriver {
             game.player.inventory.add(ItemType.HIDE_COAT, 1);
             game.qa.equipFromInventoryFirst(ItemType.HIDE_COAT);
             game.creativeQa.beforeSave();
-            smokeSaveOk = SaveSystem.save(game, smokeSave);
-            System.out.println("[smoke] isolated save=" + smokeSaveOk + " path=" + smokeSave);
+            smokeSaveOk = smokeSlots.save(game, 1);
+            System.out.println("[smoke] isolated save=" + smokeSaveOk + " path=" + smokeSlots.current(1));
         }
         if (smokePhase == 1 && elapsed > 4.0) {
             smokePhase = 2;
             if (audioQa) game.audio.scheduleThunder(game.player.pos.x + 500, game.player.pos.y, game.player.pos.z);
-            smokeLoadOk = SaveSystem.load(game, smokeSave);
+            smokeLoadOk = smokeSlots.open(game, 1).loaded();
             game.creativeQa.afterLoad(smokeLoadOk);
             if (audioQa && game.audio.pendingWeatherSounds() != 0) {
                 throw new IllegalStateException("Old-world weather audio survived load");
             }
-            System.out.println("[smoke] isolated load=" + smokeLoadOk + " path=" + smokeSave);
+            System.out.println("[smoke] isolated load=" + smokeLoadOk + " path=" + smokeSlots.current(1));
         }
         if (smokePhase == 2 && elapsed > 5.0) {
             smokePhase = 3;

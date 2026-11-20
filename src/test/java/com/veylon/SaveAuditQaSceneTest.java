@@ -1,10 +1,11 @@
 package com.veylon;
 
 import com.veylon.entity.GameMode;
+import com.veylon.save.SaveSlots;
 import com.veylon.save.SaveSystem;
 import com.veylon.world.World;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -13,22 +14,20 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * The {@code save_audit} tour, played headlessly in {@link Game#run}'s frame order from a save placed in
- * the test JVM's isolated slot: the integrated city, and a wilderness world in each mode. Each is
- * loaded as F9 loads one, walked, its screens opened with their keys, then F5 and F9 restore what F5
- * wrote. Captures are the native run's to judge.
+ * the active slot of a folder of slots of the test's own: the integrated city, and a wilderness world
+ * in each mode. Each is loaded as F9 loads one, walked, its screens opened with their keys, then F5
+ * and F9 restore what F5 wrote. Captures are the native run's to judge.
  */
 class SaveAuditQaSceneTest {
     private static final float DT = 1f / 60f;
 
-    @AfterEach
-    void emptyTheSlot() throws Exception {
-        Files.deleteIfExists(SaveSystem.SAVE_PATH);
-    }
+    @TempDir
+    Path directory;
 
     @Test
     void theIntegratedCityIsLoadedWalkedOpenedSavedAndLoadedAgain() throws Exception {
         IntegratedCityFixture.Built built = IntegratedCityFixture.build();
-        SaveAuditQaScene tour = play(bytesOf(built.game()));
+        SaveAuditQaScene tour = play(bytesOf(built.game()), directory.resolve("city"));
         assertEquals(IntegratedCityFixture.GENERATOR, tour.durable().isEmpty() ? -1 : generatorOf(tour));
     }
 
@@ -37,24 +36,25 @@ class SaveAuditQaSceneTest {
         for (GameMode mode : GameMode.values()) {
             Game world = new Game();
             world.newWorld(81_081_928L, true, World.GEN_CAVE_IDENTITIES, mode);
-            SaveAuditQaScene tour = play(bytesOf(world));
+            SaveAuditQaScene tour = play(bytesOf(world), directory.resolve(mode.id));
             assertEquals(World.GEN_CAVE_IDENTITIES, generatorOf(tour), mode.name());
-            emptyTheSlot();
         }
     }
 
     @Test
-    void theTourRefusesAnEmptySlot() throws Exception {
-        Files.deleteIfExists(SaveSystem.SAVE_PATH);
+    void theTourRefusesAnEmptySlot() {
         Game game = new Game();
+        game.saves.useSlots(new SaveSlots(directory.resolve("empty")));
         game.newWorld(7, true, World.GEN_CAVE_IDENTITIES);
         assertThrows(IllegalStateException.class, () -> new UrbanQaScenes(game).stage("save_audit"));
     }
 
-    private static SaveAuditQaScene play(byte[] save) throws Exception {
-        Files.createDirectories(SaveSystem.SAVE_PATH.getParent());
-        Files.write(SaveSystem.SAVE_PATH, save);
+    private static SaveAuditQaScene play(byte[] save, Path folder) throws Exception {
+        SaveSlots slots = new SaveSlots(folder);
+        Files.createDirectories(slots.directory());
+        Files.write(slots.current(1), save);
         Game game = new Game();
+        game.saves.useSlots(slots);
         game.newWorld(4_242L, true, World.GEN_CAVE_IDENTITIES);
         game.appState = Game.AppState.PLAYING;
         UrbanQaScenes scenes = new UrbanQaScenes(game);
@@ -73,7 +73,8 @@ class SaveAuditQaSceneTest {
         }
         assertTrue(tour.passed());
         Game reloaded = new Game();
-        assertTrue(SaveSystem.load(reloaded, SaveSystem.SAVE_PATH), "the slot holds what F5 wrote");
+        assertTrue(SaveSystem.load(reloaded, slots.current(1)), "the slot holds what F5 wrote");
+        assertNotNull(slots.newestIntactBackup(1), "and the save F5 replaced is its newest backup");
         return tour;
     }
 

@@ -10,12 +10,13 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * The structural seam that keeps tests away from the player's save slot
+ * The structural seam that keeps tests away from the player's save slots
  * (urban-survival decision D-23). On Windows the default data directory is
  * the working directory — the repository checkout under Gradle — so without
- * it any test reaching {@link SaveSystem#SAVE_PATH} would write the real slot.
- * Since 0.9.1 every worker of a test task has its own directory, so parallel
- * forks never share a slot either ({@code WorkerDataDirectory}).
+ * it any test reaching a game's own slots ({@link SaveSlots#inDataDirectory})
+ * would write the real ones. Since 0.9.1 every worker of a test task has its
+ * own directory, so parallel forks never share a slot either
+ * ({@code WorkerDataDirectory}).
  */
 class SaveSlotIsolationTest {
 
@@ -29,9 +30,9 @@ class SaveSlotIsolationTest {
 
         assertTrue(dataDirectory.startsWith(build), () -> dataDirectory + " is not under " + build);
         assertTrue(AppPaths.isolatedFromPlayerData());
-        assertEquals(dataDirectory.resolve("saves/veylon.sav"),
-                SaveSystem.SAVE_PATH.toAbsolutePath().normalize(),
-                "the save slot every default save and load uses resolves inside it");
+        assertEquals(dataDirectory.toAbsolutePath().normalize().resolve("saves"),
+                new com.veylon.Game().saves.slots().directory(),
+                "the slots every F5, F9 and title load of a game use resolve inside it");
     }
 
     /**
@@ -71,8 +72,8 @@ class SaveSlotIsolationTest {
                 "this worker's own directory, which no other fork writes");
         assertTrue(dataDirectory.getParent().startsWith(testData),
                 () -> dataDirectory + " belongs to a task directory under " + testData);
-        assertEquals(dataDirectory.resolve("saves/veylon.sav"),
-                SaveSystem.SAVE_PATH.toAbsolutePath().normalize(),
-                "chosen before SaveSystem resolved its slot");
+        assertEquals(dataDirectory.toAbsolutePath().normalize().resolve("saves"),
+                new com.veylon.Game().saves.slots().directory(),
+                "chosen before any game resolved its slots");
     }
 }

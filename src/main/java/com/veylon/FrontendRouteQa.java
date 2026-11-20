@@ -4,7 +4,8 @@ import com.veylon.entity.GameMode;
 import com.veylon.item.Inventory;
 import com.veylon.item.ItemStack;
 import com.veylon.save.LoadResult;
-import com.veylon.save.SaveSystem;
+import com.veylon.save.SaveSlots;
+import com.veylon.ui.SlotPickerScreen;
 import com.veylon.util.AppPaths;
 import com.veylon.util.Vec3i;
 import com.veylon.world.World;
@@ -35,28 +36,32 @@ import static org.lwjgl.glfw.GLFW.*;
  * keys, over two launches as a player plays it ({@code VEYLON_FRONTEND=route}, then
  * {@code VEYLON_FRONTEND=route-load} with the same isolated data directory).
  *
- * <p>The first launch: the title; N opens NEW FRONTIER on the city, W shows the wilderness and W
- * returns, C chooses Creative when {@code VEYLON_GAME_MODE=creative}; Enter, the loading card and
- * the refuge; a ground-floor cupboard searched with the use button from an empty hand (the pose
- * beside it staged, as the tours stage theirs) and one stack taken through the screen's transfer
- * command; a few steps with W, the map with M, F5. In Survival the survivor then dies through the
- * player damage gate, the card says where they wake, Enter wakes them at the refuge with what they
- * carried, and F9 loads the save over the live world; in Creative a double-tapped Space flies first.
- * Then the pause menu with its graphics and audio screens, and Q quits. What F5 wrote
- * ({@link SaveAuditQaScene#durable(Game)}) is kept beside the slot.
+ * <p>The first launch needs an empty slot 1: the title; N opens NEW FRONTIER on the city, W shows
+ * the wilderness and W returns, C chooses Creative when {@code VEYLON_GAME_MODE=creative}; Enter
+ * opens the slot picker on the first empty slot and Enter starts the world in it (0.9.1 milestone
+ * 04); the loading card and the refuge; a ground-floor cupboard searched with the use button from an
+ * empty hand (the pose beside it staged, as the tours stage theirs) and one stack taken through the
+ * screen's transfer command; a few steps with W, the map with M, F5. In Survival the survivor then
+ * dies through the player damage gate, the card says where they wake, Enter wakes them at the
+ * refuge with what they carried, and F9 loads the slot over the live world; in Creative a
+ * double-tapped Space flies first. Then the pause menu, which names the slot, with its graphics and
+ * audio screens, and Q quits. What F5 wrote ({@link SaveAuditQaScene#durable(Game)}) is kept beside
+ * the slots.
  *
- * <p>The second launch: the title, L, the loading card, and the loaded world must hold exactly what
- * the first launch saved; then the pause menu and Q. Every screen is captured; a
- * {@code [frontend-route]} line reports each check. The route refuses to run without an isolated
- * data directory, since it writes the slot. Its screens draw only with a GL context, so it has no
- * headless twin; the headless default-path tests drive the same controller through its seams.
+ * <p>The second launch: the title, L, the slot picker on the slot saved last, Enter, the loading
+ * card, and the loaded world must hold exactly what the first launch saved; then the pause menu and
+ * Q. Every screen is captured; a {@code [frontend-route]} line reports each check. The routes refuse
+ * to run without an isolated data directory, since they write slots. Their screens draw only with a
+ * GL context, so they have no headless twin; the headless default-path tests drive the same
+ * controller through its seams.
  *
- * <p>0.9.1 milestone 03 adds {@code VEYLON_FRONTEND=route-refusal}, for a slot that holds a save of
- * another version, such as one the 0.9.0 build's first launch wrote: the slot's SHA-256; the title,
- * L, and the title again with the reason under the menu; N and Enter into a new city; F9 over it,
- * which must keep that city and log the reason; the slot's SHA-256 again, which must be unchanged;
- * then the pause menu and Q. It never presses F5. {@code SaveRefusalRoutingTest} drives the same
- * paths headlessly.
+ * <p>{@code VEYLON_FRONTEND=route-refusal} (0.9.1 milestones 03 and 04) plays slot 2 holding a save
+ * of another version. When slot 2 is empty and VEYLON 0.9.0's {@code saves/veylon.sav} is there, as
+ * the 0.9.0 build's first launch leaves it, the route copies it into slot 2 first, reading the old
+ * file only. Then the SHA-256 of both; L, the picker with slot 2 as another version and the old
+ * file's note; 2 and Enter, and the reason under the cards; Esc, then N, Enter and Enter into a new
+ * city in slot 1; both hashes again, which must be unchanged; then the pause menu and Q. It never
+ * presses F5. {@code SaveRefusalRoutingTest} drives the same paths headlessly.
  */
 final class FrontendRouteQa {
     static final String ROUTE = "route";
@@ -70,8 +75,7 @@ final class FrontendRouteQa {
 
     private final Game game;
     private final AutomatedRunDriver driver;
-    private final boolean loadLaunch;
-    private final boolean refusalLaunch;
+    private final String launch;
     private final GameMode mode;
     private final Path digest;
     private final ArrayDeque<String> labels = new ArrayDeque<>();
@@ -88,7 +92,8 @@ final class FrontendRouteQa {
     private BuildingPlan.Fixture cupboard;
     private String slotBefore = "";
     private String slotAfter = "";
-    private World liveCity;
+    private String legacyBefore = "";
+    private String legacyAfter = "";
 
     /** Whether a {@code VEYLON_FRONTEND} screen names this route. */
     static boolean names(String screen) {
@@ -97,83 +102,125 @@ final class FrontendRouteQa {
 
     FrontendRouteQa(Game game, AutomatedRunDriver driver, String screen, GameMode mode) {
         if (!AppPaths.isolatedFromPlayerData()) {
-            throw new IllegalStateException("VEYLON_FRONTEND=" + screen + " saves into the slot: run with"
+            throw new IllegalStateException("VEYLON_FRONTEND=" + screen + " saves into the slots: run with"
                     + " -Dveylon.dataDir=<dir> (Gradle: -PveylonDataDir=build/qa/<name>)");
         }
         this.game = game;
         this.driver = driver;
-        this.loadLaunch = ROUTE_LOAD.equals(screen);
-        this.refusalLaunch = ROUTE_REFUSAL.equals(screen);
+        this.launch = switch (screen) {
+            case ROUTE_REFUSAL -> "refusal";
+            case ROUTE_LOAD -> "load";
+            default -> "new";
+        };
         this.mode = mode;
-        this.digest = SaveSystem.SAVE_PATH.resolveSibling("frontend-route.digest");
-        if (refusalLaunch) {
-            planRefusalLaunch();
-        } else if (loadLaunch) {
-            planLoadLaunch();
-        } else {
-            planNewLaunch();
+        this.digest = slots().directory().resolve("frontend-route.digest");
+        switch (launch) {
+            case "refusal" -> planRefusalLaunch();
+            case "load" -> planLoadLaunch();
+            default -> planNewLaunch();
         }
-        System.out.println("[frontend-route] launch=" + launchName() + " mode="
-                + mode.name().toLowerCase(Locale.ROOT) + " slot=" + SaveSystem.SAVE_PATH
-                + " saveExisted=" + Files.exists(SaveSystem.SAVE_PATH));
+        System.out.println("[frontend-route] launch=" + launch + " mode=" + mode.name().toLowerCase(Locale.ROOT)
+                + " slots=" + slots().directory() + " states=" + states());
     }
 
-    private String launchName() {
-        return refusalLaunch ? "refusal" : loadLaunch ? "load" : "new";
+    private SaveSlots slots() {
+        return game.saves.slots();
+    }
+
+    /** Every slot's state, in order, as the picker would show it. */
+    private List<SaveSlots.State> states() {
+        return slots().describeAll().stream().map(SaveSlots.Slot::state).toList();
+    }
+
+    /** What the open picker shows for {@code slot}. */
+    private SaveSlots.State shown(int slot) {
+        return game.frontend.slotPicker.slots().get(slot - 1).state();
+    }
+
+    private boolean picking(SlotPickerScreen.Purpose purpose) {
+        return game.appState == Game.AppState.TITLE_SLOTS && game.frontend.slotPicker.purpose() == purpose;
     }
 
     /**
-     * A slot holding another version's save: refused from the title and by F9 over a new city, the
-     * reason shown both times, the file never changed. Nothing here writes the slot.
+     * Slot 2 holding another version's save: refused from the picker with the reason under the cards,
+     * the file never changed, VEYLON 0.9.0's own file neither. Nothing here writes slot 2.
      */
     private void planRefusalLaunch() {
-        LoadResult refused = new LoadResult(LoadResult.Outcome.OLDER_VERSION, "");
-        String older = refused.message();
-        step("hash the slot", run(() -> slotBefore = slotHash()));
-        step("a save of another version is in the slot", check(() -> !slotBefore.isEmpty()));
+        String older = new LoadResult(LoadResult.Outcome.OLDER_VERSION, "").message();
+        Path slot2 = slots().current(2), legacy = slots().legacySave();
+        step("0.9.0's save into slot 2", run(() -> copyLegacyInto(2)));
+        step("hash slot 2 and 0.9.0's file", run(() -> {
+            slotBefore = hash(slot2);
+            legacyBefore = hash(legacy);
+        }));
+        step("a save of another version is in slot 2", check(() -> !slotBefore.isEmpty()));
+        step("slot 1 is empty", check(() -> slots().describe(1).state() == SaveSlots.State.EMPTY));
         step("title", wait(1.5));
         step("title capture", capture("01-title"));
         step("L", press(GLFW_KEY_L));
-        step("back at the title", await(() -> game.appState == Game.AppState.TITLE && game.world == null, 30));
-        step("the title says why", check(() -> older.equals(game.titleScreen.notice())));
+        step("the slot picker", await(() -> picking(SlotPickerScreen.Purpose.LOAD), 3));
+        step("2", press(GLFW_KEY_2));
+        step("slot 2 is another version", check(() -> shown(2) == SaveSlots.State.OTHER_VERSION
+                && game.frontend.slotPicker.selected() == 2));
+        step("picker settle", wait(0.6));
+        step("picker capture", capture("02-slots"));
+        step("Enter on slot 2", press(GLFW_KEY_ENTER));
+        step("the picker says why", await(() -> older.equals(game.frontend.slotPicker.notice()), 2));
+        step("nothing was loaded", check(() -> game.world == null && game.appState == Game.AppState.TITLE_SLOTS));
         step("notice settle", wait(0.6));
-        step("refused capture", capture("02-title-refused"));
+        step("refused capture", capture("03-slot-refused"));
+        step("Esc", press(GLFW_KEY_ESCAPE));
+        step("back at the title", await(() -> game.appState == Game.AppState.TITLE, 2));
         step("N", press(GLFW_KEY_N));
         step("new frontier", await(() -> game.appState == Game.AppState.TITLE_NEW_WORLD, 3));
-        step("it warns about the file in the slot", check(() -> game.newFrontierScreen.showsReplaceNotice()));
         step("Enter", press(GLFW_KEY_ENTER));
+        step("the slot picker for the new world", await(() -> picking(SlotPickerScreen.Purpose.NEW), 3));
+        step("it offers the empty slot 1", check(() -> game.frontend.slotPicker.selected() == 1));
+        step("Enter again", press(GLFW_KEY_ENTER));
         step("loading", await(() -> game.appState == Game.AppState.LOADING, 2));
         step("playing", await(() -> game.appState == Game.AppState.PLAYING, 90));
-        step("a new city", check(() -> game.world.isUrban() && game.world.changedBlocks.isEmpty()));
+        step("a new city in slot 1", check(() -> game.world.isUrban() && game.world.changedBlocks.isEmpty()
+                && game.saves.activeSlot() == 1 && slots().describe(1).state() == SaveSlots.State.READY));
         step("meshes", wait(3.0));
-        step("remember the city", run(() -> liveCity = game.world));
-        step("city capture", capture("03-new-city"));
-        step("F9 over the live city", press(GLFW_KEY_F9));
-        step("F9 says why", await(() -> logged(refused.logLine()), 5));
-        step("the city is kept", check(() -> game.world == liveCity && game.appState == Game.AppState.PLAYING));
-        step("log settle", wait(1.0));
-        step("F9 capture", capture("04-f9-refused"));
-        step("hash the slot again", run(() -> slotAfter = slotHash()));
-        step("the slot is untouched", check(() -> slotBefore.equals(slotAfter)));
+        step("city capture", capture("04-new-city"));
+        step("hash both again", run(() -> {
+            slotAfter = hash(slot2);
+            legacyAfter = hash(legacy);
+        }));
+        step("slot 2 and 0.9.0's file are untouched", check(() -> slotBefore.equals(slotAfter)
+                && legacyBefore.equals(legacyAfter)));
         pauseScreens(5);
         step("report", run(this::report));
         step("Q quits", press(GLFW_KEY_Q));
     }
 
-    /** The slot's SHA-256, or empty when it holds no file. */
-    private static String slotHash() {
+    /** Copies VEYLON 0.9.0's file into an empty slot, reading the old file only. */
+    private void copyLegacyInto(int slot) {
         try {
-            if (!Files.isRegularFile(SaveSystem.SAVE_PATH)) {
+            if (!Files.exists(slots().current(slot)) && slots().holdsLegacySave()) {
+                Files.copy(slots().legacySave(), slots().current(slot));
+                System.out.println("[frontend-route] copied " + slots().legacySave().getFileName() + " into slot " + slot);
+            }
+        } catch (IOException e) {
+            throw new UncheckedIOException("could not stage slot " + slot, e);
+        }
+    }
+
+    /** A file's SHA-256, or empty when there is none. */
+    private static String hash(Path file) {
+        try {
+            if (!Files.isRegularFile(file)) {
                 return "";
             }
-            byte[] sha = MessageDigest.getInstance("SHA-256").digest(Files.readAllBytes(SaveSystem.SAVE_PATH));
+            byte[] sha = MessageDigest.getInstance("SHA-256").digest(Files.readAllBytes(file));
             return HexFormat.of().formatHex(sha);
         } catch (IOException | NoSuchAlgorithmException e) {
-            throw new IllegalStateException("could not hash the slot", e);
+            throw new IllegalStateException("could not hash " + file, e);
         }
     }
 
     private void planNewLaunch() {
+        step("slot 1 is empty", check(() -> slots().describe(1).state() == SaveSlots.State.EMPTY));
         step("title", wait(1.5));
         step("title capture", capture("01-title"));
         step("N", press(GLFW_KEY_N));
@@ -192,13 +239,20 @@ final class FrontendRouteQa {
             step("creative capture", capture("04-new-creative"));
         }
         step("Enter", press(GLFW_KEY_ENTER));
+        step("the slot picker", await(() -> picking(SlotPickerScreen.Purpose.NEW), 3));
+        step("on the empty slot 1", check(() -> game.frontend.slotPicker.selected() == 1));
+        step("picker settle", wait(0.5));
+        step("slot capture", capture("05-slots"));
+        step("Enter starts in slot 1", press(GLFW_KEY_ENTER));
         step("loading", await(() -> game.appState == Game.AppState.LOADING, 2));
-        step("loading capture", capture("05-loading"));
+        step("loading capture", capture("06-loading"));
         step("playing", await(() -> game.appState == Game.AppState.PLAYING, 90));
         step("the default world is the city", check(() -> game.world.generatorVersion == World.DEFAULT_NEW_WORLD_GENERATOR
                 && game.world.isUrban() && game.gameMode() == mode && inRefuge()));
+        step("saved into slot 1 at once", check(() -> game.saves.activeSlot() == 1
+                && slots().describe(1).state() == SaveSlots.State.READY));
         step("meshes", wait(3.0));
-        step("refuge capture", capture("06-refuge"));
+        step("refuge capture", capture("07-refuge"));
         step("stand at a refuge cupboard", run(this::standAtCupboard));
         step("an empty hand", press(GLFW_KEY_9));
         step("aim settle", wait(0.5));
@@ -206,7 +260,7 @@ final class FrontendRouteQa {
         step("its screen", await(() -> game.uiMode == Game.UiMode.CRATE, 2));
         step("the search", await(this::cupboardSearched, 8));
         step("search settle", wait(0.4));
-        step("search capture", capture("07-search"));
+        step("search capture", capture("08-search"));
         step("take a stack", check(this::takeAStack));
         step("Esc closes it", press(GLFW_KEY_ESCAPE));
         step("closed", await(() -> game.uiMode == Game.UiMode.NONE, 2));
@@ -215,13 +269,13 @@ final class FrontendRouteQa {
         step("M", press(GLFW_KEY_M));
         step("map", await(() -> game.uiMode == Game.UiMode.MAP, 2));
         step("map settle", wait(0.5));
-        step("map capture", capture("08-map"));
+        step("map capture", capture("09-map"));
         step("Esc closes the map", press(GLFW_KEY_ESCAPE));
         step("map closed", await(() -> game.uiMode == Game.UiMode.NONE, 2));
         step("F5", press(GLFW_KEY_F5));
-        step("saved", await(() -> logged("Game saved."), 3));
+        step("saved", await(() -> logged(SaveSession.savedLine(1)), 3));
         step("remember the save", run(this::rememberSave));
-        step("saved capture", capture("09-saved"));
+        step("saved capture", capture("10-saved"));
         if (mode == GameMode.SURVIVAL) {
             step("a death through the damage gate", run(() -> {
                 carried = SaveAuditQaScene.contents(game.player.inventory);
@@ -229,27 +283,27 @@ final class FrontendRouteQa {
             }));
             step("death card", await(() -> game.appState == Game.AppState.DEATH, 3));
             step("card settle", wait(0.6));
-            step("death capture", capture("10-death"));
+            step("death capture", capture("11-death"));
             step("Enter wakes", press(GLFW_KEY_ENTER));
             step("awake", await(() -> game.appState == Game.AppState.PLAYING && !game.player.dead, 3));
             step("woke at the refuge with what was carried", check(() -> inRefuge()
                     && SaveAuditQaScene.contents(game.player.inventory).equals(carried)));
             step("wake settle", wait(1.2));
-            step("wake capture", capture("11-wake"));
+            step("wake capture", capture("12-wake"));
         } else {
             step("Space", press(GLFW_KEY_SPACE));
             step("between taps", wait(0.12));
             step("Space again", press(GLFW_KEY_SPACE));
             step("flying", await(() -> game.player.abilities.flying(), 2));
             step("rise", hold(GLFW_KEY_SPACE, 0.6));
-            step("flight capture", capture("11-flying"));
+            step("flight capture", capture("12-flying"));
         }
         step("F9 over the live world", press(GLFW_KEY_F9));
-        step("loaded", await(() -> logged("Game loaded."), 5));
+        step("loaded", await(() -> logged(SaveSession.loadedLine(1)), 5));
         step("F9 restores what F5 wrote", check(() -> SaveAuditQaScene.durable(game).equals(saved)));
         step("load settle", wait(1.5));
-        step("load capture", capture("12-after-f9"));
-        pauseScreens(13);
+        step("load capture", capture("13-after-f9"));
+        pauseScreens(14);
         step("report", run(this::report));
         step("Q quits", press(GLFW_KEY_Q));
     }
@@ -265,14 +319,20 @@ final class FrontendRouteQa {
         step("title", wait(1.5));
         step("title capture", capture("01-title"));
         step("L", press(GLFW_KEY_L));
+        step("the slot picker", await(() -> picking(SlotPickerScreen.Purpose.LOAD), 3));
+        step("on the slot saved last", check(() -> game.frontend.slotPicker.selected() == 1
+                && shown(1) == SaveSlots.State.READY));
+        step("picker settle", wait(0.5));
+        step("slot capture", capture("02-slots"));
+        step("Enter loads it", press(GLFW_KEY_ENTER));
         step("loading", await(() -> game.appState == Game.AppState.LOADING, 2));
-        step("loading capture", capture("02-loading"));
+        step("loading capture", capture("03-loading"));
         step("playing", await(() -> game.appState == Game.AppState.PLAYING, 90));
         step("restores what the first launch saved", check(() -> !saved.isEmpty()
-                && SaveAuditQaScene.durable(game).equals(saved)));
+                && SaveAuditQaScene.durable(game).equals(saved) && game.saves.activeSlot() == 1));
         step("meshes", wait(2.5));
-        step("loaded capture", capture("03-loaded"));
-        pauseScreens(4);
+        step("loaded capture", capture("04-loaded"));
+        pauseScreens(5);
         step("report", run(this::report));
         step("Q quits", press(GLFW_KEY_Q));
     }
@@ -481,20 +541,24 @@ final class FrontendRouteQa {
 
     private void report() {
         reported = true;
-        if (game.world != null && loadLaunch) {
+        if (game.world != null && "load".equals(launch)) {
             for (String line : SaveAuditQaScene.durable(game)) {
                 System.out.println("[frontend-route] loaded " + line);
             }
         }
-        if (refusalLaunch) {
-            System.out.println("[frontend-route] slot sha256 before=" + slotBefore + " after=" + slotAfter
-                    + " notice=\"" + game.titleScreen.notice() + "\"");
+        if ("refusal".equals(launch)) {
+            System.out.println("[frontend-route] slot 2 sha256 before=" + slotBefore + " after=" + slotAfter
+                    + " veylon.sav sha256 before=" + legacyBefore + " after=" + legacyAfter);
         }
-        System.out.println("[frontend-route] launch=" + launchName() + " pass=" + failures.isEmpty()
+        String keys = switch (launch) {
+            case "refusal" -> "L,2,Enter,Esc,N,Enter,Enter,Esc,O,V,Q";
+            case "load" -> "L,Enter,Esc,O,V,Q";
+            default -> "N,W,C,Enter,Enter,9,RMB,Esc,W-held,M,Esc,F5,Enter|Space,F9,O,V,Q";
+        };
+        System.out.println("[frontend-route] launch=" + launch + " pass=" + failures.isEmpty()
                 + " failures=" + failures + " generator=" + (game.world == null ? -1 : game.world.generatorVersion)
                 + " mode=" + (game.world == null ? mode : game.gameMode()).name().toLowerCase(Locale.ROOT)
-                + " evidence=keys(" + (refusalLaunch ? "L,N,Enter,F9,Esc,O,V,Q" : loadLaunch ? "L,Esc,O,V,Q"
-                : "N,W,C,Enter,9,RMB,Esc,W-held,M,Esc,F5,Enter|Space,F9,O,V,Q") + ")"
+                + " slot=" + game.saves.activeSlot() + " evidence=keys(" + keys + ")"
                 + " glErrors=" + game.window.glErrorCount() + " khrErrors=" + game.window.glDebugErrorCount());
     }
 }

@@ -5,10 +5,11 @@ import com.veylon.entity.GameMode;
 import com.veylon.entity.PlayerMovementSystem;
 import com.veylon.item.ItemStack;
 import com.veylon.item.ItemType;
-import com.veylon.save.SaveSystem;
+import com.veylon.save.SaveSlots;
 import com.veylon.simulation.TimePreset;
 import com.veylon.simulation.WeatherSystem;
 import com.veylon.ui.NewFrontierScreen;
+import com.veylon.ui.SlotPickerScreen;
 import com.veylon.ui.TitleScreen;
 import com.veylon.util.Vec3i;
 import com.veylon.world.BlockType;
@@ -45,7 +46,7 @@ class DefaultCityAcceptanceTest {
 
     @Test
     void newFrontiersDefaultsBuildTheWorldEveryCityRouteTestPlays() {
-        Game front = newFrontier(SEED, directory.resolve("slot.sav"));
+        Game front = newFrontier(SEED, directory.resolve("slots"));
         Game direct = SurvivorWorldArena.session(SEED, GameMode.SURVIVAL, World.GEN_URBAN_ECONOMY, new AudioManager());
         assertEquals(World.GEN_URBAN_ECONOMY, front.world.generatorVersion, "the default is the economy city");
         assertEquals(GameMode.SURVIVAL, front.gameMode(), "Survival is the default mode");
@@ -72,16 +73,19 @@ class DefaultCityAcceptanceTest {
 
     @Test
     void theIntegratedCityTravelsFromNewFrontierThroughASaveAndTheTitleBackIntoPlay() {
-        Path slot = directory.resolve("slot.sav");
-        Game g = newFrontier(SEED, slot);
+        Game g = newFrontier(SEED, directory.resolve("slots"));
+        assertEquals(1, g.saves.activeSlot(), "the new city belongs to the first empty slot");
         IntegratedCityFixture.Built built = IntegratedCityFixture.build(g);
         List<String> saved = IntegratedCityFixture.describe(g, built.facts());
         List<String> durable = SaveAuditQaScene.durable(g);
 
-        assertTrue(SaveSystem.save(g, slot), "F5 writes the city");
+        assertTrue(g.saves.saveActive(), "F5 writes the city into slot 1");
         g.frontend.returnToTitle();
         assertNull(g.world, "the title holds no world");
         g.frontend.applyTitle(TitleScreen.Action.LOAD_GAME);
+        assertEquals(Game.AppState.TITLE_SLOTS, g.appState, "LOAD FRONTIER lists the slots");
+        assertEquals(1, g.frontend.slotPicker.selected(), "on the one saved last");
+        g.frontend.applySlots(SlotPickerScreen.Action.CHOOSE);
         assertEquals("Restoring your frontier...", g.frontend.loadingDetail());
         assertTrue(g.frontend.performLoad(), "LOAD FRONTIER restores it");
         assertEquals(Game.AppState.PLAYING, g.appState);
@@ -89,25 +93,29 @@ class DefaultCityAcceptanceTest {
         assertEquals(saved, IntegratedCityFixture.describe(g, built.facts()), "every fact, as it was saved");
         assertEquals(durable, SaveAuditQaScene.durable(g), "and everything a save must hold");
 
-        // NEW FRONTIER over it and back again: the next new city inherits nothing, the slot still loads.
+        // A new city beside it and back again: the next new city inherits nothing, slot 1 still loads.
         g.frontend.returnToTitle();
         g.frontend.applyTitle(TitleScreen.Action.NEW_GAME);
-        assertEquals(NewFrontierScreen.CITY_REPLACE_NOTICE, g.newFrontierScreen.replaceNotice(),
-                "the shared slot's notice names the new city");
-        assertTrue(g.newFrontierScreen.showsReplaceNotice());
         g.frontend.applyNewFrontier(NewFrontierScreen.Action.START);
+        assertEquals(2, g.frontend.slotPicker.selected(), "the picker offers the first empty slot");
+        g.frontend.applySlots(SlotPickerScreen.Action.CHOOSE);
         assertTrue(g.frontend.performLoad());
+        assertEquals(2, g.saves.activeSlot());
         assertEquals(0, g.world.changedBlocks.size(), "a new city starts unedited");
         assertEquals(0, g.world.urban.missions.missions().size(), "and owes nobody anything");
         g.frontend.returnToTitle();
         g.frontend.applyTitle(TitleScreen.Action.LOAD_GAME);
+        assertEquals(SaveSlots.State.READY, g.frontend.slotPicker.slots().get(1).state(), "slot 2 holds the new city");
+        pick(g, GLFW_KEY_1);
+        g.frontend.applySlots(SlotPickerScreen.Action.CHOOSE);
         assertTrue(g.frontend.performLoad());
-        assertEquals(saved, IntegratedCityFixture.describe(g, built.facts()), "an unsaved new city never touched the slot");
+        assertEquals(1, g.saves.activeSlot());
+        assertEquals(saved, IntegratedCityFixture.describe(g, built.facts()), "a new city in slot 2 never touched slot 1");
     }
 
     @Test
     void deathOnTheDefaultCityWakesTheSurvivorAtTheRefugeWithWhatTheyCarried() {
-        Game g = newFrontier(SEED, directory.resolve("slot.sav"));
+        Game g = newFrontier(SEED, directory.resolve("slots"));
         BuildingPlan neighbour = RefugeWorldArena.neighbour(g);
         SurvivorWorldArena.standAt(g, neighbour.approaches().getFirst());
         g.player.inventory.add(ItemType.SCRAP, 3);
@@ -129,7 +137,7 @@ class DefaultCityAcceptanceTest {
 
     @Test
     void thePauseMenuAndItsScreensRouteOnTheDefaultCity() {
-        Game g = newFrontier(SEED, directory.resolve("slot.sav"));
+        Game g = newFrontier(SEED, directory.resolve("slots"));
         HotkeyRouter router = new HotkeyRouter(g);
         route(g, router, GLFW_KEY_ESCAPE);
         assertEquals(Game.UiMode.PAUSE, g.uiMode, "Esc pauses");
@@ -151,7 +159,7 @@ class DefaultCityAcceptanceTest {
 
     @Test
     void creativeOnTheDefaultCityFliesBuildsFreeAndRulesTheClockAndTheSky() {
-        Game g = newFrontier(SEED, directory.resolve("slot.sav"), GLFW_KEY_C);
+        Game g = newFrontier(SEED, directory.resolve("slots"), GLFW_KEY_C);
         assertEquals(World.DEFAULT_NEW_WORLD_GENERATOR, g.world.generatorVersion);
         assertEquals(GameMode.CREATIVE, g.gameMode());
         assertTrue(g.creativeMarked());
@@ -203,21 +211,35 @@ class DefaultCityAcceptanceTest {
         assertTrue(g.weatherLocked());
     }
 
-    /** NEW FRONTIER from the title with the given keys, then Enter: the path a player takes. */
-    static Game newFrontier(long seed, Path slot, int... keys) {
+    /**
+     * NEW FRONTIER from the title with the given keys, Enter, then Enter on the slot picker: the path a
+     * player takes, into the first empty slot of a folder of slots of the test's own.
+     */
+    static Game newFrontier(long seed, Path slots, int... keys) {
         Game g = new Game();
         g.sessionSeed = seed;
-        g.frontend.savePath = slot;
+        g.saves.useSlots(new SaveSlots(slots));
         g.frontend.applyTitle(TitleScreen.Action.NEW_GAME);
         assertTrue(g.newFrontierScreen.showsCity(), "NEW FRONTIER opens on the city");
         for (int key : keys) {
             press(g, key);
         }
         g.frontend.applyNewFrontier(press(g, GLFW_KEY_ENTER));
+        assertEquals(Game.AppState.TITLE_SLOTS, g.appState, "Enter goes on to the slot picker");
+        g.frontend.applySlots(pick(g, GLFW_KEY_ENTER));
         assertEquals("Mapping the abandoned city...", g.frontend.loadingDetail());
         assertTrue(g.frontend.performLoad());
         assertEquals(Game.AppState.PLAYING, g.appState);
         return g;
+    }
+
+    /** {@code key} pressed and released on the slot picker. */
+    private static SlotPickerScreen.Action pick(Game g, int key) {
+        g.input.onKey(key, GLFW_PRESS);
+        SlotPickerScreen.Action action = g.frontend.slotPicker.handleKeys(g.input);
+        g.input.endFrame();
+        g.input.onKey(key, GLFW_RELEASE);
+        return action;
     }
 
     private static NewFrontierScreen.Action press(Game g, int key) {

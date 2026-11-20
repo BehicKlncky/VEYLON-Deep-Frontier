@@ -96,12 +96,12 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
     }
 
     enum AppState {
-        TITLE, TITLE_OPTIONS, LOADING, PLAYING, DEATH, VICTORY, TITLE_AUDIO_OPTIONS, TITLE_NEW_WORLD;
+        TITLE, TITLE_OPTIONS, LOADING, PLAYING, DEATH, VICTORY, TITLE_AUDIO_OPTIONS, TITLE_NEW_WORLD, TITLE_SLOTS;
 
         /** True while a live world is being drawn, so render stats are meaningful. */
         boolean rendersWorld() {
             return this != TITLE && this != TITLE_OPTIONS && this != TITLE_AUDIO_OPTIONS && this != LOADING
-                    && this != TITLE_NEW_WORLD;
+                    && this != TITLE_NEW_WORLD && this != TITLE_SLOTS;
         }
     }
 

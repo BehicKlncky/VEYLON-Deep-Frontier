@@ -20,7 +20,6 @@ import com.veylon.settlement.SettlementManager;
 import com.veylon.settlement.SettlementType;
 import com.veylon.simulation.EventSystem;
 import com.veylon.simulation.WeatherSystem;
-import com.veylon.util.AppPaths;
 import com.veylon.util.Vec3i;
 import com.veylon.world.BlockType;
 import com.veylon.world.Poi;
@@ -110,15 +109,14 @@ public final class SaveSystem {
      * save the writer publishes.
      */
     static final int MAX_SAVE_BYTES = 128 * 1024 * 1024;
-    public static final Path SAVE_PATH = AppPaths.dataDirectory().resolve("saves/veylon.sav");
 
     private SaveSystem() {
     }
 
-    public static boolean save(Game g) {
-        return save(g, SAVE_PATH);
-    }
-
+    /**
+     * Saves to one file. The game's own saves go through {@link SaveSlots}, which keeps backups;
+     * tests and QA runs write files of their own here.
+     */
     public static boolean save(Game g, Path savePath) {
         return save(g, savePath, MAX_SAVE_BYTES);
     }
@@ -439,17 +437,8 @@ public final class SaveSystem {
         }
     }
 
-    public static boolean load(Game g) {
-        return load(g, SAVE_PATH);
-    }
-
     public static boolean load(Game g, Path savePath) {
         return open(g, savePath).loaded();
-    }
-
-    /** {@link #open(Game, Path)} on the save slot. */
-    public static LoadResult open(Game g) {
-        return open(g, SAVE_PATH);
     }
 
     /**

@@ -329,7 +329,7 @@ abstract class UrbanPeopleScene extends UrbanRouteScene {
                 pressed = true;
                 return false;
             }
-            if (!loggedSince(mark, "Game saved.")) { throw fail("quick-save failed: " + loggedAfter(mark)); }
+            if (!loggedSince(mark, SaveSession.savedLine(game.saves.activeSlot()))) { throw fail("quick-save failed: " + loggedAfter(mark)); }
             return true;
         }
 
@@ -350,7 +350,7 @@ abstract class UrbanPeopleScene extends UrbanRouteScene {
                 pressed = true;
                 return false;
             }
-            if (!loggedSince(mark, "Game loaded.") || game.world == world) {
+            if (!loggedSince(mark, SaveSession.loadedLine(game.saves.activeSlot())) || game.world == world) {
                 throw fail("quick-load did not replace the live world");
             }
             world = null;

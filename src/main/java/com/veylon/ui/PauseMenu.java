@@ -48,13 +48,18 @@ public class PauseMenu {
                         : "[Esc] Resume   [G] Game mode   [O] Graphics   [V] Audio",
                 1f, 1f, 1f, 1f);
         oy += 22;
-        ui.textCentered(w / 2f, oy, 1.10f, "[F5] Save   [F9] Load   [Q] Quit", 1f, 1f, 1f, 1f);
+        ui.textCentered(w / 2f, oy, 1.10f, saveKeys(g.saves.activeSlot()), 1f, 1f, 1f, 1f);
         oy += 34;
 
         for (String line : controls(city, g.world.urban != null && g.world.urban.hasMissions())) {
             ui.textShadow(x0 + 36, oy, 1.3f, line, 0.85f, 0.88f, 0.92f, 1f);
             oy += 22;
         }
+    }
+
+    /** The save keys, naming the slot the live world belongs to (0.9.1 milestone 04). */
+    public static String saveKeys(int slot) {
+        return "[F5] Save to slot " + slot + "   [F9] Load slot " + slot + "   [Q] Quit";
     }
 
     /** Under the mode in a city: what kind of world this is (urban milestone 21). */

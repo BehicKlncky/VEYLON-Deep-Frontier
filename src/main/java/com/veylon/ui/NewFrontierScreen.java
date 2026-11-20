@@ -8,23 +8,20 @@ import com.veylon.entity.GameMode;
 import static org.lwjgl.glfw.GLFW.*;
 
 /**
- * Worldless choice of the world and its mode between the title and loading (R2). The abandoned
- * city is the new world (urban milestone 26); the wilderness stays on offer beside it, labelled as
- * the legacy world. Every opening starts from the session's world and from Survival, so an abandoned
- * choice never carries into a later frontier. Keyboard decisions live in {@link #handleKeys}, which
- * never touches the renderer, so routing stays testable without a GL context.
+ * Worldless choice of the world and its mode between the title and the slot it is saved in (R2;
+ * 0.9.1 milestone 04). The abandoned city is the new world (urban milestone 26); the wilderness
+ * stays on offer beside it, labelled as the legacy world. Every opening starts from the session's
+ * world and from Survival, so an abandoned choice never carries into a later frontier. Keyboard
+ * decisions live in {@link #handleKeys}, which never touches the renderer, so routing stays
+ * testable without a GL context.
  */
 public final class NewFrontierScreen {
 
-    /** Result handed to the frontend controller. */
+    /** Result handed to the frontend controller: START goes on to the slot picker. */
     public enum Action { NONE, START, BACK }
 
-    /** D7: every world and both modes share the single save slot. */
-    public static final String REPLACE_NOTICE =
-            "Saving this new frontier will replace your current save.";
-    /** The same notice for a new city, naming the kind of world that would take the slot (P-05). */
-    public static final String CITY_REPLACE_NOTICE =
-            "Saving this new city will replace your current save.";
+    /** The line under the notes: where Enter goes next. */
+    public static final String SLOT_NOTE = "Next, choose the slot this world is saved in.";
     /** The two worlds, the city first. */
     public static final String CITY_TITLE = "THE ABANDONED CITY";
     public static final String WILDERNESS_TITLE = "THE WILDERNESS  (legacy)";
@@ -35,7 +32,7 @@ public final class NewFrontierScreen {
             "The world of releases up to 0.8.1: forests, caves, settlements and the beacon.";
     /** The key line at the foot of the screen. */
     public static final String KEYS =
-            "S / C or arrows choose the mode     W the world     Enter starts     Esc returns";
+            "S / C or arrows choose the mode     W the world     Enter chooses the slot     Esc returns";
 
     private static final GameMode[] MODES = {GameMode.SURVIVAL, GameMode.CREATIVE};
     private static final String[] TITLES = {"SURVIVAL", "CREATIVE"};
@@ -58,22 +55,19 @@ public final class NewFrontierScreen {
     private static final float BUTTON_H = 36;
 
     private int selected;
-    private boolean saveExists;
     private boolean city = true;
 
-    /** Opens on the city and Survival; {@code saveExists} decides the replace notice. */
-    public void open(boolean saveExists) {
-        open(saveExists, true);
+    /** Opens on the city and Survival. */
+    public void open() {
+        open(true);
     }
 
     /**
-     * Resets the choice to Survival; {@code saveExists} decides the replace notice and {@code city}
-     * which world the screen opens on: the session's own, the city unless a QA session chose the
-     * wilderness.
+     * Resets the choice to Survival; {@code city} decides which world the screen opens on: the
+     * session's own, the city unless a QA session chose the wilderness.
      */
-    public void open(boolean saveExists, boolean city) {
+    public void open(boolean city) {
         selected = 0;
-        this.saveExists = saveExists;
         this.city = city;
     }
 
@@ -81,18 +75,9 @@ public final class NewFrontierScreen {
         return MODES[selected];
     }
 
-    public boolean showsReplaceNotice() {
-        return saveExists;
-    }
-
     /** Whether the chosen world is the abandoned city rather than the wilderness. */
     public boolean showsCity() {
         return city;
-    }
-
-    /** The shared slot's notice, naming the kind of world chosen. */
-    public String replaceNotice() {
-        return city ? CITY_REPLACE_NOTICE : REPLACE_NOTICE;
     }
 
     /** What the chosen world is, in one line. */
@@ -108,7 +93,7 @@ public final class NewFrontierScreen {
 
     /**
      * R2 keys: S/C, arrows or Tab choose the mode; W switches between the city and the wilderness;
-     * Enter starts; Escape returns to the title.
+     * Enter goes on to the slot picker; Escape returns to the title.
      */
     public Action handleKeys(Input input) {
         if (input.wasKeyPressed(GLFW_KEY_S) || input.wasKeyPressed(GLFW_KEY_LEFT)) {
@@ -175,15 +160,13 @@ public final class NewFrontierScreen {
         ui.textCentered(w / 2f, noteY, 1.1f, MARK_NOTE, 0.55f, 0.66f, 0.70f, 1f);
         noteY += 26;
         ui.textCentered(w / 2f, noteY, 1.1f, worldNote(), 0.55f, 0.66f, 0.70f, 1f);
-        if (saveExists) {
-            ui.textCentered(w / 2f, noteY + 26, 1.2f, replaceNotice(), 1f, 0.65f, 0.42f, 1f);
-        }
+        ui.textCentered(w / 2f, noteY + 26, 1.2f, SLOT_NOTE, 0.80f, 0.94f, 0.95f, 1f);
 
         float buttonY = noteY + 66;
         float startX = w / 2f - BUTTON_W - 8, backX = w / 2f + 8;
         boolean startHover = inside(mx, my, startX, buttonY, BUTTON_W, BUTTON_H);
         boolean backHover = inside(mx, my, backX, buttonY, BUTTON_W, BUTTON_H);
-        button(ui, startX, buttonY, "START [Enter]", startHover, true);
+        button(ui, startX, buttonY, "CHOOSE SLOT [Enter]", startHover, true);
         button(ui, backX, buttonY, "BACK [Esc]", backHover, false);
         ui.textCentered(w / 2f, h - 34, 1.05f, KEYS, 0.42f, 0.50f, 0.56f, 1f);
 

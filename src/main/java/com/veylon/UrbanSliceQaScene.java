@@ -448,7 +448,7 @@ final class UrbanSliceQaScene extends UrbanRouteScene {
                 pressed = true;
                 return false;
             }
-            if (!loggedSince(mark, "Game saved.")) { throw fail("quick-save failed: " + lastLog()); }
+            if (!loggedSince(mark, SaveSession.savedLine(game.saves.activeSlot()))) { throw fail("quick-save failed: " + lastLog()); }
             return true;
         }
         @Override boolean threatsInterrupt() { return false; }
@@ -466,7 +466,7 @@ final class UrbanSliceQaScene extends UrbanRouteScene {
                 pressed = true;
                 return false;
             }
-            if (!loggedSince(mark, "Game loaded.") || game.world == savedWorld || game.player == savedPlayer) {
+            if (!loggedSince(mark, SaveSession.loadedLine(game.saves.activeSlot())) || game.world == savedWorld || game.player == savedPlayer) {
                 throw fail("quick-load did not replace the live world: " + lastLog());
             }
             plan = UrbanSlicePlan.of(game.world);

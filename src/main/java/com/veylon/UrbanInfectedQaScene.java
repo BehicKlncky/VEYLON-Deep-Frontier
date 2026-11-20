@@ -5,7 +5,6 @@ import com.veylon.combat.WeaponRegistry;
 import com.veylon.entity.CombustionSource;
 import com.veylon.entity.GameMode;
 import com.veylon.entity.Npc;
-import com.veylon.save.SaveSystem;
 import com.veylon.world.VoxelClearance;
 import com.veylon.world.urban.EncounterAnchors;
 import com.veylon.world.urban.UrbanIds;
@@ -113,7 +112,7 @@ final class UrbanInfectedQaScene {
                     + " finalInput=instrumented-head-projectile");
         }
         if (phase == 4 && elapsed >= 12 && subject.dead && !game.entities.npcs.contains(subject)) {
-            if (!SaveSystem.save(game) || !SaveSystem.load(game)) { throw new IllegalStateException("infected QA save/load failed"); }
+            if (!game.saves.saveActive() || !game.saves.openActive().loaded()) { throw new IllegalStateException("infected QA save/load failed"); }
             passed = windup && damage && pain && panic && game.entities.encounters.resident(anchor.id()).dead()
                     && game.entities.encounters.tryActivate(game, anchor) == null
                     && game.entities.corpses.stream().anyMatch(c -> c.appearance.archetype == subject.archetype)

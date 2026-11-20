@@ -2,7 +2,6 @@ package com.veylon;
 
 import com.veylon.entity.PlayerConstants;
 import com.veylon.save.LoadResult;
-import com.veylon.save.SaveSystem;
 
 import static org.lwjgl.glfw.GLFW.*;
 
@@ -122,17 +121,19 @@ final class HotkeyRouter {
         }
     }
 
+    /** F5 saves into the active slot and F9 opens it (0.9.1 milestone 04); the log names the slot. */
     private void handleQuickSaveLoad() {
+        int slot = game.saves.activeSlot();
         if (game.input.wasKeyPressed(GLFW_KEY_F5)) {
-            game.log(SaveSystem.save(game) ? "Game saved." : "Save FAILED (see console).");
+            game.log(game.saves.saveActive() ? SaveSession.savedLine(slot) : SaveSession.saveFailedLine(slot));
         }
         if (game.input.wasKeyPressed(GLFW_KEY_F9)) {
             // A refused or failed load leaves the live world as it was; the log says why.
-            LoadResult result = SaveSystem.open(game);
+            LoadResult result = game.saves.openActive();
             if (result.loaded()) {
                 game.closeScreens();
             }
-            game.log(result.logLine());
+            game.log(result.loaded() ? SaveSession.loadedLine(slot) : SaveSession.notLoadedLine(slot, result));
         }
     }
 

@@ -2,19 +2,20 @@ package com.veylon;
 
 import com.veylon.entity.GameMode;
 import com.veylon.save.LoadResult;
-import com.veylon.save.SaveSystem;
+import com.veylon.save.SaveSlots;
 import com.veylon.ui.GraphicsOptionsScreen;
 import com.veylon.ui.AudioOptionsScreen;
 import com.veylon.ui.NewFrontierScreen;
 import com.veylon.ui.PresentationOverlay;
+import com.veylon.ui.SlotPickerScreen;
 import com.veylon.ui.TitleScreen;
 import com.veylon.world.World;
 
-import java.nio.file.Files;
-import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
- * The states with no world in them: title, new-frontier mode choice, graphics
+ * The states with no world in them: title, new-frontier mode choice, the slot picker, graphics
  * and audio options, and loading, plus the transitions in and out of a live game.
  *
  * <p>These share one property that makes them worth separating from the play
@@ -27,16 +28,26 @@ import java.nio.file.Path;
  * swapped, and only then does {@link #completeLoading} do the synchronous
  * worldgen or deserialization. Doing both in one frame would show the player a
  * frozen title screen for the duration and call it a loading screen.
+ *
+ * <p>Since 0.9.1 milestone 04 every path into a live world names a slot: LOAD FRONTIER opens the
+ * slot picker to load or restore one, NEW FRONTIER's Enter opens it to choose where the new world
+ * is saved, and the live world then belongs to that slot ({@link SaveSession}).
  */
 final class FrontendController {
 
-    /** Which of the two paths into a live world the player asked for. */
+    /** Which of the paths into a live world the player asked for. */
     private enum LoadRequest {
-        NEW_GAME, LOAD_GAME
+        NEW_GAME, LOAD_GAME, RESTORE_BACKUP
     }
 
     private final Game game;
+    /** LOAD FRONTIER's and NEW FRONTIER's slot picker. */
+    final SlotPickerScreen slotPicker = new SlotPickerScreen();
     private LoadRequest loadRequest;
+    /** The slot the pending load reads or the new world is saved in. */
+    private int requestedSlot = 1;
+    /** For a restore, which of the slot's backups. */
+    private int requestedBackup = 1;
     /** True once a loading frame has actually reached the screen. */
     private boolean loadingPresented;
     /** The mode chosen on the new-frontier screen; transient, consumed by one load. */
@@ -49,8 +60,6 @@ final class FrontendController {
     int newWorldGenerator = World.DEFAULT_NEW_WORLD_GENERATOR;
     /** The generator chosen on the new-frontier screen; transient, consumed by one load. */
     private int chosenGenerator = World.DEFAULT_NEW_WORLD_GENERATOR;
-    /** The single save slot. Visible for testing so routing tests use an isolated file. */
-    Path savePath = SaveSystem.SAVE_PATH;
 
     FrontendController(Game game) {
         this.game = game;
@@ -60,7 +69,7 @@ final class FrontendController {
     boolean owns(Game.AppState state) {
         return state == Game.AppState.TITLE || state == Game.AppState.TITLE_OPTIONS
                 || state == Game.AppState.TITLE_AUDIO_OPTIONS || state == Game.AppState.LOADING
-                || state == Game.AppState.TITLE_NEW_WORLD;
+                || state == Game.AppState.TITLE_NEW_WORLD || state == Game.AppState.TITLE_SLOTS;
     }
 
     void frame(float dt) {
@@ -70,6 +79,7 @@ final class FrontendController {
         switch (game.appState) {
             case TITLE -> applyTitle(game.titleScreen.update(game));
             case TITLE_NEW_WORLD -> applyNewFrontier(game.newFrontierScreen.update(game));
+            case TITLE_SLOTS -> applySlots(slotPicker.update(game));
             case TITLE_OPTIONS -> updateOptions(dt);
             case TITLE_AUDIO_OPTIONS -> updateAudio();
             default -> presentLoading();
@@ -77,11 +87,14 @@ final class FrontendController {
         game.ui.end();
     }
 
-    /** Applies a title action; NEW FRONTIER opens the mode choice instead of loading (R2). */
+    /**
+     * Applies a title action: NEW FRONTIER opens the mode choice instead of loading (R2), and LOAD
+     * FRONTIER the slot picker.
+     */
     void applyTitle(TitleScreen.Action action) {
         switch (action) {
-            case NEW_GAME -> openNewFrontier(Files.exists(savePath));
-            case LOAD_GAME -> beginLoading(LoadRequest.LOAD_GAME);
+            case NEW_GAME -> openNewFrontier();
+            case LOAD_GAME -> openSlots(SlotPickerScreen.Purpose.LOAD);
             case OPTIONS -> {
                 game.graphicsOptionsScreen.open(game.renderer.settings,
                         game.window.windowedWidth(), game.window.windowedHeight());
@@ -97,13 +110,68 @@ final class FrontendController {
         }
     }
 
-    /**
-     * Opens the worldless choice of world and mode on this session's world; the save check happens
-     * once, not every frame.
-     */
-    void openNewFrontier(boolean saveExists) {
-        game.newFrontierScreen.open(saveExists, World.isUrbanGenerator(newWorldGenerator));
+    /** Opens the worldless choice of world and mode on this session's world. */
+    void openNewFrontier() {
+        game.newFrontierScreen.open(World.isUrbanGenerator(newWorldGenerator));
         game.appState = Game.AppState.TITLE_NEW_WORLD;
+    }
+
+    /**
+     * Opens the slot picker on the slots as their files are now: a load on the slot saved last, a
+     * new world on the first empty one. The files are read once here, not every frame.
+     */
+    void openSlots(SlotPickerScreen.Purpose purpose) {
+        SaveSlots slots = game.saves.slots();
+        List<SaveSlots.Slot> listing = slots.describeAll();
+        int preferred = purpose == SlotPickerScreen.Purpose.NEW ? SlotPickerScreen.firstEmpty(listing)
+                : SlotPickerScreen.lastSaved(listing, game.saves.activeSlot());
+        slotPicker.open(purpose, listing, slots.holdsLegacySave(), preferred);
+        game.appState = Game.AppState.TITLE_SLOTS;
+    }
+
+    /**
+     * Applies the picker's action. Choosing a slot loads it, or starts the new world in it once the
+     * picker has had a replacement confirmed; a restore loads the backup the picker offered; a
+     * confirmed delete removes the slot's save and backups and shows the slots again.
+     */
+    void applySlots(SlotPickerScreen.Action action) {
+        int slot = slotPicker.selected();
+        switch (action) {
+            case CHOOSE -> {
+                requestedSlot = slot;
+                beginLoading(slotPicker.purpose() == SlotPickerScreen.Purpose.NEW
+                        ? LoadRequest.NEW_GAME : LoadRequest.LOAD_GAME);
+            }
+            case RESTORE -> {
+                requestedSlot = slot;
+                requestedBackup = slotPicker.selectedSlot().backup().generation();
+                beginLoading(LoadRequest.RESTORE_BACKUP);
+            }
+            case DELETE -> {
+                boolean deleted = game.saves.slots().delete(slot);
+                refreshSlots(0);
+                slotPicker.notice(deleted ? "Slot " + slot + " deleted." : "Slot " + slot + " could not be deleted.");
+            }
+            case BACK -> game.appState = slotPicker.purpose() == SlotPickerScreen.Purpose.NEW
+                    ? Game.AppState.TITLE_NEW_WORLD : Game.AppState.TITLE;
+            case NONE -> {
+            }
+        }
+    }
+
+    /**
+     * Shows the slots again as their files now are. A slot whose save failed to load though its
+     * header, summary and checksum read intact is shown damaged, so its backup can be offered.
+     */
+    private void refreshSlots(int failedSlot) {
+        SaveSlots slots = game.saves.slots();
+        List<SaveSlots.Slot> listing = new ArrayList<>(slots.describeAll());
+        if (failedSlot > 0 && listing.get(failedSlot - 1).state() == SaveSlots.State.READY) {
+            SaveSlots.Slot failed = listing.get(failedSlot - 1);
+            listing.set(failedSlot - 1, new SaveSlots.Slot(failedSlot, SaveSlots.State.DAMAGED, failed.current(),
+                    true, slots.newestIntactBackup(failedSlot)));
+        }
+        slotPicker.refresh(listing, slots.holdsLegacySave());
     }
 
     /**
@@ -117,13 +185,16 @@ final class FrontendController {
         return city ? World.DEFAULT_NEW_WORLD_GENERATOR : World.WILDERNESS_NEW_WORLD_GENERATOR;
     }
 
-    /** START carries the chosen world and mode into the two-frame loading; BACK creates nothing. */
+    /**
+     * START carries the chosen world and mode to the slot picker, whose choice begins the two-frame
+     * loading; BACK creates nothing.
+     */
     void applyNewFrontier(NewFrontierScreen.Action action) {
         switch (action) {
             case START -> {
                 newWorldMode = game.newFrontierScreen.selectedMode();
                 chosenGenerator = generatorFor(game.newFrontierScreen.showsCity());
-                beginLoading(LoadRequest.NEW_GAME);
+                openSlots(SlotPickerScreen.Purpose.NEW);
             }
             case BACK -> game.appState = Game.AppState.TITLE;
             case NONE -> {
@@ -163,6 +234,9 @@ final class FrontendController {
     String loadingDetail() {
         if (loadRequest == LoadRequest.LOAD_GAME) {
             return "Restoring your frontier...";
+        }
+        if (loadRequest == LoadRequest.RESTORE_BACKUP) {
+            return "Restoring the backup...";
         }
         int generator = loadRequest == LoadRequest.NEW_GAME ? chosenGenerator : newWorldGenerator;
         return World.isUrbanGenerator(generator) ? "Mapping the abandoned city..."
@@ -205,11 +279,18 @@ final class FrontendController {
      */
     boolean performLoad() {
         loadingPresented = false;
+        LoadRequest request = loadRequest;
         LoadResult result;
-        if (loadRequest == LoadRequest.LOAD_GAME) {
-            result = SaveSystem.open(game, savePath);
+        if (request == LoadRequest.LOAD_GAME) {
+            result = game.saves.load(requestedSlot);
+        } else if (request == LoadRequest.RESTORE_BACKUP) {
+            result = game.saves.restore(requestedSlot, requestedBackup);
         } else {
             game.newWorld(game.sessionSeed, true, chosenGenerator, newWorldMode);
+            // The world plays on if its first save fails; F5 can try again.
+            if (!game.saves.startIn(requestedSlot)) {
+                game.log(SaveSession.saveFailedLine(requestedSlot));
+            }
             result = LoadResult.LOADED;
         }
         loadRequest = null;
@@ -220,14 +301,17 @@ final class FrontendController {
             game.closeScreens();
         } else {
             // A save refused from its header built nothing, but one that failed further in may
-            // have half built a world; drop to the title either way, with the reason in the
-            // player's words.
+            // have half built a world; drop it either way and go back to the slots, with the
+            // reason in the player's words.
             game.audio.resetWorld();
             game.releaseWorldMeshes();
             game.world = null;
             game.player = null;
-            game.titleScreen.notice(result.message());
-            game.appState = Game.AppState.TITLE;
+            boolean damaged = result.outcome() == LoadResult.Outcome.DAMAGED
+                    || result.outcome() == LoadResult.Outcome.UNREADABLE;
+            refreshSlots(request == LoadRequest.LOAD_GAME && damaged ? requestedSlot : 0);
+            slotPicker.notice(result.message());
+            game.appState = Game.AppState.TITLE_SLOTS;
         }
         return result.loaded();
     }
@@ -271,8 +355,9 @@ final class FrontendController {
 
     /**
      * Opens a specific screen for the VEYLON_FRONTEND QA captures. A
-     * {@code -creative} suffix stages the world in Creative; {@code newworld-save}
-     * shows the replace notice without writing a save file. Staged worlds use the
+     * {@code -creative} suffix stages the world in Creative; {@code slots} and
+     * {@code slots-new} open the slot picker on the data directory's slots as they
+     * are, to load and to start a new world, and change no file. Staged worlds use the
      * session's new-world generator, so the development selector applies to them too.
      */
     void openForQa(String screen) {
@@ -291,8 +376,9 @@ final class FrontendController {
                 game.appState = Game.AppState.LOADING;
                 game.qa.setStaticLoadingQa(true);
             }
-            case "newworld" -> openNewFrontier(Files.exists(savePath));
-            case "newworld-save" -> openNewFrontier(true);
+            case "newworld" -> openNewFrontier();
+            case "slots" -> openSlots(SlotPickerScreen.Purpose.LOAD);
+            case "slots-new" -> openSlots(SlotPickerScreen.Purpose.NEW);
             case "pause", "pause-creative", "gamemode", "gamemode-creative" -> {
                 game.newWorld(game.sessionSeed, true, newWorldGenerator, qaMode);
                 game.appState = Game.AppState.PLAYING;

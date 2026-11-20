@@ -2,7 +2,6 @@ package com.veylon;
 
 import com.veylon.item.Inventory;
 import com.veylon.item.ItemStack;
-import com.veylon.save.SaveSystem;
 import com.veylon.settlement.UrbanSiteDirector;
 import com.veylon.util.AppPaths;
 import com.veylon.util.Vec3i;
@@ -11,6 +10,7 @@ import com.veylon.world.World;
 import com.veylon.world.urban.UrbanMissions;
 
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -47,16 +47,18 @@ final class SaveAuditQaScene extends UrbanRouteScene {
         if (!AppPaths.isolatedFromPlayerData()) {
             throw new IllegalStateException("save_audit reads and writes the save slot: run it with an isolated data directory");
         }
-        if (!Files.exists(SaveSystem.SAVE_PATH)) {
-            throw new IllegalStateException("save_audit needs a save in the isolated slot: " + SaveSystem.SAVE_PATH);
+        int slot = game.saves.activeSlot();
+        Path file = game.saves.slots().current(slot);
+        if (!Files.exists(file)) {
+            throw new IllegalStateException("save_audit needs a save in the isolated slot " + slot + ": " + file);
         }
-        if (!SaveSystem.load(game)) { throw new IllegalStateException("the slot's save did not load"); }
+        if (!game.saves.openActive().loaded()) { throw new IllegalStateException("the slot's save did not load"); }
         game.closeScreens();
-        game.log("Game loaded.");
+        game.log(SaveSession.loadedLine(slot));
         game.appState = Game.AppState.PLAYING;
         container = nearestContainer();
         if (container == null) { System.out.println("[save-audit] no stored container within 24 blocks: a short walk instead"); }
-        System.out.println("[save-audit] loaded slot=" + SaveSystem.SAVE_PATH.getFileName() + " generator="
+        System.out.println("[save-audit] loaded slot=" + slot + " file=" + file.getFileName() + " generator="
                 + game.world.generatorVersion + " seed=" + game.world.seed + " mode="
                 + game.gameMode().name().toLowerCase(Locale.ROOT) + " pos=" + game.player.pos + " container=" + container
                 + " evidence=walked(W,RMB,E,M,Esc,F5,F9,mouse-look;F-at-doors)");
@@ -266,7 +268,7 @@ final class SaveAuditQaScene extends UrbanRouteScene {
                     phase = 1;
                 }
                 case 1 -> {
-                    if (!last.endsWith("Game saved.")) {
+                    if (!last.endsWith(SaveSession.savedLine(game.saves.activeSlot()))) {
                         if (age > 2) { throw fail("F5 did not save: " + last); }
                         return false;
                     }
@@ -274,7 +276,7 @@ final class SaveAuditQaScene extends UrbanRouteScene {
                     phase = 2;
                 }
                 default -> {
-                    if (game.world == before || !last.endsWith("Game loaded.")) {
+                    if (game.world == before || !last.endsWith(SaveSession.loadedLine(game.saves.activeSlot()))) {
                         if (age > 6) { throw fail("F9 did not load: " + last); }
                         return false;
                     }

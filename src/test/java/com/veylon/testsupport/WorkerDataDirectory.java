@@ -14,7 +14,7 @@ import java.util.Optional;
  * {@code build/test-data/<task>} for every {@code Test} task, so the parallel forks of one task
  * would otherwise share a save slot, settings files and QA saves. When this JVM's launcher
  * session opens, before any test class is discovered and before production code reads the
- * property (some paths, such as {@code SaveSystem.SAVE_PATH}, are resolved once when their class
+ * property (some paths, such as the settings files, are resolved once when their class
  * initializes), the property moves to {@code build/test-data/<task>/worker-<id>}, where
  * {@code <id>} is the worker id Gradle sets in {@value #GRADLE_WORKER_PROPERTY}. Without either
  * property, as outside Gradle, nothing changes. Registered through {@code META-INF/services}.

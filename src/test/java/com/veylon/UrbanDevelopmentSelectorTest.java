@@ -1,7 +1,9 @@
 package com.veylon;
 
 import com.veylon.entity.GameMode;
+import com.veylon.save.SaveSlots;
 import com.veylon.ui.NewFrontierScreen;
+import com.veylon.ui.SlotPickerScreen;
 import com.veylon.ui.TitleScreen;
 import com.veylon.world.BlockType;
 import com.veylon.world.World;
@@ -95,7 +97,7 @@ class UrbanDevelopmentSelectorTest {
     void newFrontierBuildsAnUrbanDevelopmentWorldThroughTheProductionPath() {
         Game game = new Game();
         game.sessionSeed = SEED;
-        game.frontend.savePath = temporary.resolve("absent.sav");
+        game.saves.useSlots(new SaveSlots(temporary.resolve("slots")));
         game.frontend.newWorldGenerator = AutomatedRunDriver.configuredGenerator("urban-dev", true);
 
         startNewFrontier(game);
@@ -145,7 +147,7 @@ class UrbanDevelopmentSelectorTest {
     void anOrdinaryNewFrontierIsTheCityAndTheWildernessIsOneKeyAway() {
         Game city = new Game();
         city.sessionSeed = SEED;
-        city.frontend.savePath = temporary.resolve("absent.sav");
+        city.saves.useSlots(new SaveSlots(temporary.resolve("slots")));
         startNewFrontier(city);
         assertEquals(World.GEN_URBAN_ECONOMY, city.world.generatorVersion, "the default is the economy city");
         assertEquals(UrbanRevision.CURRENT_CONTENT, city.world.urban.contentRevision());
@@ -154,11 +156,12 @@ class UrbanDevelopmentSelectorTest {
 
         Game wild = new Game();
         wild.sessionSeed = SEED;
-        wild.frontend.savePath = temporary.resolve("absent.sav");
+        wild.saves.useSlots(new SaveSlots(temporary.resolve("slots")));
         wild.frontend.applyTitle(TitleScreen.Action.NEW_GAME);
         assertEquals("Mapping the abandoned city...", wild.frontend.loadingDetail(), "the city is on offer first");
-        wild.newFrontierScreen.open(false, false); // what W does on the screen (ModeSelectionRoutingTest)
+        wild.newFrontierScreen.open(false); // what W does on the screen (ModeSelectionRoutingTest)
         wild.frontend.applyNewFrontier(NewFrontierScreen.Action.START);
+        wild.frontend.applySlots(SlotPickerScreen.Action.CHOOSE);
         assertEquals("Mapping atmosphere and terrain...", wild.frontend.loadingDetail());
         assertTrue(wild.frontend.performLoad());
         assertEquals(World.WILDERNESS_NEW_WORLD_GENERATOR, wild.world.generatorVersion);
@@ -206,9 +209,12 @@ class UrbanDevelopmentSelectorTest {
         assertEquals(live, game.world);
     }
 
+    /** NEW FRONTIER, START, and the slot picker's choice of the first empty slot. */
     private static void startNewFrontier(Game game) {
         game.frontend.applyTitle(TitleScreen.Action.NEW_GAME);
         game.frontend.applyNewFrontier(NewFrontierScreen.Action.START);
+        assertEquals(Game.AppState.TITLE_SLOTS, game.appState);
+        game.frontend.applySlots(SlotPickerScreen.Action.CHOOSE);
         assertEquals(Game.AppState.LOADING, game.appState);
         assertTrue(game.frontend.performLoad());
         assertEquals(Game.AppState.PLAYING, game.appState);

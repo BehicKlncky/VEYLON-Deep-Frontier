@@ -5,11 +5,9 @@ import com.veylon.gfx.ResourceManager;
 import com.veylon.ui.HudLayout;
 import com.veylon.world.World;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
 import org.lwjgl.stb.STBTTFontinfo;
 
 import java.nio.ByteBuffer;
-import java.nio.file.Path;
 import java.util.List;
 import java.util.function.ToDoubleFunction;
 
@@ -22,7 +20,6 @@ import static org.lwjgl.stb.STBTruetype.*;
  * NEW FRONTIER describes the city when the development selector makes this session's worlds cities.
  */
 class UrbanFirstSessionHintsTest {
-    @TempDir Path temporary;
 
     private static Game fresh(int generator, GameMode mode) {
         Game g = new Game();
@@ -77,15 +74,13 @@ class UrbanFirstSessionHintsTest {
     @Test
     void newFrontierDescribesTheWorldTheSessionMakes() {
         Game game = new Game();
-        game.frontend.savePath = temporary.resolve("absent.sav");
-        game.frontend.openNewFrontier(false);
+        game.frontend.openNewFrontier();
         assertTrue(game.newFrontierScreen.showsCity(), "an ordinary session's new world is the city");
         game.frontend.newWorldGenerator = World.WILDERNESS_NEW_WORLD_GENERATOR;
-        game.frontend.openNewFrontier(true);
+        game.frontend.openNewFrontier();
         assertFalse(game.newFrontierScreen.showsCity(), "a wilderness session opens on the wilderness");
-        assertTrue(game.newFrontierScreen.showsReplaceNotice());
         game.frontend.newWorldGenerator = World.GEN_URBAN_MISSIONS;
-        game.frontend.openNewFrontier(true);
+        game.frontend.openNewFrontier();
         assertTrue(game.newFrontierScreen.showsCity());
     }
 }

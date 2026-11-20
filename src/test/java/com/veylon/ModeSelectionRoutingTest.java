@@ -3,10 +3,12 @@ package com.veylon;
 import com.veylon.engine.Input;
 import com.veylon.entity.GameMode;
 import com.veylon.item.ItemType;
+import com.veylon.save.SaveSlots;
 import com.veylon.save.SaveSystem;
 import com.veylon.ui.GameModeScreen;
 import com.veylon.ui.NewFrontierScreen;
 import com.veylon.ui.PauseMenu;
+import com.veylon.ui.SlotPickerScreen;
 import com.veylon.ui.TitleScreen;
 import com.veylon.world.World;
 import org.junit.jupiter.api.Test;
@@ -25,14 +27,13 @@ class ModeSelectionRoutingTest {
     @Test
     void newFrontierOpensAWorldlessChoiceAndEscapeReturnsToTheTitle() throws Exception {
         Game game = new Game();
-        game.frontend.savePath = temporary.resolve("absent.sav");
+        game.saves.useSlots(new SaveSlots(temporary.resolve("slots")));
         game.frontend.applyTitle(TitleScreen.Action.NEW_GAME);
         assertEquals(Game.AppState.TITLE_NEW_WORLD, game.appState, "R2: NEW FRONTIER and N open the mode choice");
         assertTrue(game.frontend.owns(game.appState), "R2: the frontend owns the worldless choice");
         assertFalse(game.appState.rendersWorld(), "R2: no world is drawn behind the choice");
         assertNull(game.world, "R2: opening the choice creates no world");
         assertEquals(GameMode.SURVIVAL, game.newFrontierScreen.selectedMode(), "R2: Survival is the default");
-        assertFalse(game.newFrontierScreen.showsReplaceNotice(), "D7: no replace notice without a save file");
 
         game.frontend.applyNewFrontier(press(game, game.newFrontierScreen, GLFW_KEY_ESCAPE));
         assertEquals(Game.AppState.TITLE, game.appState, "R2: Escape returns to the title");
@@ -44,7 +45,7 @@ class ModeSelectionRoutingTest {
     void keysChooseTheModeAndEnterStarts() throws Exception {
         Game game = new Game();
         NewFrontierScreen screen = game.newFrontierScreen;
-        screen.open(false);
+        screen.open();
         assertEquals(NewFrontierScreen.Action.NONE, press(game, screen, GLFW_KEY_C));
         assertEquals(GameMode.CREATIVE, screen.selectedMode(), "R2: C chooses Creative");
         press(game, screen, GLFW_KEY_S);
@@ -57,30 +58,27 @@ class ModeSelectionRoutingTest {
         assertEquals(GameMode.CREATIVE, screen.selectedMode(), "R2: vertical arrows also move");
         assertEquals(NewFrontierScreen.Action.START, press(game, screen, GLFW_KEY_ENTER), "R2: Enter starts");
 
-        screen.open(true);
+        screen.open();
         assertEquals(GameMode.SURVIVAL, screen.selectedMode(), "R2: every opening defaults to Survival");
-        assertTrue(screen.showsReplaceNotice(), "D7: an existing save shows the replace notice");
     }
 
     @Test
     void wSwitchesTheWorldAndEveryOpeningReturnsToTheCity() throws Exception {
         Game game = new Game();
         NewFrontierScreen screen = game.newFrontierScreen;
-        screen.open(true);
+        screen.open();
         assertTrue(screen.showsCity(), "26: the abandoned city is the new world");
-        assertEquals(NewFrontierScreen.CITY_REPLACE_NOTICE, screen.replaceNotice(), "P-05: the notice names the city");
         assertEquals(NewFrontierScreen.CITY_NOTE, screen.worldNote());
         press(game, screen, GLFW_KEY_C);
         assertEquals(NewFrontierScreen.Action.NONE, press(game, screen, GLFW_KEY_W));
         assertFalse(screen.showsCity(), "26: W chooses the wilderness");
         assertEquals(GameMode.CREATIVE, screen.selectedMode(), "the world key leaves the mode alone");
-        assertEquals(NewFrontierScreen.REPLACE_NOTICE, screen.replaceNotice(), "D7: the wilderness keeps its notice");
         assertEquals(NewFrontierScreen.WILDERNESS_NOTE, screen.worldNote());
         assertEquals("Hunger, weather, wounds and wildlife.", screen.description(GameMode.SURVIVAL)[0]);
         press(game, screen, GLFW_KEY_W);
         assertTrue(screen.showsCity(), "W switches back");
         press(game, screen, GLFW_KEY_W);
-        screen.open(false);
+        screen.open();
         assertTrue(screen.showsCity(), "26: every opening returns to the city");
         assertEquals(GameMode.SURVIVAL, screen.selectedMode());
     }
@@ -218,23 +216,29 @@ class ModeSelectionRoutingTest {
     }
 
     @Test
-    void aFailedLoadAfterChoosingCreativeReturnsToTheTitleWithoutAWorld() throws Exception {
+    void aFailedLoadAfterChoosingCreativeLeavesNoWorldAndNoCreativeChoice() throws Exception {
         Game game = new Game();
-        Path corrupt = temporary.resolve("corrupt.sav");
-        Files.write(corrupt, new byte[]{1, 2, 3, 4});
-        game.frontend.savePath = corrupt;
+        SaveSlots slots = new SaveSlots(temporary.resolve("slots"));
+        game.saves.useSlots(slots);
+        assertTrue(slots.save(playing(GameMode.SURVIVAL), 1), "precondition: slot 1 holds a save");
         game.frontend.applyTitle(TitleScreen.Action.NEW_GAME);
-        assertTrue(game.newFrontierScreen.showsReplaceNotice(), "D7: an existing save file shows the notice");
         press(game, game.newFrontierScreen, GLFW_KEY_C);
         game.frontend.applyNewFrontier(press(game, game.newFrontierScreen, GLFW_KEY_ESCAPE));
 
         game.frontend.applyTitle(TitleScreen.Action.LOAD_GAME);
+        assertEquals(Game.AppState.TITLE_SLOTS, game.appState, "LOAD FRONTIER opens the slot picker");
+        assertEquals(1, game.frontend.slotPicker.selected(), "on the slot saved last");
+        Files.write(slots.current(1), new byte[]{1, 2, 3, 4}); // damaged after the picker read it
+        game.frontend.applySlots(press(game, game.frontend.slotPicker, GLFW_KEY_ENTER));
         assertEquals(Game.AppState.LOADING, game.appState);
-        assertFalse(game.frontend.performLoad(), "Fixture: the corrupt save cannot load");
-        assertEquals(Game.AppState.TITLE, game.appState, "a failed load returns to the title");
+        assertFalse(game.frontend.performLoad(), "Fixture: the damaged save cannot load");
+        assertEquals(Game.AppState.TITLE_SLOTS, game.appState, "a failed load returns to the slots");
+        assertEquals("This file is not a VEYLON save.", game.frontend.slotPicker.notice(), "saying why");
         assertNull(game.world, "a failed load leaves no world");
         assertNull(game.player, "a failed load leaves no player");
 
+        game.frontend.applySlots(press(game, game.frontend.slotPicker, GLFW_KEY_ESCAPE));
+        assertEquals(Game.AppState.TITLE, game.appState);
         game.frontend.applyTitle(TitleScreen.Action.NEW_GAME);
         assertEquals(GameMode.SURVIVAL, game.newFrontierScreen.selectedMode(),
                 "R2: an abandoned Creative choice does not carry over");
@@ -243,13 +247,15 @@ class ModeSelectionRoutingTest {
     private Game startFromNewFrontier(int... keys) throws Exception {
         Game game = new Game();
         game.sessionSeed = 20260910L;
-        game.frontend.savePath = temporary.resolve("absent.sav");
+        game.saves.useSlots(new SaveSlots(temporary.resolve("slots")));
         game.frontend.applyTitle(TitleScreen.Action.NEW_GAME);
         for (int key : keys) {
             press(game, game.newFrontierScreen, key);
         }
         game.frontend.applyNewFrontier(press(game, game.newFrontierScreen, GLFW_KEY_ENTER));
-        assertEquals(Game.AppState.LOADING, game.appState, "R2: Start begins the two-frame loading");
+        assertEquals(Game.AppState.TITLE_SLOTS, game.appState, "0.9.1: Enter goes on to the slot");
+        game.frontend.applySlots(press(game, game.frontend.slotPicker, GLFW_KEY_ENTER));
+        assertEquals(Game.AppState.LOADING, game.appState, "R2: the slot begins the two-frame loading");
         assertTrue(game.frontend.performLoad(), "R2: the new frontier loads");
         return game;
     }
@@ -279,6 +285,14 @@ class ModeSelectionRoutingTest {
             throws ReflectiveOperationException {
         for (int key : keys) pressed(game)[key] = true;
         GameModeScreen.Action action = screen.handleKeys(game.input);
+        game.input.endFrame();
+        return action;
+    }
+
+    private static SlotPickerScreen.Action press(Game game, SlotPickerScreen screen, int... keys)
+            throws ReflectiveOperationException {
+        for (int key : keys) pressed(game)[key] = true;
+        SlotPickerScreen.Action action = screen.handleKeys(game.input);
         game.input.endFrame();
         return action;
     }

@@ -40,16 +40,14 @@ class CityOnboardingScreensTest {
     }
 
     @Test
-    void theNewWorldChoiceOpensOnTheCityOffersTheWildernessAndKeepsATruthfulNotice() {
+    void theNewWorldChoiceOpensOnTheCityOffersTheWildernessAndLeadsToTheSlot() {
         NewFrontierScreen screen = new NewFrontierScreen();
-        screen.open(true, false);
+        screen.open(false);
         assertFalse(screen.showsCity(), "a wilderness choice describes the wilderness");
         assertEquals("Hunger, weather, wounds and wildlife.", screen.description(GameMode.SURVIVAL)[0]);
-        assertEquals("Saving this new frontier will replace your current save.", screen.replaceNotice());
-        screen.open(true);
+        screen.open();
         assertTrue(screen.showsCity(), "every opening starts on the city");
-        assertTrue(screen.showsReplaceNotice(), "the shared slot's notice stays");
-        assertEquals("Saving this new city will replace your current save.", screen.replaceNotice());
+        assertTrue(NewFrontierScreen.SLOT_NOTE.contains("slot"), "Enter goes on to the slot (0.9.1 milestone 04)");
         assertTrue(String.join(" ", screen.description(GameMode.SURVIVAL)).contains("Search buildings"));
         assertTrue(String.join(" ", screen.description(GameMode.CREATIVE)).contains("Fly"));
         assertEquals(GameMode.SURVIVAL, screen.selectedMode(), "Survival is still the default choice");
@@ -57,7 +55,7 @@ class CityOnboardingScreensTest {
 
         ToDoubleFunction<String> card = regular(1.15f);
         for (boolean city : new boolean[]{true, false}) {
-            screen.open(false, city);
+            screen.open(city);
             for (GameMode mode : GameMode.values()) {
                 for (String line : screen.description(mode)) {
                     assertTrue(card.applyAsDouble(line) <= 300, "fits a 320-wide card: " + line);
@@ -73,7 +71,7 @@ class CityOnboardingScreensTest {
         for (String line : new String[]{NewFrontierScreen.CITY_NOTE, NewFrontierScreen.WILDERNESS_NOTE}) {
             assertTrue(note.applyAsDouble(line) <= 820, "fits within 820 units: " + line);
         }
-        for (String line : new String[]{NewFrontierScreen.REPLACE_NOTICE, NewFrontierScreen.CITY_REPLACE_NOTICE}) {
+        for (String line : new String[]{NewFrontierScreen.SLOT_NOTE}) {
             assertTrue(notice.applyAsDouble(line) <= 820, "fits within 820 units: " + line);
         }
         assertTrue(keys.applyAsDouble(NewFrontierScreen.KEYS) <= 820, "fits within 820 units: " + NewFrontierScreen.KEYS);
