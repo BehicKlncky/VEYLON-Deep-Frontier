@@ -197,6 +197,10 @@ card reads "THE CITY CLAIMS YOU / You wake at your refuge, with what you carried
 
 ### Reproduce
 
+As recorded at the time. 0.9.1 milestone 04 removed the replace notice with the single
+save slot, and with it `newworld-save`; `newworld` shows the same screen today, and the
+slot picker that follows it is validated in the 0.9.1 section below.
+
 ```bash
 export VEYLON_SEED=20260731 VEYLON_SHOT=3 VEYLON_FRONTEND=newworld-save
 VEYLON_RESOLUTION=1280x720 VEYLON_CAPTURE_TAG=m26-newworld-720-s1 \
@@ -229,3 +233,57 @@ tabs and the cards), and at 0.75 the tabs stood just under the title with a wide
 above the cards (they now take the rule's old place at every scale).
 `ui.CityOnboardingScreensTest` holds every new line within 820 units with the game's
 own font. Limit: as in milestone 21, a requested 1.5 at 1280×720 is clamped to 1.
+
+## 0.9.1 milestone 04 — the slot picker, its confirmations and the pause menu's slot (2026-11-20)
+
+LOAD FRONTIER, and NEW FRONTIER's Enter, open the slot picker: one card per slot with its name,
+its state at the right (READY, EMPTY, ANOTHER VERSION, or DAMAGED / BACKUP AVAILABLE) and up to
+four lines from the slot's own summary: the world and mode, the day, time and time played, the
+place, and when and by which build it was saved. Under the cards come the last notice (amber),
+the note about VEYLON 0.9.0's `saves/veylon.sav` when it is there, and LOAD or START HERE,
+RESTORE (loading only), DELETE and BACK; a button that does nothing for the selected slot is
+dimmed. Replacing, deleting and restoring open a confirmation over the list, which names what
+the slot holds. The block is centred on a canvas taller than 720 logical rows. The pause menu's
+save keys name the slot: "[F5] Save to slot 1   [F9] Load slot 1   [Q] Quit".
+
+### Reproduce
+
+```bash
+export VEYLON_SEED=20261120 VEYLON_FRONTEND=route-slots
+VEYLON_RESOLUTION=1280x720 VEYLON_UI_SCALE=1 VEYLON_CAPTURE_TAG=v091-m04-slots-720-s1 \
+  ./gradlew.bat run -PveylonDataDir=build/qa/v091-m04-slots-720-s1
+# likewise 1280x720 at 0.75 and 1.5, and 1920x1080 at 0.75, 1 and 1.5, each in a new directory;
+# copy 0.9.0's saves/veylon.sav into a directory first to see slot 3 as an older version and
+# the note under the cards. VEYLON_FRONTEND=slots or slots-new with VEYLON_SHOT=2 shows the
+# picker statically on a directory's slots as they are.
+```
+
+### Validation record
+
+All runs on 2026-11-20, NVIDIA GeForce RTX 3060 Ti, driver 621.01, OpenGL 3.3.0, windowed, each
+in a new directory `build/qa/v091-m04-<tag>/`. Every `route-slots` run printed
+`[frontend-route] launch=slots pass=true` with `glErrors=0 khrErrors=0` and took 18 to 20 s;
+every run's shutdown summary read `glGetError=0` and 0 KHR errors (only the usual MEDIUM
+pixel-transfer notes).
+
+| Tag | Screens | Framebuffer | Requested → effective scale |
+| --- | --- | --- | --- |
+| `slots-720-s1` | `01-title` to `10-delete-confirm`; slot 3 is 0.9.0's file, with the note | 1280×720 | 1 → 1 |
+| `slots-720-s075` | the same; slot 3 is a later epoch's save | 1280×720 | 0.75 → 0.75 |
+| `slots-720-s15` | the same | 1280×720 | 1.5 → 1 |
+| `slots-1080-s075` | the same | 1920×1080 | 0.75 → 0.75 |
+| `slots-1080-s1` | the same; slot 3 is 0.9.0's file, with the note | 1920×1080 | 1 → 1 |
+| `slots-1080-s15` | the same | 1920×1080 | 1.5 → 1.5 |
+| `screen-slots`, `screen-slots-new` | the static picker to load and to start, on the first run's slots | 1280×720 | 1 → 1 |
+
+Each `route-slots` set holds the picker with every slot empty (`02-new-all-empty`), the pause
+menu naming slot 1 (`03-pause-slot-1`), the picker with one slot used (`04-new-one-used`), a
+damaged slot with its backup beside a ready slot and another version (`05-load-states`), the
+reason under the cards (`06-other-version`), the restore confirmation (`07-restore-confirm`), the
+restored city (`08-restored`), and the replace and delete confirmations (`09-replace-confirm`,
+`10-delete-confirm`). In them the cards, the notice, the note and the buttons keep their order
+without overlap and every line stays whole. Two faults were found in the first captures and
+fixed before the runs above: a dimmed button kept its red channel and read as a warning, and at
+0.75 on 1080p the block sat at the top of the screen. `ui.SlotPickerScreenTest` holds every line
+within its room with the game's own font, and the picker cuts a place name that would not fit.
+Limit: a requested 1.5 at 1280×720 is clamped to 1, as before.
