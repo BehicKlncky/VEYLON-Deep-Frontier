@@ -8,8 +8,8 @@ the first milestone below that is not complete.
 | --- | --- | --- |
 | 01 Release plan and defect audit | Complete (documentation only) | `95d09c5`, `1aadd19` |
 | 02 Test reliability and continuous integration | Complete; the verify workflow's first run waits for a push | `91975e9`, `ec4d960`, `6517ef0`, `0252fbd`, `bfb0176`, `8b87cd6` |
-| 03 Current-version save epoch | Complete | `ce4686d`, `843dce8`, `14ca773`, `3d98b70`, `6bae538`, `f3fe760`, `13486ca`, `2600134`, `0fbc816`, `71972aa`, `f3aed69`, `369d65e`, then the records commit that adds this section; 04 records its hash |
-| 04 Three save slots and backups | Not started | |
+| 03 Current-version save epoch | Complete | `ce4686d`, `843dce8`, `14ca773`, `3d98b70`, `6bae538`, `f3fe760`, `13486ca`, `2600134`, `0fbc816`, `71972aa`, `f3aed69`, `369d65e`, `3063d13` |
+| 04 Three save slots and backups | Complete | `25e899e`, `142aace`, `51956a2`, `048e2d9`, `896340a`, `88d00ed`, `7357680`, `8dcab51`, then the records commit that adds this section; 05 records its hash |
 | 05 Autosave | Not started | |
 | 06 Session and control comfort | Not started | |
 | 07 Forgotten defects sweep | Not started | |
@@ -498,7 +498,7 @@ nodes. The three worktrees, including the one at `v0.9.0`, were removed afterwar
 | `71972aa` | docs(save): describe the save epoch |
 | `f3aed69` | docs(skills): rewrite the save skill for the save epoch |
 | `369d65e` | docs(developing): ask for a section version when its rows change |
-| the records commit | docs(roadmap): record milestone 03 of 0.9.1 |
+| `3063d13` | docs(roadmap): record milestone 03 of 0.9.1 |
 
 No commit carries a co-author line. Nothing is pushed.
 
@@ -520,3 +520,186 @@ No commit carries a co-author line. Nothing is pushed.
 Three save slots and backups (D-02), with D-15's rule for foreign files in save folders.
 `SaveHeader` can judge a slot from its first bytes without loading it, and `LoadResult` already
 says why a slot does not open.
+
+## Milestone 04 — Three save slots and backups
+
+**Status:** complete on 2026-11-20.
+**Base:** `main` at `3063d13`, clean apart from an untracked `.vscode/`. 01's to 03's 21 commits
+were local; the owner asked for this milestone's commits to be pushed with them.
+
+### What was done
+
+1. **The checksum and the summary (D-22).** After the header every save carries a CRC-32C of the
+   whole file (`save.SaveChecksum`) and a summary of at most 1 KiB (`save.SaveSummary`): when
+   it was saved and by which build, real seconds played, the mode and the Creative mark, the
+   in-game clock and where the survivor stood. `SaveSummary.inspect` reads the header, the
+   summary and the checksum of a file without building anything. A load restores the play time
+   from the summary, refuses a summary that disagrees with the body, and checks the checksum
+   last. `SaveSession` counts play time in `Game.advanceWorld` and supplies the place name.
+2. **Slots and backups (D-21, D-25).** `save.SaveSlots`: three slots in `saves/`, each
+   `slot-N.sav` with `slot-N.backup-1.sav` and `slot-N.backup-2.sav`. The new save is complete
+   before the current one is copied aside and replaced, and the backups move along only after
+   the replacement. `describe` reports empty, ready, another version or damaged with the newest
+   intact backup; `restore` loads a backup first and then puts a copy of it in place, setting the
+   damaged save aside as `slot-N.damaged.sav`; `delete` removes the slot's save and backups only.
+   Files the game did not write, and 0.9.0's `veylon.sav`, are never touched (D-15).
+3. **The frontend (D-23, D-24, D-26).** `ui.SlotPickerScreen` in the new `TITLE_SLOTS` state:
+   LOAD FRONTIER opens it to load, restore or delete; NEW FRONTIER's Enter opens it to choose
+   where the new world goes, which is then saved there at once. Replacing, deleting and
+   restoring each ask first and name what the slot holds; keyboard and mouse both work. The
+   active slot drives F5 and F9 and is named in the pause menu. NEW FRONTIER's replace notice,
+   `SaveSystem.SAVE_PATH` and the one-argument save and load are gone.
+4. **QA (D-27).** The QA scenes that press F5 and F9 check the slot lines; `save_audit` and the
+   infected tour use the active slot; the release smoke saves and loads slot 1 of
+   `build/qa/smoke-slots`; `route`, `route-load` and `route-refusal` go through the picker;
+   the new `route-slots` plays every picker state, a restore and both confirmations; the
+   `slots` and `slots-new` screens open the picker statically.
+5. **Documents:** README (controls, save format, known limitations), ARCHITECTURE ("The checksum
+   and the summary", "Slots and backups", the collaborator tables), DEVELOPING (QA variables,
+   isolation, the routes, save rules), HUD_VALIDATION (a 0.9.1 section), CHANGELOG
+   [Unreleased], the save compatibility skill, DESIGN D-21 to D-27.
+
+### Owner-facing behaviour
+
+- LOAD FRONTIER lists the three slots without loading anything; Enter loads a ready slot, and on
+  any other slot the reason appears under the cards.
+- NEW FRONTIER asks which slot the new world goes into (the first empty one is offered) and asks
+  again before replacing a slot that holds a save.
+- F5 and F9 use the world's own slot; the pause menu reads "[F5] Save to slot N   [F9] Load slot
+  N   [Q] Quit".
+- A damaged slot offers its newest good backup; restoring keeps the damaged file beside it.
+- The 0.9.0 file `saves/veylon.sav` is named under the cards and never opened or changed.
+
+### The epoch guard
+
+Format 4's layout changed inside unreleased epoch 1 (the checksum and the summary), so
+`layout.city` and `layout.wilderness` were re-recorded; the other three inputs did not move. The
+guard's samples now use a fixed summary and mask the checksum. Epoch 1's digest is
+`f923a1296ea3e846b4e262dacb1e3531e584a6ee7e8209c86b4158640af143dc` (unreleased; 09 adds it to
+`RELEASED`).
+
+### Native evidence
+
+All on the owner's host (NVIDIA GeForce RTX 3060 Ti, driver 621.01, OpenGL 3.3.0, windowed), each
+in a new isolated directory `build/qa/v091-m04-<tag>/` (ignored), seed 20261120, from the final
+code of `048e2d9` (the routes) on top of `51956a2`. The script and every log are in `build/`
+(`build/v091-m04-native-summary.txt`, `build/v091-m04-native-<tag>.log`); 91 captures in all.
+
+| Tag | Route | Framebuffer, UI scale | Result |
+| --- | --- | --- | --- |
+| `slots-720-s1` | `route-slots`, 0.9.0's `veylon.sav` in the directory | 1280×720, 1 | `pass=true`, 19 s |
+| `slots-720-s075` | `route-slots` | 1280×720, 0.75 | `pass=true`, 19 s |
+| `slots-720-s15` | `route-slots` | 1280×720, 1.5 (applied 1) | `pass=true`, 18 s |
+| `slots-1080-s075` | `route-slots` | 1920×1080, 0.75 | `pass=true`, 20 s |
+| `slots-1080-s1` | `route-slots`, with `veylon.sav` | 1920×1080, 1 | `pass=true`, 19 s |
+| `slots-1080-s15` | `route-slots` | 1920×1080, 1.5 | `pass=true`, 19 s |
+| `screen-slots`, `screen-slots-new` | the static picker on `slots-720-s1`'s slots | 1280×720, 1 | one capture each at 2 s |
+| `route-720`, `route-load-720` | the default path over two launches | 1280×720, 1 | `launch=new pass=true`, `launch=load pass=true` |
+| `refusal-720` | `route-refusal`, with `veylon.sav` | 1280×720, 1 | `launch=refusal pass=true` |
+
+- Every run's shutdown summary read `glGetError=0` and 0 KHR errors (MEDIUM pixel-transfer notes
+  only); every route printed `glErrors=0 khrErrors=0`.
+- Each `route-slots` run captured the picker with every slot empty, the pause menu naming slot 1
+  ("[F5] Save to slot 1   [F9] Load slot 1   [Q] Quit", and "Saved to slot 1." in the log), the
+  picker with one slot used, a damaged slot with its backup beside a ready slot and another
+  version, the reason under the cards, the restore confirmation, the restored city (the world of
+  slot 1's first save, checked against what the route remembered), and the replace and delete
+  confirmations, each cancelled with N. Each printed the slots' states
+  `[READY, READY, OTHER_VERSION]` and the SHA-256 of the damaged file it set aside, which the
+  route checked against the file it had damaged. With `veylon.sav` present slot 3 was 0.9.0's
+  file ("written by an older version") and the note under the cards showed; without it slot 3
+  was slot 2's save under epoch 2 ("written by a newer version").
+- `route-refusal` copied 0.9.0's `veylon.sav` (the save 03's v0.9.0 worktree wrote) into slot 2.
+  Slot 2 and `veylon.sav` hashed `10c47c051ddb774a3fdc83bbf0a590f4dc126e9c5a4ce8d8a60475bf62e88521`
+  before and after: the picker showed slot 2 as another version, Enter on it gave "This save was
+  written by an older version of VEYLON. Start a new world." under the cards and loaded nothing,
+  and the new city went into slot 1.
+- `route` started the city in slot 1 from the picker (written at once), saved with F5, died, woke
+  and loaded slot 1 with F9 ("Loaded slot 1."); `route-load` opened the picker on slot 1, the slot
+  saved last, and the loaded world held exactly what the first launch saved.
+- The first round of these runs, on the code before the last two picker fixes, also passed; its
+  captures showed a dimmed button with a red cast and, at 0.75 on 1080p, the block at the top of
+  the screen. Both were fixed and every run above was repeated on fresh directories.
+
+### Changed paths
+
+- Production: new `save/SaveChecksum.java`, `save/SaveStamp.java`, `save/SaveSummary.java`,
+  `save/SaveSlots.java`, `SaveSession.java`, `ui/SlotPickerScreen.java`; changed
+  `save/SaveSystem.java`, `Game.java`, `WorldBootstrap.java`, `FrontendController.java`,
+  `HotkeyRouter.java`, `ui/NewFrontierScreen.java`, `ui/PauseMenu.java`,
+  `AutomatedRunDriver.java`, `FrontendRouteQa.java`, `SaveAuditQaScene.java`,
+  `UrbanInfectedQaScene.java`, `UrbanEcologyQaScene.java`, `UrbanPeopleScene.java`,
+  `UrbanSliceQaScene.java`.
+- Tests: new `save/SaveSummaryTest`, `save/SaveSlotsTest`, `save/SaveSeal`, `SavePlayTimeTest`,
+  `SlotPickerRoutingTest`, `ui/SlotPickerScreenTest`; changed the corruption, guard, envelope,
+  integrated save, chunk retention, isolation, routing, acceptance, refusal, save audit,
+  selector, hints and onboarding classes and `testsupport/WorkerDataDirectory`.
+- Documents: `README.md`, `CHANGELOG.md`, `docs/ARCHITECTURE.md`, `docs/DEVELOPING.md`,
+  `docs/graphics/HUD_VALIDATION.md`, `.agents/skills/veylon-save-compatibility/SKILL.md`, DESIGN
+  and this file.
+
+### Validation
+
+Every build ran from the repository root in Git Bash with `JAVA_HOME` set to
+`build/tools/jdk25/jdk-25.0.4.1+1`. Each code commit's tree was built whole in a detached worktree
+(`build/v091-m04-wt-a`, removed afterwards) after its focused checks:
+
+| Commit | Focused checks | `build --console=plain` on its tree |
+| --- | --- | --- |
+| `25e899e` | the save package and `SavePlayTimeTest`, 145 tests in 34 classes; the guard's re-record (only `layout.city` and `layout.wilderness` moved) | 5m 25s, 2,384 tests in 310 classes |
+| `142aace` | the save package with `SaveSlotsTest` and the isolation test, 155 tests | 5m 26s, 2,395 tests in 311 classes |
+| `51956a2` | the picker, routing, acceptance, refusal, selector, hints, onboarding, save audit and isolation classes, 51 tests; `ui.*` and `SlotPickerRoutingTest`, 89 tests; the whole `test` task on the working tree, 2,407 tests | 5m 24s, 2,407 tests in 313 classes |
+| `048e2d9` | `compileJava` and `javadoc --rerun`; the native runs above | the final build |
+| `896340a` | `CityOnboardingScreensTest` three times with `--rerun` | the final build |
+
+Every build passed with the two symbolic-link skips and no failure or temporary-directory retry.
+While iterating, the first full `test` run of `25e899e`'s changes failed five tests that compared
+two saves of one state byte for byte (`ChunkRetentionTest`, `UrbanIntegratedSaveTest`): the
+summary's time and place differ between such saves, so they now compare them without it
+(`SaveSeal.withoutSummary`). One focused run crashed its test JVM in `lwjgl_stb`: the new picker
+test measured text through a font buffer only a returned helper held; the face is now held by
+the class, and `896340a` fixes the same pattern in `CityOnboardingScreensTest`. The documentation
+commits had link, anchor, path and `git diff --check` checks: 72 relative links and anchors in
+the changed documents resolve.
+
+**The final tree**, `896340a` (the documentation commits change no build input):
+`./gradlew.bat build --rerun-tasks --console=plain`, BUILD SUCCESSFUL in 5m 40s with all 10 tasks
+run: 2,407 tests in 313 classes, no failure, the two symbolic-link skips, no temporary-directory
+retry (`build/v091-m04-final-build.log`). The guard printed epoch 1's digest
+`f923a1296ea3e846b4e262dacb1e3531e584a6ee7e8209c86b4158640af143dc` (unreleased). `graphify update
+. --no-cluster` then rebuilt the graph: 12,528 nodes.
+
+### Commits
+
+| Commit | Subject |
+| --- | --- |
+| `25e899e` | feat(save): describe every save and seal it with a checksum |
+| `142aace` | feat(save): keep three slots with two rotating backups each |
+| `51956a2` | feat(frontend): choose a slot to load, start, restore or delete |
+| `048e2d9` | feat(qa): play every state of the slot picker natively |
+| `896340a` | test(ui): keep the measured font alive in the onboarding screens test |
+| `88d00ed` | docs(save): describe the save slots, backups and summary |
+| `7357680` | docs(skills): add slots and the checksum to the save skill |
+| `8dcab51` | docs(hud): record the slot picker's native captures |
+| the records commit | docs(roadmap): record milestone 04 of 0.9.1 |
+
+No commit carries a co-author line. At the owner's request (2026-11-20) the commits of 01 to 04
+are pushed to `origin/main` once this records commit is made.
+
+### Limitations and pending gates
+
+- **Pending, from 02:** the first run of `verify.yml` happens with this push; its result is not
+  recorded here.
+- A backup is offered only for a damaged or missing save; a player who wants an older backup of
+  a good save copies the file by hand. Damaged saves set aside by a restore stay until removed.
+- The place name of a world saved before its first frame lacks the HUD's route place (such as
+  "your refuge"), which the player's tracker adds on the first tick.
+- The checksum catches damage; it is no defence against a deliberately edited file, which the
+  reader still judges field by field.
+- The picker's text is English with the working names (D-26); 0.9.3 brings the canon's names.
+- No return to the title from the pause menu yet (06); `route-slots` stages its title visits.
+
+### Next: milestone 05
+
+Autosave (D-03) into the active slot at the designed moments, through `SaveSession` and
+`SaveSlots.save`, so every autosave also keeps the save it replaces as the newest backup.
