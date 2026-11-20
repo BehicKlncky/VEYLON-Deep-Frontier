@@ -26,9 +26,10 @@ public class PauseMenu {
 
         // The controls reference is one line taller since [T] joined it, so the
         // panel grew with it rather than letting the last line touch the border.
-        // A city names its world under the mode, one line more (urban milestone 21).
+        // A city named its world under the mode, one line more (urban milestone 21); since 0.9.1
+        // milestone 06 every world does, with its seed.
         boolean city = g.world.isUrban();
-        float extra = city ? 20 : 0;
+        float extra = 20;
         float pw = 600, ph = 548 + extra;
         float x0 = w / 2f - pw / 2f, y0 = h / 2f - ph / 2f;
         ui.panel(x0, y0, pw, ph);
@@ -38,9 +39,8 @@ public class PauseMenu {
         boolean creative = g.gameMode() == GameMode.CREATIVE;
         ui.textCentered(w / 2f, y0 + 72, 1.2f, modeLabel(g.gameMode(), g.creativeMarked()),
                 creative ? 1f : 0.55f, creative ? 0.8f : 0.88f, creative ? 0.4f : 0.9f, 1f);
-        if (city) {
-            ui.textCentered(w / 2f, y0 + 94, 1.1f, CITY_LABEL, 0.90f, 0.72f, 0.42f, 1f);
-        }
+        ui.textCentered(w / 2f, y0 + 94, 1.1f, worldLine(city, g.world.seed),
+                city ? 0.90f : 0.80f, city ? 0.72f : 0.94f, city ? 0.42f : 0.95f, 1f);
 
         float oy = y0 + 102 + extra;
         ui.textCentered(w / 2f, oy, 1.10f, creative
@@ -62,8 +62,13 @@ public class PauseMenu {
         return "[F5] Save to slot " + slot + "   [F9] Load slot " + slot + "   [A] Autosave   [Q] Quit";
     }
 
-    /** Under the mode in a city: what kind of world this is (urban milestone 21). */
-    static final String CITY_LABEL = "The abandoned city  /  development build";
+    /**
+     * Under the mode: which world this is and its seed, so a player can share it (0.9.1 milestone 06,
+     * B01). The names are NEW FRONTIER's working names until the canon's replace them (D-26).
+     */
+    public static String worldLine(boolean city, long seed) {
+        return (city ? "The abandoned city" : "The wilderness") + "  /  seed " + seed;
+    }
 
     private static final String[] WILDERNESS = {
             "WASD          Move              Space  Jump / swim up",

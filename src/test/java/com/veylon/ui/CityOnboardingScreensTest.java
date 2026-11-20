@@ -152,6 +152,22 @@ class CityOnboardingScreensTest {
                 "a city without a relay never promises one");
         ToDoubleFunction<String> line = regular(1.3f);
         for (String l : city) { assertTrue(line.applyAsDouble(l) <= 600 - 72, "fits the 600-wide panel: " + l); }
-        assertTrue(regular(1.1f).applyAsDouble(PauseMenu.CITY_LABEL) <= 560);
+    }
+
+    /**
+     * 0.9.1 milestone 06 (B01): under the mode every world is named, without "development build", with
+     * its seed, and the line fits the panel for the longest seed there is.
+     */
+    @Test
+    void thePauseMenuNamesTheWorldAndItsSeedWithoutADevelopmentNotice() {
+        assertEquals("The abandoned city  /  seed 20261120", PauseMenu.worldLine(true, 20_261_120L));
+        assertEquals("The wilderness  /  seed -42", PauseMenu.worldLine(false, -42L));
+        ToDoubleFunction<String> line = regular(1.1f);
+        for (boolean city : new boolean[]{true, false}) {
+            String widest = PauseMenu.worldLine(city, Long.MIN_VALUE);
+            assertFalse(widest.toLowerCase(java.util.Locale.ROOT).contains("development"), widest);
+            assertTrue(widest.contains(Long.toString(Long.MIN_VALUE)), "the seed is shown whole: " + widest);
+            assertTrue(line.applyAsDouble(widest) <= 560, "fits the 600-wide panel: " + widest);
+        }
     }
 }
