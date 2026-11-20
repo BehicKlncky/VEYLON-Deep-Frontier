@@ -499,3 +499,41 @@ presentation 0.095 ms per frame (0.50). The durable `save` gate fails at 5.295 m
 against 2.20, the host gap recorded since 0.7.4, so `load` was not timed. A cold city
 `newWorld` takes 487.1 ms (warm 149.5 ms mean). The release fat JAR's and packaged
 launcher's city smokes ran at 1,026.1 and 1,015.5 FPS. No budget changed.
+
+## Autosave cost (0.9.1 milestone 05, 2026-11-20)
+
+Autosave adds no calibrated budget and changes none. An autosave is an ordinary save
+through the slot path (`SaveSession.saveActive`): the writer with its read-back, then a
+copy of the save it replaces and the backup rotation. It runs on the main thread, so its
+time is a stall of the frame it falls on; the HUD shows SAVING... for 0.35 s before it
+(decision D-31). Measured on the second machine (AMD Ryzen 5 5600X, NVIDIA GeForce RTX
+3060 Ti, OpenGL 3.3.0 NVIDIA 621.01, Temurin 25.0.4.1+1), with no other build running.
+
+**The large, well-explored fixture** is `cityPerformanceTest`'s 8 km journey (economy
+city, generator 20, seed 20260731, one building's containers searched every kilometre,
+2 GiB heap). Since this milestone its checkpoints save through a slot, as F5 and an
+autosave do, and load from that slot's file. The first save after each kilometre is the
+one an autosave makes: the writers re-plan the places the bounded plan caches dropped on
+the way. Two runs:
+
+| Checkpoint | Save size | Save through the slot, run 1 / run 2 | Load |
+| --- | ---: | ---: | ---: |
+| 1 km | 12.5 KB | 28.4 / 26.9 ms | 117.0 / 135.0 ms |
+| 4 km | 36.1 KB | 57.1 / 61.4 ms | 263.6 / 306.9 ms |
+| 8 km | 43.7 KB | 113.7 / 127.3 ms | 379.1 / 442.8 ms |
+
+A save made straight after another one finds the caches warm: in a first version of the
+profile that timed the slot save after a plain save, it took 7.9 ms at 1 km and 27.1 ms
+at 8 km while the plain save before it took 29.8 and 100.3 ms. Only the first figure is
+an autosave's, so the profile now times only that. The copy and the rotation add little:
+the plain save of urban milestone 24 took 21.2 ms at 1 km and 109.8 ms at 8 km.
+
+**A fresh city**, natively: `VEYLON_SCENE=urban_autosave` (seed 20261120, the default city
+near the starter refuge) printed every autosave's time. Over four runs (Survival at 1280 ×
+720, 1920 × 1080 and 1920 × 1080 at 0.75, Creative at 1280 × 720) the claim's autosave took
+16.3–16.5 ms, the waking's 12.5–14.1 ms and the timer's 13.1–15.0 ms. The headless
+wilderness autosaves of `AutosaveTest` took 9.3–15.4 ms.
+
+So a city autosave costs about one frame at 60 fps when the city is new and up to eight
+by 8 km of exploration; the stall is announced, not hidden. Faster saves for large cities
+remain 0.9.2's (urban D-246, D-250).
