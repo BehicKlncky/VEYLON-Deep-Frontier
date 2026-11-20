@@ -240,8 +240,8 @@ final class FrontendRouteQa {
 
     /**
      * Every state of the picker, both confirmations and a restore, from an empty isolated directory.
-     * The title visits between worlds are staged as the death card's Esc makes them, since the pause
-     * menu has no way back to the title before 0.9.1 milestone 06.
+     * Each world is left through the pause menu's R and N, the way back to the title that leaves its
+     * slot as it is (0.9.1 milestone 06).
      */
     private void planSlotsLaunch() {
         step("every slot is empty", check(() -> states().stream().allMatch(s -> s == SaveSlots.State.EMPTY)));
@@ -267,8 +267,7 @@ final class FrontendRouteQa {
         step("pause", await(() -> game.uiMode == Game.UiMode.PAUSE, 2));
         step("pause settle", wait(0.5));
         step("pause capture", capture("03-pause-slot-1"));
-        step("Esc resumes", press(GLFW_KEY_ESCAPE));
-        step("to the title", run(() -> game.frontend.returnToTitle()));
+        leaveWithoutSaving("slot 1");
         step("N again", press(GLFW_KEY_N));
         step("new frontier again", await(() -> game.appState == Game.AppState.TITLE_NEW_WORLD, 3));
         step("W", press(GLFW_KEY_W));
@@ -287,7 +286,9 @@ final class FrontendRouteQa {
         step("meshes 2", wait(2.0));
         step("F5 into slot 2", press(GLFW_KEY_F5));
         step("saved to slot 2", await(() -> logged(SaveSession.savedLine(2)), 3));
-        step("to the title again", run(() -> game.frontend.returnToTitle()));
+        step("Esc in slot 2", press(GLFW_KEY_ESCAPE));
+        step("pause in slot 2", await(() -> game.uiMode == Game.UiMode.PAUSE, 2));
+        leaveWithoutSaving("slot 2");
         step("damage slot 1 on the disk", run(this::damageSlotOne));
         step("another version into slot 3", run(this::otherVersionIntoSlotThree));
         step("L", press(GLFW_KEY_L));
@@ -316,7 +317,9 @@ final class FrontendRouteQa {
                 && slots().describe(1).state() == SaveSlots.State.READY));
         step("restored meshes", wait(3.0));
         step("restored capture", capture("08-restored"));
-        step("to the title a third time", run(() -> game.frontend.returnToTitle()));
+        step("Esc in the restored world", press(GLFW_KEY_ESCAPE));
+        step("pause in the restored world", await(() -> game.uiMode == Game.UiMode.PAUSE, 2));
+        leaveWithoutSaving("the restored slot 1");
         step("N a third time", press(GLFW_KEY_N));
         step("new frontier a third time", await(() -> game.appState == Game.AppState.TITLE_NEW_WORLD, 3));
         step("Enter to the picker", press(GLFW_KEY_ENTER));
@@ -342,6 +345,14 @@ final class FrontendRouteQa {
         step("back at the title", await(() -> game.appState == Game.AppState.TITLE, 2));
         step("report", run(this::report));
         step("Q quits", press(GLFW_KEY_Q));
+    }
+
+    /** From the pause menu, R and N: back to the title without saving, the slot left as it is. */
+    private void leaveWithoutSaving(String label) {
+        step("R in " + label, press(GLFW_KEY_R));
+        step("the question in " + label, await(() -> game.uiMode == Game.UiMode.RETURN_TO_TITLE, 2));
+        step("N leaves " + label, press(GLFW_KEY_N));
+        step("at the title from " + label, await(() -> game.appState == Game.AppState.TITLE && game.world == null, 5));
     }
 
     /** Copies VEYLON 0.9.0's file into an empty slot, reading the old file only. */
@@ -881,7 +892,8 @@ final class FrontendRouteQa {
         String keys = switch (launch) {
             case "refusal" -> "L,2,Enter,Esc,N,Enter,Enter,Esc,O,V,Q";
             case "load" -> "L,Enter,Esc,O,V,Q";
-            case "slots" -> "N,Enter,Enter,F5,Esc,Esc,N,W,C,Enter,Enter,F5,L,3,Enter,1,R,Y,N,Enter,2,Enter,N,Del,N,Esc,Esc,Q";
+            case "slots" -> "N,Enter,Enter,F5,Esc,R,N,N,W,C,Enter,Enter,F5,Esc,R,N,L,3,Enter,1,R,Y,Esc,R,N,"
+                    + "N,Enter,2,Enter,N,Del,N,Esc,Esc,Q";
             case "session" -> "N,E,typed,Enter,R,E,typed,Enter,Enter,Enter,Esc,C,Right*7,Down,Enter,F5,R,Esc,R,Enter,"
                     + "L,Enter,Esc,R,N,N,Esc,Q";
             case "relaunch" -> "C,Esc,Q";
