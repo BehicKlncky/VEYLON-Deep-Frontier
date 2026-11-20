@@ -96,7 +96,7 @@ class UrbanDevelopmentSelectorTest {
     @Test
     void newFrontierBuildsAnUrbanDevelopmentWorldThroughTheProductionPath() {
         Game game = new Game();
-        game.sessionSeed = SEED;
+        game.frontend.seeds = NewWorldSeeds.fixed(SEED);
         game.saves.useSlots(new SaveSlots(temporary.resolve("slots")));
         game.frontend.newWorldGenerator = AutomatedRunDriver.configuredGenerator("urban-dev", true);
 
@@ -146,7 +146,7 @@ class UrbanDevelopmentSelectorTest {
     @Test
     void anOrdinaryNewFrontierIsTheCityAndTheWildernessIsOneKeyAway() {
         Game city = new Game();
-        city.sessionSeed = SEED;
+        city.frontend.seeds = NewWorldSeeds.fixed(SEED);
         city.saves.useSlots(new SaveSlots(temporary.resolve("slots")));
         startNewFrontier(city);
         assertEquals(World.GEN_URBAN_ECONOMY, city.world.generatorVersion, "the default is the economy city");
@@ -155,7 +155,7 @@ class UrbanDevelopmentSelectorTest {
                 (int) Math.floor(city.player.pos.z)).use(), "the survivor wakes in the starter refuge");
 
         Game wild = new Game();
-        wild.sessionSeed = SEED;
+        wild.frontend.seeds = NewWorldSeeds.fixed(SEED);
         wild.saves.useSlots(new SaveSlots(temporary.resolve("slots")));
         wild.frontend.applyTitle(TitleScreen.Action.NEW_GAME);
         assertEquals("Mapping the abandoned city...", wild.frontend.loadingDetail(), "the city is on offer first");

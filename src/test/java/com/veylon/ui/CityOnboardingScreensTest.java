@@ -88,6 +88,43 @@ class CityOnboardingScreensTest {
         assertTrue(keys.applyAsDouble(NewFrontierScreen.KEYS) <= 820, "fits within 820 units: " + NewFrontierScreen.KEYS);
     }
 
+    /**
+     * 0.9.1 milestone 06: the seed's row fits the narrowest screen, every number a seed can be fits
+     * its field uncut, longer typed words show their end, and the lines around it fit too.
+     */
+    @Test
+    void theSeedRowAndItsLinesFitAndLongWordsShowTheirEnd() {
+        ToDoubleFunction<String> seed = regular(NewFrontierScreen.SEED_SCALE), button = regular(1.28f),
+                hint = regular(1.05f);
+        double row = seed.applyAsDouble(NewFrontierScreen.SEED_LABEL) + 14 + NewFrontierScreen.FIELD_W + 14
+                + NewFrontierScreen.REROLL_W;
+        assertTrue(row <= 960 - 48, "the row fits a 4:3 screen of 720 rows: " + row);
+        assertTrue(button.applyAsDouble(NewFrontierScreen.REROLL_LABEL) <= NewFrontierScreen.REROLL_W - 12);
+        for (long number : new long[]{Long.MIN_VALUE, Long.MAX_VALUE, -8_888_888_888_888_888_888L}) {
+            String text = Long.toString(number);
+            assertTrue(seed.applyAsDouble(text) <= NewFrontierScreen.FIELD_TEXT_SPACE, "a seed's number fits: " + text);
+            assertEquals(text, NewFrontierScreen.fittedTail(text, seed), "and is never cut");
+        }
+        assertTrue(seed.applyAsDouble(NewFrontierScreen.PLACEHOLDER) <= NewFrontierScreen.FIELD_TEXT_SPACE);
+        String wide = "W".repeat(NewFrontierScreen.MAX_SEED_CODE_POINTS);
+        assertEquals(wide, NewFrontierScreen.fittedTail(wide, seed), "as many of the widest letters as fit are whole");
+        // A face whose glyphs were wider would show the end of the words, never half a character.
+        ToDoubleFunction<String> wider = text -> text.codePointCount(0, text.length()) * 20.0;
+        String faces = "😀".repeat(NewFrontierScreen.MAX_SEED_CODE_POINTS);
+        String tail = NewFrontierScreen.fittedTail(faces, wider);
+        assertTrue(faces.endsWith(tail) && wider.applyAsDouble(tail) <= NewFrontierScreen.FIELD_TEXT_SPACE);
+        assertEquals((int) (NewFrontierScreen.FIELD_TEXT_SPACE / 20), tail.codePointCount(0, tail.length()));
+        assertFalse(Character.isLowSurrogate(tail.charAt(0)), "cut between characters");
+
+        NewFrontierScreen screen = new NewFrontierScreen();
+        screen.open(true, Long.MIN_VALUE);
+        String widestNote = "These words make seed " + Long.MIN_VALUE + ".";
+        for (String line : new String[]{NewFrontierScreen.KEYS, NewFrontierScreen.SEED_KEYS,
+                NewFrontierScreen.OFFERED_NOTE, NewFrontierScreen.NUMBER_NOTE, widestNote, screen.seedNote()}) {
+            assertTrue(hint.applyAsDouble(line) <= 820, "fits within 820 units: " + line);
+        }
+    }
+
     @Test
     void aCityDeathCardSaysWhereTheSurvivorWakes() {
         assertEquals("THE CITY CLAIMS YOU", PresentationOverlay.deathText(true)[0]);

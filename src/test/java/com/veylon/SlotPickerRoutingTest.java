@@ -234,7 +234,7 @@ class SlotPickerRoutingTest {
      */
     private Game start(long seed, int slot, int... keys) {
         Game g = title();
-        g.sessionSeed = seed;
+        g.frontend.seeds = NewWorldSeeds.fixed(seed);
         g.frontend.applyTitle(TitleScreen.Action.NEW_GAME);
         for (int key : keys) {
             g.input.onKey(key, GLFW_PRESS);

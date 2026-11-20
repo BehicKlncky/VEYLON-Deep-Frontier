@@ -217,7 +217,7 @@ class DefaultCityAcceptanceTest {
      */
     static Game newFrontier(long seed, Path slots, int... keys) {
         Game g = new Game();
-        g.sessionSeed = seed;
+        g.frontend.seeds = NewWorldSeeds.fixed(seed);
         g.saves.useSlots(new SaveSlots(slots));
         g.frontend.applyTitle(TitleScreen.Action.NEW_GAME);
         assertTrue(g.newFrontierScreen.showsCity(), "NEW FRONTIER opens on the city");

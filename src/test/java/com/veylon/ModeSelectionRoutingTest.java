@@ -246,7 +246,7 @@ class ModeSelectionRoutingTest {
 
     private Game startFromNewFrontier(int... keys) throws Exception {
         Game game = new Game();
-        game.sessionSeed = 20260910L;
+        game.frontend.seeds = NewWorldSeeds.fixed(20260910L);
         game.saves.useSlots(new SaveSlots(temporary.resolve("slots")));
         game.frontend.applyTitle(TitleScreen.Action.NEW_GAME);
         for (int key : keys) {

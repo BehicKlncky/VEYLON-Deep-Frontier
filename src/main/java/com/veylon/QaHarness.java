@@ -22,6 +22,7 @@ import com.veylon.world.BlockType;
 import com.veylon.world.Chunk;
 import com.veylon.world.Raycaster;
 import com.veylon.world.World;
+import com.veylon.world.WorldSeed;
 import org.joml.Vector3f;
 
 import java.util.Locale;
@@ -117,18 +118,18 @@ final class QaHarness {
     // Session configuration
     // ------------------------------------------------------------------
 
-    /** Resolves the world seed, honouring {@code VEYLON_SEED} for reproducible runs. */
+    /**
+     * Resolves the seed of this session's scenes and staged screens, honouring {@code VEYLON_SEED}
+     * for reproducible runs ({@link WorldSeed} reads it as NEW FRONTIER reads a typed seed). A
+     * seed it names is also the one NEW FRONTIER opens on, and its rerolls follow from it.
+     */
     long configuredSeed() {
-        long seed = new Random().nextLong();
         String configured = System.getenv("VEYLON_SEED");
         if (configured == null || configured.isBlank()) {
-            return seed;
+            return new Random().nextLong();
         }
-        try {
-            seed = Long.parseLong(configured.trim());
-        } catch (NumberFormatException e) {
-            seed = configured.trim().hashCode();
-        }
+        long seed = WorldSeed.of(configured);
+        game.frontend.seeds = NewWorldSeeds.fixed(seed);
         System.out.println("[world] deterministic seed " + seed);
         return seed;
     }

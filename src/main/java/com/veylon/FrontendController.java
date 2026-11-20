@@ -63,6 +63,13 @@ final class FrontendController {
     int newWorldGenerator = World.DEFAULT_NEW_WORLD_GENERATOR;
     /** The generator chosen on the new-frontier screen; transient, consumed by one load. */
     private int chosenGenerator = World.DEFAULT_NEW_WORLD_GENERATOR;
+    /**
+     * The seeds NEW FRONTIER offers (0.9.1 milestone 06): new ones every time, unless
+     * {@code VEYLON_SEED} names the session's ({@code QaHarness.configuredSeed}).
+     */
+    NewWorldSeeds seeds = NewWorldSeeds.random();
+    /** The seed chosen on the new-frontier screen; transient, consumed by one load. */
+    private long chosenSeed;
 
     FrontendController(Game game) {
         this.game = game;
@@ -119,9 +126,9 @@ final class FrontendController {
         }
     }
 
-    /** Opens the worldless choice of world and mode on this session's world. */
+    /** Opens the worldless choice of world, mode and seed on this session's world and a seed it offers. */
     void openNewFrontier() {
-        game.newFrontierScreen.open(World.isUrbanGenerator(newWorldGenerator));
+        game.newFrontierScreen.open(World.isUrbanGenerator(newWorldGenerator), seeds.opening());
         game.appState = Game.AppState.TITLE_NEW_WORLD;
     }
 
@@ -195,16 +202,18 @@ final class FrontendController {
     }
 
     /**
-     * START carries the chosen world and mode to the slot picker, whose choice begins the two-frame
-     * loading; BACK creates nothing.
+     * START carries the chosen world, mode and seed to the slot picker, whose choice begins the
+     * two-frame loading; REROLL offers another seed; BACK creates nothing.
      */
     void applyNewFrontier(NewFrontierScreen.Action action) {
         switch (action) {
             case START -> {
                 newWorldMode = game.newFrontierScreen.selectedMode();
                 chosenGenerator = generatorFor(game.newFrontierScreen.showsCity());
+                chosenSeed = game.newFrontierScreen.seed();
                 openSlots(SlotPickerScreen.Purpose.NEW);
             }
+            case REROLL -> game.newFrontierScreen.offer(seeds.reroll(game.newFrontierScreen.seed()));
             case BACK -> game.appState = Game.AppState.TITLE;
             case NONE -> {
             }
@@ -320,7 +329,7 @@ final class FrontendController {
         } else if (request == LoadRequest.RESTORE_BACKUP) {
             result = game.saves.restore(requestedSlot, requestedBackup);
         } else {
-            game.newWorld(game.sessionSeed, true, chosenGenerator, newWorldMode);
+            game.newWorld(chosenSeed, true, chosenGenerator, newWorldMode);
             // The world plays on if its first save fails; F5 can try again.
             if (!game.saves.startIn(requestedSlot)) {
                 game.log(SaveSession.saveFailedLine(requestedSlot));
@@ -413,7 +422,10 @@ final class FrontendController {
             }
             case "newworld" -> openNewFrontier();
             case "slots" -> openSlots(SlotPickerScreen.Purpose.LOAD);
-            case "slots-new" -> openSlots(SlotPickerScreen.Purpose.NEW);
+            case "slots-new" -> {
+                chosenSeed = game.sessionSeed; // a world started from here is staged like the others
+                openSlots(SlotPickerScreen.Purpose.NEW);
+            }
             case "pause", "pause-creative", "gamemode", "gamemode-creative" -> {
                 game.newWorld(game.sessionSeed, true, newWorldGenerator, qaMode);
                 game.appState = Game.AppState.PLAYING;
