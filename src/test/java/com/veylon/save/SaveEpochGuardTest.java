@@ -103,8 +103,8 @@ class SaveEpochGuardTest {
             "enums", "b2c78dd0ff6223d61b2ae0e4fc5069ffbc2c525e7ec97ec472952f4199e6294e",
             "generation.city", "b6c505f9d1e284630f5e0410b0eb50a918c05a713953b8e30556d245c1ae81f8",
             "generation.wilderness", "f1f93ab3af72f72c56e872f4121969025b4712a055b046c8ede382c88530df29",
-            "layout.city", "68e2c2392bc8293b47aa4a8e63255b792a353e3b3013eb3fdc997656b1dc55b5",
-            "layout.wilderness", "de3c10b4c132ecc19ecc7febe18ef6f1af2a379b2d5e052680507e88e5f67b78");
+            "layout.city", "d92581c612e0057b91187ed9f3e8d17b9421f2ba4c443497e96dd51a9c14d9d8",
+            "layout.wilderness", "ccf330b438994faf60b4b2c1c1f87f7ad0e49825d41d360955cce038572c28f0");
 
     /** The seeds {@code WorldGeneratorFingerprintTest} pins. */
     private static final long[] SEEDS = {20_260_731L, -4_242L, 7L};
@@ -235,10 +235,16 @@ class SaveEpochGuardTest {
         return inputs;
     }
 
-    /** The epoch itself is no input to what decides it. */
+    /**
+     * The epoch itself is no input to what decides it, and neither is the checksum, which follows
+     * from everything else including the epoch.
+     */
     private static byte[] masked(byte[] save) {
         byte[] copy = save.clone();
         for (int i = 8; i < 12; i++) {
+            copy[i] = 0;
+        }
+        for (int i = SaveChecksum.OFFSET; i < SaveChecksum.OFFSET + SaveChecksum.LENGTH; i++) {
             copy[i] = 0;
         }
         return copy;
@@ -590,9 +596,17 @@ class SaveEpochGuardTest {
         return stack;
     }
 
+    /**
+     * The sample's bytes. Its summary is fixed: when it was saved, by which version and the words for
+     * its place decide nothing a load restores, and the sample must not move with the clock, the
+     * build's version or a district's display name. Its layout is still the writer's.
+     */
     private static byte[] bytesOf(Game g, Path directory, String name) throws IOException {
         Path file = directory.resolve(name);
-        assertTrue(SaveSystem.save(g, file), "precondition: the sample saves");
+        SaveSummary summary = new SaveSummary(0L, "sample", 0, g.gameMode(), g.creativeMarked(),
+                g.time.totalMinutes, "sample");
+        assertTrue(SaveSystem.save(g, file, SaveSystem.MAX_SAVE_BYTES, summary),
+                "precondition: the sample saves");
         byte[] bytes = Files.readAllBytes(file);
         Files.delete(file);
         return bytes;

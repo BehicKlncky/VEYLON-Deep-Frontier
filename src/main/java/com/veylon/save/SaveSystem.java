@@ -33,6 +33,7 @@ import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.nio.channels.Channels;
 import java.nio.channels.FileChannel;
 import java.nio.file.AtomicMoveNotSupportedException;
@@ -47,10 +48,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.zip.CRC32C;
+import java.util.zip.CheckedOutputStream;
 
 /**
  * Binary save format {@value SaveHeader#FORMAT}. After the {@link SaveHeader} (magic, format,
- * epoch, seed and world-generator version) it stores every delta from the generated world
+ * epoch, seed and world-generator version), the {@link SaveChecksum} of the whole file and the
+ * {@link SaveSummary} the slot picker reads, it stores every delta from the generated world
  * (changed blocks, structures, item state, equipment, afflictions, blueprints, racks,
  * collectors, POI discovery, beacon progress, faction quests/upgrades, NPCs, creatures,
  * carcasses, weather, time, active events), the settlements (alignment, stocks, capture,
@@ -125,6 +129,16 @@ public final class SaveSystem {
      * through {@link #save(Game, Path)}, whose limit is the reader's.
      */
     static boolean save(Game g, Path savePath, int sizeLimit) {
+        return save(g, savePath, sizeLimit, null);
+    }
+
+    /**
+     * The writer itself.
+     *
+     * @param summary the summary to write, or null for the live session's as of now; a test fixes it
+     *                to get the same bytes twice
+     */
+    static boolean save(Game g, Path savePath, int sizeLimit, SaveSummary summary) {
         Objects.requireNonNull(g, "g");
         Objects.requireNonNull(savePath, "savePath");
         g.entities.flushInfectedDeaths(g);
@@ -143,14 +157,18 @@ public final class SaveSystem {
             if (com.veylon.world.urban.UrbanContainers.manages(g.world)) {
                 g.world.urban.containers.prepareSave(g.world);
             }
+            SaveSummary written = summary != null ? summary : SaveSummary.of(g, SaveStamp.now());
             Path parent = target.getParent();
             Files.createDirectories(parent);
             temporary = Files.createTempFile(parent, "veylon-save-", ".tmp");
+            CRC32C checksum = new CRC32C();
             try (FileChannel channel = FileChannel.open(temporary,
                     StandardOpenOption.WRITE, StandardOpenOption.TRUNCATE_EXISTING);
-                 DataOutputStream out = new DataOutputStream(
-                         new BufferedOutputStream(Channels.newOutputStream(channel)))) {
+                 DataOutputStream out = new DataOutputStream(new BufferedOutputStream(
+                         new CheckedOutputStream(Channels.newOutputStream(channel), checksum)))) {
                 SaveHeader.write(out, g.world.seed, g.world.generatorVersion);
+                out.writeInt(0); // the checksum, written in its place once everything else is on disk
+                written.write(out);
                 out.writeDouble(g.time.totalMinutes);
 
                 // Weather.
@@ -360,6 +378,7 @@ public final class SaveSystem {
                             + sizeLimit + " a load reads");
                 }
                 out.flush();
+                writeChecksum(channel, (int) checksum.getValue());
                 channel.force(true);
             }
             replaceAtomically(temporary, target);
@@ -377,6 +396,15 @@ public final class SaveSystem {
                             + ": " + cleanupFailure);
                 }
             }
+        }
+    }
+
+    /** Writes the finished checksum over the placeholder the header was followed by. */
+    private static void writeChecksum(FileChannel channel, int value) throws IOException {
+        ByteBuffer bytes = ByteBuffer.allocate(SaveChecksum.LENGTH).putInt(0, value);
+        long at = SaveChecksum.OFFSET;
+        while (bytes.hasRemaining()) {
+            at += channel.write(bytes, at);
         }
     }
 
@@ -456,6 +484,8 @@ public final class SaveSystem {
             SaveHeader.skipChecked(in);
             long seed = in.readLong();
             int generatorVersion = in.readInt();
+            int checksum = in.readInt(); // compared once everything else has been read
+            SaveSummary summary = SaveSummary.read(in);
             // Checked before newWorld replaces anything. The version also fixes
             // an urban world's layout revision, so geometry is never built under
             // the wrong one; its content revision comes later, from urban.meta.
@@ -463,8 +493,12 @@ public final class SaveSystem {
                 throw new IOException("unsupported world generator version " + generatorVersion);
             }
             g.newWorld(seed, false, generatorVersion);
+            g.saves.restorePlayTime(summary.playSeconds());
 
             g.time.totalMinutes = in.readDouble();
+            if (Double.doubleToLongBits(g.time.totalMinutes) != Double.doubleToLongBits(summary.clockMinutes())) {
+                throw new IOException("the save summary's clock disagrees with the save");
+            }
 
             WeatherSystem.Weather[] weathers = WeatherSystem.Weather.values();
             g.weather.current = weathers[readOrdinal(in, "current weather", weathers.length)];
@@ -714,6 +748,13 @@ public final class SaveSystem {
                 g.world.kegFuses.put(keg, fuse);
             }
             readV3Extension(in, g);
+            if (g.gameMode() != summary.mode() || g.creativeMarked() != summary.creativeMarked()) {
+                throw new IOException("the save summary's game mode disagrees with the save");
+            }
+            // Last, so every refusal above names its own cause; this catches damage that parses.
+            if (SaveChecksum.of(payload) != checksum) {
+                throw new IOException("the checksum does not match the save");
+            }
             UrbanMetaSection.finishLoad(g);
             UrbanContainersSection.finishLoad(g);
             UrbanRefugesSection.finishLoad(g);

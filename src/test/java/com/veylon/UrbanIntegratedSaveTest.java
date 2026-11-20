@@ -375,10 +375,12 @@ class UrbanIntegratedSaveTest {
     /**
      * Two saves of the same state: the same length and every extension section byte for byte. The core's
      * maps iterate in hash order, which a load may change, so the core is compared through
-     * {@link #coreDigest} instead.
+     * {@link #coreDigest} instead. Their summaries say when and where each was written, which is no
+     * state, so the length is compared without them (0.9.1 milestone 04).
      */
     static void assertSameSave(byte[] expected, byte[] actual) {
-        assertEquals(expected.length, actual.length, "the same entries");
+        assertEquals(com.veylon.save.SaveSeal.withoutSummary(expected).length,
+                com.veylon.save.SaveSeal.withoutSummary(actual).length, "the same entries");
         SaveEnvelope.Parsed a = SaveEnvelope.parse(expected), b = SaveEnvelope.parse(actual);
         assertEquals(a.ids(), b.ids());
         for (int i = 0; i < a.sections().size(); i++) {

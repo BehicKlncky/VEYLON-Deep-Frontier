@@ -64,7 +64,10 @@ public final class SaveEnvelope {
         return found;
     }
 
-    /** The save with its envelope replaced by these sections, in this order. */
+    /**
+     * The save with its envelope replaced by these sections, in this order, and resealed, so the
+     * reader's own checks judge the edit rather than its checksum.
+     */
     public static byte[] rebuild(byte[] save, Parsed parsed, List<Section> sections) {
         ByteArrayOutputStream bytes = new ByteArrayOutputStream();
         try (DataOutputStream out = new DataOutputStream(bytes)) {
@@ -79,7 +82,7 @@ public final class SaveEnvelope {
         } catch (IOException impossible) {
             throw new AssertionError(impossible);
         }
-        return bytes.toByteArray();
+        return com.veylon.save.SaveSeal.resealed(bytes.toByteArray());
     }
 
     /** The save with one section's payload replaced, or the section removed when {@code payload} is null. */

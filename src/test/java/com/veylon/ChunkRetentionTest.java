@@ -126,11 +126,13 @@ class ChunkRetentionTest {
             assertEquals(twin.get(key), returned.get(key), "chunk " + twin.get(key).cx + "," + twin.get(key).cz);
         }
         assertTrue(droppedHome.size() > 9, "most of home was dropped on the way and regenerated: " + droppedHome.size());
-        // Nothing a save holds differs from the twin that kept every chunk, byte for byte.
+        // Nothing a save holds differs from the twin that kept every chunk, byte for byte. Their
+        // summaries say when each was written, which is no state.
         Path a = dir.resolve("kept.sav"), b = dir.resolve("dropped.sav");
         assertTrue(SaveSystem.save(kept, a));
         assertTrue(SaveSystem.save(dropped, b));
-        assertEquals(-1L, Files.mismatch(a, b), "the two saves are identical");
+        assertEquals(-1, java.util.Arrays.mismatch(com.veylon.save.SaveSeal.withoutSummary(Files.readAllBytes(a)),
+                com.veylon.save.SaveSeal.withoutSummary(Files.readAllBytes(b))), "the two saves are identical");
         Game loaded = new Game();
         assertTrue(SaveSystem.load(loaded, b), "the save of a world that dropped chunks loads");
         assertEquals(kept.world.changedBlocks, loaded.world.changedBlocks);

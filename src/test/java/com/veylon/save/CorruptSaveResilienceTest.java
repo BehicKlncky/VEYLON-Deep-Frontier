@@ -262,18 +262,21 @@ class CorruptSaveResilienceTest {
             game.world.discoveredPois.add(new Vec3i(i, 64, -i));
         }
         Path measured = elsewhere.resolve("measured.dat");
-        assertTrue(SaveSystem.save(game, measured), "precondition: the grown snapshot saves");
+        SaveSummary summary = fixedSummary(game);
+        assertTrue(SaveSystem.save(game, measured, SaveSystem.MAX_SAVE_BYTES, summary),
+                "precondition: the grown snapshot saves");
         byte[] grown = Files.readAllBytes(measured);
         assertTrue(grown.length > last.length, "precondition: the next snapshot is larger");
 
-        assertFalse(SaveSystem.save(game, slot, grown.length - 1),
+        assertFalse(SaveSystem.save(game, slot, grown.length - 1, summary),
                 "one byte more than the limit must not be published");
         assertArrayEquals(last, Files.readAllBytes(slot), "the last save is untouched");
         try (var files = Files.list(dir)) {
             assertEquals(java.util.List.of(slot), files.toList(), "and no temporary file is left beside it");
         }
 
-        assertTrue(SaveSystem.save(game, slot, grown.length), "a snapshot at the limit is published");
+        assertTrue(SaveSystem.save(game, slot, grown.length, summary),
+                "a snapshot at the limit is published");
         assertArrayEquals(grown, Files.readAllBytes(slot));
         assertTrue(SaveSystem.load(new Game(), slot), "and loads");
     }
@@ -374,7 +377,10 @@ class CorruptSaveResilienceTest {
         return save;
     }
 
-    /** Copies {@code source} with the big-endian int at {@code offset} replaced. */
+    /**
+     * Copies {@code source} with the big-endian int at {@code offset} replaced, resealed so that the
+     * reader's own guard for that field refuses it, not the checksum (0.9.1 D-22).
+     */
     private static Path corrupt(Path dir, Path source, int offset, int value) throws IOException {
         byte[] bytes = Files.readAllBytes(source);
         bytes[offset] = (byte) (value >>> 24);
@@ -382,8 +388,13 @@ class CorruptSaveResilienceTest {
         bytes[offset + 2] = (byte) (value >>> 8);
         bytes[offset + 3] = (byte) value;
         Path corrupted = Files.createTempFile(dir, "corrupt-", ".dat");
-        Files.write(corrupted, bytes);
+        Files.write(corrupted, SaveSeal.resealed(bytes));
         return corrupted;
+    }
+
+    /** A summary that never changes, so two saves of one game are the same bytes. */
+    private static SaveSummary fixedSummary(Game game) {
+        return new SaveSummary(0L, "test", 0, game.gameMode(), game.creativeMarked(), game.time.totalMinutes, "");
     }
 
     private static void assertLoadFailsCleanly(Path save, String what) {
@@ -413,7 +424,9 @@ class CorruptSaveResilienceTest {
             try (DataInputStream in = new DataInputStream(
                     new BufferedInputStream(Files.newInputStream(save)))) {
                 Cursor c = new Cursor(in);
-                c.skip(SaveHeader.LENGTH + 8);          // the header, then the clock
+                c.skip(SaveHeader.LENGTH + SaveChecksum.LENGTH); // the header and the checksum
+                c.skip(c.expectPositiveCount("summary bytes")); // the save summary
+                c.skip(8);                              // the clock
                 int weatherOrdinal = c.position();
                 c.skip(4 + 4 + 4 + 4);                  // weather current, next, blend, timer
                 c.skip(5 * 4);                          // player position, camera yaw/pitch

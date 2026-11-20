@@ -213,6 +213,8 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
 
     /** Title, graphics options and loading -- the states with no world in them. */
     final FrontendController frontend = new FrontendController(this);
+    /** What saves need beyond the world: its play time and the words for its place. */
+    public final SaveSession saves = new SaveSession(this);
 
     /** VEYLON_* benchmark scenes, timed captures and the release smoke gate. */
     final AutomatedRunDriver automation = new AutomatedRunDriver(this);
@@ -581,6 +583,7 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
     void advanceWorld(double dtD) {
         float dt = (float) dtD;
         advanceClock(dtD);
+        saves.countPlay(dtD);
         scheduler.update(dtD, this);
         particles.update(dt, world);
         projectiles.update(this, dt);

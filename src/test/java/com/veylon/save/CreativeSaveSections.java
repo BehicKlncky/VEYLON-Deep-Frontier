@@ -84,6 +84,7 @@ final class CreativeSaveSections {
                 out.write(section.payload);
             }
         }
-        return bytes.toByteArray();
+        // Resealed, so the reader's own checks judge the edit rather than its checksum.
+        return SaveSeal.resealed(bytes.toByteArray());
     }
 }

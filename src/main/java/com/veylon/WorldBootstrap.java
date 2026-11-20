@@ -122,6 +122,8 @@ final class WorldBootstrap {
         // Remains are rebuilt without the flames their bodies died with (never saved).
         game.burnResidues.reset();
         game.particles.count = 0;
+        // A new world is unplayed; a load restores the play time its save recorded.
+        game.saves.resetPlayTime();
         reseedSimulation(seed);
     }
 
