@@ -20,19 +20,30 @@ import static org.lwjgl.stb.STBTruetype.*;
  */
 class CityOnboardingScreensTest {
 
+    /**
+     * The game's regular face. stb keeps a pointer into the buffer it was given, so the buffer is
+     * held for as long as the class is loaded: a measurer that outlived a collected buffer would
+     * read freed memory and take the test JVM down.
+     */
+    private static final ByteBuffer FONT = ResourceManager.readBuffer("fonts/SourceSans3-Regular.ttf");
+    private static final STBTTFontinfo FACE = STBTTFontinfo.malloc();
+
+    static {
+        if (!stbtt_InitFont(FACE, FONT)) {
+            throw new IllegalStateException("the bundled regular face does not load");
+        }
+    }
+
     private static ToDoubleFunction<String> regular(float scale) {
-        ByteBuffer data = ResourceManager.readBuffer("fonts/SourceSans3-Regular.ttf");
-        STBTTFontinfo info = STBTTFontinfo.malloc();
-        assertTrue(stbtt_InitFont(info, data));
-        float px = stbtt_ScaleForPixelHeight(info, 12 * scale);
+        float px = stbtt_ScaleForPixelHeight(FACE, 12 * scale);
         return text -> {
             int[] advance = new int[1], bearing = new int[1];
             double width = 0;
             int previous = -1;
             for (int cp : text.codePoints().toArray()) {
-                stbtt_GetCodepointHMetrics(info, cp, advance, bearing);
+                stbtt_GetCodepointHMetrics(FACE, cp, advance, bearing);
                 width += advance[0] * px;
-                if (previous >= 0) width += stbtt_GetCodepointKernAdvance(info, previous, cp) * px;
+                if (previous >= 0) width += stbtt_GetCodepointKernAdvance(FACE, previous, cp) * px;
                 previous = cp;
             }
             return width;
