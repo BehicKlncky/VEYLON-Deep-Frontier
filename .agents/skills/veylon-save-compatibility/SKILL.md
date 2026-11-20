@@ -5,7 +5,7 @@ description: Keep VEYLON saves strict within one save epoch, and raise the epoch
 
 # VEYLON saves and the save epoch
 
-All paths below are relative to the repository root. The rule is the owner's save policy: a build opens only saves of its own save epoch ("Save compatibility policy" and "The save epoch" in `docs/ARCHITECTURE.md`; decisions D-01 and D-16 to D-19 in `docs/roadmap/v0.9.1/DESIGN.md`). Read those, then the code in `src/main/java/com/veylon/save/`. Read only the contributor rules in `docs/DEVELOPING.md` that apply, starting with "Saves and the save epoch".
+All paths below are relative to the repository root. The rule is the owner's save policy: a build opens only saves of its own save epoch ("Save compatibility policy", "The save epoch", "The checksum and the summary" and "Slots and backups" in `docs/ARCHITECTURE.md`; decisions D-01, D-15 to D-19, D-21 and D-22 in `docs/roadmap/v0.9.1/DESIGN.md`). Read those, then the code in `src/main/java/com/veylon/save/`. Read only the contributor rules in `docs/DEVELOPING.md` that apply, starting with "Saves and the save epoch".
 
 ## What the policy rules out
 
@@ -21,6 +21,8 @@ All paths below are relative to the repository root. The rule is the owner's sav
 - Persisted enums: append rather than reorder, so ordinals stay stable while an epoch is developed. `SerializedEnumOrderTest` pins the orders.
 - Terrain and settlement and city structure are regenerated from seed and generator plus deltas. Only generators 3 (wilderness) and 20 (city) may change on purpose; re-record their pins in `WorldGeneratorFingerprintTest`. Generators 1, 2 and 4–19 stay as they are until 0.9.2 retires them. Keep generation and planning order-independent and seeded.
 - Keep durable publication: sibling temporary file, flush, atomic replacement, the writer's refusal of any count or size its reader would refuse. A failed save keeps the previous file; never write the destination directly.
+- After the header come the checksum (`SaveChecksum`: CRC-32C of the whole file with its own four bytes read as zero) and the summary (`SaveSummary`, at most 1 KiB, read by the slot picker without a world). A load checks the checksum last, so the reader's own refusals still name their cause. A test that edits save bytes reseals them (`SaveSeal.resealed`); compare two saves of one state with `SaveSeal.withoutSummary`. A new summary field changes the layout like any other; its mode, mark and clock must match the body (D-22).
+- The game's saves go through `SaveSlots` (three slots, two rotating backups each, D-21). A failed save keeps the current file and both backups; the slots list, move and delete only their own file names, never `saves/veylon.sav` or a file the game did not write (D-15).
 
 ## The epoch guard
 
@@ -37,6 +39,7 @@ Use the production save and load path and fixed seeds. Select tests according to
 | Change | Relevant coverage |
 | --- | --- |
 | Header, refusal, messages | `SaveEpochRefusalTest`, `SaveRefusalRoutingTest` |
+| Checksum, summary, slots and backups | `SaveSummaryTest`, `SaveSlotsTest`, `SlotPickerRoutingTest`, `SaveSlotIsolationTest` |
 | Core body or extension tail | `CoreSaveRoundTripTest`, `CorruptSaveResilienceTest` |
 | A section | its section test, such as `BodiesSectionTest`, `RemainsSectionTest`, `GameModeSectionTest` or `CreativeControlsSectionTest` |
 | City sections | `UrbanIntegratedSaveTest`, `UrbanSaveCorruptionTest` |
