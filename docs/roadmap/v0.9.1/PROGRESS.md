@@ -10,8 +10,8 @@ the first milestone below that is not complete.
 | 02 Test reliability and continuous integration | Complete; the verify workflow's first Windows run passed with the push of 2026-11-20 (recorded in 05) | `91975e9`, `ec4d960`, `6517ef0`, `0252fbd`, `bfb0176`, `8b87cd6` |
 | 03 Current-version save epoch | Complete | `ce4686d`, `843dce8`, `14ca773`, `3d98b70`, `6bae538`, `f3fe760`, `13486ca`, `2600134`, `0fbc816`, `71972aa`, `f3aed69`, `369d65e`, `3063d13` |
 | 04 Three save slots and backups | Complete | `25e899e`, `142aace`, `51956a2`, `048e2d9`, `896340a`, `88d00ed`, `7357680`, `8dcab51`, `73f53c8` |
-| 05 Autosave | Complete | `2b9ce42`, `efc99ec`, `e487e6a`, `828a184`, `0a22a7c`, `1a11340`, `90834e0`, `759b3e7`, then the records commit that adds this section; 06 records its hash |
-| 06 Session and control comfort | Not started | |
+| 05 Autosave | Complete | `2b9ce42`, `efc99ec`, `e487e6a`, `828a184`, `0a22a7c`, `1a11340`, `90834e0`, `759b3e7`, `687f3d3` |
+| 06 Session and control comfort | Complete | `91e576d`, `5909555`, `f9ea0e8`, `1573313`, `c652200`, `68a0b5f`, `c36ed1b`, `3cb57cf`, `72534e8`, then the records commit that adds this section; 07 records its hash |
 | 07 Forgotten defects sweep | Not started | |
 | 08 Day temperature curve | Not started | |
 | 09 Integration and release preparation | Not started | |
@@ -878,3 +878,157 @@ No commit carries a co-author line. Nothing was pushed.
 Seed entry and reroll, return to title (Save and return goes through `SaveSession.saveActive`,
 which also restarts the autosave interval), mouse sensitivity and invert-Y (decide where they
 live; the autosave screen has `A`), and B01.
+
+## Milestone 06 — Session and control comfort
+
+**Status:** complete on 2026-11-20.
+**Base:** `main` at `687f3d3`, the records commit of 05, local and not pushed (the remote `main`
+was `73f53c8`); clean apart from an untracked `.vscode/`.
+
+### What was done
+
+1. **Seeds (D-33).** NEW FRONTIER shows the seed its world will be built from and builds that
+   one. `NewWorldSeeds` offers a new seed at every opening and every reroll (`R`), so
+   `Game.sessionSeed` no longer fixes every new world of a process; `E` or a click types a seed,
+   a number or any words, read by `world.WorldSeed` as `VEYLON_SEED` always was (a whole number is
+   the seed, other text its `String.hashCode`). A session with `VEYLON_SEED` offers it at every
+   opening and rolls from it, so routes stay deterministic; a typed seed still makes that world.
+2. **B01 and the pause menu (D-34).** Every world's pause menu names it with its seed under the
+   mode, without "development build"; the keys take three lines, the last naming `R` and `Q`.
+3. **Releasing a world (D-36).** `WorldBootstrap.releaseWorld` runs a new world's resets without
+   the reseed and drops the world; the death card's way back, the new one and a load that failed
+   halfway all use it, and the renderer's shake is part of every reset now.
+4. **Return to title (D-35).** `R` in the pause menu asks: Enter saves into the slot and returns,
+   `N` returns without saving, Escape stays; a failed save keeps the world and the question.
+5. **Mouse settings (D-37).** `input.ControlSettings` (`veylon_controls.properties`) with 10–300%
+   sensitivity and invert-Y, `input.MouseLook` for the turn (100% is the old 0.115 bit for bit),
+   and the CONTROLS screen from the title and the pause menu (`C`).
+6. **QA.** `VEYLON_FRONTEND=route-session` and `route-session-relaunch` play all of it natively;
+   `route-slots` leaves its worlds through the pause menu; `VEYLON_FRONTEND=controls` pins the
+   screen.
+7. **Documents:** README (game modes, controls, save format), CHANGELOG [Unreleased],
+   ARCHITECTURE (initialization, world creation, returning to the title, seeds, the collaborator
+   tables), DEVELOPING (`VEYLON_SEED`, `VEYLON_FRONTEND`, isolated data, "Session QA", the slot
+   route), HUD_VALIDATION (a milestone 06 section), DESIGN D-33 to D-37 and B01.
+
+### Owner-facing behaviour
+
+- NEW FRONTIER shows the seed; `E` types your own (a number, or words that always make the same
+  world), `R` rolls another. Each opening offers a new one.
+- The pause menu names the world and its seed, so a world can be shared.
+- `R` in the pause menu returns to the title, asking first: Enter saves and returns, `N` returns
+  without saving, Escape stays. `Q` still quits.
+- CONTROLS on the title and `C` in the pause menu set mouse sensitivity (10–300%) and invert-Y,
+  kept for the next launch.
+
+### Native evidence
+
+All on the owner's host (NVIDIA GeForce RTX 3060 Ti, driver 621.01, OpenGL 3.3.0, windowed),
+seed 20261120, each in a new isolated directory `build/qa/v091-m06-<tag>/` (a relaunch in its
+launch's). The script is `build/v091-m06-native.sh`; the summary `build/v091-m06-native-summary.txt`
+and the logs `build/v091-m06-native-<tag>.log`. 69 captures.
+
+| Tag | Run | Result |
+| --- | --- | --- |
+| `session-720`, `-relaunch` | `route-session`, then `route-session-relaunch` | `pass=true` in 19 s and 7 s; 10 and 1 captures |
+| `session-1080`, `-relaunch` | the same at 1920×1080 | `pass=true` in 20 s and 6 s |
+| `session-1080-s075`, `-relaunch` | the same at UI scale 0.75 | `pass=true` in 19 s and 6 s |
+| `slots-720` | `route-slots`, each world left with `R` and `N` | `pass=true` in 20 s; 10 captures |
+| `route-720`, `route-720-load` | the default path's two launches | `pass=true` in 20 s and 10 s; 15 and 7 captures |
+| `screen-pause-wild-720`, `screen-pause-creative-720`, `screen-newworld-720`, `screen-controls-1080-s075` | static captures | one each |
+| `smoke-720` | `VEYLON_SMOKE=30` | passed: isolated save and load, `glErrors=0` |
+
+- Every run's shutdown summary read `glGetError=0` and 0 KHR errors.
+- Each session launch saw NEW FRONTIER offer 20261120, typed "deep frontier" (seed 287000769),
+  rolled 4110970681813779, built the city of 287000769 in slot 1, applied 170% and invert-Y (the
+  file read back), returned with Save and return ("Saved to slot 1.", the slot rewritten with a
+  backup), loaded the slot, returned with `N` ("Slot 1 keeps its last save.", the slot's SHA-256
+  unchanged) and found NEW FRONTIER offering 20261120 again with nothing typed. Each relaunch read
+  170% and On at launch, showed them, and Back changed nothing.
+- A first trial run of the session route (`build/qa/v091-m06-try`) passed the same way before
+  the series.
+
+### Changed paths
+
+- Production: new `NewWorldSeeds.java`, `world/WorldSeed.java`, `ui/ReturnToTitlePrompt.java`,
+  `input/ControlSettings.java`, `input/MouseLook.java`, `ui/ControlsOptionsScreen.java`; changed
+  `FrontendController.java`, `QaHarness.java`, `ui/NewFrontierScreen.java`, `ui/PauseMenu.java`,
+  `WorldBootstrap.java`, `engine/Renderer.java`, `Game.java`, `HotkeyRouter.java`, `Autosave.java`,
+  `ui/TitleScreen.java`, `FrontendRouteQa.java`.
+- Tests: new `NewFrontierSeedTest`, `world/WorldSeedTest`, `ReturnToTitleTest`,
+  `ReturnToTitleRoutingTest`, `ui/ReturnToTitlePromptTest`, `ControlsOptionsRoutingTest`,
+  `input/ControlSettingsTest`, `input/MouseLookTest`, `ui/ControlsOptionsScreenTest`; changed
+  `DefaultCityAcceptanceTest`, `ModeSelectionRoutingTest`, `SlotPickerRoutingTest`,
+  `UrbanDevelopmentSelectorTest` (they name the session's seed as `VEYLON_SEED` does),
+  `ui/CityOnboardingScreensTest`, `CombustionLifecycleTest` (the screens that pause the world),
+  `save/SaveSlotIsolationTest`.
+- Documents: `README.md`, `CHANGELOG.md`, `docs/ARCHITECTURE.md`, `docs/DEVELOPING.md`,
+  `docs/graphics/HUD_VALIDATION.md`, DESIGN and this file.
+
+### Validation
+
+Every build ran from the repository root in Git Bash with `JAVA_HOME` set to
+`build/tools/jdk25/jdk-25.0.4.1+1`. Each code commit's tree was built whole in a detached worktree
+(`build/v091-m06-wt`) after its focused checks, with its logs in `build/v091-m06/`:
+
+| Commit | Focused checks | `build --console=plain` on its tree |
+| --- | --- | --- |
+| `91e576d` | `world.WorldSeedTest`, `NewFrontierSeedTest`, `ui.CityOnboardingScreensTest`, `ModeSelectionRoutingTest`, `SlotPickerRoutingTest`, `DefaultCityAcceptanceTest`, `UrbanDevelopmentSelectorTest`, `WorldSeedDeterminismTest`, `SaveRefusalRoutingTest` | 5m 33s, 2,466 tests in 321 classes |
+| `5909555` | `ui.CityOnboardingScreensTest` | 5m 11s, 2,467 tests in 321 classes |
+| `f9ea0e8` | `ReturnToTitleTest`, which failed three of three with the old way back, `GameLoopIntegrationTest`, `DefaultCityAcceptanceTest`, `SaveRefusalRoutingTest` | 5m 30s, 2,470 tests in 322 classes |
+| `1573313` | `ReturnToTitleRoutingTest`, `ui.ReturnToTitlePromptTest`, `CombustionLifecycleTest`, `AutosaveTest` and the slot and autosave routing tests | 5m 38s, 2,478 tests in 324 classes |
+| `c652200` | `input.ControlSettingsTest`, `input.MouseLookTest`, `ControlsOptionsRoutingTest`, `ui.ControlsOptionsScreenTest`, `save.SaveSlotIsolationTest`, `CombustionLifecycleTest`, `qa.OrchestratorSizeTest` | 6m 40s beside the native runs, 2,490 tests in 328 classes |
+| `68a0b5f` | the native session routes above | 6m 9s, 2,490 tests in 328 classes |
+| `c36ed1b` | the native slot route above | the final build |
+
+Every build passed with the two symbolic-link skips and no failure or temporary-directory retry.
+While iterating, `CityOnboardingScreensTest` first assumed that 32 W's overflow the seed field;
+they fit, so the test now measures that the widest letters fit whole and proves the tail with a
+wider face. `ControlsOptionsRoutingTest` first reached a package-private step of the screen; it
+uses the settings' own steps. `Game.java` stays at 993 lines and `QaHarness.java` is at 1,493.
+
+**The final tree**, `c36ed1b` (the documentation commits change no build input):
+`./gradlew.bat build --rerun-tasks --console=plain` in the worktree, BUILD SUCCESSFUL in 6m 55s
+with all 10 tasks run: 2,490 tests in 328 classes, no failure, the two symbolic-link skips, no
+temporary-directory retry (`build/v091-m06/c6-final-build.log`). The epoch guard printed epoch 1's digest
+`f923a1296ea3e846b4e262dacb1e3531e584a6ee7e8209c86b4158640af143dc`, unchanged since 04: nothing in
+a save changed. `graphify update . --no-cluster` then rebuilt the graph: 12,903 nodes. The
+documentation commits had link, anchor and `git diff --check` checks.
+
+### Commits
+
+| Commit | Subject |
+| --- | --- |
+| `91e576d` | feat(ui): choose a new world's seed on NEW FRONTIER |
+| `5909555` | fix(ui): name the world and its seed in the pause menu |
+| `f9ea0e8` | fix(frontend): leave nothing of a world behind on the way to the title |
+| `1573313` | feat(ui): return to the title from the pause menu |
+| `c652200` | feat(input): set mouse sensitivity and invert-Y |
+| `68a0b5f` | feat(qa): play the session's seeds, the way back and the controls natively |
+| `c36ed1b` | feat(qa): leave the slot route's worlds through the pause menu |
+| `3cb57cf` | docs(frontend): describe seeds, the way back to the title and the mouse settings |
+| `72534e8` | docs(hud): record the seed field, the way back and the controls captures |
+| the records commit | docs(roadmap): record milestone 06 of 0.9.1 |
+
+No commit carries a co-author line. Nothing was pushed: 05's and 06's commits are local.
+
+### Limitations and pending gates
+
+- **Pending, from 02:** the macOS arm64 job of `verify.yml` has not run yet.
+- **For the owner, D-33:** `VEYLON_SEED` wins over NEW FRONTIER's random roll, not over a seed
+  typed there. The pack's "still wins" can also be read as "over everything"; the reading taken
+  lets the native route type a seed under a fixed `VEYLON_SEED`, and one line in
+  `FrontendController.applyNewFrontier` changes it if the owner wants the other.
+- Mouse look is off in every automated session, so the native runs prove the settings and their
+  persistence, not a turn; `MouseLookTest` proves the turn, bit for bit at 100%.
+- The death card's Escape still returns to the title without asking, as before 06.
+- A typed seed holds 32 characters; the slot cards do not show the seed (the pause menu does).
+- At 720 rows the pause panel, one line taller, reaches to within a few units of the hotbar's
+  top under the menu's dim.
+- The relaunch's report line prints the session's seed fields as 0, since it never opens NEW
+  FRONTIER; its controls fields are the evidence.
+
+### Next: milestone 07
+
+The forgotten-defects sweep: B03 to B10, B12, B13 and B15 (DESIGN §5), each fixed with a
+regression check or native evidence, or accepted by the owner.
