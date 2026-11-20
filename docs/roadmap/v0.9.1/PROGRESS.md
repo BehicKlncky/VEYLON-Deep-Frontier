@@ -7,10 +7,10 @@ the first milestone below that is not complete.
 | Milestone | Status | Commits |
 | --- | --- | --- |
 | 01 Release plan and defect audit | Complete (documentation only) | `95d09c5`, `1aadd19` |
-| 02 Test reliability and continuous integration | Complete; the verify workflow's first run waits for a push | `91975e9`, `ec4d960`, `6517ef0`, `0252fbd`, `bfb0176`, `8b87cd6` |
+| 02 Test reliability and continuous integration | Complete; the verify workflow's first Windows run passed with the push of 2026-11-20 (recorded in 05) | `91975e9`, `ec4d960`, `6517ef0`, `0252fbd`, `bfb0176`, `8b87cd6` |
 | 03 Current-version save epoch | Complete | `ce4686d`, `843dce8`, `14ca773`, `3d98b70`, `6bae538`, `f3fe760`, `13486ca`, `2600134`, `0fbc816`, `71972aa`, `f3aed69`, `369d65e`, `3063d13` |
-| 04 Three save slots and backups | Complete | `25e899e`, `142aace`, `51956a2`, `048e2d9`, `896340a`, `88d00ed`, `7357680`, `8dcab51`, then the records commit that adds this section; 05 records its hash |
-| 05 Autosave | Not started | |
+| 04 Three save slots and backups | Complete | `25e899e`, `142aace`, `51956a2`, `048e2d9`, `896340a`, `88d00ed`, `7357680`, `8dcab51`, `73f53c8` |
+| 05 Autosave | Complete | `2b9ce42`, `efc99ec`, `e487e6a`, `828a184`, `0a22a7c`, `1a11340`, `90834e0`, `759b3e7`, then the records commit that adds this section; 06 records its hash |
 | 06 Session and control comfort | Not started | |
 | 07 Forgotten defects sweep | Not started | |
 | 08 Day temperature curve | Not started | |
@@ -703,3 +703,178 @@ are pushed to `origin/main` once this records commit is made.
 
 Autosave (D-03) into the active slot at the designed moments, through `SaveSession` and
 `SaveSlots.save`, so every autosave also keeps the save it replaces as the newest backup.
+
+## Milestone 05 — Autosave
+
+**Status:** complete on 2026-11-20.
+**Base:** `main` at `73f53c8`, the records commit of 04, pushed with 01–04; clean apart from an
+untracked `.vscode/`.
+
+### What was done
+
+1. **What asks for an autosave (D-28).** `Autosave`, owned by `SaveSession`, writes the live
+   world into its slot through `SaveSession.saveActive`, the path F5 takes, so every autosave
+   keeps the save it replaces as the newest backup and the save format does not change (the
+   epoch guard's inputs did not move). `SleepSystem` asks on every waking (`wake`, and the new
+   `wakeEarly` that Escape now calls); `RefugeSystem.atBed` asks once a refuge is claimed; the
+   interval asks once its real seconds of simulated play have passed since the slot was last
+   written. On by default, every 10 minutes, or 5, 15 or 30.
+2. **When it waits (D-29).** `Autosave.frame`, at the end of `Game.playStep`, writes a due
+   autosave at the first safe frame, which `Autosave.blocker` judges: not dead or on an end
+   card, not paused, asleep, searching or behind a screen, not burning, on the ground, no body
+   still tumbling, nothing going for the player, and no hit for ten seconds. "Going for the
+   player" is the new `ai.Pursuit`, read from the AI states that exist; the city soundscape's
+   rule for a person going for the survivor moved into it.
+3. **Who may autosave (D-30).** `AutomatedRunDriver.configure` decides it before any scene
+   stages: a player's session may, an automated one only with `VEYLON_AUTOSAVE=on`. A game
+   that never ran autosaves only once permitted, and nothing autosaves a world in no slot
+   (`SaveSession.bound`).
+4. **SAVING... (D-31).** The HUD shows SAVING... for 0.35 s before each write, in the gap the
+   simulation-pause panel uses; the log then says "Autosaved to slot N." or "Could not
+   autosave to slot N.".
+5. **Settings (D-32).** `save.AutosaveSettings` in `veylon_autosave.properties`;
+   `ui.AutosaveOptionsScreen` from AUTOSAVE on the title (`A`) and `A` in the pause menu,
+   whose save line names it.
+6. **QA.** `VEYLON_SCENE=urban_autosave` plays every trigger natively into slot 1 of an
+   isolated directory, with a staged hunt that must hold the timer's autosave;
+   `VEYLON_FRONTEND=autosave` pins the options screen. The city profile's 8 km journey now
+   saves through a slot.
+7. **Documents:** README (controls, save format, the Creative section's stale "one save slot"
+   sentence that 04 missed, known limitations), CHANGELOG [Unreleased], ARCHITECTURE
+   ("Autosave", the collaborator tables), DEVELOPING (`VEYLON_AUTOSAVE`, the scene and screen,
+   "Autosave QA", the save and AI rules), PERFORMANCE_BENCHMARKS ("Autosave cost"),
+   HUD_VALIDATION (a milestone 05 section), DESIGN D-28 to D-32 and §6.
+
+### Owner-facing behaviour
+
+- After waking, after claiming a refuge and every 10 minutes of play the world is saved into
+  its own slot, with SAVING... at the top of the screen for a moment and a log line after.
+- An autosave never happens while you are hurt, hunted, falling, swimming, flying, burning,
+  asleep or in a menu; it happens as soon as that is over.
+- `A` on the title or in the pause menu turns it off or sets 5, 10, 15 or 30 minutes; the choice
+  is kept for the next launch.
+- The save an autosave replaces is the slot's newest backup, as with F5, and F5 starts the
+  interval again.
+
+### The pending gate from 02
+
+The first run of `verify.yml` came with the push of 01–04 on 2026-11-20: its Windows x64 job on
+`73f53c8` (run 44739102951) **passed**, as checked that day. The macOS arm64 job runs for pull
+requests, weekly and on demand, not on a push, so it has not run yet.
+
+### Native evidence
+
+All on the owner's host (NVIDIA GeForce RTX 3060 Ti, driver 621.01, OpenGL 3.3.0, windowed),
+seed 20261120, each in a new isolated directory `build/qa/v091-m05-<tag>/` (ignored). The scripts
+and logs are in `build/` (`build/v091-m05-native*.sh`, `build/v091-m05-native-summary.txt`,
+`build/v091-m05-native-<tag>.log`); 41 captures.
+
+| Tag | Run | Result |
+| --- | --- | --- |
+| `autosave-survival-1280x720` | `urban_autosave`, `VEYLON_AUTOSAVE=on` | `pass=true`, 29 s; the claim's autosave 16.3 ms, the waking's 13.2, the timer's 14.0, the timer's after the hunt 13.6 |
+| `autosave-survival-1920x1080` | the same | `pass=true`, 26 s; 16.5, 14.1, 13.9, 13.2 ms |
+| `autosave-survival-1920x1080-s075` | the same at UI scale 0.75 | `pass=true`, 26 s; 16.5, 12.5, 14.6, 13.1 ms |
+| `autosave-creative-1280x720` | the same, `VEYLON_GAME_MODE=creative` | `pass=true`, 19 s; 16.4, 13.7, 15.0 ms (no hunt: nothing perceives a Creative player) |
+| `refused-without-switch` | `urban_autosave` without the switch | refused before staging: "urban_autosave needs VEYLON_AUTOSAVE=on" |
+| `screen-autosave-720`, `screen-autosave-1080-s075`, `screen-pause-720`, `screen-title-720` | the options screen, the pause menu in a city, the title | one capture each |
+| `smoke-720` | `VEYLON_SMOKE=30` | passed: save and load, `glErrors=0`, and "[autosave] automated session: autosave off" |
+
+- Every run's shutdown summary read `glGetError=0` and 0 KHR errors.
+- Each Survival tour claimed the flat beside the starter refuge ("You claim the first-floor flat
+  as a refuge (2 of 3)"), whose autosave first waited on `airborne` for a moment after the
+  crouched press; slept from 23:16 and woke after 2.0 hours; ran a staged timer out; and with a
+  staged infected hunting 11.8 blocks off printed "[autosave] timer waits: pursued", held the
+  due autosave for 4.0 s until the body was taken away, then wrote it. F9 then opened slot 1
+  holding exactly what the last autosave wrote, and the slot kept two backups.
+- The first round of the four tours failed at once: `configure` decided the autosave session
+  after the scene had staged, so the scene saw autosave off. The decision moved before the
+  staging, and every run above, the screens and the smoke included, was repeated on the fixed
+  code in fresh directories.
+
+### Measured cost
+
+On the 8 km journey of `cityPerformanceTest`, the first save through a slot after each kilometre
+(an autosave's) took 26.9–28.4 ms at 1 km (12.5 KB) and 113.7–127.3 ms at 8 km (43.7 KB) over two
+runs; natively a fresh city's autosaves took 12.5–16.5 ms. A city autosave therefore stalls one
+to eight frames at 60 fps, which is why every autosave is announced (D-31). The figures, and why
+a save timed straight after another one reads too low, are in
+[PERFORMANCE_BENCHMARKS](../../PERFORMANCE_BENCHMARKS.md#autosave-cost-091-milestone-05-2026-11-20).
+
+### Changed paths
+
+- Production: new `Autosave.java`, `AutosaveQaScene.java`, `ai/Pursuit.java`,
+  `save/AutosaveSettings.java`, `ui/AutosaveOptionsScreen.java`; changed `SaveSession.java`,
+  `Game.java`, `WorldBootstrap.java`, `SleepSystem.java`, `RefugeSystem.java`,
+  `HotkeyRouter.java`, `FrontendController.java`, `AutomatedRunDriver.java`,
+  `CitySoundscape.java`, `UrbanQaScenes.java`, `QaHarness.java`, `ui/Hud.java`,
+  `ui/PauseMenu.java`, `ui/TitleScreen.java`.
+- Tests: new `AutosaveTest`, `AutosaveOptionsRoutingTest`, `AutosaveQaSceneTest`,
+  `ai/PursuitTest`, `save/AutosaveSettingsTest`, `ui/AutosaveOptionsScreenTest`; changed
+  `CombustionLifecycleTest` (the screens that pause the world), `save/SaveSlotIsolationTest`,
+  `UrbanCityPerformanceTest`.
+- Documents: `README.md`, `CHANGELOG.md`, `docs/ARCHITECTURE.md`, `docs/DEVELOPING.md`,
+  `docs/PERFORMANCE_BENCHMARKS.md`, `docs/graphics/HUD_VALIDATION.md`, DESIGN and this file.
+
+### Validation
+
+Every build ran from the repository root in Git Bash with `JAVA_HOME` set to
+`build/tools/jdk25/jdk-25.0.4.1+1`. Each code commit's tree was built whole in a detached worktree
+(`build/v091-m05-wt`, removed afterwards) after its focused checks:
+
+| Commit | Focused checks | `build --console=plain` on its tree |
+| --- | --- | --- |
+| `2b9ce42` | `ai.PursuitTest`, 8 tests | 5m 13s, 2,415 tests in 314 classes |
+| `efc99ec` | `AutosaveTest` (27), `save.AutosaveSettingsTest` (5), `save.SaveSlotIsolationTest` | 5m 9s, 2,448 tests in 316 classes |
+| `e487e6a` | `ui.AutosaveOptionsScreenTest`, `AutosaveOptionsRoutingTest`, the `ui` package, `SlotPickerRoutingTest` | 4m 52s, 2,453 tests in 318 classes |
+| `828a184` | `AutosaveQaSceneTest` (both modes and the refusal); the native tours above | 5m 32s, 2,456 tests in 319 classes |
+| `0a22a7c` | `cityPerformanceTest` twice, every profile test passing | the final build |
+
+Every build passed with the two symbolic-link skips and no failure or temporary-directory
+retry. While iterating, the first whole `test` run of the working tree failed one test:
+`CombustionLifecycleTest` lists the screens that pause the world, and the autosave options are
+a new one; the list now names it, in `e487e6a`. A first version of `AutosaveTest` put a burning
+player out with `combustion.reset()`, which keeps the body's own fire; it uses `extinguish`.
+`javadoc` ran clean after `Autosave`'s documented constants became public.
+
+**The final tree**, `0a22a7c` (the documentation commits change no build input):
+`./gradlew.bat build --rerun-tasks --console=plain`, BUILD SUCCESSFUL in 5m 13s with all 10 tasks
+run: 2,456 tests in 319 classes, no failure, the two symbolic-link skips, no temporary-directory
+retry (`build/v091-m05-final-build.log`). The epoch guard printed epoch 1's digest
+`f923a1296ea3e846b4e262dacb1e3531e584a6ee7e8209c86b4158640af143dc`, unchanged since 04, as an
+autosave changes nothing in a save. `graphify update . --no-cluster` then rebuilt the graph:
+12,727 nodes. The documentation commits had link, anchor and `git diff --check` checks; every
+relative link and anchor in the changed documents resolves.
+
+### Commits
+
+| Commit | Subject |
+| --- | --- |
+| `2b9ce42` | feat(ai): tell whether anything is going for the player |
+| `efc99ec` | feat(save): autosave into the active slot when it is safe |
+| `e487e6a` | feat(ui): set autosave from the title and the pause menu |
+| `828a184` | feat(qa): play every autosave trigger in a city natively |
+| `0a22a7c` | test(perf): save the long journey through a slot, as an autosave does |
+| `1a11340` | docs(save): describe autosave and its switch |
+| `90834e0` | docs(performance): record what a city autosave costs |
+| `759b3e7` | docs(hud): record the autosave strip and options captures |
+| the records commit | docs(roadmap): record milestone 05 of 0.9.1 |
+
+No commit carries a co-author line. Nothing was pushed.
+
+### Limitations and pending gates
+
+- **Pending, from 02:** the macOS arm64 job of `verify.yml` has not run yet.
+- An autosave waits as long as the unsafe state lasts: a long fight, a long swim or a Creative
+  flight holds it, by design.
+- A failed autosave is logged and not retried until the next interval; F5 can try at once.
+- The interval counts sleep's frames, which fast-forward the night, like any other play.
+- The hunted capture does not show the staged body, which stood behind walls; the console's
+  "waits: pursued" line and the held time are the evidence.
+- Persisted autosave settings were checked headlessly (`AutosaveSettingsTest`), not by a native
+  relaunch.
+
+### Next: milestone 06
+
+Seed entry and reroll, return to title (Save and return goes through `SaveSession.saveActive`,
+which also restarts the autosave interval), mouse sensitivity and invert-Y (decide where they
+live; the autosave screen has `A`), and B01.
