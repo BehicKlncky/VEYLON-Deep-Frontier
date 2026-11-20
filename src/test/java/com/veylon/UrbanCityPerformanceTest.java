@@ -390,7 +390,12 @@ class UrbanCityPerformanceTest {
         int radius = g.renderer.renderRadius();
         float x = g.player.pos.x, z = g.player.pos.z;
         float speed = PlayerMovementSystem.FLY_FAST_SPEED;
-        Path save = dir.resolve("travel.sav");
+        // 0.9.1 milestone 05: every save goes through a slot, F5 and autosave alike, with the backup
+        // copy and rotation; the first save after each kilometre is the one an autosave would make.
+        com.veylon.save.SaveSlots slots = new com.veylon.save.SaveSlots(dir.resolve("saves"));
+        g.saves.useSlots(slots);
+        g.saves.activate(1);
+        Path save = slots.current(1);
         report("travel", "start retained=%d heapMiB=%.1f speed=%.1f b/s radius=%d", g.world.loadedCount(),
                 mib(heapAfterGc()), speed, radius);
         int searched = 0;
@@ -417,7 +422,7 @@ class UrbanCityPerformanceTest {
             }
             searched += searchNearestBuilding(g, (int) x, (int) z);
             long t = System.nanoTime();
-            assertTrue(SaveSystem.save(g, save), "the travelled world saves");
+            assertTrue(g.saves.saveActive(), "the travelled world saves into its slot");
             double saveMs = ms(t);
             long bytes = Files.size(save);
             Game loaded = new Game();
@@ -433,8 +438,8 @@ class UrbanCityPerformanceTest {
                     mib(heapAfterGc()), snap.urbanRegionPlans(), snap.urbanBuildingPlans(),
                     snap.urbanEncounterRecords(), snap.urbanSiteRecords(), snap.visitedPlaces(),
                     g.world.urban.containers.size(), g.world.changedBlocks.size(), g.world.fixtures.size(), searched);
-            report("travel", "km=%d save=%d bytes in %.1fms load=%.1fms (%d chunks regenerated) step+stream %s"
-                    + " chunk-scans %s", km, bytes, saveMs, loadMs, loadedChunks, frame, scans);
+            report("travel", "km=%d save=%d bytes in %.1fms (slot, backups rotated) load=%.1fms (%d chunks regenerated)"
+                    + " step+stream %s chunk-scans %s", km, bytes, saveMs, loadMs, loadedChunks, frame, scans);
             // Target (milestone 24): the journey holds a bounded city, whatever its length. A checkpoint's
             // building search may generate a few chunks between two passes.
             assertTrue(g.world.loadedCount() <= ChunkRetention.RETAIN_LIMIT + 32, "retained chunks unbounded: " + g.world.loadedCount());
