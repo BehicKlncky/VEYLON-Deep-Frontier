@@ -37,7 +37,7 @@ Main.main
               AutomatedRunDriver     VEYLON_* sessions and the release smoke gate
               WorldBootstrap         reset, reseed, construct, spawn, camp
               FrontendController     title / options / slots / loading, and transitions
-              SaveSession            save slots, the active slot, play time
+              SaveSession            save slots, the active slot, play time, autosave
               HotkeyRouter           global keys, screens, quick save/load
               PlayerEnvironmentSystem shelter, smoke, vents, discovery, stations
               PlayerCombatSystem     melee, bow, firearm, thrown, reload, durability
@@ -383,6 +383,36 @@ Within one epoch the reader accepts exactly what the writer writes (D-18): the
 extension tail and the eleven sections every save holds are required, one
 version per section (per generator where the city's differ), and a section id
 it does not know fails the load.
+
+#### Autosave
+
+`Autosave` (0.9.1 milestone 05, D-28 to D-32), owned by `SaveSession`, writes the
+live world into its slot through `SaveSession.saveActive`, the path F5 takes, so
+an autosave keeps the save it replaces as the newest backup and needs nothing in
+the save format. Asking and writing are apart:
+
+- **Asking.** `SleepSystem` asks on every waking (`wake`, and `wakeEarly` for
+  Escape), `RefugeSystem.atBed` after a claim, and the interval asks once enough
+  real seconds of simulated play have passed since the slot was last written
+  (any successful save into it and any new or loaded world start it again). One
+  request waits at a time.
+- **Writing.** `Autosave.frame` runs at the end of `Game.playStep`, after the
+  frame's outcome, and writes a due autosave once `blocker()` finds the moment
+  safe: not dead or on an end card, not paused, asleep, searching or behind any
+  screen, not burning, on the ground, no body still tumbling (a save settles
+  it), nothing going for the player (`ai.Pursuit`, read from the AI states that
+  exist, within 48 blocks), and no hit for ten seconds. A blocked autosave waits
+  however long it takes. When it is safe the HUD shows SAVING... for 0.35 s and
+  then the save runs synchronously, stalling that frame; a failed autosave is
+  logged and spent, and the interval tries again.
+- **Who may autosave.** `AutomatedRunDriver.configure` turns autosave off for
+  every automated session unless `VEYLON_AUTOSAVE=on`; a game that never ran,
+  as in every headless test, autosaves only once permitted. Nothing autosaves a
+  world that belongs to no slot yet (`SaveSession.bound`): one started,
+  loaded, restored or saved into a slot belongs to it; a QA scene's world built
+  by `newWorld` alone does not. `save.AutosaveSettings` keeps the switch and the
+  interval in `veylon_autosave.properties`, edited by `ui.AutosaveOptionsScreen`
+  from the title and the pause menu.
 
 #### How saving works
 
@@ -1384,8 +1414,8 @@ in a named collaborator:
 |---|---|
 | `WorldBootstrap` | reset, reseed, construct, dry-land spawn, starter camp |
 | `AutomatedRunDriver` | `VEYLON_*` scenes and captures, the smoke script and gate |
-| `FrontendController` | title, graphics options, the slot picker, two-frame loading, return to title |
-| `SaveSession` | the save slots, the active slot F5 and F9 use, the play time a save records |
+| `FrontendController` | title, graphics, audio and autosave options, the slot picker, two-frame loading, return to title |
+| `SaveSession` | the save slots, the active slot F5 and F9 use, the play time a save records, and `Autosave` |
 | `HotkeyRouter` | global keys: screens, debug toggles, quick save/load, hotbar |
 | `PlayerEnvironmentSystem` | shelter, smoke, fumaroles, POI discovery, station scan, mesh eviction |
 | `PlayerCombatSystem` | all damage the player deals, durability, kill reputation |

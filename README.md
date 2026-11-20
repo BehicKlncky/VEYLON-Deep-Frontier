@@ -117,8 +117,9 @@ effect is free.
 
 The first switch to Creative **permanently marks that world as a Creative world**. You
 can return to Survival whenever you like, but the mark stays and is shown in the pause
-menu and on the victory screen. There is one save slot, shared by both modes and both
-worlds; NEW FRONTIER warns when a save exists that saving the new world will replace it.
+menu and on the victory screen. Each of the three save slots holds one world of either
+kind in either mode; NEW FRONTIER asks which slot a new world goes into, and asks again
+before it replaces a save (see [Save format](#save-format)).
 
 ## Requirements
 
@@ -207,7 +208,9 @@ $env:VEYLON_SMOKE = "30"; .\gradlew.bat run
 The default new-world path itself (title, NEW FRONTIER, play, F5, quit, relaunch, load)
 has a native route, `VEYLON_FRONTEND=route` then `route-load`, and every state of the
 slot picker has `route-slots`; see
-[Developing](docs/DEVELOPING.md#default-path-acceptance-urban-package-26).
+[Developing](docs/DEVELOPING.md#default-path-acceptance-urban-package-26). No automated
+run autosaves unless `VEYLON_AUTOSAVE=on` asks; the autosave tour `urban_autosave` needs
+it (see [Developing](docs/DEVELOPING.md#autosave-qa-091-milestone-05)).
 
 Release performance gate on the validation machine:
 
@@ -261,6 +264,7 @@ java --enable-native-access=ALL-UNNAMED -Xmx2G -jar build\libs\veylon-0.9.0-all.
 | `MMB` (Creative) | **Pick the block you are looking at** |
 | `O` (paused) | Graphics options |
 | `V` (title or paused) | Audio options: live sliders, Apply/F5 saves, Back/Esc restores |
+| `A` (title or paused) | Autosave options: on or off, and every 5, 10, 15 or 30 minutes of play; Apply/F5 keeps them, Back/Esc restores |
 | `F3` | Debug overlay |
 | `F5` / `F9` | Save into / load the world's slot: the one it was loaded from or started in (the pause menu names it) |
 | `1`-`3`, arrows (slot picker) | Choose a slot; `Enter` loads it or starts the new world in it, `R` restores a damaged slot's backup, `Del` deletes a slot; replacing, restoring and deleting ask first |
@@ -534,6 +538,19 @@ save and backups, nothing else. The game reads, moves and deletes no other file 
 folder: the single save of 0.9.0 and earlier, `saves/veylon.sav`, is mentioned in the
 picker but never opened, imported or changed.
 
+**Autosave** writes the world into its own slot by itself: after you wake from sleep,
+after you claim a refuge at a bed, and every 10 minutes of play (pausing counts for
+nothing). It is an ordinary save, so the save it replaces becomes the newest backup, and
+F5 starts the interval again. It waits for a safe moment rather than saving a bad one:
+never while you are dead or on an end card, asleep, searching a container or with any
+screen open, burning, off the ground (falling, climbing, swimming or flying), while a
+body is still tumbling, while anything is hunting you, or for 10 seconds after you are
+hurt. A wait is never dropped: the save happens at the next safe moment. The HUD shows
+**SAVING...** just before it, since a large city takes a moment to write, and the log
+says "Autosaved to slot N." or "Could not autosave to slot N.". `A` on the title or in
+the pause menu turns it off or sets the interval to 5, 10, 15 or 30 minutes; the choice
+is kept in `veylon_autosave.properties` beside the graphics and audio settings.
+
 Every save starts with a header: the magic `VEYL`, the **format** (4), the **save
 epoch**, the seed and the **world-generator version**. A build opens only saves of its
 own format and epoch. 0.9.1 writes epoch 1, so every save written by 0.9.0 and earlier
@@ -594,7 +611,10 @@ section inventory and the epoch rules are in [the architecture notes](docs/ARCHI
   existing worlds keep their outcomes.
 - A city plans each region the first time you come near it; fast travel into
   unplanned streets can hitch briefly. Saving a city takes a little longer the more
-  places it has recorded. There is no autosave.
+  places it has recorded.
+- Autosave waits for a safe moment, so a long fight, a long swim or a Creative flight
+  holds it until it ends. Saving stays on the game's main thread: a large city's
+  autosave is a short stall, announced by SAVING..., not a background write.
 - The city has no gardening: beyond what its buildings still hold, food and water come
   only from rain, the taps' last water, purifiers and trade.
 - The Creative mark is permanent by design and cannot be cleared.

@@ -19,6 +19,14 @@ All notable user-facing changes to VEYLON: Deep Frontier are recorded here.
 - Every save carries a checksum, so damage anywhere in the file is caught: the
   slot picker shows the slot as damaged, and such a save never replaces the
   world you are in.
+- Autosave, on by default: the world is saved into its own slot after you wake
+  from sleep, after you claim a refuge at a bed and every 10 minutes of play.
+  It waits for a safe moment, never saving while you are hurt, hunted, falling,
+  burning, asleep or in a menu, and saves as soon as that moment comes. The HUD
+  shows SAVING... just before it and the log says when it is done or failed;
+  the save it replaces is kept as the newest backup, as with F5.
+- AUTOSAVE on the title and `A` in the pause menu turn autosave off or set it to
+  every 5, 10, 15 or 30 minutes; the choice is kept for the next launch.
 
 ### Changed
 

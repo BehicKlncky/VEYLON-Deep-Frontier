@@ -71,9 +71,9 @@ runs. All are inert when unset. Everything below is handled by `QaHarness`;
 | `VEYLON_GAME_MODE=survival\|creative` | Initial mode for automated world runs only; absent means Survival. Invalid values fail explicitly. Ignored for normal title sessions and frontend-only captures. |
 | `VEYLON_GENERATOR=wilderness\|urban-dev` | This session's new world, which NEW FRONTIER opens on, staged `VEYLON_FRONTEND` worlds use and automated worlds build. Absent is the ordinary default, the abandoned city (`World.DEFAULT_NEW_WORLD_GENERATOR`, generator 20: layout 17 / template 7 / content 4, encounter catalogue 6). `wilderness` is the legacy world NEW FRONTIER also offers (`World.WILDERNESS_NEW_WORLD_GENERATOR`, generator 3). `urban-dev` is the newest urban layout (`UrbanRevision.DEVELOPMENT_GENERATOR`, today the default city itself) and needs an isolated data directory (see below). Any other value fails. Every tour's headless test keeps the generator it was written for. |
 | `VEYLON_SMOKE=<seconds>` | Release smoke gate on this session's world (the city unless `VEYLON_GENERATOR=wilderness`): a world edit and an equip, an isolated save and load, fire and storm, then a pass/fail report; in the wilderness also a generated-fortress approach. Throws on failure |
-| `VEYLON_SCENE=<name>` | Stage a deterministic benchmark scene (`day`, `pinefog`, `nightfire`, `ruin`, `toxic`, `ao_shadow`, `phase4`, `ashwolf`, `silhouette30`, `vfx_blood`, `vfx_mining`, `vfx_beacon`, `death_ragdoll_showcase`, `death_ragdoll_sequence`, `dismember_showcase`, `dismember_wall`, `dismember_bomb` (a real scrap bomb thrown into a group of six, one outside the lethal radius; it goes off at 2.4 s), `dismember_species`, `dismember_species_wall` and `dismember_species_close` (every species, a guard and the player's remains blown apart at 1 s; open meadow, a step and a wall, and a close view of the small bodies), `molotov_ground`, `molotov_tree` and `molotov_rain` (a real fire bomb thrown at 0.5 s onto a dry clearing at dusk, beside a round tree that catches, or with rain from 3 s that puts the pool out; shots `0.7,1.2,3,7,11`, `1,4,10,20` and `2,3.5,5`), the burning-body scenes `body_fire_row`, `body_fire_row_night`, `body_fire_close`, `body_fire_out`, `body_fire_blast`, `body_fire_panic`, `body_fire_bird`, `body_fire_rain`, `body_fire_ragdoll` and `body_fire_player` (see "Burning bodies QA" below), `movement`, `inventory`, `ui_cycle`, `held_*`, `creative_flight` with `VEYLON_GAME_MODE=creative`, which flies east at Shift speed and prints a `[flight]` streaming report at 29 s, and the urban scenes `urban_streets`, `urban_intersection`, `urban_seam_walk`, `urban_fixtures`, `urban_fixtures_night`, `urban_apartments`, `urban_apartments_night`, `urban_apartments_lit_night`, `urban_apartments_manual`, `urban_apartments_manual_night`, `urban_loot`, the playable-slice route `urban_slice`, the catalogue walk `urban_catalogue`, the district tour `urban_districts`, the route tour `urban_underground`, the ecology tour `urban_ecology`, the survivor tour `urban_survivors`, the stronghold tour `urban_strongholds`, the refuge tour `urban_refuge`, the utility tour `urban_utilities`, the mission tour `urban_missions`, the onboarding tour `urban_onboarding`, the atmosphere tour `urban_atmosphere` and the performance tour `urban_performance` on the default city (see "Urban planning QA" below), and the save audit `save_audit` on any save placed in an isolated slot (see the same table)). A city scene (`urban_*`) and `save_audit` play this session's world and refuse to start without an isolated data directory; every other scene was made for the wilderness and builds it unless `VEYLON_GENERATOR` names a world |
+| `VEYLON_SCENE=<name>` | Stage a deterministic benchmark scene (`day`, `pinefog`, `nightfire`, `ruin`, `toxic`, `ao_shadow`, `phase4`, `ashwolf`, `silhouette30`, `vfx_blood`, `vfx_mining`, `vfx_beacon`, `death_ragdoll_showcase`, `death_ragdoll_sequence`, `dismember_showcase`, `dismember_wall`, `dismember_bomb` (a real scrap bomb thrown into a group of six, one outside the lethal radius; it goes off at 2.4 s), `dismember_species`, `dismember_species_wall` and `dismember_species_close` (every species, a guard and the player's remains blown apart at 1 s; open meadow, a step and a wall, and a close view of the small bodies), `molotov_ground`, `molotov_tree` and `molotov_rain` (a real fire bomb thrown at 0.5 s onto a dry clearing at dusk, beside a round tree that catches, or with rain from 3 s that puts the pool out; shots `0.7,1.2,3,7,11`, `1,4,10,20` and `2,3.5,5`), the burning-body scenes `body_fire_row`, `body_fire_row_night`, `body_fire_close`, `body_fire_out`, `body_fire_blast`, `body_fire_panic`, `body_fire_bird`, `body_fire_rain`, `body_fire_ragdoll` and `body_fire_player` (see "Burning bodies QA" below), `movement`, `inventory`, `ui_cycle`, `held_*`, `creative_flight` with `VEYLON_GAME_MODE=creative`, which flies east at Shift speed and prints a `[flight]` streaming report at 29 s, and the urban scenes `urban_streets`, `urban_intersection`, `urban_seam_walk`, `urban_fixtures`, `urban_fixtures_night`, `urban_apartments`, `urban_apartments_night`, `urban_apartments_lit_night`, `urban_apartments_manual`, `urban_apartments_manual_night`, `urban_loot`, the playable-slice route `urban_slice`, the catalogue walk `urban_catalogue`, the district tour `urban_districts`, the route tour `urban_underground`, the ecology tour `urban_ecology`, the survivor tour `urban_survivors`, the stronghold tour `urban_strongholds`, the refuge tour `urban_refuge`, the utility tour `urban_utilities`, the mission tour `urban_missions`, the onboarding tour `urban_onboarding`, the atmosphere tour `urban_atmosphere`, the performance tour `urban_performance` and the autosave tour `urban_autosave` (which also needs `VEYLON_AUTOSAVE=on`; see "Autosave QA" below) on the default city (see "Urban planning QA" below), and the save audit `save_audit` on any save placed in an isolated slot (see the same table)). A city scene (`urban_*`) and `save_audit` play this session's world and refuse to start without an isolated data directory; every other scene was made for the wilderness and builds it unless `VEYLON_GENERATOR` names a world |
 | `VEYLON_SHOT="5,10"` | Capture screenshots at those elapsed seconds |
-| `VEYLON_FRONTEND=<name>` | Pin a front-end screen (`options`, `audio`, `loading`, `death`, `victory`, `glyphs`, `newworld`). `slots` and `slots-new` open the slot picker on the data directory's slots as they are, to load and to start a new world, and change no file. `route` and then `route-load` play the default new-world path natively from the title over two launches, `route-refusal` plays slot 2 holding another version's save, and `route-slots` plays every state of the slot picker with a restore and both confirmations (see "Default-path acceptance" below). Staged worlds are this session's world, the city unless `VEYLON_GENERATOR=wilderness`. `pause` and `gamemode` stage a Survival world with the pause menu or the mode confirmation open; `pause-creative`, `gamemode-creative` and `victory-creative` stage a Creative world; `catalog`, `catalog-tools`, `catalog-search` (query "iron") and `catalog-inventory` open the Creative catalog; `worldcontrols` and `worldcontrols-held` open the Creative world controls, the second with dusk, a frozen clock, a locked storm and paused spawning already applied |
+| `VEYLON_FRONTEND=<name>` | Pin a front-end screen (`options`, `audio`, `autosave`, `loading`, `death`, `victory`, `glyphs`, `newworld`). `slots` and `slots-new` open the slot picker on the data directory's slots as they are, to load and to start a new world, and change no file. `route` and then `route-load` play the default new-world path natively from the title over two launches, `route-refusal` plays slot 2 holding another version's save, and `route-slots` plays every state of the slot picker with a restore and both confirmations (see "Default-path acceptance" below). Staged worlds are this session's world, the city unless `VEYLON_GENERATOR=wilderness`. `pause` and `gamemode` stage a Survival world with the pause menu or the mode confirmation open; `pause-creative`, `gamemode-creative` and `victory-creative` stage a Creative world; `catalog`, `catalog-tools`, `catalog-search` (query "iron") and `catalog-inventory` open the Creative catalog; `worldcontrols` and `worldcontrols-held` open the Creative world controls, the second with dusk, a frozen clock, a locked storm and paused spawning already applied |
 | `VEYLON_RESOLUTION=1920x1080` | Framebuffer override |
 | `VEYLON_UI_SCALE`, `VEYLON_VSYNC`, `VEYLON_FULLSCREEN`, `VEYLON_SHADOWS` | Settings overrides |
 | `VEYLON_AUDIO_QA=1` | Add three positional audio reports per second to the smoke, without gameplay effects |
@@ -81,6 +81,7 @@ runs. All are inert when unset. Everything below is handled by `QaHarness`;
 | `VEYLON_MIN_FPS` | Stricter FPS gate layered over the mandatory 60 |
 | `VEYLON_CAPTURE_TAG` | Filename prefix for captures |
 | `VEYLON_QA_SET_OPTIONS="fov=85,bloom=false"` | Mutate and save settings through the real APPLY path, to prove persistence across relaunch |
+| `VEYLON_AUTOSAVE=on\|off` | Whether the session may autosave (0.9.1 milestone 05). Absent, a player's session may and every automated one (any scene, capture, frontend screen or route, or the smoke) may not, so no automation writes an autosave into a slot unasked. `on` lets an automated run autosave under the player's settings; `off` stops a player's session from it. Any other value fails |
 
 Example:
 
@@ -106,7 +107,11 @@ slots and their backups are `saves/slot-N.sav`, `saves/slot-N.backup-1.sav` and
   frontend routes (`route`, `route-load`, `route-refusal`, `route-slots`) refuse
   to start unless the data directory is set and differs from the player's own
   (`AppPaths.isolatedFromPlayerData`): each of them can press F5 into a slot.
-  Automated sessions start on slot 1.
+  Automated sessions start on slot 1, and none of them autosaves unless
+  `VEYLON_AUTOSAVE=on` asks.
+- The autosave settings, `veylon_autosave.properties`, sit in the data
+  directory beside the graphics and audio settings; `SaveSlotIsolationTest`
+  checks that too.
 - The release smoke runs without an isolated directory, so it saves and loads
   through a folder of slots of its own, `build/qa/smoke-slots` inside the data
   directory, and never touches the player's.
@@ -185,6 +190,34 @@ $env:VEYLON_FRONTEND='route-slots'; $env:VEYLON_RESOLUTION='1280x720'
 The release smoke runs on the city by default; the wilderness smoke, with its
 fortress approach, needs `VEYLON_GENERATOR=wilderness`. Wilderness benchmark and
 capture scenes keep the wilderness without a selector.
+
+#### Autosave QA (0.9.1 milestone 05)
+
+`VEYLON_SCENE=urban_autosave` plays every autosave trigger in the default city
+into slot 1 of an isolated directory, and refuses to start without one or
+without `VEYLON_AUTOSAVE=on`. It saves the new city into slot 1 as NEW FRONTIER
+does, then with ordinary keys: walks into the abandoned flat beside the starter
+refuge and claims it at its bed with crouch and F; sleeps in that bed at night
+(the clock staged forward) until morning; lets a staged timer run out; and in
+Survival keeps a staged infected hunting the player while the next timer runs
+out, which must hold that autosave for four seconds until the body is taken
+away. Each autosave must show SAVING... before it is written and log
+"Autosaved to slot 1."; each is captured twice (`01-claim-saving`,
+`01-claim-autosaved`, `02-asleep`, `03-wake-…`, `04-timer-…`,
+`05-hunted-no-autosave`, `06-after-the-pursuit-…`). F9 then opens the slot,
+which must hold exactly what the last autosave wrote
+(`SaveAuditQaScene.durable`), and slot 1 must have kept two backups. It prints
+each autosave's milliseconds on its pass line, and the game prints
+`[autosave] slot=… trigger=… ok=… ms=…` for every autosave and
+`[autosave] … waits: <reason>` whenever one waits. `AutosaveQaSceneTest` plays
+the same tour headlessly in both modes. `VEYLON_FRONTEND=autosave` pins the
+options screen.
+
+```powershell
+$env:VEYLON_SEED='20261120'; $env:VEYLON_AUTOSAVE='on'
+$env:VEYLON_SCENE='urban_autosave'; $env:VEYLON_CAPTURE_TAG='autosave-survival'
+.\gradlew.bat run -PveylonDataDir=build/qa/autosave-survival
+```
 
 #### Urban planning QA
 
@@ -786,6 +819,11 @@ R11, so a new sight cone, hearing check or targeting pass that skips it will mak
 a Creative player visible again. Consequences that do not depend on someone
 noticing — reputation, ownership, theft, vandalism, bounty — stay ungated.
 
+A brain that chases, stalks or searches for the player in a new state must also
+be known to `ai.Pursuit` (0.9.1 milestone 05), which reads the existing states to
+tell whether anything is going for the player, so an autosave waits, and clear
+that state in `PlayerAwareness.forgetPlayer`.
+
 ### A new way to consume an item
 
 Decide which side of D4 it is on. Using an item up *for its own effect* (placing,
@@ -995,6 +1033,16 @@ save holds, or historical fixtures, and none may be added.
   tests and tools. A test that reaches the title, F5 or F9 gives its game a folder
   of slots of its own (`game.saves.useSlots(new SaveSlots(dir))`), since classes
   share a worker's data directory.
+- **Autosave** (0.9.1 D-28 to D-32). An autosave is an ordinary save through
+  `SaveSession.saveActive`. A moment that should be kept asks for one with
+  `game.saves.autosave().request(...)` from the system that owns it, as
+  `SleepSystem` does on waking and `RefugeSystem` on a claim; it never saves
+  itself. `Autosave.frame`, at the end of `Game.playStep`, writes it once
+  `Autosave.blocker` finds the moment safe. A new state that would make a save
+  regrettable (a timed action, a new kind of danger) belongs in `blocker`, and
+  a new way for AI to go for the player belongs in `ai.Pursuit`. A game nobody
+  ran never autosaves: a test that wants it calls `autosave().permit(true)`
+  and gives the game its own slots.
 - **The guard.** `SaveEpochGuardTest` digests the layout (a sample save of each
   world kind), the enum tables a save stores and both world kinds' generation.
   The city sample holds the sections as a new city writes them, so most city
