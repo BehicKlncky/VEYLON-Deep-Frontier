@@ -103,6 +103,12 @@ music and mute. Music at zero disables it; settings persist across launches.
 **G**. For the same seed and world, the city and its refuge (or the terrain and the
 camp), the starter kit and the first wildlife are identical in either mode.
 
+NEW FRONTIER also shows the **seed** the new world will be built from, a new one every
+time. **E** (or a click on the field) types your own: a number is the seed itself, and any
+other words are turned into one, so the same words always make the same world. **R**
+rolls another. The pause menu names the world you are in with its seed, so you can share
+it or come back to it.
+
 **Survival** is the game as it has always been: you can be hurt and killed, needs drain,
 predators hunt you and everything costs what it costs.
 
@@ -239,7 +245,7 @@ java --enable-native-access=ALL-UNNAMED -Xmx2G -jar build\libs\veylon-0.9.0-all.
 | Key | Action |
 | --- | --- |
 | `WASD` | Move |
-| Mouse | Look |
+| Mouse | Look (its sensitivity and invert-Y under **CONTROLS**) |
 | `Space` | Jump / swim up / **climb rope ladders** |
 | `Left Shift` | Sprint (drains stamina, makes noise) |
 | `Left Ctrl` | Crouch — stealth (humans and predators detect you at half range) and **read animal tracks** |
@@ -265,6 +271,10 @@ java --enable-native-access=ALL-UNNAMED -Xmx2G -jar build\libs\veylon-0.9.0-all.
 | `O` (paused) | Graphics options |
 | `V` (title or paused) | Audio options: live sliders, Apply/F5 saves, Back/Esc restores |
 | `A` (title or paused) | Autosave options: on or off, and every 5, 10, 15 or 30 minutes of play; Apply/F5 keeps them, Back/Esc restores |
+| `C` (title or paused) | Controls: mouse sensitivity from 10% to 300% (100% is the turn of earlier releases) and invert mouse Y; Apply/F5 keeps them for the next launch, Back/Esc restores |
+| `R` (paused) | **Return to the title**: `Enter` saves into the world's slot first, `N` returns without saving and leaves the slot as it was, `Esc` stays |
+| `Q` (paused) | Quit the game |
+| `E` / `R` (NEW FRONTIER) | Type a seed (a number or any words; `Enter` or `Esc` finishes it) / roll a new one |
 | `F3` | Debug overlay |
 | `F5` / `F9` | Save into / load the world's slot: the one it was loaded from or started in (the pause menu names it) |
 | `1`-`3`, arrows (slot picker) | Choose a slot; `Enter` loads it or starts the new world in it, `R` restores a damaged slot's backup, `Del` deletes a slot; replacing, restoring and deleting ask first |
@@ -537,6 +547,12 @@ offers its newest good backup; restoring it keeps the damaged save beside it as
 save and backups, nothing else. The game reads, moves and deletes no other file in the
 folder: the single save of 0.9.0 and earlier, `saves/veylon.sav`, is mentioned in the
 picker but never opened, imported or changed.
+
+**R** in the pause menu returns to the title and asks first, saying how much play the
+slot's save is behind: `Enter` saves into the world's slot as F5 does and returns once it
+is written (a save that fails keeps you in the world), `N` returns without saving and
+leaves the slot exactly as it was, and `Esc` stays. Either way the world is let go
+completely, so the next world you start or load begins as it would after a fresh launch.
 
 **Autosave** writes the world into its own slot by itself: after you wake from sleep,
 after you claim a refuge at a bed, and every 10 minutes of play (pausing counts for

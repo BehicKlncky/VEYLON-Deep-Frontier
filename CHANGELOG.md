@@ -27,6 +27,16 @@ All notable user-facing changes to VEYLON: Deep Frontier are recorded here.
   the save it replaces is kept as the newest backup, as with F5.
 - AUTOSAVE on the title and `A` in the pause menu turn autosave off or set it to
   every 5, 10, 15 or 30 minutes; the choice is kept for the next launch.
+- NEW FRONTIER shows the seed the new world will be built from, a new one each
+  time. `E` types your own, a number or any words (the same words always make the
+  same world), and `R` rolls another.
+- `R` in the pause menu returns to the title. It says how much play the slot's
+  save is behind and asks first: `Enter` saves into the world's slot and returns,
+  `N` returns without saving and leaves the slot as it was, `Esc` stays. `Q` still
+  quits the game.
+- CONTROLS on the title and `C` in the pause menu set the mouse sensitivity, from
+  10% to 300% of the turn of earlier releases, and invert the mouse's Y axis; the
+  choice is kept for the next launch.
 
 ### Changed
 
@@ -40,6 +50,10 @@ All notable user-facing changes to VEYLON: Deep Frontier are recorded here.
 - A failed save keeps the slot's save and both its backups as they were.
 - The single save file of 0.9.0 and earlier, `saves/veylon.sav`, is no longer
   read. The slot picker mentions it, and it is never changed or deleted.
+- The pause menu names the world you are in and its seed, for the wilderness as
+  well as the city, and its keys take three lines: playing on and the mode, the
+  settings, then saving and leaving. `C` there opens the controls rather than the
+  crafting screen.
 
 ### Removed
 
@@ -47,6 +61,13 @@ All notable user-facing changes to VEYLON: Deep Frontier are recorded here.
   earlier save layouts.
 - NEW FRONTIER's notice that the new world would replace your save; the slot
   picker asks instead.
+
+### Fixed
+
+- A city's pause menu no longer calls the game a development build.
+- Leaving a world for the title lets all of it go: fires, burning pools, shots in
+  flight, body pieces, the log and a blast's camera shake no longer linger on the
+  title, and the shake no longer carries into the next world.
 
 ## [0.9.0] - 2026-11-06
 

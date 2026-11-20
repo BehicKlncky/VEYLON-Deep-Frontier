@@ -67,20 +67,20 @@ runs. All are inert when unset. Everything below is handled by `QaHarness`;
 
 | Variable | Effect |
 |---|---|
-| `VEYLON_SEED` | Fixed world seed (a non-numeric value is hashed) |
+| `VEYLON_SEED` | Fixed seed of this session's scenes and staged screens, and the seed NEW FRONTIER offers at every opening, its rerolls (`R`) drawn from a generator seeded by it; a seed typed on NEW FRONTIER still makes that world. Read as NEW FRONTIER reads a typed seed (`world.WorldSeed`): trimmed, a whole number in the range of a `long` is the seed itself and any other text is hashed with `String.hashCode`. Without it NEW FRONTIER offers a new seed every time and scenes build a random one |
 | `VEYLON_GAME_MODE=survival\|creative` | Initial mode for automated world runs only; absent means Survival. Invalid values fail explicitly. Ignored for normal title sessions and frontend-only captures. |
 | `VEYLON_GENERATOR=wilderness\|urban-dev` | This session's new world, which NEW FRONTIER opens on, staged `VEYLON_FRONTEND` worlds use and automated worlds build. Absent is the ordinary default, the abandoned city (`World.DEFAULT_NEW_WORLD_GENERATOR`, generator 20: layout 17 / template 7 / content 4, encounter catalogue 6). `wilderness` is the legacy world NEW FRONTIER also offers (`World.WILDERNESS_NEW_WORLD_GENERATOR`, generator 3). `urban-dev` is the newest urban layout (`UrbanRevision.DEVELOPMENT_GENERATOR`, today the default city itself) and needs an isolated data directory (see below). Any other value fails. Every tour's headless test keeps the generator it was written for. |
 | `VEYLON_SMOKE=<seconds>` | Release smoke gate on this session's world (the city unless `VEYLON_GENERATOR=wilderness`): a world edit and an equip, an isolated save and load, fire and storm, then a pass/fail report; in the wilderness also a generated-fortress approach. Throws on failure |
 | `VEYLON_SCENE=<name>` | Stage a deterministic benchmark scene (`day`, `pinefog`, `nightfire`, `ruin`, `toxic`, `ao_shadow`, `phase4`, `ashwolf`, `silhouette30`, `vfx_blood`, `vfx_mining`, `vfx_beacon`, `death_ragdoll_showcase`, `death_ragdoll_sequence`, `dismember_showcase`, `dismember_wall`, `dismember_bomb` (a real scrap bomb thrown into a group of six, one outside the lethal radius; it goes off at 2.4 s), `dismember_species`, `dismember_species_wall` and `dismember_species_close` (every species, a guard and the player's remains blown apart at 1 s; open meadow, a step and a wall, and a close view of the small bodies), `molotov_ground`, `molotov_tree` and `molotov_rain` (a real fire bomb thrown at 0.5 s onto a dry clearing at dusk, beside a round tree that catches, or with rain from 3 s that puts the pool out; shots `0.7,1.2,3,7,11`, `1,4,10,20` and `2,3.5,5`), the burning-body scenes `body_fire_row`, `body_fire_row_night`, `body_fire_close`, `body_fire_out`, `body_fire_blast`, `body_fire_panic`, `body_fire_bird`, `body_fire_rain`, `body_fire_ragdoll` and `body_fire_player` (see "Burning bodies QA" below), `movement`, `inventory`, `ui_cycle`, `held_*`, `creative_flight` with `VEYLON_GAME_MODE=creative`, which flies east at Shift speed and prints a `[flight]` streaming report at 29 s, and the urban scenes `urban_streets`, `urban_intersection`, `urban_seam_walk`, `urban_fixtures`, `urban_fixtures_night`, `urban_apartments`, `urban_apartments_night`, `urban_apartments_lit_night`, `urban_apartments_manual`, `urban_apartments_manual_night`, `urban_loot`, the playable-slice route `urban_slice`, the catalogue walk `urban_catalogue`, the district tour `urban_districts`, the route tour `urban_underground`, the ecology tour `urban_ecology`, the survivor tour `urban_survivors`, the stronghold tour `urban_strongholds`, the refuge tour `urban_refuge`, the utility tour `urban_utilities`, the mission tour `urban_missions`, the onboarding tour `urban_onboarding`, the atmosphere tour `urban_atmosphere`, the performance tour `urban_performance` and the autosave tour `urban_autosave` (which also needs `VEYLON_AUTOSAVE=on`; see "Autosave QA" below) on the default city (see "Urban planning QA" below), and the save audit `save_audit` on any save placed in an isolated slot (see the same table)). A city scene (`urban_*`) and `save_audit` play this session's world and refuse to start without an isolated data directory; every other scene was made for the wilderness and builds it unless `VEYLON_GENERATOR` names a world |
 | `VEYLON_SHOT="5,10"` | Capture screenshots at those elapsed seconds |
-| `VEYLON_FRONTEND=<name>` | Pin a front-end screen (`options`, `audio`, `autosave`, `loading`, `death`, `victory`, `glyphs`, `newworld`). `slots` and `slots-new` open the slot picker on the data directory's slots as they are, to load and to start a new world, and change no file. `route` and then `route-load` play the default new-world path natively from the title over two launches, `route-refusal` plays slot 2 holding another version's save, and `route-slots` plays every state of the slot picker with a restore and both confirmations (see "Default-path acceptance" below). Staged worlds are this session's world, the city unless `VEYLON_GENERATOR=wilderness`. `pause` and `gamemode` stage a Survival world with the pause menu or the mode confirmation open; `pause-creative`, `gamemode-creative` and `victory-creative` stage a Creative world; `catalog`, `catalog-tools`, `catalog-search` (query "iron") and `catalog-inventory` open the Creative catalog; `worldcontrols` and `worldcontrols-held` open the Creative world controls, the second with dusk, a frozen clock, a locked storm and paused spawning already applied |
+| `VEYLON_FRONTEND=<name>` | Pin a front-end screen (`options`, `audio`, `autosave`, `controls`, `loading`, `death`, `victory`, `glyphs`, `newworld`). `slots` and `slots-new` open the slot picker on the data directory's slots as they are, to load and to start a new world, and change no file. `route` and then `route-load` play the default new-world path natively from the title over two launches, `route-refusal` plays slot 2 holding another version's save, and `route-slots` plays every state of the slot picker with a restore and both confirmations (see "Default-path acceptance" below); `route-session` and then `route-session-relaunch` play the seed, the way back to the title and the mouse settings (see "Session QA" below). Staged worlds are this session's world, the city unless `VEYLON_GENERATOR=wilderness`. `pause` and `gamemode` stage a Survival world with the pause menu or the mode confirmation open; `pause-creative`, `gamemode-creative` and `victory-creative` stage a Creative world; `catalog`, `catalog-tools`, `catalog-search` (query "iron") and `catalog-inventory` open the Creative catalog; `worldcontrols` and `worldcontrols-held` open the Creative world controls, the second with dusk, a frozen clock, a locked storm and paused spawning already applied |
 | `VEYLON_RESOLUTION=1920x1080` | Framebuffer override |
 | `VEYLON_UI_SCALE`, `VEYLON_VSYNC`, `VEYLON_FULLSCREEN`, `VEYLON_SHADOWS` | Settings overrides |
 | `VEYLON_AUDIO_QA=1` | Add three positional audio reports per second to the smoke, without gameplay effects |
 | `VEYLON_NO_EFX=1` | Force the documented dry audio fallback for device QA |
 | `VEYLON_MIN_FPS` | Stricter FPS gate layered over the mandatory 60 |
 | `VEYLON_CAPTURE_TAG` | Filename prefix for captures |
-| `VEYLON_QA_SET_OPTIONS="fov=85,bloom=false"` | Mutate and save settings through the real APPLY path, to prove persistence across relaunch |
+| `VEYLON_QA_SET_OPTIONS="fov=85,bloom=false"` | Mutate and save the graphics settings through the real APPLY path, to prove persistence across relaunch (the mouse settings' relaunch is `route-session-relaunch`'s) |
 | `VEYLON_AUTOSAVE=on\|off` | Whether the session may autosave (0.9.1 milestone 05). Absent, a player's session may and every automated one (any scene, capture, frontend screen or route, or the smoke) may not, so no automation writes an autosave into a slot unasked. `on` lets an automated run autosave under the player's settings; `off` stops a player's session from it. Any other value fails |
 
 Example:
@@ -104,14 +104,16 @@ slots and their backups are `saves/slot-N.sav`, `saves/slot-N.backup-1.sav` and
 - For a native QA session pass `-PveylonDataDir=build/qa/<name>` to `run`. The
   game then reads and writes only there, including F5 saves.
 - `VEYLON_GENERATOR=urban-dev`, every city scene (`urban_*`), `save_audit` and the
-  frontend routes (`route`, `route-load`, `route-refusal`, `route-slots`) refuse
+  frontend routes (`route`, `route-load`, `route-refusal`, `route-slots`,
+  `route-session`, `route-session-relaunch`) refuse
   to start unless the data directory is set and differs from the player's own
   (`AppPaths.isolatedFromPlayerData`): each of them can press F5 into a slot.
   Automated sessions start on slot 1, and none of them autosaves unless
   `VEYLON_AUTOSAVE=on` asks.
-- The autosave settings, `veylon_autosave.properties`, sit in the data
-  directory beside the graphics and audio settings; `SaveSlotIsolationTest`
-  checks that too.
+- The autosave settings, `veylon_autosave.properties`, and the mouse settings,
+  `veylon_controls.properties`, sit in the data directory beside the graphics
+  and audio settings; `SaveSlotIsolationTest` checks that too. Both are read
+  once when the game starts, so a headless `Game` never reads a player's file.
 - The release smoke runs without an isolated directory, so it saves and loads
   through a folder of slots of its own, `build/qa/smoke-slots` inside the data
   directory, and never touches the player's.
@@ -169,8 +171,9 @@ another version is covered there.
 `route-slots` (0.9.1 milestone 04) needs an empty isolated directory and plays
 every state of the slot picker in one launch: the picker with every slot empty;
 a new city in slot 1, F5 (its first save becomes the newest backup) and the pause
-menu naming slot 1; a Creative wilderness in slot 2 and F5. Staged between title
-visits (as the death card's `Esc` makes them), slot 1's save is damaged on the
+menu naming slot 1; a Creative wilderness in slot 2 and F5. Each world is left
+through the pause menu's `R` and `N` (0.9.1 milestone 06), and staged between the
+title visits slot 1's save is damaged on the
 disk and slot 3 is given a save of another version: `veylon.sav` when it is
 there, else slot 2's save under a later epoch. `L` then shows a damaged slot with
 its backup, a ready slot and another version; Enter on slot 3 says why it does
@@ -217,6 +220,32 @@ options screen.
 $env:VEYLON_SEED='20261120'; $env:VEYLON_AUTOSAVE='on'
 $env:VEYLON_SCENE='urban_autosave'; $env:VEYLON_CAPTURE_TAG='autosave-survival'
 .\gradlew.bat run -PveylonDataDir=build/qa/autosave-survival
+```
+
+#### Session QA (0.9.1 milestone 06)
+
+`VEYLON_FRONTEND=route-session` needs an empty isolated directory and plays, with ordinary
+keys, what milestone 06 added: NEW FRONTIER with the seed it offers, the seed typed as words
+(`E`, the words, `Enter`) and rolled again (`R`); the words typed once more and a city of
+their seed started in slot 1; the pause menu naming the city and its seed; `C` and the
+CONTROLS screen, set to 170% and invert-Y with the arrow keys and `Enter`, then applied with
+F5, which must write `veylon_controls.properties`; `R` and the question on the way back to the
+title, cancelled with `Esc`, then answered with `Enter`, which must save slot 1 and return; `L`
+and the slot's world again; `R` and `N`, which must leave slot 1 byte for byte; and NEW
+FRONTIER once more, with nothing typed carried over. `route-session-relaunch`, run next with the
+same directory, must find 170% and invert-Y read at launch and shows them on the title's
+CONTROLS screen. Captures `01-title` to `10-title-returned` and `01-controls-persisted`; each
+launch prints `[frontend-route] session …` and its pass line. `NewFrontierSeedTest`,
+`ReturnToTitleRoutingTest`, `ReturnToTitleTest` and `ControlsOptionsRoutingTest` drive the
+same paths headlessly. Mouse look is off in every automated session, so the turn itself is
+`MouseLookTest`'s. `VEYLON_FRONTEND=controls` pins the CONTROLS screen.
+
+```powershell
+$env:VEYLON_SEED='20261120'; $env:VEYLON_CAPTURE_TAG='session-720'
+$env:VEYLON_FRONTEND='route-session'; $env:VEYLON_RESOLUTION='1280x720'
+.\gradlew.bat run -PveylonDataDir=build/qa/session-720
+$env:VEYLON_FRONTEND='route-session-relaunch'; $env:VEYLON_CAPTURE_TAG='session-720-relaunch'
+.\gradlew.bat run -PveylonDataDir=build/qa/session-720
 ```
 
 #### Urban planning QA

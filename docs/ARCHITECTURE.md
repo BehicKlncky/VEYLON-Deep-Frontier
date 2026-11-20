@@ -35,7 +35,7 @@ Main.main
         └── collaborators split out of Game (all in com.veylon)
               QaHarness              opt-in benchmark/capture scaffolding
               AutomatedRunDriver     VEYLON_* sessions and the release smoke gate
-              WorldBootstrap         reset, reseed, construct, spawn, camp
+              WorldBootstrap         reset, reseed, construct, spawn, camp, release
               FrontendController     title / options / slots / loading, and transitions
               SaveSession            save slots, the active slot, play time, autosave
               HotkeyRouter           global keys, screens, quick save/load
@@ -105,7 +105,10 @@ notifications), not for reaching sideways into an unrelated subsystem.
 3. `renderer.init()` — compiles shaders, builds procedural textures and the
    material/icon atlases. **Requires a live GL context.**
 4. `window.setVsync(...)` / `setFullscreen(...)`, `ui.init()`, `audio.init()`.
-5. `sessionSeed = qa.configuredSeed()` — honours `VEYLON_SEED`, else random.
+5. `sessionSeed = qa.configuredSeed()` — the seed of QA scenes and staged screens:
+   `VEYLON_SEED`'s, which NEW FRONTIER then offers at every opening, else random (see
+   "Seeds of new worlds" below). The player's mouse settings are read here too
+   (`controls`, from `veylon_controls.properties`).
 6. Branch on environment:
    - **Automated** (`VEYLON_SMOKE` / `VEYLON_SCENE` / `VEYLON_SHOT` set):
      `newWorld(seed, true, generator, mode)` with the session's world (the city
@@ -132,7 +135,8 @@ wilderness NEW FRONTIER also offers is `World.WILDERNESS_NEW_WORLD_GENERATOR`
 An unsupported version is refused before anything is reset. It **resets before it
 constructs**, in this order:
 
-1. Release GPU meshes of the outgoing world (`releaseWorldMeshes`).
+1. Release GPU meshes of the outgoing world (`releaseWorldMeshes`), and the renderer's
+   camera shake and the chunks it last selected to draw or rebuild (`Renderer.releaseWorld`).
 2. Reset every cross-world system: scheduler, audio, time, weather, temperature, fire,
    liquid fire, water, events, plants, item conditions, noise, projectiles, explosions,
    settlements, ragdolls, body fragments, body combustion (its tallies; each body's fire
@@ -158,6 +162,29 @@ constructs**, in this order:
 `GameLoopIntegrationTest.newWorldClearsSimulationQueuesAndPlayerActionState`
 pins steps 2–6. If you add a system with cross-world state, add its `reset()`
 here **and** an assertion there.
+
+### Returning to the title (0.9.1 milestone 06)
+
+`FrontendController.returnToTitle`, which the death card's Escape and the pause menu's
+question take, calls `WorldBootstrap.releaseWorld`: steps 1, 2, 5 and 6 above, without the
+reseed and without a new world, then it drops `world` and `player`. The title therefore
+holds what it holds after a fresh launch: no burning block or pool, no shot or body piece,
+no log, no shake, no play time and no slot (`SaveSession.bound` is false). A load that
+fails after building part of a world releases it the same way. `ReturnToTitleTest` dirties
+every kind of per-world state, returns, and checks that a world started or loaded afterwards
+equals a fresh launch's in its durable state, its first save and a few simulated seconds.
+
+### Seeds of new worlds (0.9.1 milestone 06)
+
+NEW FRONTIER builds the seed it shows. `FrontendController.seeds` (`NewWorldSeeds`) offers
+a new seed at every opening and every reroll (`R`), drawn from an unseeded generator: it
+chooses which world is built, not anything in one, so `WorldBootstrap` does not reseed it.
+A session with `VEYLON_SEED` offers that seed at every opening and draws its rerolls from a
+generator seeded by it, so automated runs stay deterministic. A seed the player types (`E`)
+replaces the offered one for that world; `world.WorldSeed` reads it, a whole number as
+itself and other text by `String.hashCode` after trimming, which is also how
+`QaHarness.configuredSeed` reads `VEYLON_SEED`. `Game.sessionSeed` remains the seed of QA
+scenes and staged screens only.
 
 ---
 
@@ -1412,9 +1439,9 @@ in a named collaborator:
 
 | Class | Owns |
 |---|---|
-| `WorldBootstrap` | reset, reseed, construct, dry-land spawn, starter camp |
+| `WorldBootstrap` | reset, reseed, construct, dry-land spawn, starter camp, and releasing a world for the title |
 | `AutomatedRunDriver` | `VEYLON_*` scenes and captures, the smoke script and gate |
-| `FrontendController` | title, graphics, audio and autosave options, the slot picker, two-frame loading, return to title |
+| `FrontendController` | title, graphics, audio, controls and autosave options, NEW FRONTIER's seeds, the slot picker, two-frame loading, the way back to the title and its question |
 | `SaveSession` | the save slots, the active slot F5 and F9 use, the play time a save records, and `Autosave` |
 | `HotkeyRouter` | global keys: screens, debug toggles, quick save/load, hotbar |
 | `PlayerEnvironmentSystem` | shelter, smoke, fumaroles, POI discovery, station scan, mesh eviction |
