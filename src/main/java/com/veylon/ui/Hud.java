@@ -167,7 +167,7 @@ public class Hud {
         if (!state.isEmpty()) {
             text(ui, x + 126, y, MICRO, "! " + state, fraction <= 0.1f ? RED_TEXT : AMBER);
         }
-        String number = (int) value + " / " + (int) maximum;
+        String number = vitalFigure(value, maximum);
         text(ui, x + BAR_WIDTH - width(ui, number, SMALL), y, SMALL, number, TEXT);
         meter(ui, x, y + VITAL_METER_Y, BAR_WIDTH, BAR_HEIGHT, fraction,
                 fraction <= 0.1f ? RED : color);
@@ -175,6 +175,30 @@ public class Hud {
             outline(ui, new Rect(x, y + VITAL_METER_Y, BAR_WIDTH, BAR_HEIGHT), fraction <= 0.1f ? 2 : 1, AMBER);
         }
     }
+
+    /**
+     * A vital's figures as the panel prints them. What is shown never goes
+     * below zero: an overkill hit leaves health far under it (the death test
+     * is {@code health <= 0}, so health itself is not clamped), and the death
+     * card read −900 after one (0.9.1 B15).
+     */
+    static String vitalFigure(float value, float maximum) {
+        return Math.max(0, (int) value) + " / " + (int) maximum;
+    }
+
+    /**
+     * How strongly the low-health pulse tints the screen's edges at
+     * {@code time}, from health as shown: below {@link #LOW_HEALTH} it grows to
+     * at most 0.30 at zero, and an overkill death tints no harder than any
+     * other (B15).
+     */
+    static float lowHealthEdge(float health, double time) {
+        float shown = Math.max(0f, health);
+        if (shown >= LOW_HEALTH) return 0f;
+        return (0.5f + 0.5f * (float) Math.sin(time * 4)) * (1f - shown / LOW_HEALTH) * 0.30f;
+    }
+
+    private static final float LOW_HEALTH = 25f;
 
     private void meter(UiRenderer ui, float x, float y, float width, float height,
                        float fraction, int color) {
@@ -398,11 +422,8 @@ public class Hud {
     private void renderVignettes(Game g, UiRenderer ui, int w, int h) {
         Player p = g.player;
         if (p.abilities.invulnerable()) return;
-        float red = com.veylon.gfx.BodyFireLook.shownDamageFlash(p) * 0.45f;
-        if (p.health < 25) {
-            red = Math.max(red, (0.5f + 0.5f * (float) Math.sin(g.totalTime * 4))
-                    * (1f - p.health / 25f) * 0.30f);
-        }
+        float red = Math.max(com.veylon.gfx.BodyFireLook.shownDamageFlash(p) * 0.45f,
+                lowHealthEdge(p.health, g.totalTime));
         if (red > 0.01f) {
             edge(ui, w, h, 0.75f, 0.05f, 0.05f, red);
         }
