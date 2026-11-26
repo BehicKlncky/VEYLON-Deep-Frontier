@@ -706,6 +706,11 @@ Room-aware shelter still checks live enclosure, so damage is observed. Generated
 urban temperature/audio use depth below the street datum rather than below the
 roof. Covered rooms retain seasons, buffer weather/day-night variation and
 reduce altitude cooling; ground and upper floors no longer become deep caves.
+The day-night variation is `TimeSystem.tempOffset`, in every world a cosine at its
+warmest at 14:00 (+6 °C) and its coldest at 02:00 (−8 °C), averaging −1 °C; until
+0.9.1 its sign was inverted, so 14:00 was the coldest hour (B14). A covered room takes
+0.65 of it and 0.35 of the weather's offset, so it is warmer than the street before
+dawn and cooler in the afternoon.
 Generators 1–6 retain their original light/weather/environment behavior. No
 new simulation random stream or persistent indoor state is introduced.
 

@@ -94,6 +94,11 @@ All notable user-facing changes to VEYLON: Deep Frontier are recorded here.
   while it shows.
 - Health on the death card reads 0 after a hit far beyond what you had, instead of
   a negative number.
+- The day is warmest in the afternoon and coldest in the night before dawn, in the
+  city and the wilderness alike; until now it was the other way round, with 14:00 the
+  coldest hour. The industrial yards are hot enough by day to make you thirsty, as
+  their arrival line warns, and nights are colder everywhere, so a roof and a fire
+  count for more after dark.
 
 ## [0.9.0] - 2026-11-06
 

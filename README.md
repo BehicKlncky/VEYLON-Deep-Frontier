@@ -622,9 +622,6 @@ section inventory and the epoch rules are in [the architecture notes](docs/ARCHI
   message and left untouched, and a new world is needed. A later release refuses 0.9.1
   saves the same way whenever it changes the save epoch, and no release opens a save
   written by a newer one.
-- The day's temperature curve is inverted in every world, city and wilderness alike:
-  14:00 is the coldest hour. It is a known issue awaiting a decision, left unchanged so
-  existing worlds keep their outcomes.
 - A city plans each region the first time you come near it; fast travel into
   unplanned streets can hitch briefly. Saving a city takes a little longer the more
   places it has recorded.
