@@ -694,11 +694,12 @@ public class SettlementManager
                 break;
             }
             Vec3i spawn = spawnPointFor(g, s, r);
-            boolean specialPost = r.archetype == NpcArchetype.CAPTIVE
-                    || r.archetype.leader || s.beds.isEmpty();
-            float spawnY = spawn.y() + (specialPost ? 0.4f : 0.02f);
+            // Every spawn point is a floor cell, so everyone stands on it. A captive, a
+            // leader or the people of a bedless settlement once started 0.4 higher, which
+            // put a captive's head into its cage's roof bars (the floor + 3) and left it
+            // unable to take a step, burning or not (0.9.1 B03).
             Npc n = g.entities.spawnNpc(g.world, r.name,
-                    spawn.x() + 0.5f, spawnY, spawn.z() + 0.5f);
+                    spawn.x() + 0.5f, spawn.y() + 0.02f, spawn.z() + 0.5f);
             n.archetype = r.archetype;
             n.settlementId = s.id;
             n.residentIndex = i;

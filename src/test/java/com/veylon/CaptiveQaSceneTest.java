@@ -58,6 +58,24 @@ class CaptiveQaSceneTest {
     }
 
     @Test
+    void theCaptiveStandsClearOfItsRoofAndStrugglesWhenSetAlightSoTheScenePasses() {
+        Game g = new Game();
+        g.newWorld(SEED, true, World.WILDERNESS_NEW_WORLD_GENERATOR, GameMode.CREATIVE);
+        g.appState = Game.AppState.PLAYING;
+        CaptiveQaScene scene = new CaptiveQaScene(g);
+        scene.stage();
+        float dt = 1f / 30f;
+        for (float t = 0; t <= 6.1f; t += dt) {
+            g.playStep(dt, dt);
+            scene.update(t);
+        }
+        Npc captive = scene.captive();
+        assertTrue(captive.panic.active(), "the fire panics it");
+        assertTrue(scene.passed(), "clear of every block and moving (0.9.1 B03): feet " + captive.pos.y
+                + ", the cage floor " + scene.settlement().prisonPos.y());
+    }
+
+    @Test
     void aSurvivalPlayerIsRefusedBeforeAnythingIsStaged() {
         Game g = new Game();
         g.newWorld(SEED, true, World.WILDERNESS_NEW_WORLD_GENERATOR, GameMode.SURVIVAL);
