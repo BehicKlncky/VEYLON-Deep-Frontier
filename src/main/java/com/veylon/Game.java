@@ -337,7 +337,7 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
     Game(AudioManager audio) {
         this.audio = java.util.Objects.requireNonNull(audio, "audio");
         // Bodies come apart in the pose last drawn, on the clock the living are animated by.
-        fragments.setDeathPoses(com.veylon.gfx.model.AnatomyModels.deathPoses(() -> totalTime));
+        fragments.setDeathPoses(com.veylon.gfx.model.AnatomyModels.deathPoses(() -> particles.time));
     }
 
     public void run() {

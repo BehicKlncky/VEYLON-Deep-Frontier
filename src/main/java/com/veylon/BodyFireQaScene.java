@@ -138,6 +138,7 @@ final class BodyFireQaScene {
         game.player.vel.zero();
         game.simPaused = true;
         game.totalTime = CLOCK;
+        game.particles.time = CLOCK; // the clock the living are drawn and come apart by (0.9.1 B08)
 
         floor = site.y();
         alight.clear();

@@ -144,7 +144,7 @@ final class BodyFireEffects {
             hearLiving(c, c.combustion, c.pos.x, c.pos.y + c.height * 0.5f, c.pos.z);
             float s = share(c.pos.x, c.pos.y, c.pos.z, 1f);
             if (s > 0f) {
-                ModelPart root = BodyPosing.creature(c, game.totalTime, frame);
+                ModelPart root = BodyPosing.creature(c, game.particles.time, frame);
                 emit(FlameAnchors.of(BodyFamily.of(c.type)), root, 0, s, c.vel.x, c.vel.y, c.vel.z, rng);
             }
         }
@@ -157,7 +157,7 @@ final class BodyFireEffects {
             hearLiving(n, n.combustion, n.pos.x, n.pos.y + n.height * 0.5f, n.pos.z);
             float s = share(n.pos.x, n.pos.y, n.pos.z, 1f);
             if (s > 0f) {
-                ModelPart root = BodyPosing.npc(n, game.totalTime, frame);
+                ModelPart root = BodyPosing.npc(n, game.particles.time, frame);
                 emit(FlameAnchors.of(BodyFamily.HUMANOID), root, 0, s, n.vel.x, n.vel.y, n.vel.z, rng);
             }
         }

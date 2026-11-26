@@ -142,6 +142,7 @@ final class SpeciesDismemberQaScene {
         game.player.hotbarSel = 0;
         game.simPaused = true;
         game.totalTime = CLOCK;
+        game.particles.time = CLOCK; // the clock the living come apart by (0.9.1 B08)
 
         int floor = site.y();
         int rowZ = site.z() - ROW_DISTANCE;

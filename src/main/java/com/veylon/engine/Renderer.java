@@ -505,6 +505,8 @@ public class Renderer {
         renderTracks(game);
 
         // The living first: their flames are taken from the frame's share before any remains'.
+        // They are posed on the clock their flames burn by, which holds still while the game is
+        // paused, so no paused body breathes (0.9.1 B08); bodies come apart on it too.
         Vector3f camPos = game.camera.position;
         float entityRange = fogEnd + 12f;
         for (Creature c : game.entities.creatures) {
@@ -514,7 +516,7 @@ public class Renderer {
                     boundsHalf, boundsHeight, entityRange)) {
                 continue;
             }
-            ModelPart root = BodyPosing.creature(c, game.totalTime, model);
+            ModelPart root = BodyPosing.creature(c, fireClock, model);
             setEntityLight(game, c.pos.x, c.pos.y + c.height * 0.5f, c.pos.z);
             entityShader.set("uTintMul", 1f, 1f, 1f);
             fireMaterial(fireLook.living(c));
@@ -528,7 +530,7 @@ public class Renderer {
                     0.55f, n.height + 0.25f, entityRange)) {
                 continue;
             }
-            ModelPart root = BodyPosing.npc(n, game.totalTime, model);
+            ModelPart root = BodyPosing.npc(n, fireClock, model);
             setEntityLight(game, n.pos.x, n.pos.y + 1f, n.pos.z);
             entityShader.set("uTintMul", 1f, 1f, 1f);
             fireMaterial(fireLook.living(n));

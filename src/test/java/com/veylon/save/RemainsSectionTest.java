@@ -130,7 +130,7 @@ class RemainsSectionTest {
     @Test
     void aSaveTakenMidFlightKeepsEveryBodyAndItsRecordOnce() throws IOException {
         Game game = arena(77L);
-        game.totalTime = 3.3;
+        game.particles.time = 3.3;
         blowApart(game, CreatureType.DEER, X - 3f, 0f);
         blowApart(game, CreatureType.WOLF, X + 3f, 90f);
         person(game, X, 45f, NpcArchetype.SCOUT);
@@ -389,7 +389,7 @@ class RemainsSectionTest {
 
     private static Game mixedWorld(long seed) {
         Game g = arena(seed);
-        g.totalTime = 17.25;
+        g.particles.time = 17.25;
         CreatureType[] species = CreatureType.values();
         for (int i = 0; i < species.length; i++) {
             Creature c = creature(g, species[i], X - 9f + 3f * i, Z - 2f, i * 50f);

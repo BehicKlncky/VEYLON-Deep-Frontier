@@ -192,6 +192,7 @@ final class RagdollQaScene {
         if (living) {
             int phase = Math.min(2, (int) elapsed / 2);
             game.totalTime = 2;
+            game.particles.time = 2; // the clock the living are drawn by (0.9.1 B08)
             for (Npc n : game.entities.npcs) {
                 n.vel.set(phase == 1 ? 2 : 0, 0, 0);
                 n.state = phase == 2 ? Npc.NpcState.ATTACK : Npc.NpcState.IDLE;

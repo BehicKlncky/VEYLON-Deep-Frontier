@@ -161,8 +161,10 @@ public final class AnatomyModels {
 
     /**
      * The pose a creature is drawn in at {@code time} — pass the clock the
-     * renderer animates the living with, {@code Game.totalTime}, so the pieces
-     * leave the body in the pose last drawn. The shared model is left reset.
+     * renderer animates the living with, the particle clock
+     * {@code ParticleSystem.time}, which holds still while the game is paused,
+     * so the pieces leave the body in the pose last drawn. The shared model is
+     * left reset.
      */
     public static FragmentPose captureCreature(Creature c, double time) {
         EntityModel model = modelOf(BodyFamily.of(c.type));

@@ -224,7 +224,7 @@ class SpeciesFragmentDrawTest {
         draw(model.root, world, true, halves, new HashMap<>());
 
         // The death, on the clock the living body was drawn with.
-        game.totalTime = time;
+        game.particles.time = time;
         float bx = body.pos.x - 1.2f, by = body.pos.y + body.height * 0.5f, bz = body.pos.z + 0.3f;
         List<BodyFragment> pieces = body instanceof Npc n
                 ? game.fragments.spawnFromNpc(game, n, game.fragments.deathPose(n), bx, by, bz, BOMB)
@@ -497,7 +497,7 @@ class SpeciesFragmentDrawTest {
         c.yaw = 35f;
         c.vel.zero();
         game.entities.creatures.remove(c);
-        game.totalTime = 0.7;
+        game.particles.time = 0.7;
         c.killBy(true);
         List<BodyFragment> pieces = game.fragments.spawnFromCreature(game, c, game.fragments.deathPose(c),
                 c.pos.x - 1.2f, c.pos.y + type.height * 0.5f, c.pos.z, BOMB);
