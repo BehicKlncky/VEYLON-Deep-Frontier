@@ -101,6 +101,24 @@ public final class BodyFragmentConstants {
      * instead of flipping sign every step.
      */
     public static final float FLAT_BAND = 0.15f;
+    /**
+     * A piece whose longest half extent is at least this many times its
+     * others is a long piece: one that falls off its end (0.9.1 B07).
+     */
+    public static final float END_TOPPLE_RATIO = 1.5f;
+    /**
+     * How near vertical (the cosine of its tilt) a long piece's long axis
+     * must be for it to count as standing on its end. Past this tilt
+     * (about 37°) gravity on the box's corner lays any long piece down by
+     * itself: its tangent, 0.75, is over the 1 / {@link #END_TOPPLE_RATIO}
+     * at which a box topples.
+     */
+    public static final float END_UPRIGHT = 0.8f;
+    /**
+     * Seconds a long piece is tipped off its end at most. One that cannot
+     * fall, an end wedged between walls, then rests as it stands.
+     */
+    public static final float END_TOPPLE_SECONDS = 2f;
     /** Smallest collision half extent, so a thin piece still sweeps a real box. */
     public static final float MIN_HALF_EXTENT = 0.05f;
     /**

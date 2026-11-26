@@ -490,11 +490,69 @@ public class BodyFragmentSystem implements SimulationSystem {
                 * (f.halfX * f.halfX + f.halfY * f.halfY + f.halfZ * f.halfZ);
         float gain = RagdollConstants.GRAVITY_AIR * dt / inertia;
         omega.add(leverZ * gain, 0, -leverX * gain);
+        endTopple(f, basis, omega, gain, dt);
         clampLength(omega, RagdollConstants.MAX_ANGULAR_SPEED);
     }
 
     private static float side(float up) {
         return Math.clamp(up / BodyFragmentConstants.FLAT_BAND, -1f, 1f);
+    }
+
+    /**
+     * Tips a long piece off its end (0.9.1 B07). The box model stands a piece
+     * on an end face as stably as it lays it on a side: inside {@link
+     * BodyFragmentConstants#FLAT_BAND} the corner torque fades to nothing and
+     * just past it gravity on the corner sets the piece back upright, so a leg
+     * that landed on its end kept standing. A limb's end is no flat foot.
+     * While a long piece ({@link BodyFragmentConstants#END_TOPPLE_RATIO})
+     * stands within {@link BodyFragmentConstants#END_UPRIGHT} of vertical,
+     * gravity also turns it on a lever of its larger short half extent, toward
+     * where its top leans, or along its own second axis when it leans nowhere.
+     * That is more than the corner sets back at any tilt, so it falls over the
+     * end's edge; past the band the corner torque alone lays it down. At most
+     * {@link BodyFragmentConstants#END_TOPPLE_SECONDS} for each piece.
+     */
+    private static void endTopple(BodyFragment f, Matrix3f axes, Vector3f omega, float gain, float dt) {
+        float hx = f.halfX, hy = f.halfY, hz = f.halfZ;
+        float along, other, ax, ay, az, sx, sz;
+        if (hy >= hx && hy >= hz) {
+            along = hy;
+            other = Math.max(hx, hz);
+            ax = axes.m10; ay = axes.m11; az = axes.m12;
+            sx = hx >= hz ? axes.m00 : axes.m20;
+            sz = hx >= hz ? axes.m02 : axes.m22;
+        } else if (hx >= hz) {
+            along = hx;
+            other = Math.max(hy, hz);
+            ax = axes.m00; ay = axes.m01; az = axes.m02;
+            sx = hy >= hz ? axes.m10 : axes.m20;
+            sz = hy >= hz ? axes.m12 : axes.m22;
+        } else {
+            along = hz;
+            other = Math.max(hx, hy);
+            ax = axes.m20; ay = axes.m21; az = axes.m22;
+            sx = hx >= hy ? axes.m00 : axes.m10;
+            sz = hx >= hy ? axes.m02 : axes.m12;
+        }
+        if (along < BodyFragmentConstants.END_TOPPLE_RATIO * other
+                || Math.abs(ay) < BodyFragmentConstants.END_UPRIGHT
+                || f.endTopple >= BodyFragmentConstants.END_TOPPLE_SECONDS) {
+            return;
+        }
+        f.endTopple += dt;
+        // Where the top leans: the long axis turned to point up, flattened.
+        float dx = ay >= 0 ? ax : -ax, dz = ay >= 0 ? az : -az;
+        float length = (float) Math.sqrt(dx * dx + dz * dz);
+        if (length < 1e-4f) {
+            dx = sx;
+            dz = sz;
+            length = (float) Math.sqrt(dx * dx + dz * dz);
+            if (length < 1e-4f) {
+                return;
+            }
+        }
+        float push = other * gain / length;
+        omega.add(dz * push, 0, -dx * push);
     }
 
     /**

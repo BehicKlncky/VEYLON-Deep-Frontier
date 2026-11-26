@@ -172,6 +172,8 @@ public class BodyFragment {
     public float dripTimer;
     /** Last measured settle energy, for tests and the debug overlay. */
     public float energy;
+    /** Seconds this piece has been tipped off its end ({@code BodyFragmentSystem}); never saved. */
+    public float endTopple;
 
     /** A human piece in the standing rest pose. */
     public BodyFragment(Piece piece) {
