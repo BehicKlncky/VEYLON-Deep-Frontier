@@ -36,6 +36,8 @@ public class ModelPart {
     public float rotX, rotY, rotZ;
     public float poseX, poseY, poseZ;
     public float scale = 1f;
+    /** The angle a part is built at ({@link #rest}), which {@link #resetPose} returns it to. */
+    private float restRotX, restRotY, restRotZ;
 
     public final List<ModelPart> children = new ArrayList<>();
     private final Matrix4f local = new Matrix4f();
@@ -124,9 +126,31 @@ public class ModelPart {
         return this;
     }
 
+    /**
+     * Builds the part turned by these angles (radians, applied Z, then Y,
+     * then X, as a pose's are), the angle every {@link #resetPose} returns it
+     * to: a quiver or a slung gun hanging across the back, the bent tips of a
+     * held bow. A pose writes its angles over it.
+     */
+    public ModelPart rest(float x, float y, float z) {
+        rotX = restRotX = x;
+        rotY = restRotY = y;
+        rotZ = restRotZ = z;
+        return this;
+    }
+
+    /**
+     * Back to the built model: each part at its rest angle ({@link #rest}),
+     * not moved, full size, its own glow and visible. Every pose starts here;
+     * a rest angle once set directly on {@code rotZ} was lost on the first
+     * reset, so a quiver, a slung bow and a slung gun hung straight
+     * (0.9.1 B04).
+     */
     public void resetPose() {
         emissive = restEmissive;
-        rotX = rotY = rotZ = 0;
+        rotX = restRotX;
+        rotY = restRotY;
+        rotZ = restRotZ;
         poseX = poseY = poseZ = 0;
         scale = 1f;
         visible = true;

@@ -80,21 +80,21 @@ public final class NpcModels {
         // Archer/scout quiver: angled tube with pale fletching tips.
         ModelPart quiver = new ModelPart("quiver").pivot(0.16f, 0.26f, 0.19f)
                 .box(0, 0, 0, 0.12f, 0.42f, 0.12f).color(0x5c4426);
-        quiver.rotZ = -0.35f;
+        quiver.rest(0, 0, -0.35f);
         quiver.child(new ModelPart("quiverFletch").pivot(0, 0.24f, 0)
                 .box(0, 0, 0, 0.14f, 0.08f, 0.14f).color(0xd9d2bd));
         torso.child(quiver);
         // Slung bow arc across the back.
         ModelPart slungBow = new ModelPart("slungBow").pivot(-0.06f, 0.28f, 0.235f)
                 .box(0, 0, 0, 0.045f, 1.0f, 0.05f).color(0x6a4c2c);
-        slungBow.rotZ = -0.55f;
+        slungBow.rest(0, 0, -0.55f);
         torso.child(slungBow);
         // Powderman: powder keg back-pack and slung long gun.
         torso.child(new ModelPart("kegPack").pivot(0, 0.26f, 0.24f)
                 .box(0, 0, 0.02f, 0.30f, 0.34f, 0.26f).color(0x6b4a28));
         ModelPart slungGun = new ModelPart("slungGun").pivot(0.05f, 0.28f, 0.25f)
                 .box(0, 0, 0, 0.05f, 1.1f, 0.05f).color(0x565c64);
-        slungGun.rotZ = 0.5f;
+        slungGun.rest(0, 0, 0.5f);
         torso.child(slungGun);
         // Brute bulk: heavy pauldrons and a chest slab.
         torso.child(new ModelPart("brutePadL").pivot(-0.33f, 0.55f, 0)

@@ -299,12 +299,12 @@ public final class HeldItemModels {
                 root.child(new ModelPart("tint").pivot(0, 0.28f, 0)
                         .box(0, -0.24f, 0, 0.045f, 0.48f, 0.06f).color(0x7a5a34));
                 ModelPart tipTop = new ModelPart("tipTop").pivot(0, 0.52f, 0);
-                tipTop.rotX = 0.5f;
+                tipTop.rest(0.5f, 0, 0);
                 tipTop.child(new ModelPart("tipTopArm").pivot(0, 0.07f, 0.02f)
                         .box(0, 0, 0, 0.04f, 0.16f, 0.05f).color(0x6a4c2c));
                 root.child(tipTop);
                 ModelPart tipBot = new ModelPart("tipBot").pivot(0, 0.04f, 0);
-                tipBot.rotX = -0.5f;
+                tipBot.rest(-0.5f, 0, 0);
                 tipBot.child(new ModelPart("tipBotArm").pivot(0, -0.07f, 0.02f)
                         .box(0, 0, 0, 0.04f, 0.16f, 0.05f).color(0x6a4c2c));
                 root.child(tipBot);
@@ -352,7 +352,7 @@ public final class HeldItemModels {
                 root.child(new ModelPart("fusePost").pivot(0, 0.185f, 0)
                         .box(0, 0, 0, 0.035f, 0.045f, 0.035f).color(0x2c2c30));
                 ModelPart fuse = new ModelPart("fuse").pivot(0.01f, 0.22f, 0);
-                fuse.rotZ = 0.5f;
+                fuse.rest(0, 0, 0.5f);
                 fuse.child(new ModelPart("fuseCord").pivot(0, 0.03f, 0)
                         .box(0, 0, 0, 0.016f, 0.08f, 0.016f).color(0x9a8258));
                 root.child(fuse);

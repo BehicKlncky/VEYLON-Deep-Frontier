@@ -343,11 +343,16 @@ class FragmentAnatomyModelTest {
         assertEquals(human.part("arm_r").rotX, swing.rotX(arm), 0f, "the attacking arm as last drawn");
         assertTrue(swing.rotX(arm) < -0.4f, "raised, not hanging at rest");
         human.resetPose();
-        AnatomyModels.captureNpc(raider, 0.3);
         List<ModelPart> all = new ArrayList<>();
         collect(human.root, all);
+        List<float[]> reset = new ArrayList<>();
         for (ModelPart part : all) {
-            assertArrayEquals(new float[] {0, 0, 0, 0, 0, 0, 1}, transform(part),
+            reset.add(transform(part)); // the built model: rest angles (a quiver's lean), else zero
+        }
+        AnatomyModels.captureNpc(raider, 0.3);
+        for (int i = 0; i < all.size(); i++) {
+            ModelPart part = all.get(i);
+            assertArrayEquals(reset.get(i), transform(part),
                     part.name + " is left in the reset pose for the next draw");
             assertTrue(part.visible, part.name + " is left visible for the next draw");
         }
