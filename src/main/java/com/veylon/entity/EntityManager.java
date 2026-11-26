@@ -163,44 +163,38 @@ public class EntityManager {
     }
 
     /**
-     * A save between projectile impact and the next fast tick must commit that death once: an
-     * infected body's, and (milestone 15) a managed creature's, with its tombstone and remains.
+     * Commits, before a save, every death the next fast tick would have committed. A blow lands
+     * between fast ticks (a projectile's, after the frame's ticks), and a save can come first: F5
+     * at the start of the next frame, or an autosave at the end of the same one. The save would
+     * write the fallen with health below zero and no death, and they came back from it alive.
+     * Each person and animal killed since the last fast tick is committed here once, exactly as
+     * that tick commits it: the infected and the managed creatures with their tombstones, every
+     * other person with everything a death brings (0.9.1 B17), every animal with its credit and
+     * its one body, so the saved lists never hold a fallen body.
      */
-    public void flushInfectedDeaths(Game g) {
+    public void flushPendingDeaths(Game g) {
         for (int i = npcs.size() - 1; i >= 0; i--) {
             Npc n = npcs.get(i);
-            if (n.infected() && n.dead) {
-                finishInfectedDeath(g, n); npcs.remove(i); forgetTarget(n);
+            if (!n.dead) {
+                continue;
             }
+            if (n.infected()) {
+                finishInfectedDeath(g, n);
+                npcs.remove(i);
+                forgetTarget(n);
+                continue;
+            }
+            bookDeath(g, n);
+            npcs.remove(i);
+            leaveAfterDeath(g, n);
         }
         for (int i = creatures.size() - 1; i >= 0; i--) {
             Creature c = creatures.get(i);
-            if (c.encounterId != 0 && c.dead) {
+            if (c.dead) {
                 onCreatureDied(g, c);
                 creatures.remove(i);
                 if (reallyDied(c)) { forgetTarget(c); } else { depart(g, c); }
             }
-        }
-    }
-
-    /**
-     * As {@link #flushInfectedDeaths} for the people of urban survivor sites (milestone 16): a
-     * death between a blow and the next fast tick is committed once before a save, with its
-     * tombstone and body, so the saved list never holds a fallen resident.
-     */
-    public void flushSiteDeaths(Game g) {
-        for (int i = npcs.size() - 1; i >= 0; i--) {
-            Npc n = npcs.get(i);
-            if (!n.dead || com.veylon.settlement.UrbanSiteDirector.siteOf(g.world, n) == null) { continue; }
-            if (n.health <= 0 && !n.hostileToPlayer()) { g.log(n.name + " has died."); }
-            onSettledNpcDied(g, n);
-            if (reallyDied(n) && n.dismemberOnDeath) {
-                g.fragments.spawnFromNpc(g, n, g.fragments.deathPose(n), n.blastX, n.blastY, n.blastZ, n.blastStrength);
-            } else if (reallyDied(n)) {
-                g.ragdolls.spawn(g, n);
-            }
-            npcs.remove(i);
-            if (reallyDied(n)) { forgetTarget(n); } else { depart(g, n); }
         }
     }
 

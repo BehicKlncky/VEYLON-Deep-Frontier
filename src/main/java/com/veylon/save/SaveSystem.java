@@ -161,8 +161,9 @@ public final class SaveSystem {
         Objects.requireNonNull(g, "g");
         Objects.requireNonNull(savePath, "savePath");
         Objects.requireNonNull(publisher, "publisher");
-        g.entities.flushInfectedDeaths(g);
-        g.entities.flushSiteDeaths(g);
+        // A death the next fast tick would commit is committed first, so nobody killed since that
+        // tick is written alive with health below zero (0.9.1 B17).
+        g.entities.flushPendingDeaths(g);
         // Falling bodies are transient and are not written. Freezing them here
         // rather than dropping them is what makes a save taken mid-fall come
         // back as a settled corpse instead of losing one.
