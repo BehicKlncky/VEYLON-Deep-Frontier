@@ -68,6 +68,32 @@ All notable user-facing changes to VEYLON: Deep Frontier are recorded here.
 - Leaving a world for the title lets all of it go: fires, burning pools, shots in
   flight, body pieces, the log and a blast's camera shake no longer linger on the
   title, and the shake no longer carries into the next world.
+- A captive in a fort's cage stands on the cage floor instead of hanging with its
+  head in the roof bars, so it turns to you and, if it burns, struggles about; a
+  leader is set down on the keep's floor instead of dropping onto it.
+- An archer's quiver and slung bow, a powderman's slung gun, a held bow's tips and a
+  held bomb's fuse are drawn at their angle again instead of hanging straight.
+- A whole carcass keeps the arrows lodged in it through a save and load; skinning it
+  gives them back.
+- The name of the block you aim at no longer shows through the death card, the
+  city's answer or the pause menu.
+- Leg pieces of a body blown apart no longer come to rest standing on their ends.
+- Nothing alive breathes or sways while the game is paused.
+- A burning log, plank or leaf block shows its fire: glowing flames climb its faces
+  open to the air, and its flames, embers and smoke rise from them instead of
+  starting inside the block.
+- Drying racks and rain collectors judge whether the rain reaches them exactly as
+  fires do.
+- A person killed by an arrow or a shot just as you leave their settlement behind is
+  counted as killed, with everything that follows a death, instead of vanishing
+  unremarked.
+- A save made just after a killing shot no longer brings the person or animal back
+  standing with no health: they stay dead, with their body or carcass.
+- The death card after a blast that blew you apart looks at your remains from a
+  little behind and above, instead of from inside them, and they fall to the ground
+  while it shows.
+- Health on the death card reads 0 after a hit far beyond what you had, instead of
+  a negative number.
 
 ## [0.9.0] - 2026-11-06
 
