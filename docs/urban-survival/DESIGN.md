@@ -611,7 +611,7 @@ Package 23 (generator 20, content revision 4, encounter catalogue 6; DECISIONS D
 
 ### 16.1 What a survivor needs, and where the city gives it
 
-A waking game day (900 real seconds) costs 40.5 hunger and 67.5 thirst; a day with a night slept in the refuge costs about 25 and 40 (sleep drains 0.10 and 0.14 a second for the few seconds a night takes). A serving of dried berries gives 14 hunger at full freshness (7 to 12 as found), dried meat 22, a clean waterskin 60 thirst.
+A waking game day (900 real seconds) costs 40.5 hunger and 67.5 thirst; a day with a night slept in the refuge costs about 25 and 40 (sleep drains 0.10 and 0.14 a second for the few seconds a night takes). These are the base rates, which hold wherever the air stays at or below 30 °C. Since 0.9.1 corrected the day's curve (B14) the afternoon is the warm part of the day, and in the industrial yards it is hot: their street passes 30 °C from about 10:00 to 18:00 in the Mild Season, thirst runs faster there and the body overheats, so standing in it from 08:00 to 21:00 costs about 72 thirst against 37 in the other districts (0.9.1 D-45). A serving of dried berries gives 14 hunger at full freshness (7 to 12 as found), dried meat 22, a clean waterskin 60 thirst.
 
 | Need | Urban sources (content 4) | Alternatives and renewables | Never needs |
 | --- | --- | --- | --- |
@@ -791,4 +791,4 @@ No mandatory requirement was found unmet, so the default was switched (D-253). H
 - **Human acceptance (D-80)** was closed on 2026-11-06 by the owner's report of their playtest and their request to release (D-259); the report gave no further detail. Package 26 is complete and ships as v0.9.0.
 - **The reference machine** has not run package 24's figures or this package's smokes.
 - **The release smoke** approaches a generated fortress only in the wilderness; in the city it exercises save, load, fire and storm, and the city's streaming is measured by `urban_performance` (D-255).
-- **P-15** (the inverted day's temperature curve), the first-touch planning hitches (D-247), save time growth (D-246, D-250) and the writer's untested 128 MiB check (D-249) are unchanged.
+- **P-15** (the inverted day's temperature curve), the first-touch planning hitches (D-247), save time growth (D-246, D-250) and the writer's untested 128 MiB check (D-249) are unchanged. 0.9.1 corrected the day's curve in every world (DECISIONS P-15).
