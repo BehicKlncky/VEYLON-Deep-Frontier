@@ -95,10 +95,15 @@ public class TimeSystem implements SimulationSystem {
         return "Night";
     }
 
-    /** Diurnal temperature offset in degrees C: coldest ~04:00, warmest ~14:00. */
+    /**
+     * Diurnal temperature offset in degrees C: a cosine at its highest at
+     * {@link TimeConstants#WARMEST_HOUR} (14:00, +6) and at its lowest twelve hours
+     * later, in the night before dawn (02:00, -8), averaging
+     * -{@link TimeConstants#DIURNAL_TEMP_BIAS} over the day (0.9.1 B14).
+     */
     public float tempOffset() {
         double h = hourF();
-        return (float) (-DIURNAL_TEMP_AMPLITUDE
+        return (float) (DIURNAL_TEMP_AMPLITUDE
                 * Math.cos((h - WARMEST_HOUR) / HOURS_PER_DAY * 2 * Math.PI)
                 - DIURNAL_TEMP_BIAS);
     }

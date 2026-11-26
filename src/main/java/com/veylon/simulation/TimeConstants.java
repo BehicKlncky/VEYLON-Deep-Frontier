@@ -37,6 +37,7 @@ public final class TimeConstants {
     // Diurnal temperature: a cosine peaking at WARMEST_HOUR.
     /** Half the peak-to-trough swing, in degrees C. */
     public static final double DIURNAL_TEMP_AMPLITUDE = 7.0;
+    /** The warmest hour; the coldest comes twelve hours later. */
     public static final double WARMEST_HOUR = 14.0;
     /** Constant offset so the daily mean sits slightly below the biome base. */
     public static final double DIURNAL_TEMP_BIAS = 1.0;

@@ -14,7 +14,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * {@code VEYLON_SCENE=day_curve} (0.9.1 milestone 08, B14) headlessly: in the wilderness it stands on
  * the meadow site and in a city at the industrial yards' tour stop, under the sky, shows the debug
  * overlay, holds clear weather and reads the player's air at noon of the first day and at 03:00 of
- * the second.
+ * the second, and noon is the warmer.
  */
 class DayCurveQaSceneTest {
 
@@ -64,6 +64,8 @@ class DayCurveQaSceneTest {
         assertEquals(27.0, scene.nightAt() / 60, 0.1, "the second is at 03:00 of the next day");
         assertEquals(g.player.envTemp, scene.night(), 0.05f, "the reading is the air the overlay shows");
         assertTrue(Float.isFinite(scene.noon()), "the noon reading");
+        assertTrue(scene.passed(), "noon (" + scene.noon() + ") is warmer than before dawn (" + scene.night()
+                + "), 0.9.1 B14");
     }
 
     private static int feetX(Game g) {
