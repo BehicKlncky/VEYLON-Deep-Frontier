@@ -110,6 +110,7 @@ final class DismemberQaScene {
     private boolean bomb;
     private boolean playerBlast;
     private boolean reportedCard;
+    private int cardFrames;
     private boolean blown;
     private boolean reportedRest;
     private double simulated;
@@ -187,6 +188,7 @@ final class DismemberQaScene {
         blown = false;
         reportedRest = false;
         reportedCard = false;
+        cardFrames = 0;
         active = true;
         update(0);
     }
@@ -210,7 +212,9 @@ final class DismemberQaScene {
         if (!blown) {
             return;
         }
-        if (!reportedCard && game.showsEndCard()) {
+        // The card's camera is placed by the frame after the one the death began in, and this
+        // runs before each frame: read it on the card's second frame.
+        if (!reportedCard && game.showsEndCard() && ++cardFrames >= 2) {
             reportedCard = true;
             float eyeY = game.player.pos.y + game.player.eyeHeight();
             System.out.printf(Locale.ROOT, "[scene] dismember_player: death card with %d pieces;"

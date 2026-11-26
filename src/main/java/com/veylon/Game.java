@@ -563,10 +563,12 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
 
         if (simulate) {
             advanceWorld(dtD);
+        } else {
+            lifeCycle.settleRemains(dt); // behind the death card a lethal blast's remains still fall
         }
 
-        // Camera follows the player eye.
-        camera.position.set(player.pos.x, player.pos.y + player.eyeHeight(), player.pos.z);
+        // Camera follows the player eye, or watches a lethal blast's remains from clear of them.
+        lifeCycle.placeCamera();
         player.yaw = camera.yaw;
         qa.updateMiningShowcase(dt);
         audio.setListener(camera.position.x, camera.position.y, camera.position.z, camera.yaw);
