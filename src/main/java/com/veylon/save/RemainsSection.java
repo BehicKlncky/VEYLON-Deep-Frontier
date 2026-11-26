@@ -9,7 +9,6 @@ import com.veylon.entity.FragmentAnatomy;
 import com.veylon.entity.FragmentPiece;
 import com.veylon.entity.FragmentPose;
 import com.veylon.entity.RagdollConstants;
-import com.veylon.item.ItemType;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -48,9 +47,11 @@ import static com.veylon.save.SaveSystem.readCount;
  * int pieces; per piece: int pose index, int piece id, 3 floats position,
  *                       4 floats orientation (a unit quaternion), float decay,
  *                       the appearance exactly as {@link BodiesSection} writes it
- * int links; per link:  int piece index, int carcass index (the v3 body's order),
- *                       int arrows lodged, int arrow item (0 = none, else ordinal + 1)
+ * int links; per link:  int piece index, int carcass index (the core body's order)
  * </pre>
+ * The record a link names carries everything harvested from it, its lodged
+ * arrows included, in the core body; until 0.9.1 B05 only a link carried the
+ * arrows, so a whole carcass lost them.
  * A piece's identity is (family, piece id), both append only
  * ({@link BodyFamily}, each family's {@link FragmentAnatomy} piece list); a
  * person's piece id is its {@link BodyFragment.Piece} ordinal. The pieces of
@@ -96,11 +97,8 @@ final class RemainsSection {
     static final float MIN_POSE_SCALE = 0.5f, MAX_POSE_SCALE = 2f;
     /** How far from 1 the squared length of a stored orientation may be. */
     static final float QUATERNION_TOLERANCE = 1e-3f;
-    /** Far more arrows than one animal's health lets lodge in it. */
-    static final int MAX_STUCK_ARROWS = 1024;
 
     private static final BodyFamily[] FAMILIES = BodyFamily.values();
-    private static final ItemType[] ITEMS = ItemType.values();
 
     private RemainsSection() {
     }
@@ -181,11 +179,8 @@ final class RemainsSection {
                 if (!linked(f, carcassIndex)) {
                     continue;
                 }
-                Carcass record = f.harvest;
                 out.writeInt(i);
-                out.writeInt(carcassIndex.get(record));
-                out.writeInt(Math.clamp(record.stuckArrows, 0, MAX_STUCK_ARROWS));
-                out.writeInt(record.stuckArrowType == null ? 0 : record.stuckArrowType.ordinal() + 1);
+                out.writeInt(carcassIndex.get(f.harvest));
             }
         }
         return bytes.toByteArray();
@@ -240,8 +235,8 @@ final class RemainsSection {
     // Reading
     // ------------------------------------------------------------------
 
-    /** One harvest link as read: which piece, which record, and the record's arrows. */
-    private record Link(int piece, Carcass record, int arrows, ItemType arrowType) {
+    /** One harvest link as read: which piece carries which record. */
+    private record Link(int piece, Carcass record) {
     }
 
     /**
@@ -268,8 +263,6 @@ final class RemainsSection {
 
         Carcass[] harvest = new Carcass[pieces.length];
         for (Link link : links) {
-            link.record.stuckArrows = link.arrows;
-            link.record.stuckArrowType = link.arrowType;
             harvest[link.piece] = link.record;
         }
         for (int i = 0; i < pieces.length; i++) {
@@ -372,14 +365,6 @@ final class RemainsSection {
             if (carcass < 0 || carcass >= carcasses.size()) {
                 throw new IOException("harvest link refers to missing carcass " + carcass);
             }
-            int arrows = in.readInt();
-            if (arrows < 0 || arrows > MAX_STUCK_ARROWS) {
-                throw new IOException("invalid lodged arrow count: " + arrows);
-            }
-            int item = in.readInt();
-            if (item < 0 || item > ITEMS.length) {
-                throw new IOException("invalid lodged arrow item ordinal: " + item);
-            }
             if (pieceTaken[piece] || recordTaken[carcass]) {
                 throw new IOException("a torso carries one harvest record and a record one torso");
             }
@@ -394,7 +379,7 @@ final class RemainsSection {
                 throw new IOException("the " + f.definition + " piece cannot carry a " + record.type
                         + " carcass");
             }
-            links.add(new Link(piece, record, arrows, item == 0 ? null : ITEMS[item - 1]));
+            links.add(new Link(piece, record));
         }
         return links;
     }

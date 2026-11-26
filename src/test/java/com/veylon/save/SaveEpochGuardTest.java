@@ -104,7 +104,7 @@ class SaveEpochGuardTest {
             "generation.city", "b6c505f9d1e284630f5e0410b0eb50a918c05a713953b8e30556d245c1ae81f8",
             "generation.wilderness", "f1f93ab3af72f72c56e872f4121969025b4712a055b046c8ede382c88530df29",
             "layout.city", "d92581c612e0057b91187ed9f3e8d17b9421f2ba4c443497e96dd51a9c14d9d8",
-            "layout.wilderness", "ccf330b438994faf60b4b2c1c1f87f7ad0e49825d41d360955cce038572c28f0");
+            "layout.wilderness", "2aa9698e1f6c48ae87045f25cdedf2ff3edfe90df28ae61e494f434d7fec40de");
 
     /** The seeds {@code WorldGeneratorFingerprintTest} pins. */
     private static final long[] SEEDS = {20_260_731L, -4_242L, 7L};

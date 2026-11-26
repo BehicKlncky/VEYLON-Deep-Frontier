@@ -97,6 +97,8 @@ public final class SaveSystem {
     private static final int V3_EXTENSION_MAGIC = 0x57334558; // "W3EX"
     private static final int V3_EXTENSION_VERSION = 2;
     private static final int MAX_SERIALIZED_ENTRIES = 100_000;
+    /** Far more arrows than one animal's health lets lodge in it; a carcass record holds at most this. */
+    static final int MAX_STUCK_ARROWS = 1024;
     /**
      * Block edits get their own, far looser ceiling: they are the one section
      * a long-lived world can legitimately grow without bound, and rejecting a
@@ -357,6 +359,10 @@ public final class SaveSystem {
                     out.writeInt(c.meatLeft);
                     out.writeInt(c.hideLeft);
                     out.writeFloat(c.decay);
+                    // The arrows lodged in it, recovered when it is skinned (0.9.1 B05): the
+                    // count, and the arrow by ordinal + 1, 0 for none.
+                    out.writeInt(Math.clamp(c.stuckArrows, 0, MAX_STUCK_ARROWS));
+                    out.writeInt(c.stuckArrowType == null ? 0 : c.stuckArrowType.ordinal() + 1);
                 }
 
                 // Active events.
@@ -721,6 +727,15 @@ public final class SaveSystem {
                 c.meatLeft = in.readInt();
                 c.hideLeft = in.readInt();
                 c.decay = in.readFloat();
+                c.stuckArrows = in.readInt();
+                if (c.stuckArrows < 0 || c.stuckArrows > MAX_STUCK_ARROWS) {
+                    throw new IOException("invalid lodged arrow count: " + c.stuckArrows);
+                }
+                int arrow = in.readInt();
+                if (arrow < 0 || arrow > itemTypes.length) {
+                    throw new IOException("invalid lodged arrow item ordinal: " + arrow);
+                }
+                c.stuckArrowType = arrow == 0 ? null : itemTypes[arrow - 1];
                 g.entities.carcasses.add(c);
             }
 

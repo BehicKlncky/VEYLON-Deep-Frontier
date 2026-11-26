@@ -307,8 +307,8 @@ class RemainsSectionTest {
         corruptions.put("a link to a missing carcass", s -> s.links.get(0).carcass = 99);
         corruptions.put("a negative carcass index", s -> s.links.get(0).carcass = -1);
         // Each of these breaks exactly one rule; everything else about the link is sound.
-        corruptions.put("two records on one torso", s -> s.link(0, 3, 0, 0));
-        corruptions.put("one record on two torsos", s -> s.link(4, 0, 0, 0));
+        corruptions.put("two records on one torso", s -> s.link(0, 3));
+        corruptions.put("one record on two torsos", s -> s.link(4, 0));
         corruptions.put("a record on a limb", s -> s.links.get(0).piece = 1);
         corruptions.put("a record on a person", s -> {
             s.piece(1, BodyFragment.Piece.TORSO.ordinal());
@@ -321,11 +321,7 @@ class RemainsSectionTest {
             s.links.get(0).piece = s.pieces.size() - 1;
             s.links.get(0).carcass = 2;
         });
-        corruptions.put("negative arrows", s -> s.links.get(0).arrows = -1);
-        corruptions.put("more arrows than any animal holds",
-                s -> s.links.get(0).arrows = RemainsSection.MAX_STUCK_ARROWS + 1);
-        corruptions.put("an arrow item past the enum", s -> s.links.get(0).item = ItemType.values().length + 1);
-        corruptions.put("a negative arrow item", s -> s.links.get(0).item = -1);
+        // A record's lodged arrows are the core body's since 0.9.1 B05 (CarcassArrowsSaveTest).
 
         Map<String, byte[]> payloads = new LinkedHashMap<>();
         for (Map.Entry<String, Consumer<Spec>> corruption : corruptions.entrySet()) {
@@ -567,8 +563,8 @@ class RemainsSectionTest {
     /**
      * A valid section against {@link #withCarcasses}: a deer at rest (torso, a
      * leg), a person in a captured pose (shin), a wolf at rest (torso), a
-     * second deer's torso, and the first deer's record, with two arrows, on
-     * the first deer's torso.
+     * second deer's torso, and the first deer's record on the first deer's
+     * torso.
      */
     private static Spec valid() {
         Spec spec = new Spec();
@@ -583,7 +579,7 @@ class RemainsSectionTest {
         spec.piece(1, BodyFragment.Piece.SHIN_L.ordinal());
         spec.piece(2, 0);
         spec.piece(0, 0);
-        spec.link(0, 0, 2, ItemType.ARROW.ordinal() + 1);
+        spec.link(0, 0);
         return spec;
     }
 
@@ -624,8 +620,6 @@ class RemainsSectionTest {
     private static final class LinkSpec {
         int piece;
         int carcass;
-        int arrows;
-        int item;
     }
 
     private static final class Spec {
@@ -649,12 +643,10 @@ class RemainsSectionTest {
             pieces.add(piece);
         }
 
-        void link(int piece, int carcass, int arrows, int item) {
+        void link(int piece, int carcass) {
             LinkSpec link = new LinkSpec();
             link.piece = piece;
             link.carcass = carcass;
-            link.arrows = arrows;
-            link.item = item;
             links.add(link);
         }
 
@@ -683,8 +675,6 @@ class RemainsSectionTest {
                 for (LinkSpec l : links) {
                     out.writeInt(l.piece);
                     out.writeInt(l.carcass);
-                    out.writeInt(l.arrows);
-                    out.writeInt(l.item);
                 }
             }
             return bytes.toByteArray();

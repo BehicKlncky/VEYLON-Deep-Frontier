@@ -456,7 +456,7 @@ class CorruptSaveResilienceTest {
                 c.skip(4 + 6 * 4);                      // type, position, health, hunger, bleed
                 c.expectCount(1, "carcasses");
                 int carcassOrdinal = c.position();
-                c.skip(4 + 3 * 4 + 4 + 4 + 4);          // type, position, meat, hide, decay
+                c.skip(4 + 3 * 4 + 4 + 4 + 4 + 4 + 4);  // type, position, meat, hide, decay, arrows, arrow item
                 c.expectCount(1, "active events");
                 int eventOrdinal = c.position();
 
