@@ -61,6 +61,7 @@ final class QaHarness {
     private final MolotovQaScene molotovScene;
     private final BodyFireQaScene bodyFireScene;
     private final CaptiveQaScene captiveScene;
+    private final DayCurveQaScene dayCurveScene;
     private final HudQaScene hudScene;
     private final UrbanQaScenes urbanScene;
 
@@ -112,6 +113,7 @@ final class QaHarness {
         molotovScene = new MolotovQaScene(game);
         bodyFireScene = new BodyFireQaScene(game);
         captiveScene = new CaptiveQaScene(game);
+        dayCurveScene = new DayCurveQaScene(game);
         hudScene = new HudQaScene(game);
         urbanScene = new UrbanQaScenes(game);
     }
@@ -280,6 +282,7 @@ final class QaHarness {
         molotovScene.update(elapsed);
         bodyFireScene.update(elapsed);
         captiveScene.update(elapsed);
+        dayCurveScene.update(elapsed);
         hudScene.update(elapsed);
         urbanScene.update(elapsed);
     }
@@ -589,6 +592,7 @@ final class QaHarness {
             }
             case "physical_rain" -> rainScene.stage();
             case "fort_captive" -> captiveScene.stage();
+            case "day_curve" -> dayCurveScene.stage();
             case "rain_impact" -> rainScene.stageImpact();
             case "day", "meadow" -> {
                 site = BenchmarkSite.move(game, Biome.MEADOW);
