@@ -591,7 +591,7 @@ final class QaHarness {
             case "fort_captive" -> captiveScene.stage();
             case "rain_impact" -> rainScene.stageImpact();
             case "day", "meadow" -> {
-                site = moveBenchmarkToBiome(Biome.MEADOW);
+                site = BenchmarkSite.move(game, Biome.MEADOW);
                 clearBenchmarkStage(site, 9, 18);
                 game.time.totalMinutes = 12 * 60;
                 setWeatherNow(WeatherSystem.Weather.CLEAR);
@@ -600,7 +600,7 @@ final class QaHarness {
                 clearHeldForScenicCapture();
             }
             case "dawnfog", "pinefog" -> {
-                site = moveBenchmarkToBiome(Biome.PINE_FOREST);
+                site = BenchmarkSite.move(game, Biome.PINE_FOREST);
                 clearBenchmarkStage(site, 9, 20);
                 game.time.totalMinutes = (long) (6.15 * 60);
                 setWeatherNow(WeatherSystem.Weather.FOG);
@@ -608,7 +608,7 @@ final class QaHarness {
                 clearHeldForScenicCapture();
             }
             case "nightfire", "campfire_rain" -> {
-                site = moveBenchmarkToBiome(Biome.MEADOW);
+                site = BenchmarkSite.move(game, Biome.MEADOW);
                 clearBenchmarkStage(site, 8, 16);
                 game.time.totalMinutes = 23 * 60;
                 setWeatherNow(WeatherSystem.Weather.RAIN);
@@ -625,7 +625,7 @@ final class QaHarness {
                 clearHeldForScenicCapture();
             }
             case "ruin", "cave_ruin" -> {
-                site = moveBenchmarkToBiome(Biome.ROCKY_HIGHLANDS);
+                site = BenchmarkSite.move(game, Biome.ROCKY_HIGHLANDS);
                 clearBenchmarkStage(site, 9, 18);
                 game.time.totalMinutes = 22 * 60;
                 setWeatherNow(WeatherSystem.Weather.CLEAR);
@@ -633,7 +633,7 @@ final class QaHarness {
                 clearHeldForScenicCapture();
             }
             case "toxic", "ashfall" -> {
-                site = moveBenchmarkToBiome(Biome.SCRUBLAND);
+                site = BenchmarkSite.move(game, Biome.SCRUBLAND);
                 clearBenchmarkStage(site, 9, 20);
                 game.time.totalMinutes = 14 * 60;
                 setWeatherNow(WeatherSystem.Weather.CLEAR);
@@ -648,7 +648,7 @@ final class QaHarness {
                 clearHeldForScenicCapture();
             }
             case "ao_shadow", "lighting" -> {
-                site = moveBenchmarkToBiome(Biome.MEADOW);
+                site = BenchmarkSite.move(game, Biome.MEADOW);
                 // Cleared through z-26 so the south-facing comparison camera at
                 // z-24 stands on level ground.
                 clearBenchmarkStage(site, 10, 26);
@@ -661,47 +661,47 @@ final class QaHarness {
                 game.simPaused = true;
             }
             case "phase4", "verticalslice" -> {
-                site = moveBenchmarkToBiome(Biome.MEADOW);
+                site = BenchmarkSite.move(game, Biome.MEADOW);
                 clearBenchmarkStage(site, 11, 22);
                 setupPhase4Showcase(site.x(), site.z());
             }
             case "ashwolf", "ashwolf_poses" -> {
-                site = moveBenchmarkToBiome(Biome.MEADOW);
+                site = BenchmarkSite.move(game, Biome.MEADOW);
                 clearBenchmarkStage(site, 9, 16);
                 setupAshwolfPoseShowcase(site);
             }
             case "ashwolf_seq", "ashwolf_states" -> {
-                site = moveBenchmarkToBiome(Biome.MEADOW);
+                site = BenchmarkSite.move(game, Biome.MEADOW);
                 clearBenchmarkStage(site, 8, 14);
                 setupAshwolfSeqShowcase(site);
             }
             case "silhouette30", "silhouette_30m" -> {
-                site = moveBenchmarkToBiome(Biome.MEADOW);
+                site = BenchmarkSite.move(game, Biome.MEADOW);
                 clearBenchmarkStage(site, 13, 38);
                 setupSilhouette30mShowcase(site);
             }
             case "held_pickaxe", "held_axe", "held_spear", "held_knife", "held_torch",
                     "held_food", "held_berry", "held_medicine", "held_building",
                     "held_bow", "held_musket", "held_bomb" -> {
-                site = moveBenchmarkToBiome(Biome.MEADOW);
+                site = BenchmarkSite.move(game, Biome.MEADOW);
                 clearBenchmarkStage(site, 11, 22);
                 setupPhase4Showcase(site.x(), site.z());
                 selectShowcaseItem(normalized);
             }
             case "held_cycle" -> {
-                site = moveBenchmarkToBiome(Biome.MEADOW);
+                site = BenchmarkSite.move(game, Biome.MEADOW);
                 clearBenchmarkStage(site, 11, 22);
                 setupPhase4Showcase(site.x(), site.z());
                 heldCycleShowcase = true;
                 updateHeldCycle(0);
             }
             case "death_ragdoll_showcase", "vfx_ragdoll" -> {
-                site = moveBenchmarkToBiome(Biome.MEADOW);
+                site = BenchmarkSite.move(game, Biome.MEADOW);
                 clearBenchmarkStage(site, 12, 20);
                 ragdollScene.stage(site);
             }
             case "death_ragdoll_sequence", "ragdoll_seq", "death_ragdoll_quadruped" -> {
-                site = moveBenchmarkToBiome(Biome.MEADOW);
+                site = BenchmarkSite.move(game, Biome.MEADOW);
                 clearBenchmarkStage(site, 9, 14);
                 ragdollScene.stageSequence(site);
                 if (normalized.equals("death_ragdoll_quadruped")) {
@@ -712,48 +712,48 @@ final class QaHarness {
             }
             case "death_ragdoll_human", "death_ragdoll_ledge", "death_ragdoll_drape",
                     "ragdoll_living", "ragdoll_living_species" -> {
-                site = moveBenchmarkToBiome(Biome.MEADOW);
+                site = BenchmarkSite.move(game, Biome.MEADOW);
                 clearBenchmarkStage(site, 9, 14);
                 ragdollScene.stageJoints(site, normalized);
             }
             case "dismember_showcase", "dismember_wall", "dismember_bomb", "dismember_player" -> {
-                site = moveBenchmarkToBiome(Biome.MEADOW);
+                site = BenchmarkSite.move(game, Biome.MEADOW);
                 clearBenchmarkStage(site, 10, 18);
                 dismemberScene.stage(site, normalized);
             }
             case "dismember_species", "dismember_species_wall", "dismember_species_close" -> {
-                site = moveBenchmarkToBiome(Biome.MEADOW);
+                site = BenchmarkSite.move(game, Biome.MEADOW);
                 clearBenchmarkStage(site, 12, 18);
                 speciesDismemberScene.stage(site, normalized);
             }
             case "molotov_ground", "molotov_tree", "molotov_rain" -> {
-                site = moveBenchmarkToBiome(Biome.MEADOW);
+                site = BenchmarkSite.move(game, Biome.MEADOW);
                 clearBenchmarkStage(site, 12, 16);
                 molotovScene.stage(site, normalized);
             }
             case "body_fire_row", "body_fire_row_night", "body_fire_close", "body_fire_out", "body_fire_blast",
                     "body_fire_panic", "body_fire_bird", "body_fire_rain", "body_fire_ragdoll", "body_fire_player" -> {
-                site = moveBenchmarkToBiome(Biome.MEADOW);
+                site = BenchmarkSite.move(game, Biome.MEADOW);
                 clearBenchmarkStage(site, 14, 18);
                 bodyFireScene.stage(site, normalized);
             }
             case "vfx_blood", "blood_tracks" -> {
-                site = moveBenchmarkToBiome(Biome.MEADOW);
+                site = BenchmarkSite.move(game, Biome.MEADOW);
                 clearBenchmarkStage(site, 10, 18);
                 setupBloodVfxShowcase(site);
             }
             case "vfx_mining", "mining_cracks" -> {
-                site = moveBenchmarkToBiome(Biome.ROCKY_HIGHLANDS);
+                site = BenchmarkSite.move(game, Biome.ROCKY_HIGHLANDS);
                 clearBenchmarkStage(site, 10, 18);
                 setupMiningVfxShowcase(site);
             }
             case "vfx_beacon", "beacon_vfx" -> {
-                site = moveBenchmarkToBiome(Biome.MEADOW);
+                site = BenchmarkSite.move(game, Biome.MEADOW);
                 clearBenchmarkStage(site, 10, 20);
                 setupBeaconVfxShowcase(site);
             }
             case "movement", "chunk_churn" -> {
-                site = moveBenchmarkToBiome(Biome.MEADOW);
+                site = BenchmarkSite.move(game, Biome.MEADOW);
                 clearBenchmarkStage(site, 8, 16);
                 game.time.totalMinutes = 11 * 60;
                 setWeatherNow(WeatherSystem.Weather.CLEAR);
@@ -761,12 +761,12 @@ final class QaHarness {
                 benchmarkMovement = true;
             }
             case "inventory", "icons" -> {
-                site = moveBenchmarkToBiome(Biome.MEADOW);
+                site = BenchmarkSite.move(game, Biome.MEADOW);
                 clearBenchmarkStage(site, 8, 14);
                 setupInventoryShowcase();
             }
             case "ui_cycle", "screens" -> {
-                site = moveBenchmarkToBiome(Biome.MEADOW);
+                site = BenchmarkSite.move(game, Biome.MEADOW);
                 clearBenchmarkStage(site, 11, 22);
                 setupPhase4Showcase(site.x(), site.z());
                 setupInventoryShowcase();
@@ -782,82 +782,6 @@ final class QaHarness {
             default -> System.out.println("[scene] unknown VEYLON_SCENE '" + scene + "'");
         }
         System.out.println("[scene] applied benchmark scene '" + scene + "'");
-    }
-
-    /** Finds a nearby deterministic dry site in the requested biome and moves the QA camera there. */
-    private Vec3i moveBenchmarkToBiome(Biome desired) {
-        World world = game.world;
-        int ox = (int) Math.floor(game.spawnPos.x);
-        int oz = (int) Math.floor(game.spawnPos.z);
-        int bx = ox, bz = oz;
-        boolean found = false;
-        outer:
-        for (int radius = 0; radius <= 1024; radius += 8) {
-            for (int dx = -radius; dx <= radius; dx += 8) {
-                int[] zs = radius == 0 ? new int[]{0} : new int[]{-radius, radius};
-                for (int dz : zs) {
-                    if (world.biomeAt(ox + dx, oz + dz) == desired) {
-                        bx = ox + dx;
-                        bz = oz + dz;
-                        found = true;
-                        break outer;
-                    }
-                }
-            }
-            for (int dz = -radius + 8; dz <= radius - 8; dz += 8) {
-                for (int dx : new int[]{-radius, radius}) {
-                    if (world.biomeAt(ox + dx, oz + dz) == desired) {
-                        bx = ox + dx;
-                        bz = oz + dz;
-                        found = true;
-                        break outer;
-                    }
-                }
-            }
-        }
-        if (!found) {
-            System.err.println("[scene] no nearby " + desired.displayName + "; using spawn biome");
-        }
-        world.ensureChunks(bx, bz, 4, 10_000);
-
-        int sx = bx, sz = bz;
-        search:
-        for (int radius = 0; radius <= 48; radius += 4) {
-            for (int dx = -radius; dx <= radius; dx += 4) {
-                for (int dz = -radius; dz <= radius; dz += 4) {
-                    if (Math.max(Math.abs(dx), Math.abs(dz)) != radius) continue;
-                    int x = bx + dx, z = bz + dz;
-                    int surface = world.surfaceHeight(x, z);
-                    if (world.biomeAt(x, z) == desired && surface > World.SEA_LEVEL + 1
-                            && world.getBlock(x, surface + 1, z) != BlockType.WATER) {
-                        sx = x;
-                        sz = z;
-                        break search;
-                    }
-                }
-            }
-        }
-        int naturalGround = world.surfaceHeight(sx, sz);
-        int ground = Math.max(naturalGround, World.SEA_LEVEL + 3);
-        Biome siteBiome = world.biomeAt(sx, sz);
-        for (int y = naturalGround + 1; y < ground; y++) {
-            world.setBlock(sx, y, sz, siteBiome.subsurface, false);
-        }
-        world.setBlock(sx, ground, sz, siteBiome.surface, false);
-        for (int y = ground + 1; y <= Math.min(Chunk.SY - 1, ground + 5); y++) {
-            world.setBlock(sx, y, sz, BlockType.AIR, false);
-        }
-        game.player.pos.set(sx + 0.5f, ground + 1.2f, sz + 0.5f);
-        game.player.vel.zero();
-        game.player.biome = world.biomeAt(sx, sz);
-        game.camera.yaw = 0f;
-        game.camera.pitch = 4f;
-        System.out.println("[scene] camera site=" + sx + "," + (ground + 1) + "," + sz
-                + " biome=" + game.player.biome.displayName
-                + " sea=" + World.SEA_LEVEL
-                + " feet=" + world.getBlock(sx, ground + 1, sz)
-                + " eye=" + world.getBlock(sx, ground + 2, sz));
-        return new Vec3i(sx, ground + 1, sz);
     }
 
     /**
