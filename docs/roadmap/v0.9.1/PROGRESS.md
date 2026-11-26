@@ -11,8 +11,8 @@ the first milestone below that is not complete.
 | 03 Current-version save epoch | Complete | `ce4686d`, `843dce8`, `14ca773`, `3d98b70`, `6bae538`, `f3fe760`, `13486ca`, `2600134`, `0fbc816`, `71972aa`, `f3aed69`, `369d65e`, `3063d13` |
 | 04 Three save slots and backups | Complete | `25e899e`, `142aace`, `51956a2`, `048e2d9`, `896340a`, `88d00ed`, `7357680`, `8dcab51`, `73f53c8` |
 | 05 Autosave | Complete | `2b9ce42`, `efc99ec`, `e487e6a`, `828a184`, `0a22a7c`, `1a11340`, `90834e0`, `759b3e7`, `687f3d3` |
-| 06 Session and control comfort | Complete | `91e576d`, `5909555`, `f9ea0e8`, `1573313`, `c652200`, `68a0b5f`, `c36ed1b`, `3cb57cf`, `72534e8`, then the records commit that adds this section; 07 records its hash |
-| 07 Forgotten defects sweep | Not started | |
+| 06 Session and control comfort | Complete | `91e576d`, `5909555`, `f9ea0e8`, `1573313`, `c652200`, `68a0b5f`, `c36ed1b`, `3cb57cf`, `72534e8`, `bb17c31` |
+| 07 Forgotten defects sweep | Complete | `dea5189`, `323ee57`, `77517ce`, `1508aef`, `3958deb`, `422e2a9`, `9b485dd`, `42d3e53`, `79aee28`, `9b17061`, `56648d9`, `df85b5d`, `ebff3a8`, `010a60d`, `b181761`, `1de9ae8`, `dc3ea84`, `5e5044e`, then the records commit that adds this section; 08 records its hash |
 | 08 Day temperature curve | Not started | |
 | 09 Integration and release preparation | Not started | |
 
@@ -1032,3 +1032,185 @@ No commit carries a co-author line. Nothing was pushed: 05's and 06's commits ar
 
 The forgotten-defects sweep: B03 to B10, B12, B13 and B15 (DESIGN §5), each fixed with a
 regression check or native evidence, or accepted by the owner.
+
+## Milestone 07 — Forgotten defects sweep
+
+**Status:** complete on 2026-11-26.
+**Base:** `main` at `bb17c31`, the records commit of 06, pushed with 05 and 06 on 2026-11-20;
+clean apart from an untracked `.vscode/`.
+
+### What was done
+
+Every ledger defect 07 owns was reproduced first, then fixed, one defect to a change, each with
+a regression test that fails against the old behaviour; the visual ones were captured natively
+before and after. One new defect turned up on the way and was fixed after its sibling (B17).
+
+| Defect | Reproduced by | Fix | Commit |
+| --- | --- | --- | --- |
+| B15 overkill health | the route's death card read "-900 / 100" (`before-route-720`); `ui.HudVitalsTest` fails on the old figure and pulse | the vitals and the low-health edge read health clamped at 0; health itself is not clamped | `dea5189` |
+| B06 the target label | "Brick" under the death card and "Radio Workstation" under the city's answer (`before-route-720`, `before-missions-720`); `HudTargetLabelTest` fails on the old condition | the label is drawn only while no end card is up and no pausing screen is open (`Game.showsEndCard`) | `323ee57` |
+| B10 the rained-on test | by reading: the literal matched the shared constant | racks and collectors ask `FireSystem.isRainedOn`; `simulation.RainShelterAgreementTest` holds them to the flames' outcome under four shelters, and fails when the rack asks about the wrong cell | `77517ce` |
+| B03 captives in cages | `settlement.SpecialPostSpawnTest` on `bb17c31`: the captive's body overlapped the roof (feet 34.4, floor 34) and never moved; natively `fort_captive` printed feet 32.40, head 34.15 under a roof at 34, `moved=0.00 m` while burning | every post spawns 0.02 above its floor cell; natively feet 32.02, head 33.77, 15.98 m moved while burning, `pass=true` | `1508aef` (the scene), `3958deb` |
+| B04 slung gear | `gfx.RestAngleTest` with the old reset: every angle 0 | `ModelPart.rest` angles survive `resetPose`; the held bow's tips and bomb's fuse had the same fault | `422e2a9` |
+| B08 breathing while paused | `PausedBodiesTest` with death poses on the wall clock: the poses differ | the living, their flames and their death poses use the particle clock (D-40) | `9b485dd` |
+| B05 a whole carcass's arrows | `save.CarcassArrowsSaveTest` with the arrows dropped on load: 0 of 3 come back | the core carcass record holds every carcass's arrows (D-38) | `42d3e53` |
+| B12 the projectile-kill race | `settlement.DeathBeforeDormancyTest` on `bb17c31`: the killing cost no reputation and left no log line or body | the death is committed before the write-back (D-42) | `79aee28` |
+| B17 a save after a killing blow (new) | a probe saved straight after a village resident's and a deer's killing blows: both loaded standing at −1 health (`build/v091-m07-b12-save-probe.log`); `save.PendingDeathSaveTest` fails on `bb17c31` | every pending death is committed before a save (D-42) | `9b17061` |
+| B07 legs on end | `dismember_species_close` headlessly: 27 of 72 long pieces of every species stood on end; `entity.EndToppleTest` and `SpeciesRestTest` fail without the topple | long pieces are tipped off their ends for at most 2 s (D-39); one is left, wedged against the step | `56648d9` |
+| B13 the death card's view | `dismember_player` on the commit before the fix: the card's camera 0.00 from the eye, the pieces frozen (`before-player-blast-720`); `DeathViewTest` fails with the eye camera | a clear view of the remains while they settle behind the card (D-43); natively 2.73 from the eye | `df85b5d` (the scene), `ebff3a8` |
+| B09 burning blocks | `molotov_tree` showed only smoke over the canopy (`before-molotov-tree-720`); `BlockFireVisibilityTest` fails with the particles started inside the block | fire on the faces open to the air (D-41) | `010a60d` |
+
+### Owner-facing behaviour
+
+- A captive in a fort's cage stands on the floor, turns to you and struggles if it burns; set
+  alight behind broken bars, it runs out.
+- Quivers, slung bows and guns, a held bow's tips and a bomb's fuse are drawn at their angles.
+- Skinning a carcass after a save gives back the arrows in it.
+- No block name shows through the death card, the city's answer or the pause menu, and the death
+  card reads 0 health after an overkill.
+- Limbs blown off no longer stand on their ends; one wedged against a wall may.
+- Nothing alive moves while the game is paused.
+- A burning tree, wall or floor shows flames and glow on its open faces.
+- A person shot dead as you leave their settlement counts as killed, and a save right after a
+  killing shot keeps the body or carcass instead of bringing the dead back.
+- Blown apart by your own bomb, the death card shows your remains falling from just behind and
+  above where you stood.
+
+### Native evidence
+
+All on the owner's host (NVIDIA GeForce RTX 3060 Ti, driver 621.01, OpenGL 3.3.0, windowed),
+seed 20261126, each in a new isolated directory `build/qa/v091-m07-<phase>-<tag>/` (ignored), by
+`build/v091-m07-native.sh <checkout> <phase> <sets>`; the summary is
+`build/v091-m07-native-summary.txt` and the logs `build/v091-m07-<phase>-<tag>.log`. "Before" ran
+on a worktree at `bb17c31` (with the captive scene copied in for B03) or, for B13, on `df85b5d`;
+"after" on the tree of `010a60d`. Every run's shutdown summary read `glGetError=0` and 0 KHR
+errors.
+
+| Tag | Before | After |
+| --- | --- | --- |
+| `route-720` (`VEYLON_FRONTEND=route`) | `pass=true`; `11-death`: "-900 / 100", solid red edges, "Brick" under the card | `pass=true`; "0 / 100", no label |
+| `missions-720` (`urban_missions`) | `pass=true`; `12-the-city-answers`: "Radio Workstation" under the card | `pass=true`; no label |
+| `captive-720` (`fort_captive`, Creative, shots 1, 2.4, 3, 6) | `pass=false`: the head in the roof bars, `moved=0.00 m` | `pass=true`: on the floor, struggling, out through the window by 6 s |
+| `species-close-720` (`dismember_species_close`, shots 0.5, 1, 3, 8) | legs standing on end; every piece at rest 1.933 s after the blast | the legs lie down, one wedged against the step stands; at rest 2.217 s after |
+| `molotov-tree-720` (`molotov_tree`, shots 1, 4, 10, 20) | smoke over the canopy, the pool's sheets on the ground, no fire on the tree | flames and glow on the trunk's and the canopy's open faces |
+| `player-blast-720` (`dismember_player`, shots 0.9, 1.3, 2, 3.5) | the card's camera 0.00 from the eye, inside a red piece, nothing moving | 2.73 from the eye, the pieces flying, then at rest in the crater |
+
+The HUD captures are recorded in [HUD_VALIDATION](../../graphics/HUD_VALIDATION.md), milestone 07.
+
+### Changed paths
+
+- Production: new `CaptiveQaScene.java`, `engine/BlockFireFaces.java`; changed `ui/Hud.java`,
+  `Game.java`, `simulation/ItemConditionSystem.java`, `QaHarness.java`,
+  `settlement/SettlementManager.java`, `gfx/model/ModelPart.java`, `gfx/model/NpcModels.java`,
+  `gfx/model/HeldItemModels.java`, `engine/Renderer.java`, `BodyFireEffects.java`,
+  `gfx/model/AnatomyModels.java`, `BodyFireQaScene.java`, `SpeciesDismemberQaScene.java`,
+  `RagdollQaScene.java`, `save/SaveSystem.java`, `save/RemainsSection.java`,
+  `entity/EntityManager.java`, `entity/BodyFragment.java`, `entity/BodyFragmentConstants.java`,
+  `entity/BodyFragmentSystem.java`, `DismemberQaScene.java`, `PlayerLifeCycle.java`,
+  `AmbienceSystem.java`, `engine/ParticleSystem.java`.
+- Tests: new `ui/HudVitalsTest`, `HudTargetLabelTest`, `simulation/RainShelterAgreementTest`,
+  `CaptiveQaSceneTest`, `settlement/SpecialPostSpawnTest`, `gfx/RestAngleTest`,
+  `PausedBodiesTest`, `save/CarcassArrowsSaveTest`, `settlement/DeathBeforeDormancyTest`,
+  `save/PendingDeathSaveTest`, `entity/EndToppleTest`, `SpeciesRestTest`,
+  `DismemberPlayerSceneTest`, `DeathViewTest`, `BlockFireVisibilityTest`; changed
+  `gfx/FragmentAnatomyModelTest` (the reset pose is the built one), `gfx/SpeciesFragmentDrawTest`
+  and `save/RemainsSectionTest` (the death-pose clock; the link's layout),
+  `save/CorruptSaveResilienceTest` (the carcass record's width), `save/SaveEpochGuardTest`.
+- Documents: `CHANGELOG.md`, `docs/ARCHITECTURE.md`, `docs/DEVELOPING.md`,
+  `docs/graphics/HUD_VALIDATION.md`, DESIGN and this file.
+
+### Validation
+
+Every build ran in Git Bash with `JAVA_HOME` set to `build/tools/jdk25/jdk-25.0.4.1+1`. Each code
+commit's tree was built whole in a detached worktree (`build/v091-m07-wt`) after its focused
+checks, logs in `build/v091-m07/`. Each defect's regression test was also run against the old
+behaviour, on `bb17c31` (`build/v091-m07-before-reproduction.log`) or with the fix reverted in
+place (`build/v091-m07-*-mutation.log`), and failed there; B10's, whose old behaviour equalled the
+new, failed against a rack asking about the wrong cell instead.
+
+| Commit | Focused checks | `build --console=plain` on its tree |
+| --- | --- | --- |
+| `dea5189` | `ui.HudVitalsTest` | 6m 27s, 2,492 tests in 329 classes |
+| `323ee57` | `HudTargetLabelTest` | 5m 57s, 2,495 tests in 330 classes |
+| `77517ce` | `simulation.RainShelterAgreementTest` | 6m 18s, 2,496 tests in 331 classes |
+| `1508aef` | `CaptiveQaSceneTest`; the native "before" run | 5m 55s, 2,498 tests in 332 classes |
+| `3958deb` | `settlement.SpecialPostSpawnTest`, `CaptiveQaSceneTest`; the native "after" run | 5m 37s, 2,501 tests in 333 classes |
+| `422e2a9` | `gfx.RestAngleTest` and the `gfx` packages | 6m 48s, 2,504 tests in 334 classes |
+| `9b485dd` | `PausedBodiesTest` | 7m 12s, 2,505 tests in 335 classes |
+| `42d3e53` | `save.CarcassArrowsSaveTest`, `RemainsSectionTest`, `CorruptSaveResilienceTest`, `SaveEpochGuardTest` | 9m 30s beside another full test run, 2,507 tests in 336 classes |
+| `79aee28` | `settlement.DeathBeforeDormancyTest` | 5m 37s, 2,508 tests in 337 classes |
+| `9b17061` | `save.PendingDeathSaveTest` | 5m 11s, 2,510 tests in 338 classes |
+| `56648d9` | `entity.EndToppleTest`, `SpeciesRestTest` | 5m 34s, 2,514 tests in 340 classes |
+| `df85b5d` | `DismemberPlayerSceneTest`; the native "before" run | 5m 33s, 2,516 tests in 341 classes |
+| `ebff3a8` | `DeathViewTest`, `DismemberPlayerSceneTest`; the native "after" run | 5m 35s, 2,518 tests in 342 classes |
+| `010a60d` | `BlockFireVisibilityTest`; every native "after" run | 5m 32s, 2,521 tests in 343 classes |
+
+Every build passed with the two symbolic-link skips and no failure or temporary-directory retry.
+The whole suite also ran once on the combined working tree before the series was split (9m 32s
+beside a worktree build, 2,521 tests in 343 classes). While iterating:
+`FragmentAnatomyModelTest` pinned the defective all-zero reset pose and now compares against the
+built model; three tests and three capture scenes set the wall clock to stage a death pose and
+now set the particle clock; the first `DeathViewTest` expected every piece at rest within the
+card's three seconds, which a piece rolling in the blast's crater may outlast, so it checks that
+every piece moved and most rest, then that all rest with the card held; the first view choice
+accepted a step or two of clearance in a walled-in shaft and now falls back to straight up.
+`Game.java` is at 998 of its 1,000 lines and `QaHarness.java` at 1,497 of 1,500.
+
+**The final tree**, `010a60d` (the documentation commits change no build input):
+`./gradlew.bat build --rerun-tasks --console=plain` in the worktree, BUILD SUCCESSFUL in 5m 40s
+with all 10 tasks run: 2,521 tests in 343 classes, no failure, the two symbolic-link skips, no
+temporary-directory retry (`build/v091-m07/final-build.log`). The epoch guard printed epoch 1's digest
+`6feb385a093f33b59e74590e5844da16fcaf1c323218962c46449f6a6d93d5b8`, re-recorded by `42d3e53`
+(D-38) and unchanged by every later commit. `graphify update . --no-cluster` then rebuilt the graph:
+13,036 nodes. The documentation commits had link, anchor and `git diff --check` checks.
+
+### Commits
+
+| Commit | Subject |
+| --- | --- |
+| `dea5189` | fix(hud): show no health below zero after an overkill hit |
+| `323ee57` | fix(hud): hide the aimed block's name under end cards and the pause menu |
+| `77517ce` | fix(items): judge rain on racks and collectors by the fire's own rule |
+| `1508aef` | feat(qa): look into a generated fort's cage at its captive |
+| `3958deb` | fix(settlement): stand captives and leaders on their posts' floors |
+| `422e2a9` | fix(gfx): keep the angles parts are built at through every pose |
+| `9b485dd` | fix(gfx): pose the living on the clock that stops when the game pauses |
+| `42d3e53` | fix(save): keep the arrows lodged in a whole carcass |
+| `79aee28` | fix(settlement): book a resident's death before the settlement sleeps |
+| `9b17061` | fix(save): commit every death a save would catch half done |
+| `56648d9` | fix(entity): tip a long body piece off its end so it lies down |
+| `df85b5d` | feat(qa): blow the Survival player apart with their own bomb |
+| `ebff3a8` | fix(death): watch a lethal blast's remains fall from clear of them |
+| `010a60d` | fix(fire): show a burning block's fire on its faces open to the air |
+| `b181761` | docs(architecture): record the rules the defect sweep changed |
+| `1de9ae8` | docs(qa): describe the captive and player-blast scenes and rest angles |
+| `dc3ea84` | docs(changelog): list the defects 0.9.1 milestone 07 fixed |
+| `5e5044e` | docs(hud): record the end cards without the aimed block or negative health |
+| the records commit | docs(roadmap): record milestone 07 of 0.9.1 |
+
+No commit carries a co-author line. Nothing was pushed.
+
+### Limitations and pending gates
+
+- **Pending, from 02:** the macOS arm64 job of `verify.yml` has not run yet. The push of 05 and 06
+  on 2026-11-20 started verify run 44808396706, whose Windows x64 job passed as checked that day;
+  it was not re-checked here.
+- **For the owner, D-43:** behind the death card after a lethal blast the bodies and the particles
+  now move while the rest of the world stays paused; a burning body there flickers while the card
+  shows. The milestone allowed this "if it fits the death flow"; the alternative is to move only
+  the camera and keep the remains frozen.
+- **For the owner, D-41:** the burning blocks' glow is a set of flat sheets in the pool's colours,
+  rectangular like everything else in the voxel style; their size and coverage are proposed, not
+  signed off, like the rest of the fire tuning (Q-04).
+- A burning captive behind bars the player has broken runs out through them, as anyone flees a
+  fire; it stays a captive, can still be rescued, and is back in its cage when the fort next wakes.
+- A long piece wedged upright against a wall or a step stays upright (`dismember_species_close`
+  keeps one against its step), by design.
+- The B13 view is chosen once, at the death; pieces thrown far from where the body stood can leave
+  the frame. The card's first frame still shows the eye, since the view is placed from the next.
+- B10 changed no behaviour: the literal it replaced equalled the shared constant.
+
+### Next: milestone 08
+
+The day temperature curve (P-15, B14, D-07): warmest in the afternoon in every world, with the
+economy re-measured.
