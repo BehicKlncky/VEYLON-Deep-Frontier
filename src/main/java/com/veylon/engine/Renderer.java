@@ -547,14 +547,7 @@ public class Renderer {
 
         renderProjectiles(game);
 
-        // Burning blocks: emissive flames handled by particles; keep a core glow cube.
-        float pulse = 0.78f + 0.22f * (float) Math.sin(game.totalTime * 9.0);
-        entityShader.set("uEmissive", 0.9f);
-        for (Vec3i p : game.fire.burningCells()) {
-            model.identity().translate(p.x() + 0.5f, p.y(), p.z() + 0.5f)
-                    .scale(0.95f * pulse, 1.05f * pulse, 0.95f * pulse);
-            drawCube(1.0f, 0.45f + 0.15f * pulse, 0.08f);
-        }
+        renderBlockFire(game);
         renderLiquidFire(game);
 
         // Active beacon: pulsing cyan light column.
@@ -657,6 +650,62 @@ public class Renderer {
      * in step, and a sheet shrinks and dims away over its last seconds or as
      * the rain soaks it. The flames, smoke and steam are particles.
      */
+    /**
+     * Burning blocks' glow, on the faces their fire is seen on ({@link BlockFireFaces}, 0.9.1
+     * B09): every block that burns is opaque, and the glowing core this drew inside it never
+     * showed. On each face open to the air and turned to the camera a thin glowing sheet climbs
+     * from the face's foot, or spreads over the top, pulsing on the clock the flames burn by,
+     * each block in a phase of its own. No more than three faces of a block face the camera, so
+     * this draws at most three thin boxes for a burning block, within the fog and the view.
+     */
+    private void renderBlockFire(Game game) {
+        Vector3f cam = game.camera.position;
+        float range = fogEnd + 4f;
+        for (Vec3i p : game.fire.burningCells()) {
+            float cx = p.x() + 0.5f, cy = p.y() + 0.5f, cz = p.z() + 0.5f;
+            float dx = cx - cam.x, dy = cy - cam.y, dz = cz - cam.z;
+            if (dx * dx + dy * dy + dz * dz > range * range
+                    || !frustum.testAab(p.x() - 0.1f, p.y(), p.z() - 0.1f, p.x() + 1.1f, p.y() + 1.1f, p.z() + 1.1f)) {
+                continue;
+            }
+            int open = BlockFireFaces.open(game.world, p.x(), p.y(), p.z());
+            float phase = (p.x() * 0.73f + p.y() * 1.31f + p.z() * 0.57f) % 6.2831855f;
+            float wave = (float) Math.sin(fireClock * 9.0 + phase);
+            float pulse = 0.78f + 0.22f * wave;
+            // The liquid's sheet colours: the same fire, hottest at the top of the pulse.
+            float heat = 0.5f + 0.5f * wave;
+            setEntityLight(game, cx, cy, cz);
+            entityShader.set("uEmissive", SHEET_EMISSIVE * pulse);
+            float green = MathUtil.lerp(SHEET_COOL_G, SHEET_HOT_G, heat);
+            float blue = MathUtil.lerp(SHEET_COOL_B, SHEET_HOT_B, heat);
+            for (int face = 0; face <= BlockFireFaces.UP; face++) {
+                int nx = BlockFireFaces.normalX(face), ny = BlockFireFaces.normalY(face);
+                int nz = BlockFireFaces.normalZ(face);
+                // Open, and the camera on its outer side.
+                if ((open & (1 << face)) == 0
+                        || nx * (cam.x - cx - nx * 0.5f) + ny * (cam.y - cy - ny * 0.5f) + nz * (cam.z - cz - nz * 0.5f) <= 0f) {
+                    continue;
+                }
+                if (face == BlockFireFaces.UP) {
+                    float side = BLOCK_FIRE_TOP * pulse;
+                    model.identity().translate(cx, p.y() + 1f + BLOCK_FIRE_LIFT, cz)
+                            .scale(side, BLOCK_FIRE_THICKNESS, side);
+                } else {
+                    model.identity().translate(cx + nx * (0.5f + BLOCK_FIRE_LIFT), p.y(), cz + nz * (0.5f + BLOCK_FIRE_LIFT))
+                            .scale(nx != 0 ? BLOCK_FIRE_THICKNESS : BLOCK_FIRE_WIDTH, BLOCK_FIRE_HEIGHT * pulse,
+                                    nz != 0 ? BLOCK_FIRE_THICKNESS : BLOCK_FIRE_WIDTH);
+                }
+                drawCube(1f, green, blue);
+            }
+        }
+        entityShader.set("uEmissive", 0f);
+    }
+
+    /** How far a burning block's glow stands off its face, and how thick it is. */
+    private static final float BLOCK_FIRE_LIFT = 0.02f, BLOCK_FIRE_THICKNESS = 0.03f;
+    /** A side's sheet: this wide, and at full pulse this much of the face high; the top's, this wide. */
+    private static final float BLOCK_FIRE_WIDTH = 0.8f, BLOCK_FIRE_HEIGHT = 0.5f, BLOCK_FIRE_TOP = 0.6f;
+
     private void renderLiquidFire(Game game) {
         List<LiquidFireSystem.Patch> patches = game.liquidFire.patches();
         Vector3f camPos = game.camera.position;

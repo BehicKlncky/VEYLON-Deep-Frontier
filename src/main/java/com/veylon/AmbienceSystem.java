@@ -1,6 +1,7 @@
 package com.veylon;
 
 import com.veylon.engine.AudioEnvironment;
+import com.veylon.engine.BlockFireFaces;
 import com.veylon.engine.ParticleSystem;
 import com.veylon.entity.Affliction;
 import com.veylon.simulation.LiquidFireSystem;
@@ -170,16 +171,32 @@ final class AmbienceSystem {
         }
     }
 
-    /** Smoke and embers from burning blocks and fueled campfires. */
+    /**
+     * Smoke and embers from burning blocks and fueled campfires. A burning block is opaque, so
+     * what it gives off starts outside it, on a face open to the air: a flame and an ember on any
+     * open face, smoke off the top when it is open and off an open side when it is not. They
+     * used to start inside the block, where nobody saw them (0.9.1 B09). A block with no open
+     * face burns unseen; the pass stops at the splash ceiling, as the liquid's does.
+     */
     private void emitFires(float px, float py, float pz) {
         Random rng = emitterRng;
+        ParticleSystem particles = game.particles;
         for (Vec3i p : game.fire.burningCells()) {
-            if (p.distSq(px, py, pz) < FIRE_PARTICLE_RANGE * FIRE_PARTICLE_RANGE) {
-                game.particles.smoke(p.x() + 0.5f, p.y() + 1f, p.z() + 0.5f, 1f);
-                game.particles.flame(p.x() + 0.5f, p.y() + 0.2f, p.z() + 0.5f);
-                if (rng.nextFloat() < FIRE_EMBER_CHANCE) {
-                    game.particles.ember(p.x() + 0.5f, p.y() + 0.6f, p.z() + 0.5f);
-                }
+            if (p.distSq(px, py, pz) >= FIRE_PARTICLE_RANGE * FIRE_PARTICLE_RANGE) {
+                continue;
+            }
+            if (particles.count >= ParticleSystem.SPLASH_LIMIT) {
+                break;
+            }
+            int open = BlockFireFaces.open(game.world, p.x(), p.y(), p.z());
+            if (open == 0) {
+                continue;
+            }
+            int smokeFace = (open & BlockFireFaces.TOP) != 0 ? BlockFireFaces.UP : BlockFireFaces.pick(open, rng);
+            BlockFireFaces.emit(particles, BlockFireFaces.SMOKE, smokeFace, p, rng);
+            BlockFireFaces.emit(particles, BlockFireFaces.FLAME, BlockFireFaces.pick(open, rng), p, rng);
+            if (rng.nextFloat() < FIRE_EMBER_CHANCE) {
+                BlockFireFaces.emit(particles, BlockFireFaces.EMBER, BlockFireFaces.pick(open, rng), p, rng);
             }
         }
         for (Vec3i p : game.world.campfireFuel.keySet()) {

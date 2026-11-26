@@ -298,21 +298,34 @@ public class ParticleSystem {
     }
 
     public void smoke(float x, float y, float z, float strength) {
+        smoke(x, y, z, strength, 0.25f, 0.25f);
+    }
+
+    /**
+     * Smoke scattered up to {@code spreadX} and {@code spreadZ} about its point; a burning block's
+     * side face scatters it along the face, not into the block (0.9.1 B09).
+     */
+    public void smoke(float x, float y, float z, float strength, float spreadX, float spreadZ) {
         if (scaled(1) < 1) {
             return;
         }
         float s = 0.30f + rng.nextFloat() * 0.25f;
-        spawn(KIND_PUFF, x + rnd(0.25f), y, z + rnd(0.25f),
+        spawn(KIND_PUFF, x + rnd(spreadX), y, z + rnd(spreadZ),
                 rnd(0.25f), 0.7f + rng.nextFloat() * 0.6f * strength, rnd(0.25f),
                 s, s, s + 0.02f,
                 0.30f + rng.nextFloat() * 0.35f, 1.8f + rng.nextFloat() * 1.8f, -0.4f);
     }
 
     public void ember(float x, float y, float z) {
+        ember(x, y, z, 0.3f, 0.3f);
+    }
+
+    /** An ember scattered up to {@code spreadX} and {@code spreadZ} about its point (see {@link #smoke}). */
+    public void ember(float x, float y, float z, float spreadX, float spreadZ) {
         if (scaled(1) < 1) {
             return;
         }
-        spawn(KIND_SPARK, x + rnd(0.3f), y + 0.2f, z + rnd(0.3f),
+        spawn(KIND_SPARK, x + rnd(spreadX), y + 0.2f, z + rnd(spreadZ),
                 rnd(0.5f), 1.2f + rng.nextFloat() * 1.4f, rnd(0.5f),
                 1f, 0.45f + rng.nextFloat() * 0.3f, 0.1f,
                 0.09f, 0.7f + rng.nextFloat() * 0.6f, 1.5f);
@@ -320,10 +333,15 @@ public class ParticleSystem {
 
     /** Fire tongues rising from burning blocks (additive). */
     public void flame(float x, float y, float z) {
+        flame(x, y, z, 0.3f, 0.3f);
+    }
+
+    /** A fire tongue scattered up to {@code spreadX} and {@code spreadZ} about its point (see {@link #smoke}). */
+    public void flame(float x, float y, float z, float spreadX, float spreadZ) {
         if (scaled(1) < 1) {
             return;
         }
-        spawn(KIND_SPARK, x + rnd(0.3f), y, z + rnd(0.3f),
+        spawn(KIND_SPARK, x + rnd(spreadX), y, z + rnd(spreadZ),
                 rnd(0.2f), 0.9f + rng.nextFloat() * 0.8f, rnd(0.2f),
                 1f, 0.55f + rng.nextFloat() * 0.25f, 0.12f,
                 0.22f + rng.nextFloat() * 0.15f, 0.35f + rng.nextFloat() * 0.3f, -1.2f);
