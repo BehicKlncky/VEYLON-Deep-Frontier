@@ -402,3 +402,43 @@ which the menu's dim covers. `ui.CityOnboardingScreensTest`, `ui.ReturnToTitlePr
 seed field and the pause menu's world line for the longest seed there is. Limits: a requested 1.5
 at 1280×720 is clamped to 1, as before; mouse look is off in automated sessions, so the captures
 show the settings, not a turn.
+
+## 0.9.1 milestone 07 — the end cards without the aimed block or negative health (2026-11-26)
+
+Two HUD defects showed on the end cards. The name of the block aimed at (the target label under
+the crosshair) was drawn under the death card, the city's answer and the pause menu, whose
+translucent backdrops let it through, though none of them updates the aim (B06); it is now drawn
+only while neither card is up and no pausing screen is open. After an overkill hit the vitals
+printed negative health, "-900 / 100" after the route's 1,000-damage kill, and the low-health
+pulse grew past its full strength (B15); the panel now prints health clamped at 0 and the pulse
+reads health as shown. Nothing else on either card changed.
+
+### Reproduce
+
+```bash
+export VEYLON_SEED=20261126
+VEYLON_FRONTEND=route VEYLON_RESOLUTION=1280x720 VEYLON_CAPTURE_TAG=v091-m07-after-route-720 \
+  ./gradlew.bat run -PveylonDataDir=build/qa/v091-m07-after-route-720
+VEYLON_SCENE=urban_missions VEYLON_RESOLUTION=1280x720 VEYLON_CAPTURE_TAG=v091-m07-after-missions-720 \
+  ./gradlew.bat run -PveylonDataDir=build/qa/v091-m07-after-missions-720
+# The script, build/v091-m07-native.sh, runs these and the milestone's other scenes on a given
+# checkout; the "before" runs used a worktree at bb17c31.
+```
+
+### Validation record
+
+All runs on 2026-11-26, NVIDIA GeForce RTX 3060 Ti, driver 621.01, OpenGL 3.3.0, windowed, seed
+20261126, each in a new directory `build/qa/v091-m07-<phase>-<tag>/`; logs are
+`build/v091-m07-<phase>-<tag>.log`. Both routes printed `pass=true` with `glErrors=0
+khrErrors=0` before and after, and every run's shutdown summary read `glGetError=0` and 0 KHR
+errors.
+
+| Tag | Capture | Before (`bb17c31`) | After |
+| --- | --- | --- | --- |
+| `route-720` | `11-death`, the city's death card after the 1,000-damage kill | "-900 / 100" under Health, the edges solid red, and "Brick" under the card's sentence | "0 / 100", the edges tinted as at any death, no label |
+| `missions-720` | `12-the-city-answers`, the city's answer over the radio | "Radio Workstation" under the card's sentence | no label |
+
+The pause menu's panel covers the label's place, so `14-pause` looked the same before and after;
+`HudTargetLabelTest` proves the label is not drawn there, nor under the screens opened from it.
+`ui.HudVitalsTest` holds the figures and the pulse. Limits: the crosshair still shows through
+both cards, as it always has, and the HUD under them is otherwise unchanged.
