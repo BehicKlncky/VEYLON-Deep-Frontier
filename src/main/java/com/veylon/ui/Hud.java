@@ -376,8 +376,18 @@ public class Hud {
         } else centered(ui, box, box.y() + 36, SMALL, action, AMBER);
     }
 
+    /**
+     * Whether the name of the block aimed at is drawn. Not under the death or
+     * victory card, nor under the pause menu or a screen opened from it: it
+     * showed through their translucent backdrops (0.9.1 B06), and none of them
+     * updates the aim, so it named whatever was aimed at when they opened.
+     */
+    public static boolean showsTargetLabel(Game g) {
+        return g.targetHit != null && !g.showsEndCard() && !g.uiMode.pausesSimulation();
+    }
+
     private void renderFocus(Game g, UiRenderer ui, HudLayout layout) {
-        if (g.targetHit != null) {
+        if (showsTargetLabel(g)) {
             Rect box = layout.target;
             ui.nineSlice(IconAtlas.SLOT, box.x(), box.y(), box.width(), box.height(), 4);
             centered(ui, box, box.y() + 4, BODY, g.targetHit.type().displayName, TEXT);

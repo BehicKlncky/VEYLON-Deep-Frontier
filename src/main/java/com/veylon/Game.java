@@ -587,6 +587,9 @@ public class Game implements SimulationScheduler.Ticks, World.BlockListener {
         return appState == AppState.PLAYING && !uiMode.pausesSimulation() && !simPaused;
     }
 
+    /** Whether the death or victory card is drawn over the world and the HUD. */
+    public boolean showsEndCard() { return appState == AppState.DEATH || appState == AppState.VICTORY; }
+
     /** The world's share of a simulated frame; nothing else advances a fire, a body or a residue. */
     void advanceWorld(double dtD) {
         float dt = (float) dtD;
