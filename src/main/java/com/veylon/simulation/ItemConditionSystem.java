@@ -105,9 +105,10 @@ public class ItemConditionSystem implements SlowTickSystem {
             if (batch.done()) {
                 continue;
             }
-            // Rain stalls drying for exposed racks; warm dry air speeds it up.
+            // Rain stalls drying for exposed racks; warm dry air speeds it up. Racks,
+            // collectors and flames share one rained-on rule (0.9.1 B10).
             float rate = 1f;
-            if (g.weather.isPrecip() && g.world.skyLight(p.x(), p.y() + 1, p.z()) > 0.9f) {
+            if (g.fire.isRainedOn(g, p.x(), p.y(), p.z())) {
                 rate = 0.15f;
             } else if (g.player.envTemp > 24) {
                 rate = 1.4f;
@@ -132,7 +133,7 @@ public class ItemConditionSystem implements SlowTickSystem {
             if (g.world.getBlock(p.x(), p.y(), p.z()) != BlockType.RAIN_COLLECTOR) {
                 continue;
             }
-            if (g.world.skyLight(p.x(), p.y() + 1, p.z()) > 0.9f) {
+            if (g.fire.isRainedOn(g, p.x(), p.y(), p.z())) {
                 e.setValue(Math.min(3f, e.getValue() + gain));
             }
         }
