@@ -12,8 +12,8 @@ the first milestone below that is not complete.
 | 04 Three save slots and backups | Complete | `25e899e`, `142aace`, `51956a2`, `048e2d9`, `896340a`, `88d00ed`, `7357680`, `8dcab51`, `73f53c8` |
 | 05 Autosave | Complete | `2b9ce42`, `efc99ec`, `e487e6a`, `828a184`, `0a22a7c`, `1a11340`, `90834e0`, `759b3e7`, `687f3d3` |
 | 06 Session and control comfort | Complete | `91e576d`, `5909555`, `f9ea0e8`, `1573313`, `c652200`, `68a0b5f`, `c36ed1b`, `3cb57cf`, `72534e8`, `bb17c31` |
-| 07 Forgotten defects sweep | Complete | `dea5189`, `323ee57`, `77517ce`, `1508aef`, `3958deb`, `422e2a9`, `9b485dd`, `42d3e53`, `79aee28`, `9b17061`, `56648d9`, `df85b5d`, `ebff3a8`, `010a60d`, `b181761`, `1de9ae8`, `dc3ea84`, `5e5044e`, then the records commit that adds this section; 08 records its hash |
-| 08 Day temperature curve | Not started | |
+| 07 Forgotten defects sweep | Complete | `dea5189`, `323ee57`, `77517ce`, `1508aef`, `3958deb`, `422e2a9`, `9b485dd`, `42d3e53`, `79aee28`, `9b17061`, `56648d9`, `df85b5d`, `ebff3a8`, `010a60d`, `b181761`, `1de9ae8`, `dc3ea84`, `5e5044e`, `a7a2695` |
+| 08 Day temperature curve | Complete | `3fc3570`, `132ff76`, `64b20a6`, `bbc497f`, `5694a20`, `a7ddf7b`, then the records commit that adds this section; 09 records its hash |
 | 09 Integration and release preparation | Not started | |
 
 ## Milestone 01 — Release plan and defect audit
@@ -1214,3 +1214,198 @@ No commit carries a co-author line. Nothing was pushed.
 
 The day temperature curve (P-15, B14, D-07): warmest in the afternoon in every world, with the
 economy re-measured.
+
+## Milestone 08 — Day temperature curve
+
+**Status:** complete on 2026-11-27.
+**Base:** `main` at `a7a2695`, the records commit of 07, local only (19 commits ahead of
+`origin/main` at `bb17c31`); clean apart from an untracked `.vscode/`.
+
+### What was done
+
+1. **The before-figure.** A measurement probe (`build/v091-m08/probe/DayTemperatureProbe.java`,
+   run as a test class and not committed) read the air on the hour through production
+   `TemperatureSystem.envTempAt` at every district's tour stop and a ground-floor room of each
+   district in the default city, and on a surface column of every wilderness biome, both of seed
+   20260731, in clear weather with no world event; then it stood a survivor from full needs
+   through a waking day (08:00 to 21:00) and a night (21:00 to 08:00) in each place and season
+   through `Player.tickNeeds`, and scored sleep, bedtime air and a campfire's worth. The figures are
+   `build/v091-m08/probe-before.txt`, on the old curve (run last on the refactor's tree, whose
+   simulation is `a7a2695`'s), and `probe-after.txt`.
+2. **The fix** (D-44): the sign of `TimeSystem.tempOffset`, its Javadoc and a line on
+   `TimeConstants.WARMEST_HOUR`. Nothing else in the game changed.
+3. **The re-measure** (D-45): the probe again, the economy suites and route before and after, and
+   the whole suite. No test pinned the inverted curve: the suite passed unchanged with the fix, and
+   no expectation or tuning value was changed.
+4. **The epoch digest** stayed `6feb385a093f33b59e74590e5844da16fcaf1c323218962c46449f6a6d93d5b8`,
+   as temperature is not saved.
+5. **Tooling.** `QaHarness` was at 1,497 of its 1,500 lines, so its benchmark biome site moved,
+   word for word, to `BenchmarkSite` (1,421 lines after); `VEYLON_SCENE=day_curve` is the native
+   evidence.
+6. **Records.** Urban DECISIONS P-15 closed with a note pointing to this release, and D-239, urban
+   DESIGN §16.1 and §19.4 noted; README "Known limitations", ARCHITECTURE, DEVELOPING, CHANGELOG,
+   DESIGN and this file.
+
+### The day, before and after
+
+Air in clear weather of the Mild Season (day 1), °C, at the coldest and warmest hour of each
+place. The hourly tables are in the probe's files; every place changed by the same offsets, twelve
+hours apart.
+
+| Place (biome; feet y) | Before: 02:00 / 14:00 | After: 02:00 / 14:00 |
+| --- | --- | --- |
+| Residential, commercial and civic streets (Meadow; 41) | 22.7 / 8.7 | 8.7 / 22.7 |
+| The refuge and the rooms of those districts, covered | 20.2 / 11.1 | 11.1 / 20.2 |
+| Industrial yards' street (Dry Scrubland) / a room | 33.7 / 19.7, 31.2 / 22.1 | 19.7 / 33.7, 22.1 / 31.2 |
+| Flooded street (Wet Marsh) / a room | 20.7 / 6.7, 18.2 / 9.1 | 6.7 / 20.7, 9.1 / 18.2 |
+| Quarantine street (Rocky Highlands) / a room | 9.7 / −4.3, 7.2 / −1.9 | −4.3 / 9.7, −1.9 / 7.2 |
+| Wilderness meadow (35) | 23.0 / 9.0 | 9.0 / 23.0 |
+| Pine forest (45) | 13.6 / −0.4 | −0.4 / 13.6 |
+| Rocky highlands (66) | 2.7 / −11.3 | −11.3 / 2.7 |
+| Wet marsh (34) | 21.0 / 7.0 | 7.0 / 21.0 |
+| Cold ridge (37) | −2.0 / −16.0 | −16.0 / −2.0 |
+| Dry scrubland (37) | 34.0 / 20.0 | 20.0 / 34.0 |
+
+`TimeSystem.tempOffset` itself, scanned minute by minute: before, coldest −8.00 at 14:00 and
+warmest +6.00 at 02:00; after, the reverse; the mean −1.000 both times. The industrial yards stay
+the warmest district and the quarantine the coldest at every hour, the three Meadow districts read
+alike, and the wilderness keeps its order from the scrubland down to the cold ridge.
+
+### What the corrected day changes
+
+From full needs, standing still, no clothing (the new world's kit has none), clear weather. Thirst
+and hunger are what the part of the day used; "hot" is seconds of air above 30 °C, "overheated"
+and "freezing" seconds of body temperature above 40.5 °C or below 33 °C.
+
+| Measure | Before | After |
+| --- | --- | --- |
+| A temperate street, the refuge or any room of those districts, waking 08:00–21:00, every season | 36.6 thirst and 21.9 hunger; the body never froze or overheated | the same |
+| Industrial street, waking, Mild Season | 19.7–28.5 °C, 36.6 thirst, health 100 | 24.9–33.7 °C, 310 s hot, 211 s overheated, 71.6 thirst, health 97.3 at the lowest |
+| Industrial room, waking, Mild Season | 36.6 thirst | 208 s hot, 45.9 thirst, never overheated |
+| Industrial street, waking, Dry Season | 53.0 thirst, health 95.7 | thirst emptied (100), health 35.2 |
+| Industrial street, night 21:00–08:00, Mild Season | 310 s hot, 66.0 thirst, health 98.0 | 31.0 thirst, health 100 |
+| Quarantine street, waking, Mild Season | −4.3–4.5 °C, 228 s freezing, health 91.7 | 0.9–9.7 °C, none, health 100 |
+| Quarantine street, night, Mild Season | none | 228 s freezing, health 91.7 |
+| Wilderness cold ridge, waking, Mild Season | health 0 | health 72.5 (the night now kills, as the day did) |
+| Wilderness scrubland, waking, Mild Season | 36.6 thirst | 73.8 thirst, health 96.2 |
+| Sleep in the refuge on a camp bed, Frost Season, clear | 0.85 at 21:00, 23:00 and 01:00 | 0.85 (air 1.2 °C at 01:00) |
+| The same on a snowy night | 0.85 | 0.85 at 21:00, 0.65 from 23:00 (air −0.4 °C) |
+| A quarantine room's bedtime air below 0 °C, Mild Season | never | from about 22:30 |
+| A roof against the street (refuge, residential) | 2.5 °C colder at 02:00, 2.4 °C warmer at 14:00 | 2.4 °C warmer at 02:00, 2.5 °C cooler at 14:00 |
+| A campfire two blocks off, meadow, Mild Season | +3.0 °C at 02:00, +17.0 °C at 14:00 | +17.0 °C at 02:00, +3.0 °C at 14:00 |
+| The same, Frost Season | +13.0 / +26.3 | +26.3 / +13.0 |
+
+**The economy route** (`UrbanEconomyRouteTest`, seed 20260731), its four days after the city
+answers, before → after: health 100 every evening both times; food 20, 19, 20, 21 servings and
+clean water 12, 14, 16, 17 both times; 15, 8, 8 and 10 containers searched both times; the refuge's
+taps 8 L both times; thirst 61, 97, 92, 89 both times; hunger 71, 80, 76, 71 → 71, 80, 75, 70; the
+refuge's air at about 20:30 15.0, 15.1, 16.2, 3.5 °C → 14.8, 14.1, 15.0, 2.3 °C, the evening now
+on the cooling side of the day. The route spends its days in the residential district, mostly
+indoors, and its survivor's thirst and health crossed no threshold either way. All eight
+`UrbanEconomy*Test` classes passed before and after; the census and the audit count loot and
+recipes, which no temperature touches.
+
+### Owner-facing behaviour
+
+- The day is warmest in the afternoon and coldest in the small hours, in the city and the
+  wilderness.
+- The industrial yards are hot by day: standing in the sun there makes you thirsty, as their
+  arrival line warns, and in the Dry Season it is dangerous without water.
+- Nights are colder everywhere, so the refuge, a roof and a fire count for more after dark; on a
+  snowy Frost Season night even the refuge's air falls below freezing late in the evening.
+- The quarantine, the pine forests and the cold heights are milder by day and harsher by night.
+
+### Native evidence
+
+All on the owner's host (NVIDIA GeForce RTX 3060 Ti, driver 621.01, OpenGL 3.3.0, windowed),
+seed 20260731, 1280×720, each in a new isolated directory `build/qa/v091-m08-<phase>-<place>-720/`
+(ignored), by `build/v091-m08-native.sh <checkout> <phase>`; the summary is
+`build/v091-m08-native-summary.txt` and the logs `build/v091-m08-<phase>-<place>-720.log`. "Before"
+ran on the scene's commit `132ff76`, whose curve is still inverted, and "after" on the fix's
+`64b20a6`. Every run's shutdown summary read `glGetError=0` and 0 KHR errors, and each wrote its two
+captures (`_2s`, `_4s`).
+
+| Tag (`VEYLON_SCENE=day_curve`) | Before | After |
+| --- | --- | --- |
+| `meadow-720` (the wilderness meadow at −15.5, 35.2, 64.5) | 12:03 9.9 °C, 03:02 22.7 °C, `pass=false` | 12:03 22.1 °C, 03:02 9.3 °C, `pass=true` |
+| `yards-720` (with `VEYLON_GENERATOR=urban-dev`: the industrial yards' gateway at 31.5, 41.0, −448.5, Dry Scrubland) | 12:03 20.6 °C, 03:02 33.5 °C, `pass=false` | 12:03 32.8 °C, 03:02 20.0 °C, `pass=true` |
+
+In every capture the overlay's EnvTemp line and the HUD's Air read the figure the console printed;
+the body stayed at 36.9–37.3 °C, as four seconds allow.
+
+### Changed paths
+
+- Production: new `BenchmarkSite.java`, `DayCurveQaScene.java`; changed `QaHarness.java`,
+  `simulation/TimeSystem.java`, `simulation/TimeConstants.java`.
+- Tests: new `DayTemperatureCurveTest`, `DayCurveQaSceneTest`.
+- Documents: `CHANGELOG.md`, `README.md`, `docs/ARCHITECTURE.md`, `docs/DEVELOPING.md`,
+  `docs/urban-survival/DECISIONS.md`, `docs/urban-survival/DESIGN.md`, DESIGN and this file.
+
+### Validation
+
+Every build ran in Git Bash with `JAVA_HOME` set to `build/tools/jdk25/jdk-25.0.4.1+1`. Each code
+commit's tree was built whole in a detached worktree (`build/v091-m08-wt`) after its focused
+checks; logs in `build/v091-m08/`.
+
+| Commit | Focused checks | `build --console=plain` on its tree |
+| --- | --- | --- |
+| `3fc3570` | the moved method compared line for line with the one it replaced | 5m 36s, 2,521 tests in 343 classes |
+| `132ff76` | `DayCurveQaSceneTest`, `qa.OrchestratorSizeTest`; the native "before" runs | 5m 36s, 2,523 tests in 344 classes |
+| `64b20a6` | `DayTemperatureCurveTest`, `DayCurveQaSceneTest`, `simulation.*`, `UrbanEconomy*Test`, `UrbanRefugeNightTest`, `AutosaveTest`, `CombustionLifecycleTest`, `CreativeHazardsTest`, `CreativeWorldControlsTest`, `UrbanStarterProgressionTest`, `UrbanIndoorEnvironmentTest`, `UrbanUndergroundEnvironmentTest`, `PlayerOutcomeDeterminismTest`, `qa.TickProfileTest`, `HudQaSceneTest` and `save.SaveEpochGuardTest`: 198 tests in 29 classes, 1m 11s; the native "after" runs | 5m 19s, 2,526 tests in 345 classes |
+
+Every build passed with the two symbolic-link skips and no failure. In the first one temporary
+directory, and in the second two, were deleted on their cleanup's second attempt (B02's retry at
+work); the third needed none.
+
+Against the old behaviour: `DayTemperatureCurveTest`, with the sign reverted in place, failed all
+three tests (the warmest minute at 2.0 h, the meadow and the residential street warmest at 02:00;
+`build/v091-m08/curve-test-mutation.log`), and `DayCurveQaSceneTest` as the fix leaves it failed both
+tests on `132ff76` (noon 9.9 against 22.7 °C and 20.6 against 33.5 °C;
+`build/v091-m08/c3-scene-test-on-old-curve.log`). Before the series was split, the whole suite ran on
+the working tree with only the fix and its test: 2,524 tests in 344 classes passed unchanged (5m 31s,
+`build/v091-m08/full-test-1.log`), so no existing test pinned the inverted curve. The economy suites
+ran on `a7a2695` (52 s, 8 classes, `build/v091-m08/economy-before.log`) and on the fix, and the probe on
+both curves.
+
+**The final tree**, `a7ddf7b` (the documentation commits change no build input):
+`./gradlew.bat build --rerun-tasks --console=plain` in the worktree, BUILD SUCCESSFUL in 5m 31s
+with all 10 tasks run: 2,526 tests in 345 classes, no failure, the two symbolic-link skips, no
+temporary-directory retry (`build/v091-m08/final-build.log`). The epoch guard printed epoch 1's
+digest `6feb385a093f33b59e74590e5844da16fcaf1c323218962c46449f6a6d93d5b8` on every tree, as before
+the milestone. `graphify update . --no-cluster` then rebuilt the graph: 13,072 nodes. The
+documentation commits had link, path and `git diff --check` checks.
+
+### Commits
+
+| Commit | Subject |
+| --- | --- |
+| `3fc3570` | refactor(qa): move the benchmark scenes' biome site out of QaHarness |
+| `132ff76` | feat(qa): read the day's air at noon and before dawn off the debug overlay |
+| `64b20a6` | fix(simulation): make the afternoon the warmest part of the day |
+| `bbc497f` | docs(simulation): describe the day's corrected temperature curve |
+| `5694a20` | docs(qa): describe the day-curve scene |
+| `a7ddf7b` | docs(urban): close the inverted-day question in the city's records |
+| the records commit | docs(roadmap): record milestone 08 of 0.9.1 |
+
+No commit carries a co-author line. Nothing was pushed.
+
+### Limitations and pending gates
+
+- **Pending, from 02:** the macOS arm64 job of `verify.yml` has not run yet; 07 and 08 are local.
+- **For the owner, D-44:** the coldest hour is 02:00, twelve hours after the warmest, because the
+  curve stays a pure cosine. A low just before sunrise (about 05:00) would need an uneven curve, a
+  new shape the milestone did not ask for; it can be added if wanted.
+- **For the owner, D-45:** the industrial yards in the Dry Season now cost a careless survivor real
+  health by day (about 65 for a whole day standing in the sun without water), where before they did
+  so only at night. Every threshold is unchanged; this is the yards' design ("hot, so thirst
+  rises") meeting a day that is finally warm in the afternoon.
+- The probe stands a survivor still and unclothed; real days mix places, shade and clothing, so
+  its figures bound the change rather than predict a playthrough. How the warm afternoons and cold
+  nights feel is for the owner's play.
+- Sleep fast-forwards the night, so a survivor in bed spends seconds, not hours, in the cold
+  half of the day; the colder night bites mostly on those who stay up or travel.
+
+### Next: milestone 09
+
+Integration and release preparation: full evidence, documents, version 0.9.1 and its release
+notes, ready for the owner.
