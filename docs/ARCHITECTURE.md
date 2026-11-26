@@ -225,8 +225,12 @@ while (!window.shouldClose())
    `scheduler.update(dt, this)` which drives the three tick buckets, then
    per-frame systems (particles, projectiles, ragdolls, body fragments, burn residues,
    explosion fuses, noise decay, ambient emitters). Nothing else advances the world, so a
-   paused frame burns, panics and settles nothing.
-7. **Camera and audio** follow the player eye; set the listener before `audio.update(dt)`.
+   paused frame burns, panics and settles nothing. The one exception is the death card after
+   a lethal blast (0.9.1 B13): `PlayerLifeCycle.settleRemains` lets the particles, ragdolls and
+   body pieces go on falling behind it, while the ticks, the clock and every other system wait.
+7. **Camera and audio** follow the player eye (`PlayerLifeCycle.placeCamera`), except on that
+   card, where the camera watches the remains from a clear point chosen at the death; set the
+   listener before `audio.update(dt)`.
 8. **Streaming** — `ChunkStreaming.frame()`: `world.ensureChunks(...)` out to one
    ring beyond the render radius (two chunks a frame), a generated city's
    `ChunkRetention` pass once it holds too many chunks, then
@@ -1449,7 +1453,7 @@ in a named collaborator:
 | `PlayerBlockActions` | hold-to-mine, break drops/spill/vandalism, placement |
 | `WorldInteractions` | F and RMB routing, NPC talk/rescue, stations, beacon endgame |
 | `PlayerConsumables` | eat, drink, treat wounds, equip gear |
-| `PlayerLifeCycle` | death transition and respawn; Game keeps its existing command delegates |
+| `PlayerLifeCycle` | death transition, the death card's view of a lethal blast's remains while they settle (0.9.1 B13) and respawn; Game keeps its existing command delegates |
 | `CrateTransactionSystem` | simulation-timed searches, crate transfers and theft attribution |
 | `InteractPromptBuilder` | the `[F] …` hint (pure read — cannot change what F does) |
 | `AmbienceSystem` | ambient particles and the audio mix; `BodyFireEffects`, what burning bodies give off and their sound |
@@ -1780,7 +1784,13 @@ whose fuse ends explodes), ragdolls, pieces, remains' flames, keg fuses, noise
 and the ambient emitters, which give off the bodies' sparks and smoke. The
 player's death transition comes after the world step. So in any frame a burn
 death is processed before a blast, a body the fire killed is never blown apart,
-and drawing reads a finished step.
+and drawing reads a finished step. A projectile's kill therefore waits for the
+next fast tick, and two things can come first: a slow tick in a frame with no
+fast tick, whose settlement deactivation would write the fallen resident back,
+and a save. Both commit the death themselves, exactly as the fast tick would
+(`EntityManager.commitDeath` when a settlement goes dormant, `flushPendingDeaths`
+for every person and animal before a save; 0.9.1 B12 and B17), so a death is never
+written back, saved alive at negative health or left without its bookkeeping.
 
 **Where a shot lands decides what it costs.** A bullet or an arrow that enters
 an `Npc` is judged by `HitZone`, the height above the feet at which the
@@ -1821,7 +1831,11 @@ proportional to its mass (never less than `MIN_LAUNCH_MASS`), and then falls wit
 stepped from the same per-frame `simulate` gate at the same fixed 1/60 s. It
 sweeps the world-axis box of its *turned* collision box, so a limb that lands
 lying down rests on its lowest corner, and a grounded piece feels gravity's
-torque about that corner. No generator was added: what the blast does not decide
+torque about that corner. A box balances on an end face as well as on a side, so a
+long piece (its longest half extent at least 1.5 times its others) standing within
+about 37° of upright is also tipped over its end's edge, toward where it leans, for at
+most two seconds (`BodyFragmentSystem.endTopple`, 0.9.1 B07): a leg that lands on its
+end lies down, and one wedged upright against a wall stays. No generator was added: what the blast does not decide
 comes from a hash of the piece's position, the way `RagdollSystem.positionBias`
 picks a side. At most 120 pieces fly and 600 lie about; over either cap the
 oldest gives way. Pieces rot on the corpse clock beside carcasses and corpses in
@@ -1847,9 +1861,22 @@ passes it on as it spreads, so it burns bodies for the thrower. A bottle that
 breaks on a body sets that body alight before it spills, so a bird hit in the air
 burns though the liquid finds no ground.
 
+**A burning block shows its fire on the faces open to the air.** Every block that
+burns is opaque, so nothing drawn inside it shows (0.9.1 B09). `BlockFireFaces`
+names a burning block's open faces, the four sides and the top whose neighbour is
+not opaque (never the bottom: fire climbs). On the ambience cadence each block in
+range gives off a flame and, half the time, an ember from an open face picked at
+random, scattered along the face and just outside it, and smoke off its top when
+the top is open, else off an open side; a block with no open face gives off nothing,
+and the pass stops at the particle splash ceiling. The renderer lays a thin glowing
+sheet on each open face turned to the camera, at most three a block within the fog
+and the view, climbing from a side's foot or spread over the top, in the burning
+liquid's colours and pulsing on the particle clock, each block in its own phase.
+
 **Rain is one predicate.** `FireSystem.isRainedOn` — precipitation falling and
 sky light above `RAIN_EXPOSURE_SKYLIGHT` in the cell above — decides for burning
-blocks, campfires and pools alike. An exposed burning block holds still and goes
+blocks, campfires and pools alike, and for drying racks and rain collectors, which
+kept their own copy of it until 0.9.1 (B10). An exposed burning block holds still and goes
 out after two seconds without being consumed; an exposed pool goes out after
 one. Shelter needs headroom: the sky light is sampled one cell up, and the top
 of a column is always fully lit, so a roof resting directly on a block does not
@@ -1957,12 +1984,16 @@ sounds through `AudioManager`. The player's own fire is drawn at the edges of th
 view by `post_final.frag` (`Environment.vigBurn`) and round the grip of a held
 item, never inside the camera. Nothing here reads a simulation random stream,
 allocates per frame, or changes a burn; flames flicker by the particle clock, which
-stands still while the game is paused. Details, budgets and QA in the contract §16.1.
+stands still while the game is paused. The living are posed on the same clock, by the
+renderer, by these effects and for the pose a body is blown apart in, so nothing that
+lives breathes or sways while the game is paused (0.9.1 B08). Details, budgets and QA in
+the contract §16.1.
 
 | State | Persisted | Where |
 | --- | --- | --- |
 | Settled pieces of every body (family, piece, position, orientation, decay, appearance, the pose it died in) | yes | `world.remains`, one record per piece, oldest first; one pose per body |
-| An animal's harvest record tied to its torso, and the arrows lodged in it | yes | the carcass in the core body; the tie and the arrows in `world.remains` |
+| An animal's harvest record tied to its torso, and the arrows lodged in it | yes | the carcass, with its arrows, in the core body; the tie in `world.remains` |
+| The arrows lodged in a whole carcass | yes | the carcass in the core body (0.9.1 B05; before it they were lost on every save) |
 | Pieces still in flight | no — a save settles them first, so they come to rest rather than being lost | — |
 | Pools of burning liquid, burning blocks | no — a save taken mid-burn loads with the fires out | — |
 | A fire bomb still in the air | yes, with the other explosives; it shatters where it lands | active explosives |
