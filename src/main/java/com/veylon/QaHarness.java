@@ -716,7 +716,7 @@ final class QaHarness {
                 clearBenchmarkStage(site, 9, 14);
                 ragdollScene.stageJoints(site, normalized);
             }
-            case "dismember_showcase", "dismember_wall", "dismember_bomb" -> {
+            case "dismember_showcase", "dismember_wall", "dismember_bomb", "dismember_player" -> {
                 site = moveBenchmarkToBiome(Biome.MEADOW);
                 clearBenchmarkStage(site, 10, 18);
                 dismemberScene.stage(site, normalized);

@@ -36,6 +36,16 @@ import java.util.Locale;
  * the pieces in fixed steps tied to elapsed wall-clock seconds, snapped to a
  * tenth of a second, so a capture requested at 1.2 s always shows exactly
  * 0.2 s of flight and two runs of the same seed match.
+ *
+ * <p>{@code dismember_player} is the one that does not: the Survival player
+ * stands on the clearing looking ahead and down, and at 1 s a scrap bomb's
+ * blast goes off at their feet through {@code ExplosionSystem.explode}, the
+ * call a thrown bomb ends in. The simulation runs as in play, so the death
+ * transition, the death card, its view and the remains behind it are the
+ * game's own, and the player wakes when the card ends three seconds later.
+ * The console reports the card's camera against the eye and when the
+ * remains come to rest (0.9.1 B13). It refuses a Creative player, who cannot
+ * die.
  */
 final class DismemberQaScene {
 
@@ -89,10 +99,17 @@ final class DismemberQaScene {
     private static final float HOLD_STILL = 60f;
     private static final long SCENE_THROW_SEED = 0x424f4d42L;
 
+    /** A scrap bomb's damage at its centre, as {@code ProjectileSystem} sets it off. */
+    private static final float SCRAP_DAMAGE = 14f;
+    /** Where the player's bomb goes off: beside their feet, a little ahead, on its first bounce. */
+    private static final float PLAYER_BOMB_AHEAD = 0.6f, PLAYER_BOMB_SIDE = 0.4f, PLAYER_BOMB_HEIGHT = 0.3f;
+
     private final Game game;
     private final List<Npc> row = new ArrayList<>();
     private boolean active;
     private boolean bomb;
+    private boolean playerBlast;
+    private boolean reportedCard;
     private boolean blown;
     private boolean reportedRest;
     private double simulated;
@@ -143,8 +160,17 @@ final class DismemberQaScene {
         game.camera.pitch = 20f;
 
         bomb = scene.equals("dismember_bomb");
+        playerBlast = scene.equals("dismember_player");
         row.clear();
-        if (bomb) {
+        if (playerBlast) {
+            if (game.player.abilities.invulnerable()) {
+                throw new IllegalStateException("dismember_player needs a Survival player, who can die");
+            }
+            // On their feet, looking ahead and down; the world runs as in play.
+            game.player.pos.set(site.x() + 0.5f, floor, site.z() + 0.5f);
+            game.camera.pitch = 25f;
+            game.simPaused = false;
+        } else if (bomb) {
             stageGroup(site.x() + 0.5f, floor, site.z() - BOMB_DISTANCE + 0.5f);
         } else {
             for (int i = 0; i < ROW.length; i++) {
@@ -160,8 +186,45 @@ final class DismemberQaScene {
         steps = 0;
         blown = false;
         reportedRest = false;
+        reportedCard = false;
         active = true;
         update(0);
+    }
+
+    /** {@code dismember_player}: the bomb at the player's feet at 1 s, then the game's own death. */
+    private void updatePlayerBlast(double elapsed) {
+        if (!blown && elapsed >= BLAST_AT) {
+            blown = true;
+            double yaw = Math.toRadians(game.camera.yaw);
+            float x = game.player.pos.x + (float) Math.sin(yaw) * PLAYER_BOMB_AHEAD
+                    + (float) Math.cos(yaw) * PLAYER_BOMB_SIDE;
+            float z = game.player.pos.z - (float) Math.cos(yaw) * PLAYER_BOMB_AHEAD
+                    + (float) Math.sin(yaw) * PLAYER_BOMB_SIDE;
+            game.explosions.explode(game, x, game.player.pos.y + PLAYER_BOMB_HEIGHT, z,
+                    BLAST_STRENGTH, SCRAP_DAMAGE, 0f, true, true);
+            blastAt = elapsed;
+            System.out.printf(Locale.ROOT, "[scene] dismember_player: the bomb at %.2f s, player dead=%b%n",
+                    elapsed, game.player.dead);
+            return;
+        }
+        if (!blown) {
+            return;
+        }
+        if (!reportedCard && game.showsEndCard()) {
+            reportedCard = true;
+            float eyeY = game.player.pos.y + game.player.eyeHeight();
+            System.out.printf(Locale.ROOT, "[scene] dismember_player: death card with %d pieces;"
+                            + " camera (%.2f, %.2f, %.2f), %.2f from the eye (%.2f, %.2f, %.2f)%n",
+                    game.fragments.liveCount(), game.camera.position.x, game.camera.position.y,
+                    game.camera.position.z, game.camera.position.distance(game.player.pos.x, eyeY,
+                            game.player.pos.z), game.player.pos.x, eyeY, game.player.pos.z);
+        }
+        if (reportedCard && !reportedRest && game.fragments.liveCount() == 0) {
+            reportedRest = true;
+            System.out.printf(Locale.ROOT, "[scene] dismember_player: all %d pieces at rest by %.2f s,"
+                    + " the card %s%n", game.fragments.settledCount(), elapsed - blastAt,
+                    game.showsEndCard() ? "still up" : "gone");
+        }
     }
 
     /**
@@ -201,6 +264,10 @@ final class DismemberQaScene {
     /** Advances the staged moment the elapsed second maps to. */
     void update(double elapsed) {
         if (!active) {
+            return;
+        }
+        if (playerBlast) {
+            updatePlayerBlast(elapsed);
             return;
         }
         double staged = Math.floor(elapsed / STAGE_GRID + 1e-6) * STAGE_GRID;
