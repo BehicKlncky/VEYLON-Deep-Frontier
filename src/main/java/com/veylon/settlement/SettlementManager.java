@@ -755,12 +755,23 @@ public class SettlementManager
      * Health is kept as it is now; a fire or a panic is not: the dormant
      * simulation has no fire, so a resident burning as the settlement goes
      * dormant is put out and calm when it wakes ({@code EntityManager.depart}).
+     * A resident killed since the last fast tick is not written back: their
+     * death is committed as that tick would commit it
+     * ({@code EntityManager.commitDeath}).
      */
     public void deactivate(Game g, Settlement s) {
         for (Settlement.Resident r : s.residents) {
             Npc n = r.live;
             if (n == null) {
                 continue;
+            }
+            if (n.dead) {
+                // Killed since the last fast tick, say by an arrow after the frame's ticks: the
+                // death is committed first, as that tick would, and settles the record (B12).
+                g.entities.commitDeath(g, n);
+                if (r.live != n) {
+                    continue;
+                }
             }
             r.health = n.health;
             r.alive = !n.dead;

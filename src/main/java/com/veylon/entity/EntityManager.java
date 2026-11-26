@@ -83,43 +83,70 @@ public class EntityManager {
                     forgetTarget(n);
                     continue;
                 }
-                if (n.isTrader && n.partyMissionId != null && !n.partyMissionId.isBlank()) {
-                    g.faction.failMission(n.partyMissionId, "the escorted trader was lost");
-                }
-                if (n.lastHitByPlayer && n.faction != null) {
-                    g.faction.addTrust(g, -40, "You killed " + n.name + "!");
-                }
-                if (n.health <= 0 && !n.raider && !n.hostileToPlayer()) {
-                    g.log(n.name + " has died.");
-                }
-                if (n.raider && n.lastHitByPlayer) {
-                    g.player.inventory.add(ItemType.SCRAP, 1 + rng.nextInt(2));
-                    if (rng.nextFloat() < 0.4f) {
-                        g.player.inventory.add(ItemType.BANDAGE, 1);
-                    }
-                    g.log("You looted the fallen scavenger.");
-                    g.onRaiderKilled();
-                }
-                if (n.settled() || n.warParty) {
-                    onSettledNpcDied(g, n);
-                }
-                // A person killed inside a blast's lethal radius is blown apart
-                // by that blast, from the pose they died in; every other death
-                // falls as one body.
-                if (reallyDied(n) && n.dismemberOnDeath) {
-                    g.fragments.spawnFromNpc(g, n, g.fragments.deathPose(n),
-                            n.blastX, n.blastY, n.blastZ, n.blastStrength);
-                } else if (reallyDied(n)) {
-                    g.ragdolls.spawn(g, n);
-                }
+                bookDeath(g, n);
                 it.remove();
-                if (reallyDied(n)) {
-                    forgetTarget(n);
-                } else {
-                    // Routed, gone home, faded away: no body, and no fire or panic follows it.
-                    depart(g, n);
-                }
+                leaveAfterDeath(g, n);
             }
+        }
+    }
+
+    /**
+     * Commits the death of a person killed since the last fast tick, as that tick would, and takes
+     * them out of the world. A blow lands between fast ticks (a projectile's, after the frame's
+     * ticks), and a settlement can go dormant on a slow tick that runs in a frame with no fast
+     * tick: it must not write a fallen resident back, or remove them, without the death's
+     * bookkeeping (0.9.1 B12). Does nothing for a person who is not dead or not in the world, or
+     * for one of the infected, whose deaths their own director commits.
+     */
+    public void commitDeath(Game g, Npc n) {
+        if (!n.dead || n.infected() || !npcs.contains(n)) {
+            return;
+        }
+        bookDeath(g, n);
+        npcs.remove(n);
+        leaveAfterDeath(g, n);
+    }
+
+    /** Everything a person's death credits, fails or reports, then exactly one body for a real death. */
+    private void bookDeath(Game g, Npc n) {
+        if (n.isTrader && n.partyMissionId != null && !n.partyMissionId.isBlank()) {
+            g.faction.failMission(n.partyMissionId, "the escorted trader was lost");
+        }
+        if (n.lastHitByPlayer && n.faction != null) {
+            g.faction.addTrust(g, -40, "You killed " + n.name + "!");
+        }
+        if (n.health <= 0 && !n.raider && !n.hostileToPlayer()) {
+            g.log(n.name + " has died.");
+        }
+        if (n.raider && n.lastHitByPlayer) {
+            g.player.inventory.add(ItemType.SCRAP, 1 + rng.nextInt(2));
+            if (rng.nextFloat() < 0.4f) {
+                g.player.inventory.add(ItemType.BANDAGE, 1);
+            }
+            g.log("You looted the fallen scavenger.");
+            g.onRaiderKilled();
+        }
+        if (n.settled() || n.warParty) {
+            onSettledNpcDied(g, n);
+        }
+        // A person killed inside a blast's lethal radius is blown apart
+        // by that blast, from the pose they died in; every other death
+        // falls as one body.
+        if (reallyDied(n) && n.dismemberOnDeath) {
+            g.fragments.spawnFromNpc(g, n, g.fragments.deathPose(n),
+                    n.blastX, n.blastY, n.blastZ, n.blastStrength);
+        } else if (reallyDied(n)) {
+            g.ragdolls.spawn(g, n);
+        }
+    }
+
+    /** After a death is booked and the person is out of {@link #npcs}. */
+    private void leaveAfterDeath(Game g, Npc n) {
+        if (reallyDied(n)) {
+            forgetTarget(n);
+        } else {
+            // Routed, gone home, faded away: no body, and no fire or panic follows it.
+            depart(g, n);
         }
     }
 
