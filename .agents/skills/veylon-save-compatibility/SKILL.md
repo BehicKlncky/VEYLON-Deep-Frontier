@@ -30,6 +30,7 @@ All paths below are relative to the repository root. The rule is the owner's sav
 
 - It fails while the current epoch is unreleased: check that the change was meant to alter saves, then paste the values it prints into `RECORDED`.
 - It fails while `RELEASED` names the current epoch: raise `SaveHeader.EPOCH` by one and record the new epoch's inputs. Never edit or remove a `RELEASED` entry; a release adds its epoch with the digest the passing test prints.
+- Epoch 1 shipped with 0.9.1 and is in `RELEASED`: the next change to any input raises the epoch to 2.
 - An appended enum constant counts as a change: a build of the same epoch must read every save of that epoch.
 
 ## Verify the affected behavior

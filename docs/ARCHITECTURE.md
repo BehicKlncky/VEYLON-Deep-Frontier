@@ -407,8 +407,8 @@ enum tables a save stores, and what the new-world generators of both kinds make
 from a seed, including what a city's containers hold on their first search. Its
 record of the current epoch may be re-recorded until a release ships the
 epoch; after that any change, an appended enum constant included, fails with
-the instruction to raise `SaveHeader.EPOCH`. Milestone 09 records epoch 1 as
-released.
+the instruction to raise `SaveHeader.EPOCH`. Epoch 1 shipped with 0.9.1 and is
+recorded as released, so the next change to any of those inputs needs epoch 2.
 
 Within one epoch the reader accepts exactly what the writer writes (D-18): the
 extension tail and the eleven sections every save holds are required, one

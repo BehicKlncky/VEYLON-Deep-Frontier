@@ -1127,6 +1127,8 @@ save holds, or historical fixtures, and none may be added.
   to alter saves, then paste the new values it prints into `RECORDED`. When it
   fails under a released epoch (`RELEASED` names it), raise `SaveHeader.EPOCH`
   by one and record the new epoch's inputs; never edit a released entry.
+  Epoch 1 shipped with 0.9.1 and is in `RELEASED`, so the next change to any
+  input needs epoch 2.
 - **Generation.** Only the generators new worlds use, 3 and 20, may change on
   purpose: re-record their pins in `WorldGeneratorFingerprintTest`, and the
   guard decides the epoch. Generators 1, 2 and 4–19 stay as they are until
