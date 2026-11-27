@@ -69,9 +69,6 @@ class UrbanGeneratorDispatchTest {
                             || version == World.GEN_URBAN_UTILITIES || version == World.GEN_URBAN_MISSIONS
                             || version == World.GEN_URBAN_ECONOMY,
                     World.isUrbanGenerator(version), "urban " + version);
-            assertEquals(version == World.GEN_CAVE_IDENTITIES,
-                    World.hasDeepFrontier(version), "deep frontier " + version);
-            assertEquals(version == World.GEN_CAVE_IDENTITIES, World.hasCaveIdentities(version));
         }
     }
 

@@ -568,14 +568,12 @@ public class EntityManager {
         }
         // Gloomstalkers are the stronger Basalt-depth predator. Root Caves
         // retain ordinary wildlife and do not inherit this spawn pressure.
-        int playerSurface = g.world.surfaceHeight((int) px, (int) pz);
         WorldGenerator.CaveZone playerZone = g.world.generator.caveZoneAt(
                 (int) px, (int) g.player.pos.y, (int) pz);
         // Urban worlds have no Basalt depths: a basement under a roof is not one.
-        boolean playerInBasalt = World.hasCaveIdentities(g.world.generatorVersion)
-                ? (playerZone == WorldGenerator.CaveZone.BASALT
-                || playerZone == WorldGenerator.CaveZone.RESONANT)
-                : !g.world.isUrban() && g.player.pos.y < playerSurface - 6;
+        boolean playerInBasalt = !g.world.isUrban()
+                && (playerZone == WorldGenerator.CaveZone.BASALT
+                || playerZone == WorldGenerator.CaveZone.RESONANT);
         if (playerInBasalt && stalkers < 2 && rng.nextFloat() < 0.4f) {
             trySpawnStalker(g, px, pz);
         }

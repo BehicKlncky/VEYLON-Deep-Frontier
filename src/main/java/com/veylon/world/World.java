@@ -161,7 +161,7 @@ public class World implements VoxelAccess {
     public int beaconStage = -1;
 
     // ---- 0.3.0 world expansion state ----
-    /** Registered settlements keyed by packed region id (deep-frontier worlds only). */
+    /** Registered settlements keyed by packed region id (the wilderness only). */
     public final Map<Long, Settlement> settlements = new LinkedHashMap<>();
     /** Cached deterministic settlement layouts (rebuilt on demand, never saved). */
     private final Map<Long, SettlementBuilder.Layout> settlementLayouts = new HashMap<>();
@@ -211,9 +211,11 @@ public class World implements VoxelAccess {
         this.generator = new WorldGenerator(this, seed);
     }
 
-    // Generator feature gates. Each names its versions explicitly rather than
-    // comparing with >= or <, so a newer generator inherits nothing by accident:
-    // the urban generator gets none of the wilderness features (decision D-02).
+    // Generator gates. Each names its versions explicitly rather than comparing
+    // with >= or <, so a newer generator inherits nothing by accident. The
+    // wilderness's features (deep caves, underground POIs, cave mouths,
+    // settlements, fumaroles and the Gloomstalker depths) ask whether a world is
+    // a city instead: the city gets none of them (decision D-02).
 
     /** True for every generator version this build can build and load: the wilderness and the cities. */
     public static boolean isSupportedGenerator(int version) {
@@ -231,16 +233,6 @@ public class World implements VoxelAccess {
                 || version == GEN_URBAN_STRONGHOLDS || version == GEN_URBAN_REFUGES
                 || version == GEN_URBAN_UTILITIES || version == GEN_URBAN_MISSIONS
                 || version == GEN_URBAN_ECONOMY;
-    }
-
-    /** Generator 3: deep caves, underground POIs, cave mouths and settlements. */
-    public static boolean hasDeepFrontier(int version) {
-        return version == GEN_CAVE_IDENTITIES;
-    }
-
-    /** Generator 3: depth-derived cave identities, fumaroles and Gloomstalker depths. */
-    public static boolean hasCaveIdentities(int version) {
-        return version == GEN_CAVE_IDENTITIES;
     }
 
     public boolean isUrban() {
@@ -267,7 +259,7 @@ public class World implements VoxelAccess {
      * Safe to call from any chunk in any order; registration is idempotent.
      */
     public Settlement settlementForRegion(int rx, int rz) {
-        if (!hasDeepFrontier(generatorVersion)) {
+        if (urban != null) {
             return null;
         }
         long key = Settlement.packId(rx, rz);
@@ -945,7 +937,7 @@ public class World implements VoxelAccess {
         // common thing in that volume while exposed sulfur underfoot is the
         // rarest. Testing air first paid three chunk lookups per cell to
         // reject; testing the floor first pays one.
-        if (!hasCaveIdentities(generatorVersion)
+        if (urban != null
                 || getBlock(x, y - 1, z) != BlockType.SULFUR_ORE
                 || getBlock(x, y, z) != BlockType.AIR
                 || getBlock(x, y + 1, z) != BlockType.AIR

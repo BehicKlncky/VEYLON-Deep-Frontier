@@ -373,7 +373,7 @@ final class QaHarness {
         boolean materialsOk = com.veylon.gfx.MaterialRegistry.errors().isEmpty();
         RuntimeBudgetSnapshot runtime = RuntimeBudgetSnapshot.capture(game);
         boolean runtimeBoundsOk = runtime.withinHardLimits();
-        boolean fortressApproachOk = !World.hasDeepFrontier(game.world.generatorVersion)
+        boolean fortressApproachOk = game.world.isUrban()
                 || fortressApproachComplete && smokeFortress != null
                 && fortressTiming.frames() > 0 && fortressTiming.averageFps() >= 60.0;
 
@@ -518,8 +518,8 @@ final class QaHarness {
      */
     private String deterministicFortressSnapshot() {
         Settlement settlement = nearestPlannedFortress();
-        if (!World.hasDeepFrontier(game.world.generatorVersion)) {
-            return "{available=false,generator=" + (game.world.isUrban() ? "urban" : "legacy") + "}";
+        if (game.world.isUrban()) {
+            return "{available=false,generator=urban}";
         }
         if (settlement == null) {
             return "{available=false,searchRadiusRegions=" + FORTRESS_SEARCH_RADIUS_REGIONS + "}";
@@ -533,7 +533,7 @@ final class QaHarness {
     }
 
     private Settlement nearestPlannedFortress() {
-        if (game.world == null || !World.hasDeepFrontier(game.world.generatorVersion)) {
+        if (game.world == null || game.world.isUrban()) {
             return null;
         }
         int originRx = SettlementPlanner.regionOfBlock((int) Math.floor(game.spawnPos.x));

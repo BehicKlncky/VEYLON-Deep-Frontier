@@ -16,10 +16,8 @@ import java.util.Random;
  */
 public class WorldGenerator {
 
-    /** Generator-2 compatibility boundary; generator 3 derives zones from depth. */
+    /** The height below which sulfur veins form; the cave zones themselves follow depth. */
     public static final int BASALT_TOP = 22;
-    /** Generator-2 compatibility boundary for its absolute resonant band. */
-    public static final int RESONANT_TOP = 12;
     /** Depth below the local surface where root caves end. */
     public static final int ROOT_DEPTH = 14;
     /** Depth below local surface where the rare Resonant band begins. */
@@ -84,14 +82,6 @@ public class WorldGenerator {
         tunnelNoiseB = new Noise(seed + 808);
         warpNoise = new Noise(seed + 909);
         chamberNoise = new Noise(seed + 1010);
-    }
-
-    private boolean deep() {
-        return World.hasDeepFrontier(world.generatorVersion);
-    }
-
-    private boolean caveIdentities() {
-        return World.hasCaveIdentities(world.generatorVersion);
     }
 
     /** Derived terrain identity; names are stable but the enum is never serialized. */
@@ -185,7 +175,7 @@ public class WorldGenerator {
         int baseZ = c.cz * Chunk.SZ;
         if (World.isUrbanGenerator(world.generatorVersion)) {
             // Exact dispatch: the urban branch shares no terrain, cave, ore,
-            // decoration, POI or settlement step with generators 1-3 (D-02).
+            // decoration, POI or settlement step with the wilderness (D-02).
             // Its layout revision picks the datum or the city plan; soil
             // moisture still follows the climate biome (D-08): the district's own climate in
             // six-district cities, the frozen noise climate in earlier urban layouts.
@@ -194,8 +184,6 @@ public class WorldGenerator {
             world.urban.stamp(c, climate.moisture);
             return;
         }
-        boolean deep = deep();
-        boolean identities = caveIdentities();
 
         for (int lx = 0; lx < Chunk.SX; lx++) {
             for (int lz = 0; lz < Chunk.SZ; lz++) {
@@ -209,10 +197,8 @@ public class WorldGenerator {
                         t = BlockType.STONE;
                     } else if (y < h - 3) {
                         // Deep-frontier worlds have a dark basalt identity below.
-                        CaveZone zone = identities ? caveZone(h, y) : null;
-                        boolean basaltHost = deep && (identities
-                                ? zone == CaveZone.BASALT || zone == CaveZone.RESONANT
-                                : y < BASALT_TOP);
+                        CaveZone zone = caveZone(h, y);
+                        boolean basaltHost = zone == CaveZone.BASALT || zone == CaveZone.RESONANT;
                         t = basaltHost ? BlockType.BASALT : BlockType.STONE;
                     } else if (y < h) {
                         t = biome.subsurface;
@@ -235,26 +221,18 @@ public class WorldGenerator {
                     }
                 }
 
-                if (deep) {
-                    carveCavesDeep(c, lx, lz, wx, wz, h);
-                } else {
-                    carveCaves(c, lx, lz, wx, wz, h);
-                }
+                carveCavesDeep(c, lx, lz, wx, wz, h);
             }
         }
 
         placeOres(c);
-        if (identities) {
-            decorateCaveIdentities(c, baseX, baseZ);
-        }
+        decorateCaveIdentities(c, baseX, baseZ);
         decorate(c, baseX, baseZ);
         placePoi(c, baseX, baseZ);
 
-        if (deep) {
-            placeUndergroundPoiSlices(c, baseX, baseZ);
-            carveCaveEntranceSlice(c, baseX, baseZ);
-            applySettlementSlice(c, baseX, baseZ);
-        }
+        placeUndergroundPoiSlices(c, baseX, baseZ);
+        carveCaveEntranceSlice(c, baseX, baseZ);
+        applySettlementSlice(c, baseX, baseZ);
 
         // Initial soil moisture from the biome at the chunk center.
         c.moisture = biomeAt(baseX + 8, baseZ + 8).moisture;
@@ -276,51 +254,29 @@ public class WorldGenerator {
         return biome.surface;
     }
 
-    private void carveCaves(Chunk c, int lx, int lz, int wx, int wz, int h) {
-        // Don't carve directly beneath lakes so they don't instantly drain.
-        int top = h < World.SEA_LEVEL + 2 ? h - 8 : h - 4;
-        for (int y = 3; y <= top; y++) {
-            double n = caveNoise.fbm3(wx * 0.065, y * 0.095, wz * 0.065, 2, 2.0, 0.5);
-            if (n > 0.40) {
-                c.set(lx, y, lz, BlockType.AIR);
-            }
-        }
-    }
-
     /**
      * Deep-frontier cave column: three depth identities (root caves, basalt
      * depths, resonant depths), domain-warped worm tunnels for connectivity,
-     * seeded chambers, and sparse cave life. Lake protection matches legacy.
+     * seeded chambers, and sparse cave life. A column near or below sea level
+     * carves nothing in its top eight blocks, so lakes never drain.
      */
     private void carveCavesDeep(Chunk c, int lx, int lz, int wx, int wz, int h) {
         int top = h < World.SEA_LEVEL + 2 ? h - 8 : h - 4;
-        boolean identities = caveIdentities();
         boolean carvedBelow = false;
         for (int y = 3; y <= top; y++) {
             int depth = h - y;
             boolean carve = false;
-            CaveZone zone = identities ? caveZone(h, y) : null;
+            CaveZone zone = caveZone(h, y);
 
             // Density chambers: threshold loosens with depth so the basalt
             // layer opens into larger rooms; the resonant band is rare but big.
             double n = caveNoise.fbm3(wx * 0.065, y * 0.095, wz * 0.065, 2, 2.0, 0.5);
             if (depth >= 4) {
-                double threshold;
-                if (identities) {
-                    threshold = switch (zone) {
-                        case SURFACE, ROOT -> 0.42;
-                        case BASALT -> 0.40;
-                        case RESONANT -> 0.355;
-                    };
-                } else {
-                    if (depth < ROOT_DEPTH) {
-                        threshold = 0.42;
-                    } else if (y >= BASALT_TOP) {
-                        threshold = 0.40;
-                    } else {
-                        threshold = 0.355;
-                    }
-                }
+                double threshold = switch (zone) {
+                    case SURFACE, ROOT -> 0.42;
+                    case BASALT -> 0.40;
+                    case RESONANT -> 0.355;
+                };
                 carve = n > threshold;
             }
 
@@ -345,7 +301,7 @@ public class WorldGenerator {
 
             // Resonant depths: rare crystal chambers at the very bottom.
             boolean resonant = false;
-            if (identities ? zone == CaveZone.RESONANT : y < RESONANT_TOP) {
+            if (zone == CaveZone.RESONANT) {
                 double r = chamberNoise.fbm3(wx * 0.030, y * 0.040, wz * 0.030, 2, 2.0, 0.5);
                 if (r > 0.52) {
                     carve = true;
@@ -362,8 +318,7 @@ public class WorldGenerator {
                         c.set(lx, y - 1, lz, BlockType.RUIN_CORE);
                     } else if (resonant && deco < 0.10) {
                         c.set(lx, y, lz, BlockType.GLOW_FUNGUS);
-                    } else if ((identities ? zone == CaveZone.BASALT : depth > 10)
-                            && deco < 0.018) {
+                    } else if (zone == CaveZone.BASALT && deco < 0.018) {
                         c.set(lx, y, lz, BlockType.GLOW_FUNGUS);
                     }
                 }
@@ -522,13 +477,11 @@ public class WorldGenerator {
         placeVeins(c, rng, BlockType.COAL_ORE, 7, 6, 52, 5);
         placeVeins(c, rng, BlockType.COPPER_ORE, 5, 5, 42, 4);
         placeVeins(c, rng, BlockType.IRON_ORE, 4, 4, 28, 4);
-        if (deep()) {
-            // Black-powder progression lives in the basalt depths.
-            placeVeins(c, rng, BlockType.SULFUR_ORE, 4, 4, BASALT_TOP, 4);
-            placeVeins(c, rng, BlockType.SALTPETER_ORE, 4, 6, 30, 4);
-            // Extra iron rewards deep expeditions.
-            placeVeins(c, rng, BlockType.IRON_ORE, 3, 3, 18, 5);
-        }
+        // Black-powder progression lives in the basalt depths.
+        placeVeins(c, rng, BlockType.SULFUR_ORE, 4, 4, BASALT_TOP, 4);
+        placeVeins(c, rng, BlockType.SALTPETER_ORE, 4, 6, 30, 4);
+        // Extra iron rewards deep expeditions.
+        placeVeins(c, rng, BlockType.IRON_ORE, 3, 3, 18, 5);
     }
 
     private void placeVeins(Chunk c, Random rng, BlockType ore, int veins, int minY, int maxY, int size) {
@@ -566,7 +519,7 @@ public class WorldGenerator {
                     continue;
                 }
                 // Keep settlement footprints clear of trees and brush.
-                if (deep() && world.settlementAt(wx, wz) != null) {
+                if (world.settlementAt(wx, wz) != null) {
                     continue;
                 }
                 Biome biome = biomeAt(wx, wz);
@@ -620,25 +573,23 @@ public class WorldGenerator {
             return;
         }
         // Settlements reserve their bounds; POIs never overlap them.
-        if (deep() && world.settlementAt(x, z) != null) {
+        if (world.settlementAt(x, z) != null) {
             return;
         }
-        if (deep()) {
-            int rx = com.veylon.settlement.SettlementPlanner.regionOfBlock(x);
-            int rz = com.veylon.settlement.SettlementPlanner.regionOfBlock(z);
-            var settlement = world.settlementForRegion(rx, rz);
-            // Reserve complete footprints, not only POI center points.
-            if (settlement != null
-                    && Math.abs(x - settlement.center.x()) <= settlement.radius + 8
-                    && Math.abs(z - settlement.center.z()) <= settlement.radius + 8) {
-                return;
-            }
-            Vec3i mouth = com.veylon.settlement.SettlementPlanner.caveEntrance(
-                    seed, this, rx, rz);
-            if (Math.abs(x - mouth.x()) <= com.veylon.settlement.SettlementPlanner.CAVE_RESERVATION_RADIUS
-                    && Math.abs(z - mouth.z()) <= com.veylon.settlement.SettlementPlanner.CAVE_RESERVATION_RADIUS) {
-                return;
-            }
+        int rx = com.veylon.settlement.SettlementPlanner.regionOfBlock(x);
+        int rz = com.veylon.settlement.SettlementPlanner.regionOfBlock(z);
+        var settlement = world.settlementForRegion(rx, rz);
+        // Reserve complete footprints, not only POI center points.
+        if (settlement != null
+                && Math.abs(x - settlement.center.x()) <= settlement.radius + 8
+                && Math.abs(z - settlement.center.z()) <= settlement.radius + 8) {
+            return;
+        }
+        Vec3i mouth = com.veylon.settlement.SettlementPlanner.caveEntrance(
+                seed, this, rx, rz);
+        if (Math.abs(x - mouth.x()) <= com.veylon.settlement.SettlementPlanner.CAVE_RESERVATION_RADIUS
+                && Math.abs(z - mouth.z()) <= com.veylon.settlement.SettlementPlanner.CAVE_RESERVATION_RADIUS) {
+            return;
         }
         Vec3i pos = new Vec3i(x, h + 1, z);
         switch (type) {
@@ -694,17 +645,15 @@ public class WorldGenerator {
         if (rng.nextFloat() < 0.4f) {
             loot.add(ItemType.SCRAP, 2);
         }
-        // Expedition-issue relic gear: very rare, loot-only (deep worlds).
-        if (deep()) {
-            if (rng.nextFloat() < 0.05f) {
-                loot.add(ItemType.RELIC_CARBINE, 1);
-            }
-            if (rng.nextFloat() < 0.25f) {
-                loot.add(ItemType.RIFLE_CARTRIDGE, 4 + rng.nextInt(6));
-            }
-            if (rng.nextFloat() < 0.15f) {
-                loot.add(ItemType.RELIC_PARTS, 1);
-            }
+        // Expedition-issue relic gear: very rare, loot-only.
+        if (rng.nextFloat() < 0.05f) {
+            loot.add(ItemType.RELIC_CARBINE, 1);
+        }
+        if (rng.nextFloat() < 0.25f) {
+            loot.add(ItemType.RIFLE_CARTRIDGE, 4 + rng.nextInt(6));
+        }
+        if (rng.nextFloat() < 0.15f) {
+            loot.add(ItemType.RELIC_PARTS, 1);
         }
         world.crateContents.putIfAbsent(new Vec3i(x, h + 1, z), loot);
     }
@@ -799,7 +748,7 @@ public class WorldGenerator {
     }
 
     // ------------------------------------------------------------------
-    // Deep-frontier additions (generator version 2+)
+    // Deep-frontier additions: underground POIs, cave mouths and settlements
     // ------------------------------------------------------------------
 
     /** Pure per-chunk POI plan, later sliced into every intersecting chunk. */
@@ -827,12 +776,12 @@ public class WorldGenerator {
             y = 20 + rng.nextInt(12);
         } else if (roll < 0.023) {
             type = Poi.PoiType.RESONANT_SHRINE;
-            y = caveIdentities() ? -1 : 6 + rng.nextInt(5);
+            y = -1; // by depth band below, once the column's surface is known
         } else if (roll < 0.030) {
             type = Poi.PoiType.STALKER_NEST;
             // Stronger predators belong to the Basalt Depths, not the safer
             // near-surface Root Caves or rare Resonant band.
-            y = caveIdentities() ? -1 : 10 + rng.nextInt(14);
+            y = -1;
         } else if (roll < 0.036) {
             type = Poi.PoiType.EXPEDITION_CAMP;
             y = 14 + rng.nextInt(16);
@@ -842,10 +791,10 @@ public class WorldGenerator {
         int x = cx * Chunk.SX + 5 + rng.nextInt(6);
         int z = cz * Chunk.SZ + 5 + rng.nextInt(6);
         int surface = heightAt(x, z);
-        if (caveIdentities() && type == Poi.PoiType.STALKER_NEST) {
+        if (type == Poi.PoiType.STALKER_NEST) {
             int depthSpan = RESONANT_DEPTH - ROOT_DEPTH - 4;
             y = surface - (ROOT_DEPTH + 2 + rng.nextInt(depthSpan));
-        } else if (caveIdentities() && type == Poi.PoiType.RESONANT_SHRINE) {
+        } else if (type == Poi.PoiType.RESONANT_SHRINE) {
             y = surface - (RESONANT_DEPTH + 2 + rng.nextInt(6));
         }
         if (surface <= World.SEA_LEVEL + 1 || y < 4 || y > surface - 12) {
