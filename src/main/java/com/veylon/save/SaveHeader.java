@@ -35,8 +35,12 @@ public final class SaveHeader {
     public static final int MAGIC = 0x5645594C;
     /** The layout this build writes and the only one it reads. */
     public static final int FORMAT = 4;
-    /** The save epoch this build writes and the only one it opens. */
-    public static final int EPOCH = 1;
+    /**
+     * The save epoch this build writes and the only one it opens. Epoch 1 shipped with 0.9.1;
+     * 0.9.2 retires world generators, which changes what a load accepts, so it writes epoch 2
+     * (0.9.2 D-11).
+     */
+    public static final int EPOCH = 2;
     /** Bytes from the start of the file to the end of the generator id. */
     public static final int LENGTH = 4 + 4 + 4 + 8 + 4;
 

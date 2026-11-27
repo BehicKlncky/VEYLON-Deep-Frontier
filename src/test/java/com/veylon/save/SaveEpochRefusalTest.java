@@ -62,7 +62,7 @@ class SaveEpochRefusalTest {
             assertEquals(FOREIGN_SEED, header.readLong());
             assertEquals(World.GEN_CAVE_IDENTITIES, header.readInt());
         }
-        assertEquals(1, SaveHeader.EPOCH, "0.9.1 starts at epoch 1");
+        assertEquals(2, SaveHeader.EPOCH, "0.9.1 shipped epoch 1; 0.9.2 retires generators, so it opens epoch 2");
         Live live = new Live();
         LoadResult result = SaveSystem.open(live.game, file("own.sav", written));
         assertEquals(LoadResult.Outcome.LOADED, result.outcome());

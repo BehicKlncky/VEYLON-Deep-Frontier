@@ -155,9 +155,9 @@ class SlotPickerScreenTest {
         assertEquals("The abandoned city · Survival, a Creative world", SlotPickerScreen.worldLine(World.DEFAULT_NEW_WORLD_GENERATOR, marked));
         assertEquals("The wilderness · Survival, a Creative world", SlotPickerScreen.worldLine(World.WILDERNESS_NEW_WORLD_GENERATOR, marked));
         assertEquals("Day 4, 08:00 · played 1 h 05 min", SlotPickerScreen.timeLine(marked));
-        assertEquals("Saved 20 Nov 2026, 14:32 · VEYLON 0.9.1, save epoch 1", SlotPickerScreen.savedLine(marked, UTC));
+        assertEquals("Saved 20 Nov 2026, 14:32 · VEYLON 0.9.1, save epoch 2", SlotPickerScreen.savedLine(marked, UTC));
         SaveSummary development = new SaveSummary(SAVED_AT, "development", 0, GameMode.CREATIVE, true, 480, "");
-        assertEquals("Saved 20 Nov 2026, 14:32 · a development build, save epoch 1", SlotPickerScreen.savedLine(development, UTC));
+        assertEquals("Saved 20 Nov 2026, 14:32 · a development build, save epoch 2", SlotPickerScreen.savedLine(development, UTC));
         assertEquals("under a minute", SlotPickerScreen.duration(59));
         assertEquals("1 min", SlotPickerScreen.duration(60));
         assertEquals("59 min", SlotPickerScreen.duration(3_599));
