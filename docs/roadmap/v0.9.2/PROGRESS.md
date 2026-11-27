@@ -6,8 +6,8 @@ Resume at the first milestone below that is not complete.
 
 | Milestone | Status | Commits |
 | --- | --- | --- |
-| 01 Retirement audit and plan | Complete (documentation only) | the records commit that adds this file |
-| 02 One wilderness generator | Not started | |
+| 01 Retirement audit and plan | Complete (documentation only) | `6fb68a2` |
+| 02 One wilderness generator | Complete | `a0b6244`, `cb81cbb`, `4007e02`, `b77012d`, `5c28eed`, `e1cbfd9`, `cf9629b`, the records commit |
 | 03 One city generator | Not started | |
 | 04 World kinds and generation pins | Not started | |
 | 05 QA tooling out of the shipped game | Not started | |
@@ -219,7 +219,7 @@ ticks are slow, so 06 should count the slow ticks above its target as well.
 
 | Commit | Subject |
 | --- | --- |
-| the records commit | docs(roadmap): record the 0.9.2 retirement audit and plan |
+| `6fb68a2` | docs(roadmap): record the 0.9.2 retirement audit and plan |
 
 No commit carries a co-author line. At the owner's request it is pushed to `origin/main`.
 
@@ -240,3 +240,206 @@ Start with step 1 of DESIGN §6: in `SaveEpochGuardTest`, move the loadable line
 recording epoch 2's inputs with `generation.*`, `enums` and `layout.*` at D-12's values; move
 `SaveEpochRefusalTest:65` and `ui/SlotPickerScreenTest:158-160` with the epoch. Then retarget the
 fifteen generator-1 and generator-2 tests of DESIGN §5.9 while both generators still exist.
+
+## Milestone 02 — One wilderness generator
+
+**Status:** complete on 2026-11-27.
+**Base:** `main` at `6fb68a2`, equal to the remote `main`, clean apart from an untracked `.vscode/`.
+The Verify workflow's run 46043427912 (#6, push) on `6fb68a2` succeeded: Windows x64, 17:38–17:53
+UTC.
+
+### What was done
+
+The steps of DESIGN §6 for 02. Each revision was built and tested on its own tree before it was
+committed.
+
+1. **Epoch 2** (D-11; `a0b6244`). `SaveHeader.EPOCH` is 2. This build writes and opens epoch 2
+   alone: it refuses every save of epoch 1, 0.9.1's included, as written by an older version, before
+   it touches the live world and without changing the file. 0.9.1's header check, which this build
+   left unchanged but for the constant, refuses an epoch-2 save as newer (read from the code, not
+   run). The owner has not answered Q-01, so D-11's default applies; the choice
+   stays open until 08. `SaveEpochRefusalTest`'s epoch assertion and the slot picker's "save epoch"
+   line moved with the epoch; the refusal tests that derive another epoch from `SaveHeader.EPOCH`
+   now refuse epoch 1 as older.
+2. **The guard's `loadable` input** (D-12; `cb81cbb`). `SaveEpochGuardTest` digests the generators
+   a load accepts as an input of its own, and `generation.*` digest only what the two generators
+   make.
+3. **Retargets** (`4007e02`), while generators 1 and 2 still existed. The eleven test classes of
+   DESIGN §5.9 that used generator 1 or 2 as a convenient world build generator 3: `PathfinderTest`,
+   `PlayerMovementSystemTest`, `PlayerTreatmentSystemTest`, `EnvironmentalSimulationTest`,
+   `RaycasterTest`, `WorldCoordinateContractTest`, seven tests of `DeepCaveGenTest`,
+   `SettlementPlannerTest`, `FortressGameplayIntegrationTest`, `EntityEcologyTest` and
+   `UrbanRefugesSectionTest`. The pathfinder and movement arenas generate every chunk before they
+   flatten any, so no neighbour's tree reaches into them.
+4. **Retirement** (`b77012d`). `GEN_LEGACY` and `GEN_DEEP` are gone and `World.isSupportedGenerator`
+   accepts 3 and 4–20: the `World` constructor throws for 1 and 2, and a save whose header names
+   either is refused as damaged before any world is built. Their pins went with them (two tests of
+   `WorldGeneratorFingerprintTest` with their arrays, `DeepCaveGenTest.legacyWorldsKeepLegacyTerrain`).
+   `UrbanGeneratorDispatchTest` and `UrbanRevisionTest` name 1 and 2 only as refused ids,
+   `CorruptSaveResilienceTest` proves the refusal with its reason, and `UrbanIndoorEnvironmentTest`'s
+   loop over the generators without buildings starts at 3. `loadable` was re-recorded. B19's `World`
+   comments were corrected.
+5. **Collapse** (D-07; `5c28eed`). `World.hasDeepFrontier` and `hasCaveIdentities` are gone. Where
+   they also ran in a city, they became "not a city": `World.settlementForRegion` and
+   `isBasaltFumarole`, `EntityManager`'s Gloomstalker depth rule, and the smoke's fortress approach,
+   snapshot and search in `QaHarness`. Inside `WorldGenerator` they became true, and `carveCaves`,
+   generator 2's depth thresholds with `RESONANT_TOP` and the conditions around the powder ores, the
+   settlement clearance, the POI reservations, the relic loot and the underground POIs, cave mouths
+   and settlements went. `BASALT_TOP` stays: the sulfur veins form below it. Every surviving branch
+   keeps its text (`git diff -w` shows only removed conditions), and the underground POI plan keeps
+   generator 3's branch, which draws no random number for a nest's or a shrine's height.
+6. **Documents** (`e1cbfd9`, `cf9629b`). ARCHITECTURE (the save policy's status, the guard's inputs,
+   the generator list, the gates, the fingerprint pins and two notes on generators 3–6), DEVELOPING
+   (the guard and the generation rule), the save skill, and CHANGELOG [Unreleased], which tells
+   players that 0.9.1's saves do not open.
+7. **Records:** this section, the status table, 01's commit hash, and DESIGN's B19 and Q-01 rows.
+
+**Order.** DESIGN §6 lists the collapse (its step 3) before the removal of the constants (its
+step 4); they ran the other way round. With the refusal first, every revision either builds
+generators 1 and 2 with their own code or refuses them, whereas the collapse first would have left
+a revision in which generator 3's code built a world that named generator 1 or 2. 03's plan
+already refuses (its step 3) before it collapses (its step 4).
+
+### Identity (D-12)
+
+The guard's inputs at each revision, by their first eight hex digits (the full values are in
+`SaveEpochGuardTest.RECORDED`):
+
+| Input | Epoch 1 (0.9.1) | `a0b6244` | `cb81cbb` | `b77012d` | `5c28eed` |
+| --- | --- | --- | --- | --- | --- |
+| `enums` | `b2c78dd0` | `b2c78dd0` | `b2c78dd0` | `b2c78dd0` | `b2c78dd0` |
+| `generation.city` | `b6c505f9` | `b6c505f9` | `6eb9e20c` | `6eb9e20c` | `6eb9e20c` |
+| `generation.wilderness` | `f1f93ab3` | `f1f93ab3` | `0d671ebd` | `0d671ebd` | `0d671ebd` |
+| `layout.city` | `d92581c6` | `d92581c6` | `d92581c6` | `d92581c6` | `d92581c6` |
+| `layout.wilderness` | `2aa9698e` | `2aa9698e` | `2aa9698e` | `2aa9698e` | `2aa9698e` |
+| `loadable` | inside `generation.*` | inside `generation.*` | `ed3b3c43` | `15958036` | `15958036` |
+| Digest | `6feb385a`, released | `6feb385a`, epoch 2 | `b07d3d02` | `be60041f` | `be60041f` |
+
+- From `cb81cbb` on, `generation.city` and `generation.wilderness` are D-12's targets, the values
+  0.9.1's tree gives for the same texts. `enums` and both layouts never moved. From `b77012d` only
+  `loadable` moved, to `loadable 3 4(1/0/3) … 20(17/7/4)`; the collapse moved nothing.
+- `WorldGeneratorFingerprintTest`'s generator-3 pins (terrain and column queries) are untouched and
+  pass, as do `ChunkMesherFingerprintTest`, `WorldSeedDeterminismTest` and `DeepCaveGenTest`'s
+  chunk-order cases, now on generator 3.
+
+### Findings
+
+- **The stalker rule's surface lookup.** `EntityManager.slowTick` looked up the surface under the
+  player for every world, although only generators 1 and 2 read it; the collapse removed it. The
+  lookup generated the player's chunk when a slow tick found it missing. The frame's streaming step,
+  which runs after the simulation and generates the nearest missing chunk first, now generates it
+  later in the same frame. `spawnStalkerIfValid` already refuses unloaded columns, and no test or
+  native run showed a difference.
+- **The smoke's fortress snapshot** no longer prints `generator=legacy`, which only generator 1
+  printed; a city still prints `{available=false,generator=urban}`.
+- **B19** is fixed in `World` (`b77012d`); its `UrbanWorldState` part stays with 03.
+- **The fifteen files of DESIGN §5.9.** Eleven were retargeted. The other four changed with the
+  retirement, because their subject was generators 1 and 2 themselves: `WorldGeneratorFingerprintTest`,
+  `UrbanGeneratorDispatchTest`, `UrbanRevisionTest` and `UrbanIndoorEnvironmentTest`. DESIGN put the
+  last one's historical test in 03; its loop had to start at 3 here because the constant went, and
+  03 still removes its generators 4–6. Three tests were deleted with their subject;
+  `legacyWorldsKeepLegacyTerrain`'s "never plans settlements" check stays proven for the city by
+  `UrbanGeneratorDispatchTest.noWildernessFeatureReachesAnUrbanWorld`.
+- **The README** describes 0.9.1, which wrote epoch 1, and stays true for that release; 08 writes
+  0.9.2's paragraph and its known limitation.
+
+### Native evidence
+
+`build/v092-m02-native.sh <checkout> <phase>` runs the wilderness release smoke from a checkout
+(`VEYLON_GENERATOR=wilderness VEYLON_SMOKE=30`, with its fortress approach), with a capture at 1 s,
+before the smoke changes anything. Seed 20261127, 1280 × 720, Survival and Creative, each run in its
+own data directory `build/qa/v092-m02-<phase>-wild-<mode>`. The 0.9.1 side ran from a detached
+worktree of `v0.9.1` (`build/v092-m02-v091`, at `2f78150`), this side from `5c28eed`. VSync was on,
+so frame rates sit at the monitor's 144 Hz. The first two 0.9.1 runs overlapped the portable build
+of `5c28eed`, which lowered their frame rate; they were repeated on an idle machine.
+
+| Run | Survival approach | Creative approach |
+| --- | --- | --- |
+| 0.9.1, during the build | 1,660 frames, 138.3 FPS | 1,489 frames, 124.1 FPS |
+| 0.9.1, idle | 1,727 frames, 143.8 FPS | 1,729 frames, 144.0 FPS |
+| `5c28eed` | 1,728 frames, 143.9 FPS | 1,727 frames, 143.8 FPS |
+| `5c28eed` again (control) | 1,728 frames, 143.9 FPS | 1,729 frames, 144.0 FPS |
+
+All eight runs exited 0 (the smoke throws on any failed gate), saved and loaded through their
+isolated slot, completed the fortress approach, and reported no GL, KHR or `glGetError` errors.
+Every run planned the same fortress: id −25769803771, region −6,5, centre −2134,2022, 2,940 blocks
+from the spawn, registered.
+
+The spawn captures, compared pixel by pixel (921,600 pixels; those differing by more than 8 of 255
+in a channel):
+
+| Pair | Survival | Creative |
+| --- | --- | --- |
+| 0.9.1 (idle) against `5c28eed` | 496 (0.054 %) | 3,444 (0.374 %) |
+| `5c28eed` against itself (control) | 633 (0.069 %) | 1,768 (0.192 %) |
+| 0.9.1 (during the build) against `5c28eed` | 3,566 (0.387 %) | 3,187 (0.346 %) |
+
+The differences are swaying plants and an even, pixel-wide speckle over textured faces (masks in
+`build/v092-m02/`), the same as between two runs of one build; no block differs. The binding proof
+of identical generation is the guard and the pins above.
+
+### Changed paths
+
+- Production: `save/SaveHeader.java`, `world/World.java`, `world/WorldGenerator.java`,
+  `entity/EntityManager.java`, `QaHarness.java`.
+- Tests: `save/SaveEpochGuardTest`, `save/SaveEpochRefusalTest`, `save/CorruptSaveResilienceTest`,
+  `save/UrbanRefugesSectionTest`, `ui/SlotPickerScreenTest`, `world/WorldGeneratorFingerprintTest`,
+  `world/DeepCaveGenTest`, `world/UrbanGeneratorDispatchTest`, `world/RaycasterTest`,
+  `world/WorldCoordinateContractTest`, `world/urban/UrbanRevisionTest`, `ai/PathfinderTest`,
+  `entity/PlayerMovementSystemTest`, `entity/PlayerTreatmentSystemTest`, `entity/EntityEcologyTest`,
+  `settlement/SettlementPlannerTest`, `settlement/FortressGameplayIntegrationTest`,
+  `simulation/EnvironmentalSimulationTest`, `UrbanIndoorEnvironmentTest`.
+- Documents: `docs/ARCHITECTURE.md`, `docs/DEVELOPING.md`,
+  `.agents/skills/veylon-save-compatibility/SKILL.md`, `CHANGELOG.md`, this file and DESIGN.
+- Ignored by Git: the logs, comparison masks and counting script in `build/v092-m02/`, the native
+  script `build/v092-m02-native.sh`, the worktree `build/v092-m02-v091`, the data directories
+  `build/qa/v092-m02-*` and the pack's status line for 02.
+
+### Validation
+
+In Git Bash with `JAVA_HOME` set to `build/tools/jdk25/jdk-25.0.4.1+1`:
+
+| Revision | Check | Result |
+| --- | --- | --- |
+| `a0b6244` | `./gradlew.bat test --tests "com.veylon.save.*" --tests "com.veylon.ui.SlotPickerScreenTest" --tests "com.veylon.SlotPickerRoutingTest" --tests "com.veylon.SaveRefusalRoutingTest" --console=plain` | 181 tests in 40 classes passed |
+| `cb81cbb` | `SaveEpochGuardTest` | 4 tests passed |
+| `4007e02` | the eleven retargeted classes | 80 tests passed |
+| `b77012d` | `./gradlew.bat build --console=plain` | BUILD SUCCESSFUL in 5m 44s: 2,523 tests in 345 classes passed, 2 skipped (both need symbolic links, which this host refuses); Javadoc and doclint passed |
+| `5c28eed` | the D-12 checks and the wilderness suites: `WorldGeneratorFingerprintTest`, `WorldSeedDeterminismTest`, `ChunkMesherFingerprintTest`, `SaveEpochGuardTest`, `DeepCaveGenTest`, `CaveIdentityGenerationTest`, `CaveToolsGameplayIntegrationTest`, `SettlementPlannerTest`, `FortressGameplayIntegrationTest`, `EntityEcologyTest`, `UrbanGeneratorDispatchTest`, `BeaconEndgameIntegrationTest` | 68 tests passed; the guard's digest unchanged |
+| `5c28eed` | `./gradlew.bat build --console=plain` | BUILD SUCCESSFUL in 5m 39s: 2,523 tests in 345 classes passed, 2 skipped as above |
+| `e1cbfd9`, `cf9629b` | a link checker over the changed documents; `git diff --cached --check` | every relative link and anchor resolves; clean |
+
+2,523 tests are 0.9.1's 2,526 less the three deleted ones. After the code, `graphify update .
+--no-cluster` rebuilt the graph: 13,084 nodes, 55,164 edges. Not run: the performance tasks (nothing
+on a measured path changed but removed conditions and one lookup) and the packaged builds (08).
+
+### Commits
+
+| Commit | Subject |
+| --- | --- |
+| `a0b6244` | feat(save): open only saves of epoch 2 |
+| `cb81cbb` | test(save): digest the generators a load accepts as an input of their own |
+| `4007e02` | test(world): build the tests that used generators 1 and 2 on the wilderness |
+| `b77012d` | refactor(world): retire generators 1 and 2 |
+| `5c28eed` | refactor(world): collapse the deep-frontier gates only the wilderness passed |
+| `e1cbfd9` | docs(save): describe save epoch 2 and the guard's loadable input |
+| `cf9629b` | docs(world): describe the wilderness as the only generator before the cities |
+| the records commit | docs(roadmap): record milestone 02 of 0.9.2 |
+
+No commit carries a co-author line. At the owner's request they are pushed to `origin/main`.
+
+### Limitations and pending gates
+
+- **Q-01 is open** (DESIGN §11). Under D-11's default a build of `main` refuses 0.9.1's saves. If the
+  owner keeps epoch 1, 08 reverts the epoch, adds the guard's subset rule (D-11) and opens a 0.9.1
+  save natively.
+- The Verify workflow's run on the pushed commits had not finished when this was written.
+- DESIGN's source line numbers are as of `2f78150`; `World`, `WorldGenerator`, `EntityManager` and
+  `QaHarness` changed in 02.
+
+### Next: milestone 03
+
+03 must record this records commit's hash in the table above. Then step 1 of DESIGN §6 for 03: add
+the direct generator-20 pins of D-13, with the values in milestone 01's section, in a commit of
+their own; then move the test arenas to the city newest first (D-14). Through 03 the guard's
+`generation.*`, `enums` and `layout.*` keep the values above; only `loadable` may move.

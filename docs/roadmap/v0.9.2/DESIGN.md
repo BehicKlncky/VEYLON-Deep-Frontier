@@ -483,7 +483,7 @@ Numbers continue 0.9.1's ledger, so that an id names one defect across releases.
 
 | Id | Defect | Evidence | Owner |
 | --- | --- | --- | --- |
-| B19 | Comments in `World` still describe save compatibility that 0.9.1 removed: generator 2 "retained for existing v3 saves" (`world/World.java:34`), "legacy (v2) saves always load as `GEN_LEGACY`" (`:137`), and keg attribution kept in "the optional extension" so that "older v3 saves default safely" (`:178-182`); `UrbanWorldState`'s class comment still names `urban.meta`'s "absent default" (`world/urban/UrbanWorldState.java:18`), which 0.9.1 D-18 removed. | Source; 0.9.1 D-16 to D-18. Found by this audit. | 02 (`World`), 03 (`UrbanWorldState`) |
+| B19 | Comments in `World` still describe save compatibility that 0.9.1 removed: generator 2 "retained for existing v3 saves" (`world/World.java:34`), "legacy (v2) saves always load as `GEN_LEGACY`" (`:137`), and keg attribution kept in "the optional extension" so that "older v3 saves default safely" (`:178-182`); `UrbanWorldState`'s class comment still names `urban.meta`'s "absent default" (`world/urban/UrbanWorldState.java:18`), which 0.9.1 D-18 removed. | Source; 0.9.1 D-16 to D-18. Found by this audit. | 02 (`World`: fixed in `b77012d`), 03 (`UrbanWorldState`) |
 
 The audit found no behavioural defect. The pack's own errors (D-16, §10) are not defects of the
 game.
@@ -507,7 +507,7 @@ existed. 01 changed it where it no longer fits (D-19):
 
 | Id | Question | Default until answered |
 | --- | --- | --- |
-| Q-01 | **Should 0.9.1's saves open in 0.9.2?** Retiring generators changes an input the released epoch 1 digests. Either 0.9.2 raises the epoch and refuses 0.9.1's saves as older, or the guard learns that narrowing the accepted generators to those a 0.9.1 player could make keeps the epoch, which weakens a released check (D-11). | Raise the epoch in 02 (D-11). The choice can be reversed until 08 prepares the release. |
+| Q-01 | **Should 0.9.1's saves open in 0.9.2?** Retiring generators changes an input the released epoch 1 digests. Either 0.9.2 raises the epoch and refuses 0.9.1's saves as older, or the guard learns that narrowing the accepted generators to those a 0.9.1 player could make keeps the epoch, which weakens a released check (D-11). | Raise the epoch in 02 (D-11), done in `a0b6244`. The choice can be reversed until 08 prepares the release. |
 
 Carried from 0.9.1 and still open: its Q-01 to Q-04 (blast torso speed, the self-blast radius, the
 iron arrow against the bullet, fire tuning) and the readings it flagged (its D-33, D-41, D-43, D-44
