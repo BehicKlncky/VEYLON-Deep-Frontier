@@ -19,6 +19,8 @@ final class CreativeQaScenes {
     private static final double SMOKE_FLIGHT_START_SECONDS = 5.2;
     private static final double SMOKE_FLIGHT_END_SECONDS = 6.8;
     private static final double SMOKE_FLIGHT_CLIMB_SECONDS = 1.0;
+    /** Blocks east of its start, more than the whole run, that a city's smoke flight is lifted clear of. */
+    private static final int SMOKE_FLIGHT_REACH = 48;
     /** VEYLON_SCENE=creative_flight flies from this time until the report. */
     private static final double SCENE_FLIGHT_START_SECONDS = 1.0;
     private static final double SCENE_FLIGHT_REPORT_SECONDS = 29.0;
@@ -103,10 +105,38 @@ final class CreativeQaScenes {
             smokeFlightEnded = true;
             return;
         }
-        if (flightFrames == 0) game.player.abilities.setFlying(true);
+        if (flightFrames == 0) {
+            game.player.abilities.setFlying(true);
+            liftClearOfTheCity();
+        }
         boolean climb = elapsed < SMOKE_FLIGHT_START_SECONDS + SMOKE_FLIGHT_CLIMB_SECONDS;
         flight.set(EAST_YAW, true, false, false, false, true, false, climb, false);
         fly(flightStep(elapsed));
+    }
+
+    /**
+     * A city starts the player in its refuge, under a roof and between walls, where the smoke's
+     * flight east keeps colliding and, on some seeds, crosses no chunk at all (0.9.1 B18). In a city
+     * the flight therefore starts two blocks above the highest loaded column on its way east, staged
+     * and printed; the wilderness starts in the open and is unchanged.
+     */
+    private void liftClearOfTheCity() {
+        if (!game.world.isUrban()) return;
+        int x = (int) Math.floor(game.player.pos.x), z = (int) Math.floor(game.player.pos.z);
+        int top = (int) Math.floor(game.player.pos.y);
+        for (int dx = 0; dx <= SMOKE_FLIGHT_REACH; dx++) {
+            for (int dz = -1; dz <= 1; dz++) {
+                Chunk chunk = game.world.getChunk(Math.floorDiv(x + dx, Chunk.SX), Math.floorDiv(z + dz, Chunk.SZ));
+                if (chunk != null) {
+                    top = Math.max(top, chunk.height(Math.floorMod(x + dx, Chunk.SX), Math.floorMod(z + dz, Chunk.SZ)));
+                }
+            }
+        }
+        float from = game.player.pos.y;
+        game.player.pos.y = Math.max(from, top + 2f);
+        game.player.vel.zero();
+        System.out.println(String.format(Locale.ROOT,
+                "[smoke] staged city flight start above the roofs east: y %.1f -> %.1f", from, game.player.pos.y));
     }
 
     /** VEYLON_SCENE=creative_flight: stage a straight fast flight that measures streaming (R14). */
