@@ -442,3 +442,71 @@ The pause menu's panel covers the label's place, so `14-pause` looked the same b
 `HudTargetLabelTest` proves the label is not drawn there, nor under the screens opened from it.
 `ui.HudVitalsTest` holds the figures and the pulse. Limits: the crosshair still shows through
 both cards, as it always has, and the HUD under them is otherwise unchanged.
+
+## 0.9.1 milestone 09 — the release's acceptance route (2026-11-27)
+
+No screen or HUD element changed in this milestone. The release route
+(`VEYLON_FRONTEND=route-release`, its relaunch and its restore) captured every screen of
+0.9.1's save flow in one sequence, on the release tree, for each world kind and mode: NEW
+FRONTIER with a typed seed, the slot picker, the night's sleep and the autosave's SAVING...,
+the pause menu naming each slot and its world's seed, the question on the way back to the
+title, the picker with two ready slots and 0.9.0's file, a slot of another version refused, the
+CONTROLS screen before and after, the settings read back at a relaunch, and a damaged slot
+restored from its backup.
+
+### Reproduce
+
+```bash
+# build/v091-m09-native.sh copies the matching 0.9.0 save into each directory first; the saves
+# came from the tagged 0.9.0 build (build/v091-m09-v090-saves.sh).
+VEYLON_SEED=20261127 VEYLON_AUTOSAVE=on VEYLON_FRONTEND=route-release VEYLON_RESOLUTION=1280x720 \
+  VEYLON_CAPTURE_TAG=v091-m09-city-survival ./gradlew.bat run -PveylonDataDir=build/qa/v091-m09-city-survival
+VEYLON_SEED=20261127 VEYLON_FRONTEND=route-release-relaunch VEYLON_RESOLUTION=1280x720 \
+  VEYLON_CAPTURE_TAG=v091-m09-city-survival-relaunch ./gradlew.bat run -PveylonDataDir=build/qa/v091-m09-city-survival
+cp -r build/qa/v091-m09-city-survival build/qa/v091-m09-city-survival-restore
+VEYLON_SEED=20261127 VEYLON_FRONTEND=route-release-restore VEYLON_RESOLUTION=1280x720 \
+  VEYLON_CAPTURE_TAG=v091-m09-city-survival-restore ./gradlew.bat run -PveylonDataDir=build/qa/v091-m09-city-survival-restore
+# Creative adds VEYLON_GAME_MODE=creative, the wilderness VEYLON_GENERATOR=wilderness.
+```
+
+### Validation record
+
+All runs on 2026-11-27, NVIDIA GeForce RTX 3060 Ti, driver 621.01, OpenGL 3.3.0, windowed,
+1280 × 720, seed 20261127, each world kind and mode in its own directory
+`build/qa/v091-m09-<tag>/` and its copy `…-restore/`; logs are
+`build/v091-m09-native-<tag>[-relaunch|-restore].log` and the summary
+`build/v091-m09-native-summary.txt`. Every launch printed `pass=true` with `glErrors=0
+khrErrors=0`, and every shutdown summary read `glGetError=0` and 0 KHR errors.
+
+| Tag | `route-release` | `-relaunch` | `-restore` |
+| --- | --- | --- | --- |
+| `city-survival` | 35 s, 21 captures | 11 s, 4 | 8 s, 3 |
+| `city-creative` | 34 s, 21 | 11 s, 4 | 9 s, 3 |
+| `wild-survival` | 30 s, 20 (no search) | 10 s, 4 | 8 s, 3 |
+| `wild-creative` | 31 s, 20 (no search) | 11 s, 4 | 8 s, 3 |
+
+- `02-new-frontier-typed`: the field holds "safe saves" and the note gives its seed,
+  1788257347; `03-world-a` is that world in slot 1.
+- `06-saving` and `07-autosaved`: SAVING... in the top gap while the waking's fade is still
+  dark, then "Autosaved to slot 1." in the log under "You wake after 2.0 hours". In the
+  wilderness the staged bedroll is in view with "[F] Sleep (bedroll)".
+- `08-pause-slot-1` and `12-pause-slot-2`: the pause menu names the world and its seed (the
+  wilderness's "The wilderness  /  seed 20261127") and its keys name the slot, "[F5] Save to
+  slot 2   [F9] Load slot 2   [R] Return to title   [Q] Quit".
+- `13-return-question`: "Since slot 2 was last saved: under a minute of play." over SAVE AND
+  RETURN, RETURN WITHOUT SAVING and CANCEL.
+- `15-load-two-slots`: two READY cards with their world, mode, day and time, place and "a
+  development build, save epoch 1" (a run from Gradle has no jar version), the third empty, and
+  under them "saves/veylon.sav is a save from VEYLON 0.9.0 or earlier: this version cannot open
+  it and leaves it as it is."
+- `18-slot-3-other-version` and `19-slot-3-refused`: slot 3 reads ANOTHER VERSION in orange,
+  "This save was written by an older version of VEYLON. Start a new world." on its card and,
+  after Enter, under the cards; LOAD is dimmed.
+- `20-controls`, `21-controls-changed` and the relaunch's `02-controls-persisted`: 100% and Off,
+  then 170% and On, then 170% and On read at launch.
+- The restore's `01-slot-2-damaged`: "DAMAGED / BACKUP AVAILABLE", "This save is damaged and
+  cannot be opened." and the backup's time and contents, with RESTORE [R] lit;
+  `02-restore-confirm` and `03-restored`, the world F5 saved.
+
+Limits: the city's SAVING... capture falls under the waking's fade, as a player sees it; the
+wilderness's bedroll is staged beside the survivor, since that world has no refuge bed.
