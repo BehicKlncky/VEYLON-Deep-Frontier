@@ -13,8 +13,8 @@ the first milestone below that is not complete.
 | 05 Autosave | Complete | `2b9ce42`, `efc99ec`, `e487e6a`, `828a184`, `0a22a7c`, `1a11340`, `90834e0`, `759b3e7`, `687f3d3` |
 | 06 Session and control comfort | Complete | `91e576d`, `5909555`, `f9ea0e8`, `1573313`, `c652200`, `68a0b5f`, `c36ed1b`, `3cb57cf`, `72534e8`, `bb17c31` |
 | 07 Forgotten defects sweep | Complete | `dea5189`, `323ee57`, `77517ce`, `1508aef`, `3958deb`, `422e2a9`, `9b485dd`, `42d3e53`, `79aee28`, `9b17061`, `56648d9`, `df85b5d`, `ebff3a8`, `010a60d`, `b181761`, `1de9ae8`, `dc3ea84`, `5e5044e`, `a7a2695` |
-| 08 Day temperature curve | Complete | `3fc3570`, `132ff76`, `64b20a6`, `bbc497f`, `5694a20`, `a7ddf7b`, then the records commit that adds this section; 09 records its hash |
-| 09 Integration and release preparation | Not started | |
+| 08 Day temperature curve | Complete | `3fc3570`, `132ff76`, `64b20a6`, `bbc497f`, `5694a20`, `a7ddf7b`, `23e50bc` |
+| 09 Integration and release preparation | Complete: 0.9.1 is prepared for release; merging, tagging and publishing are the owner's | `388d087`, `bc6e81a`, `06675dc`, `ab11925`, `8c37958`, `1ffc375`, `a565ae3`, `079954b`, `1c96e10`, then the records commit that adds this section |
 
 ## Milestone 01 — Release plan and defect audit
 
@@ -1409,3 +1409,254 @@ No commit carries a co-author line. Nothing was pushed.
 
 Integration and release preparation: full evidence, documents, version 0.9.1 and its release
 notes, ready for the owner.
+
+## Milestone 09 — Integration and release preparation
+
+**Status:** complete on 2026-11-27. Every gate of this milestone is met and 0.9.1 is prepared for
+release; merging, tagging and publishing are the owner's and were not done.
+**Base:** `main` at `23e50bc`, the records commit of 08, pushed with 07 that morning; clean apart
+from an untracked `.vscode/`.
+
+### What was done
+
+1. **The audit** of the acceptance contract (00 §4) and the ledger, below: every item is met. The
+   release smoke found one more defect, B18, which was fixed here.
+2. **The final acceptance scenario**, natively, in Survival and Creative, in the city and the
+   wilderness: a new route plays the pack's whole scenario over three launches (`388d087`, D-46),
+   against genuine saves the tagged 0.9.0 build wrote. The reverse direction, 0.9.0 opening a 0.9.1
+   save, was run natively too.
+3. **The ledger's native evidence** and the corrected day, run again on the release tree.
+4. **The release smoke** in the city, the Creative city and the wilderness, the calibrated
+   performance tasks, and the same smokes and the city profile on the tagged 0.9.0 build the same
+   afternoon, to tell a change from the host's drift.
+5. **Epoch 1 released:** `SaveEpochGuardTest`'s `RELEASED` holds epoch 1 and its digest
+   `6feb385a093f33b59e74590e5844da16fcaf1c323218962c46449f6a6d93d5b8` (`bc6e81a`).
+6. **B18** (new): the Creative smoke's flight in a city starts above the roofs (`8c37958`, D-47).
+7. **Documents:** the README's 0.9.1 paragraph, where Windows keeps the slots (its run section still
+   named 0.9.0's `saves\veylon.sav`) and the artifact names; ARCHITECTURE, DEVELOPING and the save skill
+   on the released epoch; DEVELOPING's "Release acceptance QA" and the smoke's flight; the release
+   figures in PERFORMANCE_BENCHMARKS; HUD_VALIDATION's milestone 09 section; DESIGN D-46, D-47 and
+   B18.
+8. **Version and notes:** `build.gradle` and `ReleaseVersionTest` at 0.9.1, CHANGELOG's
+   `[0.9.1] - 2026-11-27` with a Compatibility section and `[Unreleased]` above it, and
+   `docs/releases/v0.9.1.md` with tag-pinned links, which says plainly that saves of 0.9.0 and
+   earlier do not open, why, and that the file is left untouched.
+9. **The release artifacts:** `releaseArtifacts --rerun-tasks --no-daemon`, the Windows archive
+   checked as the tag workflow checks it, and the release smoke from the fat JAR and the unpacked
+   `Veylon.exe`.
+
+### The acceptance contract
+
+| Item (00 §4) | Evidence | Status |
+| --- | --- | --- |
+| 1. A 0.9.1 save opens; every other epoch is refused before the live world is touched, with a message, and the file stays byte-identical | `SaveEpochRefusalTest`, `SaveRefusalRoutingTest` (03); natively, in each world kind and mode a save the tagged 0.9.0 build wrote was refused from slot 3 with "This save was written by an older version of VEYLON. Start a new world.", and it and its copy hashed the same before and after; the tagged 0.9.0 build refused a 0.9.1 save ("Save is version 4; this build reads versions 2-3", "No compatible save was found.") and left it unchanged | Met |
+| 2. Three slots: a new world into an empty or confirmed slot, any slot loads from the title, F5/F9 on the active slot, a damaged slot recovered from its backup, summaries without loading | `SaveSlotsTest`, `SlotPickerRoutingTest` (04); natively two worlds in slots 1 and 2, both loaded and compared from the title at launch and after a relaunch, F5 into slot 2, and a damaged slot 2 restored from its newest backup in every world kind and mode | Met |
+| 3. Autosave at the designed moments, never at an unsafe one, and it can be turned off | `AutosaveTest` (05); natively the waking's autosave, announced by SAVING..., wrote slot 1 in every world kind and mode; `urban_autosave` (05) holds the hunted case | Met |
+| 4. NEW FRONTIER accepts and rerolls a seed; the pause menu returns to the title with a save choice; mouse sensitivity and invert-Y persist | `NewFrontierSeedTest`, `ReturnToTitleRoutingTest`, `ControlsOptionsRoutingTest` (06); natively a typed seed, both ways back to the title, and 170 % with invert-Y read at a relaunch | Met |
+| 5. Every ledger defect fixed with a regression test or native evidence, or accepted; the day warmest in the afternoon | B01–B18 fixed (DESIGN §5); their tests ran in this milestone's builds; their native evidence and `day_curve` were run again below | Met |
+| 6. The build passes without flaky failures across runs and is faster than the snapshot; a push and pull-request workflow exists | 17m 50s at the snapshot, 5–7 min for a build alone since 02, this milestone's included; `verify.yml`'s Windows job passed on all three pushes, the last (run 45941592409, #4) on `23e50bc`; its macOS arm64 job passed on the weekly run of 2026-11-23 (run 45191368017, #3, on `bb17c31`, 18 min), which closes 02's pending gate | Met |
+
+### The final scenario, natively
+
+All on the owner's host (AMD Ryzen 5 5600X, NVIDIA GeForce RTX 3060 Ti, driver 621.01, OpenGL
+3.3.0, windowed), 1280 × 720, seed 20261127. **The 0.9.0 saves:** a detached worktree at tag
+`v0.9.0` (`41dbfd6`), by `build/v091-m09-v090-saves.sh`, wrote one save per world kind and mode,
+each in its own directory under `build/qa/v091-m09-v090-*` (format 3, header `56 45 59 4c 00 00 00
+03`): the city's from its `route` (`saves/veylon.sav`, 3,414 bytes in Survival, SHA-256
+`7d74b588…dc1c0c`, and 3,355 in Creative, `35b669fe…f33aed`), the wilderness's from its 30-second
+smoke (`build/qa/smoke-save.dat`, 5,625 bytes in Survival, `c9158ed9…a74dcf`, and 5,865 in Creative,
+`26cbaf6d…86021e`); every run passed. A first pass with a 10-second smoke ended before the smoke's
+fortress approach could finish, so its gate failed after the saves were written; it was repeated
+at 30 s.
+
+**The release route,** by `build/v091-m09-native.sh`, which copies the matching 0.9.0 save into a
+new directory `build/qa/v091-m09-<tag>/` as `saves/veylon.sav`, runs `route-release` there with
+`VEYLON_AUTOSAVE=on`, then `route-release-relaunch`, then copies the directory to `…-restore/` and
+runs `route-release-restore` in the copy. Summary `build/v091-m09-native-summary.txt`; logs
+`build/v091-m09-native-<tag>[-relaunch|-restore].log`; the captures are in HUD_VALIDATION,
+milestone 09.
+
+| Tag | `route-release` | `-relaunch` | `-restore` | 0.9.0's file |
+| --- | --- | --- | --- | --- |
+| `city-survival` | `pass=true`, 35 s, 21 captures | `pass=true`, 11 s, 4 | `pass=true`, 8 s, 3 | unchanged |
+| `city-creative` | `pass=true`, 34 s, 21 | `pass=true`, 11 s, 4 | `pass=true`, 9 s, 3 | unchanged |
+| `wild-survival` | `pass=true`, 30 s, 20 | `pass=true`, 10 s, 4 | `pass=true`, 8 s, 3 | unchanged |
+| `wild-creative` | `pass=true`, 31 s, 20 | `pass=true`, 11 s, 4 | `pass=true`, 8 s, 3 | unchanged |
+
+- Every launch printed `glErrors=0 khrErrors=0`, and every shutdown summary read `glGetError=0` and
+  0 KHR errors.
+- Each first launch typed "safe saves" (seed 1788257347) and started that world in slot 1; in a
+  city it searched a refuge cupboard and took a stack from it; at a staged 23:15 it slept, in the
+  refuge's camp bed or on a bedroll staged beside the survivor in the wilderness, woke after 2.0
+  hours, and the waking's autosave showed SAVING... and wrote slot 1 in 14.5–17.2 ms; `R` and `N`
+  left slot 1 byte for byte. A world of the offered seed, 20261127, started in slot 2, walked,
+  opened the map and saved with F5; `R` and `Enter` saved it again, after which F5's save was
+  slot 2's newest backup. LOAD FRONTIER then loaded slot 1 and slot 2: each held the durable digest
+  kept when it was written, its file was unchanged, and its clock and play time were those of its
+  summary (+0.00 minutes and +0.00 s, read in the frame the load began to play). 0.9.0's save was
+  copied into slot 3, shown as another version and refused, both files unchanged; 170 % and
+  invert-Y were applied on the title's CONTROLS.
+- Each relaunch read 170 % and invert-Y at launch and loaded both slots again as saved, the files
+  unchanged by the loads. Each restore damaged one byte of slot 2's save in the copy, saw slot 2
+  damaged with its backup, restored it, and found the world F5 had saved, the slot's file now byte
+  for byte that backup and the damaged file set aside unchanged.
+- The first two runs of the Survival city failed one check each, "slot 1 holds exactly what was
+  saved" (in its first launch and its relaunch alike): the digest had been kept 0.8 s after the
+  autosave, by when a slow tick had registered a city site and a block had been edited, neither of
+  which the save held (`sites=1 edits=1` kept, `sites=0 edits=0` loaded), and the loaded side was
+  read a frame after the load. Kept in the frame
+  of the write and read in the frame of the load (D-46), every comparison matched; the four
+  directories were run afresh on that code.
+- **The reverse direction:** the tagged 0.9.0 build, given slot 1 of `city-survival` as its
+  `saves/veylon.sav` and its `route-load` (`build/v091-m09-v090-reads-091.log`), printed "Save is
+  version 4; this build reads versions 2-3. Old prototype saves can't be migrated - start a new
+  world.", stayed on its title with "No compatible save was found." and left the file's SHA-256
+  as it was (`836c2d3e…3c37`). Its route reported its own load check failed, as it must.
+
+The route runs no smoke code, so B18's fix, made after these runs, does not touch them; neither
+does the version, which a run from Gradle reports as "a development build".
+
+### The ledger on the release tree
+
+Every ledger defect is closed (DESIGN §5), and each one's regression test ran in this milestone's
+builds. The native evidence of 07 and 08 was run again on the release tree by
+`build/v091-m09-ledger.sh`, each run in a new directory `build/qa/v091-m09-ledger-<tag>/`, summary
+`build/v091-m09-ledger-summary.txt`; every run ended with `glGetError=0`.
+
+| Run | Defects | Result |
+| --- | --- | --- |
+| `route-720`, `route-creative-720` (`VEYLON_FRONTEND=route`, seed 20261126) | B15, B06, and the default path | `pass=true` both, 15 captures each: the Survival death card reads 0 health with no label |
+| `missions-720` (`urban_missions`) | B06 | `pass=true`, 15 captures |
+| `species-close-720` (`dismember_species_close`) | B07 | 4 captures: the legs lie down |
+| `molotov-tree-720` (`molotov_tree`) | B09 | 4 captures: fire on the trunk's and canopy's open faces |
+| `captive-720` (`fort_captive`, Creative) | B03 | `pass=true` |
+| `player-blast-720` (`dismember_player`) | B13 | 4 captures: the card watches the remains from clear of them |
+| `day-meadow-720`, `day-yards-720` (`day_curve`, seed 20260731) | B14 | `pass=true` both: the meadow 22.1 °C at 12:03 and 9.3 °C at 03:02; the industrial yards 32.8 and 20.0 °C, as 08 measured |
+
+B01 (the pause menu's world line), B02 (the temporary-directory retry, which deleted three
+directories on their second attempt in the builds of `388d087` and `8c37958`), B04, B05, B08, B10, B11, B12, B16
+and B17 rest on their tests and records.
+
+### B18: the Creative smoke's flight in a city
+
+The release smoke flies a Creative player east from 5.2 to 6.8 s and fails unless the flight
+crosses a loaded chunk. Since urban package 26 the smoke plays the city, where the player starts in
+the refuge: the flight climbs into its ceiling and flies into its walls. With seed 20261127 it
+crossed no chunk, and the Creative city smoke failed ("Creative smoke flight did not cross loaded
+terrain"); the tagged 0.9.0 build failed the same way on that seed, and seeds 20260910 and 20261120
+passed only by crossing one chunk. Now, in a city, the flight starts two blocks above the highest
+loaded column within 48 blocks east of the player (`[smoke] staged city flight start above the
+roofs east: y 41.0 -> 55.0` on all three seeds) and crossed two chunks on each; the Creative
+wilderness smoke, which starts in the open and is unchanged, crossed two as before. The smoke has
+no headless twin, so the evidence is native: before, `build/v091-m09-ledger-smoke-creative-720.log`
+and `build/v091-m09-v090-smoke-creative.log`; after, `build/v091-m09-b18-smoke-*.log`.
+
+### Release smoke and performance
+
+Measured with no build running beside them; the tables, budgets and the 0.9.0 comparison are in
+[PERFORMANCE_BENCHMARKS](../../PERFORMANCE_BENCHMARKS.md#release-run-v091-2026-11-27).
+
+- **Smokes**, seed 20260910, 1280 × 720, VSync off: the city 995.1 FPS, the Creative city 1,012.7
+  (before B18's fix; 1,038.8 after it, from another view), the wilderness 1,419.1 with its fortress
+  approach at 1,493.8. The tagged 0.9.0 build on the same afternoon: 988.8, 1,005.8, 1,417.2 and
+  1,490.7. Every run saved and loaded, kept every hard limit and read zero GL and KHR errors.
+- **`performanceTest`** (`build/v091-m09-performance*.log`): nine of ten benchmarks pass (chunk tick
+  0.608 ms, entity tick 0.698, settlement tick 0.019, presentation 0.0969); the durable `save` gate
+  fails at 5.255 ms against 2.20, this host's gap since 0.7.4 (0.9.0: 5.295). The rain gates pass.
+  The city profile passed 5 of 5 in two of three runs; in the first, the flight leg's CPU frame p99
+  was 8.366 ms against the half-frame gate of 8.33 ms, then 8.102, 7.591 and 8.091 ms, while the
+  tagged 0.9.0 build read 7.891 and 7.800 ms (`build/v091-m09-v090-cityperf-*.log`). The gate sits at
+  this host's edge for both builds; the miss is recorded and nothing was relaxed.
+
+### The release artifacts
+
+`./gradlew.bat releaseArtifacts --rerun-tasks --no-daemon --console=plain` ran on the working tree
+whose build inputs are exactly `1c96e10`'s (the code of `8c37958` with the version at 0.9.1; every
+later change is a document): BUILD SUCCESSFUL in 5m 56s with all 15 tasks run
+(`build/v091-m09-release-artifacts.log`), 2,526 tests in 345 classes, no failure, the two
+symbolic-link skips and no temporary-directory retry, then Javadoc, the fat JAR
+`build/libs/veylon-0.9.1-all.jar` (9,565,619 bytes) and `build/distributions/veylon-0.9.1-windows-x64.zip`
+(56,921,039 bytes, SHA-256 `81d4e2e36d0b1e9dbc04eafabf9f7ebd315d5a8f6a9f40101e9fdf017dd22a48`). The
+epoch guard printed epoch 1's digest as released.
+
+`build/v091-m09-package.sh` (summary `build/v091-m09-package-summary.txt`) then checked the archive
+as `release-build.yml` checks it: over 1 MiB, it unpacks, `Veylon/Veylon.exe`, the bundled runtime
+(`JAVA_VERSION="25.0.4.1"`), and `app/Veylon.cfg` naming the `natives-windows` jar and
+`--enable-native-access=ALL-UNNAMED` (beside `-Djpackage.app-version=0.9.1` and `-Xmx2G`); the
+versioned `veylon-0.9.1.jar` and the license are there too. It ran the release smoke
+(`VEYLON_SMOKE=30`, seed 20260910, VSync off) from the fat JAR (`java --enable-native-access=ALL-UNNAMED
+-Xmx2G -jar`) and from the unpacked `Veylon.exe`, each with its working directory, which is the
+data directory on Windows, set to a new `build/qa/v091-m09-fatjar-smoke/` or `…-exe-smoke/`: 1,007.9
+and 991.2 FPS, save and load through `build/qa/smoke-slots/slot-1.sav` inside it, 139 of 139 item
+icons, zero GL and KHR errors (0.9.0: 1,026.1 and 1,015.5). A first run of the script took the
+first archive in `build/distributions`, 0.7.3's, which older releases left there, and smoked that;
+it was discarded, and the script now names the version's files.
+
+### Changed paths
+
+- Production: `FrontendRouteQa.java`, `CreativeQaScenes.java`.
+- Tests: `save/SaveEpochGuardTest.java`, `qa/ReleaseVersionTest.java`.
+- Build: `build.gradle` (version 0.9.1).
+- Documents: `README.md`, `CHANGELOG.md`, `docs/releases/v0.9.1.md` (new), `docs/ARCHITECTURE.md`,
+  `docs/DEVELOPING.md`, `docs/PERFORMANCE_BENCHMARKS.md`, `docs/graphics/HUD_VALIDATION.md`,
+  `.agents/skills/veylon-save-compatibility/SKILL.md`, DESIGN and this file.
+
+### Validation
+
+Every build ran in Git Bash with `JAVA_HOME` set to `build/tools/jdk25/jdk-25.0.4.1+1`. The code
+commits were built in a detached worktree (`build/v091-m09-wt`), logs in `build/v091-m09/`:
+
+| Commit | Focused checks | Build on its tree |
+| --- | --- | --- |
+| `388d087` | `compileJava`; the twelve native launches above | `build --console=plain`: 5m 45s, 2,526 tests in 345 classes |
+| `bc6e81a` | `save.SaveEpochGuardTest` (4 tests, "epoch 1 … (released)"); with `ReleaseVersionTest` and `qa.OrchestratorSizeTest` on the working tree first | the final build |
+| `8c37958` | the B18 smokes above | `build --console=plain`: 5m 38s, 2,526 tests in 345 classes |
+
+**The final tree**, `1c96e10` (the records commit changes no build input): its build is the
+`releaseArtifacts` run under "The release artifacts". `graphify update . --no-cluster` then rebuilt
+the graph: 13,092 nodes. The documentation commits had link, anchor, path and `git diff --check`
+checks: every relative link and anchor in the changed documents resolves, and so do the release
+notes' tag-pinned links against the working tree.
+
+### Commits
+
+| Commit | Subject |
+| --- | --- |
+| `388d087` | feat(qa): play the release's acceptance scenario from the title |
+| `bc6e81a` | test(save): record epoch 1 as released with 0.9.1 |
+| `06675dc` | docs(save): record epoch 1 as released |
+| `ab11925` | docs(readme): say where Windows keeps the save slots |
+| `8c37958` | fix(qa): start a city's Creative smoke flight above the roofs |
+| `1ffc375` | docs(qa): describe the release acceptance route and the city smoke flight |
+| `a565ae3` | docs(hud): record the release route's captures |
+| `079954b` | docs(performance): record the 0.9.1 release measurements |
+| `1c96e10` | chore(release): prepare v0.9.1 |
+| the records commit | docs(roadmap): record milestone 09 of 0.9.1 |
+
+No commit carries a co-author line. At the owner's request every commit of 09 is pushed to
+`origin/main` once this records commit is made; nothing is tagged or published.
+
+### Limitations and pending gates
+
+- **For the owner, the release itself:** `main` holds the prepared 0.9.1. Releasing it is an
+  annotated tag `v0.9.1` ("VEYLON 0.9.1 - Safe Saves") on the pushed release commit, pushed to
+  `origin`; the tag workflow then builds, checks and publishes the Windows x64, macOS Apple Silicon
+  and macOS Intel archives with `docs/releases/v0.9.1.md` as the release body, and it refuses a tag
+  that is not `v` plus `build.gradle`'s version. 0.9.1 was developed on `main`, so there is no
+  release branch to merge. Not done here: the milestone does not authorize it.
+- **macOS packaging** is checked only by the tag workflow; no macOS archive was built or run here.
+  The macOS arm64 build and tests passed in `verify.yml`'s weekly run on `bb17c31`.
+- **Readings the owner may want to change**, none of which blocks the release: D-33 (`VEYLON_SEED`
+  wins over NEW FRONTIER's roll, not over a typed seed), D-41 (the burning blocks' glow sheets,
+  with the rest of the fire tuning, Q-04), D-43 (bodies settle behind the death card while the
+  world stays paused), D-44 (the coldest hour is 02:00, not just before dawn) and D-45 (the
+  industrial yards in the Dry Season cost a careless survivor real health by day). Q-01 to Q-04
+  stay open.
+- The city profile's flight gate and the durable-save gate sit at or past this host's edge; the
+  reference machine has not run 0.9.1.
+- `FrontendRouteQa` holds every frontend route and is now 1,431 lines; it has no line budget, but
+  a later route belongs in a class of its own.
+
+### Next
+
+The owner tags `v0.9.1`, then 0.9.2 "Clean Slate", milestone 01.
