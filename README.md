@@ -153,8 +153,11 @@ before it replaces a save (see [Save format](#save-format)).
 ./gradlew run
 ```
 
-On Windows, saves go to `saves\veylon.sav`. On macOS, saves, graphics and audio settings
-go under `~/Library/Application Support/VEYLON Deep Frontier/`. A build opens only the
+On Windows, the three save slots and their backups go to a `saves` folder
+(`saves\slot-1.sav` and so on), with the settings files beside it, in the working
+directory the game is started from. On macOS, saves and the graphics, audio, autosave
+and mouse settings go under
+`~/Library/Application Support/VEYLON Deep Frontier/`. A build opens only the
 saves of its own **save epoch**: saves written by 0.9.0 and earlier releases are
 refused with a message and left untouched, and need a new world (see
 [Save format](#save-format)).
