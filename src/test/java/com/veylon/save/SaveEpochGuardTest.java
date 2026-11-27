@@ -94,9 +94,10 @@ class SaveEpochGuardTest {
 
     /**
      * The digest of each epoch a release has shipped, as {@link #digest} gave it when the release was
-     * prepared. Milestone 09 adds epoch 1 when 0.9.1 is released. Never edit or remove an entry.
+     * prepared: epoch 1 is VEYLON 0.9.1's (0.9.1 milestone 09). Never edit or remove an entry.
      */
-    private static final Map<Integer, String> RELEASED = Map.of();
+    private static final Map<Integer, String> RELEASED = Map.of(
+            1, "6feb385a093f33b59e74590e5844da16fcaf1c323218962c46449f6a6d93d5b8");
 
     /** The current epoch's inputs as last recorded. */
     private static final Map<String, String> RECORDED = Map.of(
