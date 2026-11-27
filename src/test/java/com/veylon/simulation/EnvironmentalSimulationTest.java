@@ -70,7 +70,7 @@ class EnvironmentalSimulationTest {
 
     @Test
     void roofAndWallsProduceIndoorShelterCoverage() {
-        World world = new World(1005L, World.GEN_LEGACY);
+        World world = new World(1005L, World.GEN_CAVE_IDENTITIES);
         Chunk chunk = world.getOrCreateChunk(0, 0);
         for (int x = 0; x < Chunk.SX; x++) {
             for (int z = 0; z < Chunk.SZ; z++) {

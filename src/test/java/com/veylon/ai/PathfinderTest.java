@@ -16,12 +16,20 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /** Bounded A*: walls, gates, step-up, drop limits and unloaded-chunk safety. */
 class PathfinderTest {
 
-    /** Builds a flat 3-chunk-square test arena at y=40 around the origin chunk. */
+    /**
+     * Builds a flat 3-chunk-square test arena at y=40 around the origin chunk. Every chunk is
+     * generated before any is flattened, so no neighbour's trees reach into the arena.
+     */
     private World flatWorld() {
-        World w = new World(555L, World.GEN_LEGACY);
+        World w = new World(555L, World.GEN_CAVE_IDENTITIES);
         for (int cx = -1; cx <= 1; cx++) {
             for (int cz = -1; cz <= 1; cz++) {
-                Chunk c = w.getOrCreateChunk(cx, cz);
+                w.getOrCreateChunk(cx, cz);
+            }
+        }
+        for (int cx = -1; cx <= 1; cx++) {
+            for (int cz = -1; cz <= 1; cz++) {
+                Chunk c = w.getChunk(cx, cz);
                 for (int lx = 0; lx < 16; lx++) {
                     for (int lz = 0; lz < 16; lz++) {
                         for (int y = 0; y < Chunk.SY; y++) {
@@ -195,10 +203,15 @@ class PathfinderTest {
     }
 
     private World snakeMaze(int rows) {
-        World world = new World(556L, World.GEN_LEGACY);
+        World world = new World(556L, World.GEN_CAVE_IDENTITIES);
         for (int cx = -1; cx <= 2; cx++) {
             for (int cz = -1; cz <= 2; cz++) {
-                Chunk chunk = world.getOrCreateChunk(cx, cz);
+                world.getOrCreateChunk(cx, cz);
+            }
+        }
+        for (int cx = -1; cx <= 2; cx++) {
+            for (int cz = -1; cz <= 2; cz++) {
+                Chunk chunk = world.getChunk(cx, cz);
                 for (int lx = 0; lx < Chunk.SX; lx++) {
                     for (int lz = 0; lz < Chunk.SZ; lz++) {
                         for (int y = 0; y < Chunk.SY; y++) {

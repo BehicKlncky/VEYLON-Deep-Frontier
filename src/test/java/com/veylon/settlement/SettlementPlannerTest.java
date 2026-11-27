@@ -19,7 +19,7 @@ class SettlementPlannerTest {
     private static final long SEED = 20260716L;
 
     private WorldGenerator gen(long seed) {
-        return new World(seed, World.GEN_DEEP).generator;
+        return new World(seed, World.GEN_CAVE_IDENTITIES).generator;
     }
 
     @Test
@@ -48,8 +48,8 @@ class SettlementPlannerTest {
     void chunkGenerationOrderDoesNotChangeSettlements() {
         // Generate the same chunks in reversed order on two worlds and compare
         // every block: layouts must be identical.
-        World w1 = new World(SEED, World.GEN_DEEP);
-        World w2 = new World(SEED, World.GEN_DEEP);
+        World w1 = new World(SEED, World.GEN_CAVE_IDENTITIES);
+        World w2 = new World(SEED, World.GEN_CAVE_IDENTITIES);
         Settlement plan = null;
         int rx = 0, rz = 0;
         outer:

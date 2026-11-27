@@ -13,7 +13,7 @@ class WorldCoordinateContractTest {
 
     @BeforeEach
     void setUp() {
-        world = new World(801L, World.GEN_LEGACY);
+        world = new World(801L, World.GEN_CAVE_IDENTITIES);
         world.getOrCreateChunk(0, 0);
     }
 

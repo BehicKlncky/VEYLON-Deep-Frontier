@@ -17,7 +17,7 @@ class PlayerTreatmentSystemTest {
 
     @BeforeEach
     void setUp() {
-        player = new Player(new World(1L, World.GEN_LEGACY));
+        player = new Player(new World(1L, World.GEN_CAVE_IDENTITIES));
         treatments = new PlayerTreatmentSystem();
     }
 

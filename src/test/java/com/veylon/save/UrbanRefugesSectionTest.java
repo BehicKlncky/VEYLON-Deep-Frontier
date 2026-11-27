@@ -45,9 +45,9 @@ class UrbanRefugesSectionTest {
         }
         Vec3i anchor = g.world.urban.refugeAnchor;
         assertEquals(41, anchor.y());
-        Game legacy = new Game(); legacy.newWorld(7, true, World.GEN_LEGACY);
-        assertDoesNotThrow(() -> UrbanRefugesSection.finishLoad(legacy));
-        assertThrows(IOException.class, () -> UrbanRefugesSection.read(good, legacy));
+        Game wilderness = new Game(); wilderness.newWorld(7, true, World.GEN_CAVE_IDENTITIES);
+        assertDoesNotThrow(() -> UrbanRefugesSection.finishLoad(wilderness));
+        assertThrows(IOException.class, () -> UrbanRefugesSection.read(good, wilderness));
     }
 
     @Test

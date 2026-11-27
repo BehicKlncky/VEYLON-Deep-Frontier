@@ -16,7 +16,7 @@ class RaycasterTest {
 
     @BeforeEach
     void setUp() {
-        world = new World(123L, World.GEN_LEGACY);
+        world = new World(123L, World.GEN_CAVE_IDENTITIES);
         Chunk chunk = world.getOrCreateChunk(0, 0);
         for (int x = 0; x < Chunk.SX; x++) {
             for (int z = 0; z < Chunk.SZ; z++) {

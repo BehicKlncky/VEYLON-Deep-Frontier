@@ -22,8 +22,8 @@ class DeepCaveGenTest {
 
     @Test
     void sameSeedProducesIdenticalDeepChunks() {
-        World w1 = new World(SEED, World.GEN_DEEP);
-        World w2 = new World(SEED, World.GEN_DEEP);
+        World w1 = new World(SEED, World.GEN_CAVE_IDENTITIES);
+        World w2 = new World(SEED, World.GEN_CAVE_IDENTITIES);
         for (int cx = -2; cx <= 2; cx++) {
             for (int cz = -2; cz <= 2; cz++) {
                 Chunk c1 = w1.getOrCreateChunk(cx, cz);
@@ -67,7 +67,7 @@ class DeepCaveGenTest {
 
     @Test
     void deepWorldsContainPowderResourcesAndCaveLife() {
-        World w = new World(SEED, World.GEN_DEEP);
+        World w = new World(SEED, World.GEN_CAVE_IDENTITIES);
         int sulfur = 0, saltpeter = 0, basalt = 0, fungus = 0, air = 0;
         for (int cx = -6; cx <= 6; cx++) {
             for (int cz = -6; cz <= 6; cz++) {
@@ -98,7 +98,7 @@ class DeepCaveGenTest {
 
     @Test
     void lakesAreNeverCarvedOpenFromBelow() {
-        World w = new World(SEED, World.GEN_DEEP);
+        World w = new World(SEED, World.GEN_CAVE_IDENTITIES);
         int lakes = 0;
         for (int cx = -8; cx <= 8 && lakes < 40; cx++) {
             for (int cz = -8; cz <= 8 && lakes < 40; cz++) {
@@ -125,7 +125,7 @@ class DeepCaveGenTest {
 
     @Test
     void cavesAreBoundedNotOneGiantVoid() {
-        World w = new World(SEED, World.GEN_DEEP);
+        World w = new World(SEED, World.GEN_CAVE_IDENTITIES);
         // Sample columns: carved fraction below the surface stays within sane
         // bounds so meshes and navigation stay bounded.
         int carved = 0, total = 0;
@@ -153,7 +153,7 @@ class DeepCaveGenTest {
 
     @Test
     void everyGeneratedEntranceIsClimbableFromSurfaceToTargetDepth() {
-        World w = new World(SEED, World.GEN_DEEP);
+        World w = new World(SEED, World.GEN_CAVE_IDENTITIES);
         for (int[] region : new int[][]{{0, 0}, {-1, 0}, {0, -1}, {-2, -2}, {2, 1}}) {
             Vec3i mouth = SettlementPlanner.caveEntrance(
                     SEED, w.generator, region[0], region[1]);
@@ -173,8 +173,8 @@ class DeepCaveGenTest {
 
     @Test
     void entranceBlocksAreIndependentOfReverseChunkGenerationOrder() {
-        World forward = new World(SEED, World.GEN_DEEP);
-        World reverse = new World(SEED, World.GEN_DEEP);
+        World forward = new World(SEED, World.GEN_CAVE_IDENTITIES);
+        World reverse = new World(SEED, World.GEN_CAVE_IDENTITIES);
         Vec3i mouth = SettlementPlanner.caveEntrance(SEED, forward.generator, -1, -1);
         int cx = Math.floorDiv(mouth.x(), 16), cz = Math.floorDiv(mouth.z(), 16);
         List<int[]> chunks = new ArrayList<>();
@@ -202,7 +202,7 @@ class DeepCaveGenTest {
 
     @Test
     void requiredUndergroundPoiHasBoundedReachableOrderIndependentConnector() {
-        World probe = new World(SEED, World.GEN_DEEP);
+        World probe = new World(SEED, World.GEN_CAVE_IDENTITIES);
         Vec3i mouth = null;
         Poi target = null;
         int targetRx = 0, targetRz = 0;
@@ -244,8 +244,8 @@ class DeepCaveGenTest {
                 chunks.add(new int[]{cx, cz});
             }
         }
-        World forward = new World(SEED, World.GEN_DEEP);
-        World reverse = new World(SEED, World.GEN_DEEP);
+        World forward = new World(SEED, World.GEN_CAVE_IDENTITIES);
+        World reverse = new World(SEED, World.GEN_CAVE_IDENTITIES);
         for (int[] pos : chunks) {
             forward.getOrCreateChunk(pos[0], pos[1]);
         }

@@ -176,7 +176,7 @@ class EntityEcologyTest {
 
     @Test
     void generatedGloomstalkerNestContainsVisibleBoneEvidence() {
-        World world = new World(987654321L, World.GEN_DEEP);
+        World world = new World(987654321L, World.GEN_CAVE_IDENTITIES);
         Poi nest = null;
         for (int radius = 0; radius <= 10 && nest == null; radius++) {
             for (int cx = -radius; cx <= radius && nest == null; cx++) {

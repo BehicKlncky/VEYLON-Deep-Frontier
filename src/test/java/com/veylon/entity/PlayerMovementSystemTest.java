@@ -191,10 +191,16 @@ class PlayerMovementSystemTest {
     }
 
     private static World flatWorld(int minCx, int maxCx, int minCz, int maxCz) {
-        World world = new World(991L, World.GEN_LEGACY);
+        World world = new World(991L, World.GEN_CAVE_IDENTITIES);
+        // Generate every chunk before flattening any, so no neighbour's trees reach the arena.
         for (int cx = minCx; cx <= maxCx; cx++) {
             for (int cz = minCz; cz <= maxCz; cz++) {
-                Chunk chunk = world.getOrCreateChunk(cx, cz);
+                world.getOrCreateChunk(cx, cz);
+            }
+        }
+        for (int cx = minCx; cx <= maxCx; cx++) {
+            for (int cz = minCz; cz <= maxCz; cz++) {
+                Chunk chunk = world.getChunk(cx, cz);
                 for (int x = 0; x < Chunk.SX; x++) {
                     for (int z = 0; z < Chunk.SZ; z++) {
                         for (int y = 0; y < Chunk.SY; y++) {

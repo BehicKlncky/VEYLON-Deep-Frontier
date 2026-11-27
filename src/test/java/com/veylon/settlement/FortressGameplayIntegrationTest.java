@@ -35,12 +35,12 @@ class FortressGameplayIntegrationTest {
     @Test
     void everyRequiredSeedBuildsDeterministicGatePosternAlarmPrisonMagazineAndCommandRoutes() {
         for (long seed : REQUIRED_SEEDS) {
-            World firstWorld = new World(seed, World.GEN_DEEP);
+            World firstWorld = new World(seed, World.GEN_CAVE_IDENTITIES);
             Settlement first = findFortress(firstWorld, true);
             assertNotNull(first, "hostile fortress for seed " + seed);
             SettlementBuilder.Layout layout = firstWorld.layoutFor(first);
 
-            World secondWorld = new World(seed, World.GEN_DEEP);
+            World secondWorld = new World(seed, World.GEN_CAVE_IDENTITIES);
             Settlement second = secondWorld.settlementForRegion(first.regionX, first.regionZ);
             assertNotNull(second);
             SettlementBuilder.Layout repeated = secondWorld.layoutFor(second);
