@@ -537,3 +537,67 @@ wilderness autosaves of `AutosaveTest` took 9.3–15.4 ms.
 So a city autosave costs about one frame at 60 fps when the city is new and up to eight
 by 8 km of exploration; the stall is announced, not hidden. Faster saves for large cities
 remain 0.9.2's (urban D-246, D-250).
+
+## Release run (v0.9.1, 2026-11-27)
+
+0.9.1 changes saving, the frontend and a set of defects, not the frame's or the tick's
+hot paths, and no budget or baseline changed. Measured on the second machine (AMD Ryzen 5
+5600X, NVIDIA GeForce RTX 3060 Ti, driver 621.01, OpenGL 3.3.0, Windows 11 Pro, Temurin
+25.0.4.1+1) on the release tree, with no build running beside the timed runs. To tell a
+change from the host's own drift, the tagged 0.9.0 build was measured again on the same
+afternoon in a worktree.
+
+**`performanceTest`** (with its `rainPerformanceTest` and `cityPerformanceTest`):
+
+| Measure | 0.9.1 | Budget | 0.9.0 (2026-11-06) |
+| --- | ---: | ---: | ---: |
+| Chunk tick | 0.608 ms | 0.92 | 0.635 ms |
+| Entity tick | 0.698 ms | 0.95 | 0.675 ms |
+| Settlement tick | 0.019 ms | 0.52 | 0.017 ms |
+| All-living presentation, per frame | 0.0969 ms | 0.50 | 0.095 ms |
+| Durable `save` | **5.255 ms, fails** | 2.20 | 5.295 ms, failed |
+| Rain storm / full budget, per frame | 0.040 / 0.140 ms | gates pass | gates passed |
+| City `newWorld`, cold / warm mean | 470.6 / 141.1 ms | — | 487.1 / 149.5 ms |
+
+Nine of ten benchmarks pass; the durable `save` gate fails by this host's known gap, as at
+every release since 0.7.4, so `load` is not timed. The rain gates pass (2 tests). The city
+profile passed 5 of 5 in two of its three runs. In the first, `streamingAtWalkingAndFlightPace`
+failed: the flight leg's CPU frame p99 was 8.366 ms against the half-frame gate of 8.33 ms.
+Run again it read 8.102 and 7.591 ms alone and 8.091 ms inside `performanceTest`, while
+0.9.0's tree read 7.891 and 7.800 ms; the walking leg's p99 was 6.73–6.98 ms against
+0.9.0's 6.60–6.72. The gate sits at the edge of this host for both releases, so the miss is
+recorded, not a regression, and the gate is unchanged. The 8 km journey's slot saves took
+28.1–29.8 ms at 1 km, 65.2–66.9 ms at 4 km and 123.4–126.3 ms at 8 km (loads 139–141, 327–330
+and 458–471 ms), as milestone 05 measured.
+
+**The release smoke** (`VEYLON_SMOKE=30`, 1280 × 720, VSync off, seed 20260910 as in 0.9.0's
+table above, each in its own isolated data directory):
+
+| Smoke | 0.9.1 | 0.9.0, same afternoon | 0.9.0 (2026-11-06) |
+| --- | ---: | ---: | ---: |
+| City, Survival | 995.1 FPS (p95 1.35, p99 1.64, max 9.97 ms) | 988.8 | 1,036.9 |
+| City, Creative | 1,012.7 FPS (p95 1.34, p99 1.58, max 8.63 ms) | 1,005.8 | 1,057.0 |
+| Wilderness, Survival | 1,419.1 FPS (p95 1.05, p99 1.31, max 16.12 ms) | 1,417.2 | 1,491.3 |
+| Its fortress approach | 1,493.8 FPS | 1,490.7 | 1,574.5 |
+
+Every run saved and loaded through its slots, kept every hard limit, drew 139 of 139 item
+icons and ended with 0 `glGetError` and 0 KHR errors. 0.9.1 and 0.9.0 measured the same on the
+same afternoon; both are 4–5 % below 0.9.0's own record of three weeks earlier, which is the
+host's drift. With seed 20261127 the city smoke read 975.0 FPS and the wilderness 1,456.5
+(fortress 1,418.3).
+
+The Creative city row was measured before the smoke's flight was fixed (B18). The Creative
+smoke flies east for 1.6 s and must cross a loaded chunk, but in a city it starts in the
+refuge, whose walls stop it: with seed 20261127 it crossed none and failed its gate, in 0.9.0 as
+in 0.9.1, and the seeds that passed crossed one. In a city the flight now starts above the
+roofs on its way, and crosses two chunks on all three seeds; the rest of that smoke then looks
+on from wherever the flight ended rather than from inside the refuge, so its figures are not
+comparable with the row above: 1,038.8 FPS (p99 1.57 ms) with seed 20260910, 952.9 with
+20261127 and 964.4 with 20261120. The Creative wilderness smoke, whose flight starts in the open
+and is unchanged, read 1,369.6 FPS with seed 20260910.
+
+The release build's own artifacts, each started with its working directory set to a new
+isolated directory: the city smoke (seed 20260910) ran at 1,007.9 FPS from the fat JAR and at
+991.2 FPS from the unpacked archive's `Veylon.exe`, against 0.9.0's 1,026.1 and 1,015.5, each
+saving and loading through its own folder of slots with zero GL and KHR errors. The commands
+are in the [0.9.1 records](roadmap/v0.9.1/PROGRESS.md).
