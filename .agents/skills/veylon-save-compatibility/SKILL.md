@@ -26,11 +26,11 @@ All paths below are relative to the repository root. The rule is the owner's sav
 
 ## The epoch guard
 
-`SaveEpochGuardTest` digests the layout (a sample save of each world kind), the stored enum tables and both world kinds' generation, as five recorded inputs.
+`SaveEpochGuardTest` digests the layout (a sample save of each world kind), the stored enum tables, both world kinds' generation and the generators a load accepts, as six recorded inputs. The last, `loadable`, stands apart from `generation.*`, so retiring a generator moves it alone.
 
 - It fails while the current epoch is unreleased: check that the change was meant to alter saves, then paste the values it prints into `RECORDED`.
 - It fails while `RELEASED` names the current epoch: raise `SaveHeader.EPOCH` by one and record the new epoch's inputs. Never edit or remove a `RELEASED` entry; a release adds its epoch with the digest the passing test prints.
-- Epoch 1 shipped with 0.9.1 and is in `RELEASED`: the next change to any input raises the epoch to 2.
+- Epoch 1 shipped with 0.9.1 and is in `RELEASED`. The build is at epoch 2, unreleased (D-11 in `docs/roadmap/v0.9.2/DESIGN.md`): re-record its inputs until a release ships it.
 - An appended enum constant counts as a change: a build of the same epoch must read every save of that epoch.
 
 ## Verify the affected behavior

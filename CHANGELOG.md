@@ -4,6 +4,13 @@ All notable user-facing changes to VEYLON: Deep Frontier are recorded here.
 
 ## [Unreleased]
 
+### Changed
+
+- Saves carry save epoch 2, since this version retires world generators that no new
+  world used. Saves written by 0.9.1 do not open in it: they are refused before
+  anything is loaded, with the reason on the slot picker and from F9, and the file is
+  left exactly as it is. Start a new world to play this version.
+
 ## [0.9.1] - 2026-11-27
 
 ### Added

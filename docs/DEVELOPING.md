@@ -1162,7 +1162,8 @@ save holds, or historical fixtures, and none may be added.
   ran never autosaves: a test that wants it calls `autosave().permit(true)`
   and gives the game its own slots.
 - **The guard.** `SaveEpochGuardTest` digests the layout (a sample save of each
-  world kind), the enum tables a save stores and both world kinds' generation.
+  world kind), the enum tables a save stores, both world kinds' generation and,
+  as an input of its own, the generators a load accepts (`loadable`).
   The city sample holds the sections as a new city writes them, so most city
   sections reach it with no rows: when a section's rows change, raise that
   section's version, which the sample does carry.
@@ -1170,8 +1171,9 @@ save holds, or historical fixtures, and none may be added.
   to alter saves, then paste the new values it prints into `RECORDED`. When it
   fails under a released epoch (`RELEASED` names it), raise `SaveHeader.EPOCH`
   by one and record the new epoch's inputs; never edit a released entry.
-  Epoch 1 shipped with 0.9.1 and is in `RELEASED`, so the next change to any
-  input needs epoch 2.
+  Epoch 1 shipped with 0.9.1 and is in `RELEASED`. This build is at epoch 2,
+  which 0.9.2 opened for its retirement of generators ([0.9.2
+  D-11](roadmap/v0.9.2/DESIGN.md)) and which stays unreleased until 0.9.2 ships.
 - **Generation.** Only the generators new worlds use, 3 and 20, may change on
   purpose: re-record their pins in `WorldGeneratorFingerprintTest`, and the
   guard decides the epoch. Generators 1, 2 and 4–19 stay as they are until

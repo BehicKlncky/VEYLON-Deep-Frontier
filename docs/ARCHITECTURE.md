@@ -322,8 +322,10 @@ only save-compatibility promise VEYLON makes.
 
 **Status.** Implemented in 0.9.1 (roadmap milestone 03, decisions D-01 and
 D-16 to D-19 in [the 0.9.1 design](roadmap/v0.9.1/DESIGN.md)). Saves carry the
-save epoch in their header; 0.9.1 writes epoch 1 and opens only epoch 1, so
-every save of 0.9.0 and earlier is refused. Generators 1, 2 and 4–19 still load
+save epoch in their header. 0.9.1 wrote and opened epoch 1 alone, so it refused
+every save of 0.9.0 and earlier; this build writes and opens epoch 2 alone, so
+it refuses 0.9.1's saves as well (D-11 in [the 0.9.2
+design](roadmap/v0.9.2/DESIGN.md)). Generators 1, 2 and 4–19 still load
 and save in this build because tests and QA build them; 0.9.2 retires them.
 
 #### The save epoch
@@ -403,12 +405,16 @@ session a folder of slots of their own.
 Two builds share an epoch only if each opens every save the other writes, into
 the same world and state (D-17). `SaveEpochGuardTest` digests what decides that:
 a sample save of each world kind (the layout and every section's version), the
-enum tables a save stores, and what the new-world generators of both kinds make
-from a seed, including what a city's containers hold on their first search. Its
-record of the current epoch may be re-recorded until a release ships the
-epoch; after that any change, an appended enum constant included, fails with
-the instruction to raise `SaveHeader.EPOCH`. Epoch 1 shipped with 0.9.1 and is
-recorded as released, so the next change to any of those inputs needs epoch 2.
+enum tables a save stores, what the new-world generators of both kinds make
+from a seed, including what a city's containers hold on their first search, and
+the generators a load accepts with the revisions each city among them names.
+That last is an input of its own (`loadable`), so retiring a generator moves it
+alone (0.9.2 D-12). Its record of the current epoch may be re-recorded until a
+release ships the epoch; after that any change, an appended enum constant
+included, fails with the instruction to raise `SaveHeader.EPOCH`. Epoch 1
+shipped with 0.9.1 and is recorded as released. 0.9.2 retires generators, which
+changes what a load accepts, so this build is at epoch 2, which no release has
+shipped yet (0.9.2 D-11).
 
 Within one epoch the reader accepts exactly what the writer writes (D-18): the
 extension tail and the eleven sections every save holds are required, one
