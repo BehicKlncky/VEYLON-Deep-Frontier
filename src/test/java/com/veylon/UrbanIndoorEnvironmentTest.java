@@ -181,7 +181,7 @@ class UrbanIndoorEnvironmentTest {
 
     @Test
     void historicalGeneratorsKeepTheirOriginalGlassAndRoofDepthQueries() {
-        for (int generator = World.GEN_LEGACY; generator <= World.GEN_URBAN_PLANS; generator++) {
+        for (int generator = World.GEN_CAVE_IDENTITIES; generator <= World.GEN_URBAN_PLANS; generator++) {
             World world = new World(SEED, generator);
             Chunk chunk = world.getOrCreateChunk(0, 0);
             for (int y = 0; y < Chunk.SY; y++) { chunk.set(8, y, 8, BlockType.AIR); }

@@ -29,11 +29,10 @@ public class World implements VoxelAccess {
             {1, 0}, {-1, 0}, {0, 1}, {0, -1}
     };
 
-    /** Terrain algorithm used when this world's chunks generate. */
-    public static final int GEN_LEGACY = 1;
-    /** Pre-identity 0.3.0 development generator, retained for existing v3 saves. */
-    public static final int GEN_DEEP = 2;
-    /** Release 0.3.0 generator with distinct Root/Basalt cave identities. */
+    /**
+     * The wilderness: release 0.3.0's generator, with distinct Root/Basalt cave identities. The
+     * terrain before it (1) and its development predecessor (2) were retired in 0.9.2.
+     */
     public static final int GEN_CAVE_IDENTITIES = 3;
     /**
      * Urban-survival development generator, layout revision 1: the street datum
@@ -134,7 +133,7 @@ public class World implements VoxelAccess {
     public static final int MAX_SUPPORTED_GENERATOR = GEN_URBAN_ECONOMY;
 
     public final long seed;
-    /** Persisted in save v3; legacy (v2) saves always load as {@link #GEN_LEGACY}. */
+    /** The generator this world was made with, which its save's header names. */
     public final int generatorVersion;
     public final WorldGenerator generator;
     /** Urban foundation state; present exactly when the generator is urban. */
@@ -175,10 +174,10 @@ public class World implements VoxelAccess {
     /** Lit powder-keg fuses: block position -> seconds remaining (persisted in v3). */
     public final Map<Vec3i, Float> kegFuses = new HashMap<>();
     /**
-     * Source attribution for every armed keg. The historical v3 core stores
-     * only {@link #kegFuses}; the optional extension persists this parallel,
-     * bounded state so older v3 saves default safely to environmental rather
-     * than charging an unknown blast to the player.
+     * Source attribution for every armed keg: whether the player armed it, so
+     * its blast counts as the player's only then. The core body stores only
+     * {@link #kegFuses}; this parallel, bounded state is the extension's
+     * required {@code combat.keg-fuse-attribution} section.
      */
     public final Map<Vec3i, Boolean> kegFusePlayerAttribution = new HashMap<>();
     /** Gates opened by NPCs/players that auto-close: position -> seconds left. */
@@ -216,10 +215,9 @@ public class World implements VoxelAccess {
     // comparing with >= or <, so a newer generator inherits nothing by accident:
     // the urban generator gets none of the wilderness features (decision D-02).
 
-    /** True for every generator version this build can build and load. */
+    /** True for every generator version this build can build and load: the wilderness and the cities. */
     public static boolean isSupportedGenerator(int version) {
-        return version == GEN_LEGACY || version == GEN_DEEP
-                || version == GEN_CAVE_IDENTITIES || isUrbanGenerator(version);
+        return version == GEN_CAVE_IDENTITIES || isUrbanGenerator(version);
     }
 
     /** Explicit urban layouts, including the frozen datum, street and plan-only versions. */
@@ -235,9 +233,9 @@ public class World implements VoxelAccess {
                 || version == GEN_URBAN_ECONOMY;
     }
 
-    /** Generators 2 and 3: deep caves, underground POIs, cave mouths and settlements. */
+    /** Generator 3: deep caves, underground POIs, cave mouths and settlements. */
     public static boolean hasDeepFrontier(int version) {
-        return version == GEN_DEEP || version == GEN_CAVE_IDENTITIES;
+        return version == GEN_CAVE_IDENTITIES;
     }
 
     /** Generator 3: depth-derived cave identities, fumaroles and Gloomstalker depths. */

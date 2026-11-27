@@ -17,7 +17,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * The urban generator is reached by exact dispatch and inherits nothing from
- * generators 1-3, and generators 1-3 keep their own gates (decision D-02).
+ * the wilderness (generator 3), which keeps its own gates (decision D-02).
+ * Generators 1 and 2 were retired in 0.9.2 and are refused.
  */
 class UrbanGeneratorDispatchTest {
 
@@ -53,8 +54,10 @@ class UrbanGeneratorDispatchTest {
         assertEquals(19, World.GEN_URBAN_MISSIONS, "urban missions and the long-term objective (milestone 20)");
         assertEquals(20, World.GEN_URBAN_ECONOMY, "the survival economy (milestone 23)");
         assertEquals(World.GEN_URBAN_ECONOMY, World.MAX_SUPPORTED_GENERATOR);
+        assertEquals(3, World.GEN_CAVE_IDENTITIES, "the wilderness keeps its stored id");
         for (int version = -1; version <= World.MAX_SUPPORTED_GENERATOR + 2; version++) {
-            boolean known = version >= World.GEN_LEGACY && version <= World.MAX_SUPPORTED_GENERATOR;
+            boolean known = version == World.GEN_CAVE_IDENTITIES
+                    || version >= World.GEN_URBAN && version <= World.MAX_SUPPORTED_GENERATOR;
             assertEquals(known, World.isSupportedGenerator(version), "supported " + version);
             assertEquals(version == World.GEN_URBAN || version == World.GEN_URBAN_STREETS
                             || version == World.GEN_URBAN_PLANS || version == World.GEN_URBAN_APARTMENTS
@@ -66,7 +69,7 @@ class UrbanGeneratorDispatchTest {
                             || version == World.GEN_URBAN_UTILITIES || version == World.GEN_URBAN_MISSIONS
                             || version == World.GEN_URBAN_ECONOMY,
                     World.isUrbanGenerator(version), "urban " + version);
-            assertEquals(version == World.GEN_DEEP || version == World.GEN_CAVE_IDENTITIES,
+            assertEquals(version == World.GEN_CAVE_IDENTITIES,
                     World.hasDeepFrontier(version), "deep frontier " + version);
             assertEquals(version == World.GEN_CAVE_IDENTITIES, World.hasCaveIdentities(version));
         }
@@ -74,11 +77,9 @@ class UrbanGeneratorDispatchTest {
 
     @Test
     void onlyUrbanWorldsCarryUrbanState() {
-        for (int version : new int[]{World.GEN_LEGACY, World.GEN_DEEP, World.GEN_CAVE_IDENTITIES}) {
-            World world = new World(1L, version);
-            assertFalse(world.isUrban());
-            assertNull(world.urban);
-        }
+        World wilderness = new World(1L, World.GEN_CAVE_IDENTITIES);
+        assertFalse(wilderness.isUrban());
+        assertNull(wilderness.urban);
         World urban = new World(1L, World.GEN_URBAN);
         assertTrue(urban.isUrban());
         assertNotNull(urban.urban);
@@ -89,7 +90,8 @@ class UrbanGeneratorDispatchTest {
 
     @Test
     void aWorldRefusesAGeneratorThisBuildCannotBuild() {
-        for (int version : new int[]{0, -3, World.MAX_SUPPORTED_GENERATOR + 1, 99}) {
+        // 1 and 2, the terrain before 0.3.0 and its development successor, were retired in 0.9.2.
+        for (int version : new int[]{0, 1, 2, -3, World.MAX_SUPPORTED_GENERATOR + 1, 99}) {
             assertThrows(IllegalArgumentException.class, () -> new World(1L, version));
         }
     }

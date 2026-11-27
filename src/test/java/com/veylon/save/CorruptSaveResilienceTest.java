@@ -326,15 +326,21 @@ class CorruptSaveResilienceTest {
     void unsupportedGeneratorVersionIsRejectedBeforeWorldReplacement(@TempDir Path dir)
             throws IOException {
         Path save = fixture(dir, 40_113L);
-        // The generator id ends the header: magic, format, epoch and seed come first.
-        Path futureGenerator = corrupt(dir, save, SaveHeader.LENGTH - Integer.BYTES,
-                World.MAX_SUPPORTED_GENERATOR + 1);
         Game target = new Game();
         target.newWorld(91_338L, true, World.GEN_CAVE_IDENTITIES);
         World liveWorld = target.world;
 
-        assertFalse(SaveSystem.load(target, futureGenerator));
-        assertSame(liveWorld, target.world);
+        // A generator above the newest, and 1 and 2, which 0.9.2 retired: this build cannot
+        // build their worlds, so the header alone refuses them.
+        for (int generator : new int[]{World.MAX_SUPPORTED_GENERATOR + 1, 1, 2}) {
+            // The generator id ends the header: magic, format, epoch and seed come first.
+            Path named = corrupt(dir, save, SaveHeader.LENGTH - Integer.BYTES, generator);
+            LoadResult result = SaveSystem.open(target, named);
+            assertEquals(LoadResult.Outcome.DAMAGED, result.outcome(), "generator " + generator);
+            assertEquals("unsupported world generator version " + generator, result.reason());
+            assertFalse(SaveSystem.load(target, named));
+            assertSame(liveWorld, target.world);
+        }
     }
 
     // ------------------------------------------------------------------

@@ -42,30 +42,6 @@ class DeepCaveGenTest {
     }
 
     @Test
-    void legacyWorldsKeepLegacyTerrain() {
-        // A legacy world and a deep world share surface terrain but the legacy
-        // one must contain none of the new deep-frontier blocks.
-        World legacy = new World(SEED, World.GEN_LEGACY);
-        for (int cx = -3; cx <= 3; cx++) {
-            for (int cz = -3; cz <= 3; cz++) {
-                Chunk c = legacy.getOrCreateChunk(cx, cz);
-                for (int y = 0; y < Chunk.SY; y++) {
-                    for (int lx = 0; lx < 16; lx++) {
-                        for (int lz = 0; lz < 16; lz++) {
-                            BlockType t = c.get(lx, y, lz);
-                            assertTrue(t != BlockType.BASALT && t != BlockType.SULFUR_ORE
-                                            && t != BlockType.SALTPETER_ORE && t != BlockType.GLOW_FUNGUS
-                                            && t != BlockType.STONE_BRICK && t != BlockType.GATE,
-                                    "legacy world contains new-generator block " + t);
-                        }
-                    }
-                }
-            }
-        }
-        assertTrue(legacy.settlements.isEmpty(), "legacy worlds never plan settlements");
-    }
-
-    @Test
     void deepWorldsContainPowderResourcesAndCaveLife() {
         World w = new World(SEED, World.GEN_CAVE_IDENTITIES);
         int sulfur = 0, saltpeter = 0, basalt = 0, fungus = 0, air = 0;

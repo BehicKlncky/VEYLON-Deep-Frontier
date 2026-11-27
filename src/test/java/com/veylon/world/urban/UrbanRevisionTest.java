@@ -57,7 +57,8 @@ class UrbanRevisionTest {
                 UrbanRevision.buildingTemplateRevisionOf(World.GEN_URBAN_ECONOMY), "layout seventeen keeps template seven");
         assertEquals(World.GEN_URBAN_ECONOMY, UrbanRevision.DEVELOPMENT_GENERATOR,
                 "the development selector builds the newest layout (decision D-35)");
-        for (int notUrban : new int[]{0, World.GEN_LEGACY, World.GEN_DEEP,
+        // 1 and 2 are the retired generators before the wilderness: no world at all.
+        for (int notUrban : new int[]{0, 1, 2,
                 World.GEN_CAVE_IDENTITIES, World.MAX_SUPPORTED_GENERATOR + 1}) {
             assertThrows(IllegalArgumentException.class,
                     () -> UrbanRevision.layoutRevisionOf(notUrban));

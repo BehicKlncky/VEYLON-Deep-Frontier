@@ -33,8 +33,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * wilderness's 3 and the city's 20, may then change: re-record their pins, and
  * {@code SaveEpochGuardTest}, which digests the same fingerprints through
  * {@link WorldFingerprints}, decides whether the save epoch must rise. No new
- * generator version is added to keep an old save's world. Generators 1, 2 and
- * 4–19 stay exactly as they are until 0.9.2 retires them.
+ * generator version is added to keep an old save's world. Generators 4–19 stay
+ * exactly as they are until 0.9.2 retires them, as it retired 1 and 2.
  *
  * <p>Each pin names its generator explicitly rather than "the current one":
  * the generator new worlds use and the generators a save may name are
@@ -42,10 +42,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * re-point at a new generator when the default moves.
  *
  * <p>Generator {@code GEN_CAVE_IDENTITIES} (3) was recorded 2026-07-31 at
- * {@code 3414dbf}, before the v0.5.0 generator optimizations. Generators
- * {@code GEN_LEGACY} (1) and {@code GEN_DEEP} (2) were recorded 2026-10-07 at
- * {@code 923345f}, before the urban generator split, from unchanged generator
- * code.
+ * {@code 3414dbf}, before the v0.5.0 generator optimizations.
  */
 class WorldGeneratorFingerprintTest {
 
@@ -61,14 +58,6 @@ class WorldGeneratorFingerprintTest {
 
     private static final long[] COLUMN_QUERY_FINGERPRINTS = {
             0xc7e914449117bdd9L, 0x82273c0c999fcdc6L, 0xde29e867023f323cL};
-
-    /** Generator 1, which every v2 save and gen-1 v3 save re-derives. */
-    private static final long[] LEGACY_TERRAIN_FINGERPRINTS = {
-            0x575ff79c72c5e75cL, 0xaf2846b2fa8fb028L, 0xd53be542e8a9ac72L};
-
-    /** Generator 2, the pre-identity 0.3.0 development generator. */
-    private static final long[] DEEP_TERRAIN_FINGERPRINTS = {
-            0x0ac52031ca6ac5bcL, 0x23bc80e5d60717e2L, 0xb40fceda52cad351L};
 
     /**
      * Generator 4, urban layout revision 1: the street datum placeholder,
@@ -447,15 +436,6 @@ class WorldGeneratorFingerprintTest {
     }
 
     @Test
-    void olderGeneratorsMatchTheirRecordedFingerprints() {
-        // Before these, generators 1 and 2 were pinned only relative to each
-        // other or through one historical save, so a shared refactor could move
-        // both and stay green.
-        assertTerrainPinned(World.GEN_LEGACY, LEGACY_TERRAIN_FINGERPRINTS);
-        assertTerrainPinned(World.GEN_DEEP, DEEP_TERRAIN_FINGERPRINTS);
-    }
-
-    @Test
     void theUrbanGeneratorMatchesItsRecordedFingerprint() {
         assertTerrainPinned(World.GEN_URBAN, URBAN_TERRAIN_FINGERPRINTS);
     }
@@ -549,20 +529,6 @@ class WorldGeneratorFingerprintTest {
         }
         assertTrue(moved.isEmpty(),
                 () -> "per-column terrain queries changed:\n  " + String.join("\n  ", moved));
-    }
-
-    @Test
-    void legacyGeneratorsStillProduceTheirOwnTerrain() {
-        // The whole point of the generator version is that an old save keeps
-        // its world. Two versions of one seed must disagree, and each must
-        // agree with itself.
-        long legacy = WorldFingerprints.terrain(SEEDS[0], World.GEN_LEGACY);
-        long identities = WorldFingerprints.terrain(SEEDS[0], World.GEN_CAVE_IDENTITIES);
-
-        assertNotEquals(legacy, identities,
-                "the legacy generator must not have collapsed onto generator 3");
-        assertEquals(legacy, WorldFingerprints.terrain(SEEDS[0], World.GEN_LEGACY),
-                "the legacy generator must still be deterministic");
     }
 
     @Test
