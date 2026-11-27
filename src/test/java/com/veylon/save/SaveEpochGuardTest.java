@@ -78,8 +78,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  *       generator makes from its seed, through the fingerprints {@code WorldGeneratorFingerprintTest}
  *       pins ({@link WorldFingerprints}): terrain and POIs, the column queries and the planned
  *       settlements of the wilderness; the city's plans, routes, ecology, encounter anchors, sites,
- *       compounds, wrecks and relay, and what its containers hold on their first search. Both list
- *       the generators a load accepts and the city revisions each of them names.</li>
+ *       compounds, wrecks and relay, and what its containers hold on their first search.</li>
+ *   <li>{@code loadable}: the generators a load accepts and the layout, template and content
+ *       revision each city among them names. It is an input of its own so that retiring a generator
+ *       moves it alone, and the generation inputs keep proving that the two world kinds still make
+ *       what they made (0.9.2 D-12).</li>
  * </ul>
  *
  * <p>The current epoch's inputs are recorded in {@link #RECORDED}. While no release has shipped the
@@ -102,10 +105,11 @@ class SaveEpochGuardTest {
     /** The current epoch's inputs as last recorded. */
     private static final Map<String, String> RECORDED = Map.of(
             "enums", "b2c78dd0ff6223d61b2ae0e4fc5069ffbc2c525e7ec97ec472952f4199e6294e",
-            "generation.city", "b6c505f9d1e284630f5e0410b0eb50a918c05a713953b8e30556d245c1ae81f8",
-            "generation.wilderness", "f1f93ab3af72f72c56e872f4121969025b4712a055b046c8ede382c88530df29",
+            "generation.city", "6eb9e20cc2c825216b3daede0990e341857f3028599bc99954a5fb34a5338da8",
+            "generation.wilderness", "0d671ebdb5a76c49210e4e89f1133886612cee2134f138153560d810a7f76eb0",
             "layout.city", "d92581c612e0057b91187ed9f3e8d17b9421f2ba4c443497e96dd51a9c14d9d8",
-            "layout.wilderness", "2aa9698e1f6c48ae87045f25cdedf2ff3edfe90df28ae61e494f434d7fec40de");
+            "layout.wilderness", "2aa9698e1f6c48ae87045f25cdedf2ff3edfe90df28ae61e494f434d7fec40de",
+            "loadable", "ed3b3c439cff320564df3c0604bf99c8e331d97f150a95d627c1b7320bd90935");
 
     /** The seeds {@code WorldGeneratorFingerprintTest} pins. */
     private static final long[] SEEDS = {20_260_731L, -4_242L, 7L};
@@ -233,6 +237,7 @@ class SaveEpochGuardTest {
         inputs.put("generation.wilderness", sha256(wildernessGeneration().getBytes(StandardCharsets.UTF_8)));
         inputs.put("layout.city", sha256(masked(citySample(directory, "city"))));
         inputs.put("layout.wilderness", sha256(masked(wildernessSample(directory, "wilderness"))));
+        inputs.put("loadable", sha256(loadableGenerators().getBytes(StandardCharsets.UTF_8)));
         return inputs;
     }
 
@@ -300,7 +305,7 @@ class SaveEpochGuardTest {
 
     static String wildernessGeneration() {
         int generator = World.WILDERNESS_NEW_WORLD_GENERATOR;
-        StringBuilder text = new StringBuilder(loadableGenerators());
+        StringBuilder text = new StringBuilder();
         text.append("wilderness generator ").append(generator).append('\n');
         for (long seed : SEEDS) {
             text.append(seed).append(" terrain ").append(WorldFingerprints.terrain(seed, generator))
@@ -329,7 +334,7 @@ class SaveEpochGuardTest {
 
     static String cityGeneration() {
         int generator = World.DEFAULT_NEW_WORLD_GENERATOR;
-        StringBuilder text = new StringBuilder(loadableGenerators());
+        StringBuilder text = new StringBuilder();
         text.append("city generator ").append(generator).append('\n');
         for (long seed : SEEDS) {
             text.append(seed)
