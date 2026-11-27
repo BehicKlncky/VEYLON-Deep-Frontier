@@ -40,7 +40,7 @@ the code as it then is. Status lives in each `PROGRESS.md`.
 | Version | Title | Records |
 | --- | --- | --- |
 | 0.9.1 | Safe Saves | [DESIGN](v0.9.1/DESIGN.md), [PROGRESS](v0.9.1/PROGRESS.md) |
-| 0.9.2 | Clean Slate | Not yet created |
+| 0.9.2 | Clean Slate | [DESIGN](v0.9.2/DESIGN.md), [PROGRESS](v0.9.2/PROGRESS.md) |
 | 0.9.3 | City Limits | Not yet created |
 | 0.9.4 | Landmarks & Backroads | Not yet created |
 | 0.10.0 | Bite & Shadow | Not yet created |
