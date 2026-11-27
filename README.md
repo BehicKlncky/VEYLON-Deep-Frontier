@@ -219,7 +219,9 @@ has a native route, `VEYLON_FRONTEND=route` then `route-load`, and every state o
 slot picker has `route-slots`; see
 [Developing](docs/DEVELOPING.md#default-path-acceptance-urban-package-26). No automated
 run autosaves unless `VEYLON_AUTOSAVE=on` asks; the autosave tour `urban_autosave` needs
-it (see [Developing](docs/DEVELOPING.md#autosave-qa-091-milestone-05)).
+it (see [Developing](docs/DEVELOPING.md#autosave-qa-091-milestone-05)), and so does
+`route-release`, which plays 0.9.1's whole acceptance scenario in either world and mode
+(see [Developing](docs/DEVELOPING.md#release-acceptance-qa-091-milestone-09)).
 
 Release performance gate on the validation machine:
 
