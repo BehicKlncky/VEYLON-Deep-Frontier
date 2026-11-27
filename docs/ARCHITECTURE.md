@@ -325,8 +325,9 @@ D-16 to D-19 in [the 0.9.1 design](roadmap/v0.9.1/DESIGN.md)). Saves carry the
 save epoch in their header. 0.9.1 wrote and opened epoch 1 alone, so it refused
 every save of 0.9.0 and earlier; this build writes and opens epoch 2 alone, so
 it refuses 0.9.1's saves as well (D-11 in [the 0.9.2
-design](roadmap/v0.9.2/DESIGN.md)). Generators 1, 2 and 4–19 still load
-and save in this build because tests and QA build them; 0.9.2 retires them.
+design](roadmap/v0.9.2/DESIGN.md)). Generators 4–19 still load and save in
+this build because tests and QA build them; 0.9.2 retires them, as it retired
+1 and 2.
 
 #### The save epoch
 
@@ -463,8 +464,8 @@ from the seed plus the generator version. Only deltas and dynamic state are
 serialized. This is why `world.generatorVersion` is part of the save: a save
 names the generator its world was made with.
 
-Generator versions form an explicit set (`World.isSupportedGenerator`): 1 legacy,
-2 deep, 3 cave identities, 4 the urban street datum, 5 the urban street network,
+Generator versions form an explicit set (`World.isSupportedGenerator`): 3 the
+wilderness with its cave identities, 4 the urban street datum, 5 the urban street network,
 6 the same street geometry plus frozen building plans (layout 3, template 1),
 7 generated furnished apartments and shops (layout 4, template 2), and
 8 the same buildings with shaped stairs (layout 5, template 3), and 9 the starter
@@ -480,15 +481,20 @@ adds guarded strongholds and raider yards (layout 13, template 7, catalogue 5), 
 adds burnt-out cars to the local streets and the refuge, salvage and fortification
 rules (layout 14, template 7, catalogue 5), and 18 adds refuge utilities (layout 15), 19
 the relay mast and missions (layout 16), and 20 is the city of 19 under the survival
-economy's content revision 4 and encounter catalogue 6 (layout 17). New worlds use
+economy's content revision 4 and encounter catalogue 6 (layout 17). 0.9.2 retired
+generators 1 (the terrain before 0.3.0) and 2 (the 0.3.0 development generator
+before the cave identities): a world or a save that names either is refused like
+any unknown version. New worlds use
 `World.DEFAULT_NEW_WORLD_GENERATOR`, generator 20 since the urban rollout (package
 26; generator 3 before it), or the wilderness's generator 3 when NEW FRONTIER's
 legacy choice is taken; the development selector creates 20 too. A load accepts any
 supported version and rejects the rest, including anything above
-`MAX_SUPPORTED_GENERATOR`, before it replaces the live world. Feature gates name
-their versions (`hasDeepFrontier`, `hasCaveIdentities`, `isUrbanGenerator`) instead
-of comparing with `>=`, so a new generator inherits nothing by accident, and
-`WorldGeneratorFingerprintTest` pins versions 1–20 absolutely. `ShapedStairGenerationTest`
+`MAX_SUPPORTED_GENERATOR`, before it replaces the live world. Generator gates name
+their versions (`isUrbanGenerator`) instead of comparing with `>=`, so a new
+generator inherits nothing by accident. The wilderness's own features (deep caves,
+underground POIs, cave mouths, settlements, fumaroles and the Gloomstalker depths)
+ask whether a world is a city (`World.isUrban`), so the city gets none of them.
+`WorldGeneratorFingerprintTest` pins versions 3–20 absolutely. `ShapedStairGenerationTest`
 checks version 8 against frozen version 7 outside stair cells and across chunk orders.
 Under building template 7 (generators 13–20) a building whose every attempt failed on a
 roof opening that faces its own stair house is planned once more without that opening
@@ -636,7 +642,7 @@ Generator 6 pins `BuildingTemplates` revision 1 before bootstrap through
 from layout 2; it never changes generator 5's plans or stamps interiors. Generator
 7 stamps furnished template 2 on the same city fabric. `urban.meta` v1 and the frozen v3 base
 layout are unchanged. A build supporting at most generator 5 rejects a generator-6
-save; this build still re-derives generators 1–6 under their original contracts.
+save; this build still re-derives generators 3–6 under their original contracts.
 
 `BuildingPlanner` derives a whole immutable `BuildingPlan` from seed, template
 revision and parcel. Nested floor/room/fixture/stair records carry stable packed
@@ -717,7 +723,7 @@ warmest at 14:00 (+6 °C) and its coldest at 02:00 (−8 °C), averaging −1 °
 0.9.1 its sign was inverted, so 14:00 was the coldest hour (B14). A covered room takes
 0.65 of it and 0.35 of the weather's offset, so it is warmer than the street before
 dawn and cooler in the afternoon.
-Generators 1–6 retain their original light/weather/environment behavior. No
+Generators 3–6 retain their original light/weather/environment behavior. No
 new simulation random stream or persistent indoor state is introduced.
 
 ### Commercial and civic catalogue

@@ -1176,8 +1176,9 @@ save holds, or historical fixtures, and none may be added.
   D-11](roadmap/v0.9.2/DESIGN.md)) and which stays unreleased until 0.9.2 ships.
 - **Generation.** Only the generators new worlds use, 3 and 20, may change on
   purpose: re-record their pins in `WorldGeneratorFingerprintTest`, and the
-  guard decides the epoch. Generators 1, 2 and 4–19 stay as they are until
-  0.9.2 retires them.
+  guard decides the epoch. Generators 4–19 stay as they are until 0.9.2
+  retires them, as it retired 1 and 2. A retirement re-records only the
+  guard's `loadable` input; any other input it moves is a bug.
 
 ---
 
