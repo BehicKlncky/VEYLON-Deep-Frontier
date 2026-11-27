@@ -40,6 +40,15 @@ find blueprints, master the crafting stations and **repair the distress beacon**
 
 ---
 
+Version **0.9.1 — Safe Saves** makes progress hard to lose: three save slots, each
+with two rotating backups and a checksum that catches damage, autosave at safe
+moments, a seed to type or reroll on NEW FRONTIER, a way back to the title from the
+pause menu, and mouse sensitivity and invert-Y. It fixes the defects earlier releases
+left behind, among them a day that was coldest in the afternoon. Saves written by
+0.9.0 and earlier do not open in 0.9.1: they are refused and left untouched. See the
+[release notes](docs/releases/v0.9.1.md) and the
+[0.9.1 records](docs/roadmap/v0.9.1/PROGRESS.md).
+
 Version **0.9.0 — The Abandoned City** makes an abandoned city the new world: six
 districts whose every building can be entered and searched, infected and alien
 threats, survivor camps, hidden civilians, guarded strongholds and a raider yard, a
@@ -172,9 +181,9 @@ Windows x64 (PowerShell):
 ```powershell
 .\gradlew.bat build             # compile + unit tests + jar
 .\gradlew.bat performanceTest   # opt-in benchmarks calibrated for the reference PC
-.\gradlew.bat fatJar            # build\libs\veylon-0.9.0-all.jar
+.\gradlew.bat fatJar            # build\libs\veylon-0.9.1-all.jar
 .\gradlew.bat jpackage          # build\jpackage\Veylon\Veylon.exe
-.\gradlew.bat appImageZip       # build\distributions\veylon-0.9.0-windows-x64.zip
+.\gradlew.bat appImageZip       # build\distributions\veylon-0.9.1-windows-x64.zip
 .\gradlew.bat releaseArtifacts  # tests + all host-specific release artifacts
 ```
 
@@ -184,7 +193,7 @@ macOS Intel or Apple Silicon (Terminal):
 ./gradlew build
 ./gradlew fatJar
 ./gradlew jpackage          # build/jpackage/Veylon.app
-./gradlew appImageZip       # build/distributions/veylon-0.9.0-macos-{x64|arm64}.zip
+./gradlew appImageZip       # build/distributions/veylon-0.9.1-macos-{x64|arm64}.zip
 ./gradlew releaseArtifacts
 ```
 
@@ -240,7 +249,7 @@ See [CHANGELOG.md](CHANGELOG.md) for release notes.
 Run the fat JAR with the same JVM options used by the packaged launchers:
 
 ```powershell
-java --enable-native-access=ALL-UNNAMED -Xmx2G -jar build\libs\veylon-0.9.0-all.jar
+java --enable-native-access=ALL-UNNAMED -Xmx2G -jar build\libs\veylon-0.9.1-all.jar
 ```
 
 ---

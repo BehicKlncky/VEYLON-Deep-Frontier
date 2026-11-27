@@ -4,6 +4,8 @@ All notable user-facing changes to VEYLON: Deep Frontier are recorded here.
 
 ## [Unreleased]
 
+## [0.9.1] - 2026-11-27
+
 ### Added
 
 - Three save slots, each with two rotating backups. LOAD FRONTIER lists the slots
@@ -99,6 +101,18 @@ All notable user-facing changes to VEYLON: Deep Frontier are recorded here.
   coldest hour. The industrial yards are hot enough by day to make you thirsty, as
   their arrival line warns, and nights are colder everywhere, so a roof and a fire
   count for more after dark.
+
+### Compatibility
+
+- Saves are format 4 with save epoch 1. Saves written by 0.9.0 and earlier releases
+  (formats 2 and 3) do not open in 0.9.1: they are refused before anything is loaded,
+  with the reason on the slot picker and from F9, and the file is left exactly as it
+  is. 0.9.0's `saves/veylon.sav` is never read, imported, changed or deleted. Start a
+  new world to play this release.
+- 0.9.0 and earlier releases refuse a 0.9.1 save as a format they do not read, before
+  touching their live world, and leave the file as it is.
+- Epoch 1 is recorded as released. A later release that changes anything a save holds
+  raises the epoch and then refuses 0.9.1 saves the same way.
 
 ## [0.9.0] - 2026-11-06
 
